@@ -1,0 +1,21 @@
+network:
+  name: "case30_ieee" # Name of the power grid network
+  source: "pglib" # Data source for the grid; options: pglib, pandapower, file
+
+load:
+  generator: "powergraph" # Name of the load generator
+  agg_profile: "powergraph_ieee118" # Name of the aggregated load profile
+  scenarios: 15000 # Number of different load scenarios to generate
+
+
+topology_perturbation:
+  k: 10 # Maximum number of components to drop in each perturbation
+  n_topology_variants: 10 # Number of unique perturbed topologies per scenario
+  type: "none" # Type of topology generator; options: n_minus_k, random, overloaded, none
+
+settings:
+  num_processes: 10 # Number of parallel processes to use
+  data_dir: "../data" # Directory to save generated data
+  large_chunk_size: 5000 # Number of load scenarios processed before saving
+  no_stats: false # If true, disables statistical calculations
+  overwrite: true # If true, overwrites existing files

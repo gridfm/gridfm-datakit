@@ -1,0 +1,11 @@
+data
+venv
+venv_pp
+GridDataGen.egg-info
+__pycache__/
+*.pyc
+.vscode
+.venv
+notebooks/opf_pertubations.ipynb
+.DS_Store
+GridDataGen/grids

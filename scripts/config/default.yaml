@@ -1,0 +1,26 @@
+network:
+  name: "case24_ieee_rts" # Name of the power grid network
+  source: "pglib" # Data source for the grid; options: pglib, pandapower, file
+
+load:
+  generator: "agg_load_profile" # Name of the load generator
+  agg_profile: "powergraph_ieee118" # Name of the aggregated load profile
+  scenarios: 15000 # Number of different load scenarios to generate
+  sigma: 0.05 # max local noise 
+  change_reactive_power: true # If true, changes reactive power of loads. If False, keeps the ones from the case file
+  global_range: 0.4 # Range of the global scaling factor. used to set the lower bound of the scaling factor
+  max_scaling_factor: 4.0 # Max upper bound of the global scaling factor
+  step_size: 0.025 # Step size when finding the upper bound of the global scaling factor
+  start_scaling_factor: 0.8 # Initial value of the global scaling factor
+
+topology_perturbation:
+  k: 10 # Maximum number of components to drop in each perturbation
+  n_topology_variants: 10 # Number of unique perturbed topologies per scenario
+  type: "none" # Type of topology generator; options: n_minus_k, random, overloaded, none
+
+settings:
+  num_processes: 10 # Number of parallel processes to use
+  data_dir: "../data" # Directory to save generated data
+  large_chunk_size: 5000 # Number of load scenarios processed before saving
+  no_stats: false # If true, disables statistical calculations
+  overwrite: true # If true, overwrites existing files

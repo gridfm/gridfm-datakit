@@ -1,0 +1,11 @@
+nbformat
+matplotlib
+pandapower==2.14.11
+plotly
+pandas
+numpy
+ipykernel
+pathlib
+matpowercaseframes
+numba
+requests
