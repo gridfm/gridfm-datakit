@@ -126,6 +126,7 @@ def main(args):
         args.topology_perturbation.type,
         args.topology_perturbation.n_topology_variants,
         args.topology_perturbation.k,
+        args.topology_perturbation.elements,
         net,
     )
 
@@ -211,7 +212,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--config",
         type=str,
-        default="config/default.yaml",
+        default="scripts/config/test_powergraph.yaml",
         help="Path to config file",
     )
 

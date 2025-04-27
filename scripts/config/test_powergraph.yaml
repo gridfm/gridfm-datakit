@@ -12,6 +12,7 @@ topology_perturbation:
   k: 10 # Maximum number of components to drop in each perturbation
   n_topology_variants: 10 # Number of unique perturbed topologies per scenario
   type: "none" # Type of topology generator; options: n_minus_k, random, overloaded, none
+  elements: ["line", "trafo", "sgen", "gen"]
 
 settings:
   num_processes: 10 # Number of parallel processes to use

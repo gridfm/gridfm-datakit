@@ -110,18 +110,23 @@ class RandomComponentDropGenerator(TopologyGenerator):
     Note that the generators and static generators are not dropped, but in_service is set to False!
     """
 
-    def __init__(self, n_topology_variants, k, base_net):
+    def __init__(
+        self,
+        n_topology_variants,
+        k,
+        base_net,
+        elements=["line", "trafo", "gen", "sgen"],
+    ):
         super().__init__()
         self.n_topology_variants = n_topology_variants
         self.k = k
 
         # Create a list of all components that can be dropped
-        self.components_to_drop = (
-            [(index, "line") for index in base_net.line.index]
-            + [(index, "trafo") for index in base_net.trafo.index]
-            + [(index, "gen") for index in base_net.gen.index]
-            + [(index, "sgen") for index in base_net.sgen.index]
-        )
+        self.components_to_drop = []
+        for element in elements:
+            self.components_to_drop.extend(
+                [(index, element) for index in base_net[element].index]
+            )
 
     def generate(self, net):
         """
@@ -138,7 +143,9 @@ class RandomComponentDropGenerator(TopologyGenerator):
             perturbed_topology = copy.deepcopy(net)
 
             # draw the number of components to drop from a uniform distribution
-            r = np.random.randint(0, self.k + 1)
+            r = np.random.randint(
+                1, self.k + 1
+            )  # TODO: decide if we want to be able to drop 0 components
 
             # Randomly select r<=k components to drop
             components = tuple(
@@ -158,8 +165,14 @@ class RandomComponentDropGenerator(TopologyGenerator):
 
             # Drop selected lines and transformers, turn off generators and static generators
             if lines_to_drop:
+                # perturbed_topology.line.loc[lines_to_drop, "in_service"] = False
+                # TODO: decide if we want to drop lines or just turn them off
+                # turn off lines:
                 pp.drop_lines(perturbed_topology, lines_to_drop)
             if trafos_to_drop:
+                # perturbed_topology.trafo.loc[trafos_to_drop, "in_service"] = False
+                # TODO: decide if we want to drop transformers or just turn them off
+                # turn off transformers:
                 pp.drop_trafos(perturbed_topology, trafos_to_drop)
             if gens_to_turn_off:
                 perturbed_topology.gen.loc[gens_to_turn_off, "in_service"] = False
@@ -234,7 +247,7 @@ class MostOverloadedLineDropGenerator(TopologyGenerator):
                 n_generated_topologies += 1
 
 
-def initialize_generator(generator_type, n_topology_variants, k, base_net):
+def initialize_generator(generator_type, n_topology_variants, k, elements, base_net):
     """
     Initialize the appropriate topology generator based on the given generator type.
 
@@ -250,7 +263,7 @@ def initialize_generator(generator_type, n_topology_variants, k, base_net):
     if generator_type == "n_minus_k":
         return NMinusKGenerator(k, base_net)
     elif generator_type == "random":
-        return RandomComponentDropGenerator(n_topology_variants, k, base_net)
+        return RandomComponentDropGenerator(n_topology_variants, k, base_net, elements)
     elif generator_type == "overloaded":
         return MostOverloadedLineDropGenerator(n_topology_variants)
     elif generator_type == "none":
