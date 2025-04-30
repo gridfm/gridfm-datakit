@@ -9,6 +9,7 @@ from abc import ABC, abstractmethod
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from copy import deepcopy
 
 
 def load_scenarios_to_df(scenarios: np.ndarray) -> pd.DataFrame:
@@ -16,7 +17,7 @@ def load_scenarios_to_df(scenarios: np.ndarray) -> pd.DataFrame:
     convert load scenarios to df.
     """
 
-    n_buses = scenarios.shape[0]
+    n_loads = scenarios.shape[0]
     n_scenarios = scenarios.shape[1]
 
     # Flatten the array
@@ -26,11 +27,11 @@ def load_scenarios_to_df(scenarios: np.ndarray) -> pd.DataFrame:
     df = pd.DataFrame(reshaped_array, columns=["p_mw", "q_mvar"])
 
     # Create load_scenario and bus columns
-    bus_idx = np.tile(np.arange(n_buses), n_scenarios)
-    scenarios_idx = np.repeat(np.arange(n_scenarios), n_buses)
+    load_idx = np.tile(np.arange(n_loads), n_scenarios)
+    scenarios_idx = np.repeat(np.arange(n_scenarios), n_loads)
 
     df.insert(0, "load_scenario", scenarios_idx)
-    df.insert(1, "bus", bus_idx)
+    df.insert(1, "load", load_idx)
 
     return df
 
@@ -53,28 +54,28 @@ def plot_load_scenarios_combined(df, output_file):
     )
 
     # Add p_mw plot
-    for bus in df["bus"].unique():
-        df_bus = df[df["bus"] == bus]
+    for load in df["load"].unique():
+        df_load = df[df["load"] == load]
         fig.add_trace(
             go.Scatter(
-                x=df_bus["load_scenario"],
-                y=df_bus["p_mw"],
+                x=df_load["load_scenario"],
+                y=df_load["p_mw"],
                 mode="lines",
-                name=f"Bus {bus} p_mw",
+                name=f"Load {load} p_mw",
             ),
             row=1,
             col=1,
         )
 
     # Add q_mvar plot
-    for bus in df["bus"].unique():
-        df_bus = df[df["bus"] == bus]
+    for load in df["load"].unique():
+        df_load = df[df["load"] == load]
         fig.add_trace(
             go.Scatter(
-                x=df_bus["load_scenario"],
-                y=df_bus["q_mvar"],
+                x=df_load["load_scenario"],
+                y=df_load["q_mvar"],
                 mode="lines",
-                name=f"Bus {bus} q_mvar",
+                name=f"Load {load} q_mvar",
             ),
             row=2,
             col=1,
@@ -104,7 +105,12 @@ class LoadScenarioGeneratorBase(ABC):
         return interp1d(x_original, row, kind="linear")(x_target)
 
     @staticmethod
-    def find_largest_scaling_factor(net, max_scaling, step_size, start):
+    def find_largest_scaling_factor(
+        net, max_scaling, step_size, start, change_reactive_power
+    ):
+        net = deepcopy(
+            net
+        )  ## Without this, we change the base load of the network, whioch impacts the entire data gen
         p_ref = net.load["p_mw"]
         q_ref = net.load["q_mvar"]
         u = start
@@ -115,7 +121,10 @@ class LoadScenarioGeneratorBase(ABC):
 
         while (u <= max_scaling) and (converged == True):
             net.load["p_mw"] = p_ref * u
-            net.load["q_mvar"] = q_ref * u
+            if change_reactive_power:
+                net.load["q_mvar"] = q_ref * u
+            else:
+                net.load["q_mvar"] = q_ref
 
             try:
                 pp.runopp(net, numba=True)
@@ -178,8 +187,11 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
             max_scaling=self.max_scaling_factor,
             step_size=self.step_size,
             start=self.start_scaling_factor,
+            change_reactive_power=self.change_reactive_power,
         )
-        l = u - self.global_range
+        l = (
+            u - self.global_range * u
+        )  ## The lower bound used to be set as e.g. u - 40%, while now it is set as u - 40% of u (otherwise the lower bound is too low when u is big)
 
         with open(scenarios_log, "a") as f:
             f.write("u=" + str(u) + "\n")
@@ -191,20 +203,14 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
         agg_load = pd.read_csv(agg_load_path).to_numpy()
         agg_load = agg_load.reshape(agg_load.shape[0])
         ref_curve = self.min_max_scale(agg_load, l, u)
+        print("min, max of ref_curve: {}, {}".format(ref_curve.min(), ref_curve.max()))
+        print("l, u: {}, {}".format(l, u))
 
-        # Get the bus indices from the network and compute load for each bus
-        bus_indices = net.bus.index.values
+        p_mw_array = (
+            net.load.p_mw.to_numpy()
+        )  # we now store the active power at the load elements level, we don't aggregate it at the bus level (which was probably not changing anything since there is usually max one load per bus)
 
-        p_mw_array = np.array(
-            [net.load.loc[net.load["bus"] == bus, "p_mw"].sum() for bus in bus_indices]
-        )
-
-        q_mvar_array = np.array(
-            [
-                net.load.loc[net.load["bus"] == bus, "q_mvar"].sum()
-                for bus in bus_indices
-            ]
-        )
+        q_mvar_array = net.load.q_mvar.to_numpy()
 
         # if the number of requested scenarios is smaller than the number of timesteps in the load profile, we cut the load profile
         if n_scenarios <= ref_curve.shape[0]:
@@ -242,16 +248,6 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
         # Stack profiles along the last dimension
         load_profiles = np.stack((load_profile_pmw, load_profile_qmvar), axis=-1)
 
-        buses_with_no_load_element = ~np.isin(
-            range(net.bus.shape[0]), net.load.bus.values
-        )
-
-        assert (
-            (load_profiles[buses_with_no_load_element, :] == 0).all()
-        ).all(), (
-            "there is a bus that has no load element but that has a load assigned to it"
-        )
-
         return load_profiles
 
 
@@ -275,19 +271,11 @@ class Powergraph(LoadScenarioGeneratorBase):
         ref_curve = agg_load / agg_load.max()
         print("u={}, l={}".format(ref_curve.max(), ref_curve.min()))
 
-        # Get the bus indices from the network and compute load for each bus
-        bus_indices = net.bus.index.values
+        p_mw_array = (
+            net.load.p_mw.to_numpy()
+        )  # we now store the active power at the load elements level, we don't aggregate it at the bus level (which was probably not changing anything since there is usually max one load per bus)
 
-        p_mw_array = np.array(
-            [net.load.loc[net.load["bus"] == bus, "p_mw"].sum() for bus in bus_indices]
-        )
-
-        q_mvar_array = np.array(
-            [
-                net.load.loc[net.load["bus"] == bus, "q_mvar"].sum()
-                for bus in bus_indices
-            ]
-        )
+        q_mvar_array = net.load.q_mvar.to_numpy()
 
         # if the number of requested scenarios is smaller than the number of timesteps in the load profile, we cut the load profile
         if n_scenarios <= ref_curve.shape[0]:
@@ -312,15 +300,5 @@ class Powergraph(LoadScenarioGeneratorBase):
 
         # Stack profiles along the last dimension
         load_profiles = np.stack((load_profile_pmw, load_profile_qmvar), axis=-1)
-
-        buses_with_no_load_element = ~np.isin(
-            range(net.bus.shape[0]), net.load.bus.values
-        )
-
-        assert (
-            (load_profiles[buses_with_no_load_element, :] == 0).all()
-        ).all(), (
-            "there is a bus that has no load element but that has a load assigned to it"
-        )
 
         return load_profiles

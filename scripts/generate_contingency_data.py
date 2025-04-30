@@ -15,61 +15,7 @@ from GridDataGen.utils.topology_perturbation import initialize_generator
 import psutil
 import shutil
 import yaml
-
-
-
-
-def process_scenario_contingency(
-    net,
-    scenarios,
-    scenario_index,
-    generator,
-    no_stats,
-    local_csv_data,
-    local_adjacency_lists,
-    local_stats,
-    error_log_file,
-):
-    """
-    Process a load scenario
-    """
-    net = copy.deepcopy(net)
-    net.load.p_mw = scenarios[net.load.bus, scenario_index, 0]
-    net.load.q_mvar = scenarios[net.load.bus, scenario_index, 1]
-    try:
-        run_opf(net)
-    except Exception as e:
-        with open(error_log_file, "a") as f:
-            f.write(
-                f"Caught an exception at scenario {scenario_index} in run_opf function: {e}\n"
-            )
-        return local_csv_data, local_adjacency_lists, local_stats
-
-    net_pf = copy.deepcopy(net)
-    net_pf = pf_preprocessing(net_pf)
-
-    # Generate perturbed topologies
-    perturbed_topologies = generator.generate(net_pf)
-
-    for perturbed_topology in perturbed_topologies:
-        try:
-            run_pf(perturbed_topology)
-        except Exception as e:
-            with open(error_log_file, "a") as f:
-                f.write(
-                    f"Caught an exception at scenario {scenario_index} in run_pf function: {e}\n"
-                )
-
-                # TODO 1: What to do when the network does not converge for AC-PF? -> we dont have targets for regression!!
-        
-
-        # Append processed power flow data
-        local_csv_data.extend(pf_post_processing(net_pf))
-        local_adjacency_lists.append(get_adjacency_list(net_pf))
-        if not no_stats:
-            local_stats.update(net_pf)
-
-    return local_csv_data, local_adjacency_lists, local_stats
+from GridDataGen.utils.process_network import process_scenario_contingency
 
 
 def write_ram_usage(tqdm_log):
@@ -181,7 +127,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--config",
         type=str,
-        default="scripts/config/default.yaml",
+        default="scripts/config/default_contingency.yaml",
         help="Path to config file",
     )
 

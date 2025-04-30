@@ -33,6 +33,7 @@ def write_ram_usage(tqdm_log):
 
 
 def process_scenario_chunk(
+    mode,
     start_idx: int,
     end_idx: int,
     scenarios: np.ndarray,
@@ -51,18 +52,32 @@ def process_scenario_chunk(
     local_adjacency_lists = []
 
     for scenario_index in range(start_idx, end_idx):
-
-        local_csv_data, local_adjacency_lists, local_stats = process_scenario(
-            net,
-            scenarios,
-            scenario_index,
-            generator,
-            no_stats,
-            local_csv_data,
-            local_adjacency_lists,
-            local_stats,
-            error_log_path,
-        )
+        if mode == "pf":
+            local_csv_data, local_adjacency_lists, local_stats = process_scenario(
+                net,
+                scenarios,
+                scenario_index,
+                generator,
+                no_stats,
+                local_csv_data,
+                local_adjacency_lists,
+                local_stats,
+                error_log_path,
+            )
+        elif mode == "contingency":
+            local_csv_data, local_adjacency_lists, local_stats = (
+                process_scenario_contingency(
+                    net,
+                    scenarios,
+                    scenario_index,
+                    generator,
+                    no_stats,
+                    local_csv_data,
+                    local_adjacency_lists,
+                    local_stats,
+                    error_log_path,
+                )
+            )
 
         progress_queue.put(1)  # update queue
 
@@ -74,6 +89,7 @@ def main(args):
     Main routine that loads the network, splits scenarios into large chunks of 10,000,
     runs multiple processes in parallel, and saves data incrementally to avoid high memory usage.
     """
+    mode = args.settings.mode
     base_path = os.path.join(args.settings.data_dir, args.network.name, "raw")
     if os.path.exists(base_path) and args.settings.overwrite:
         shutil.rmtree(base_path)
@@ -156,6 +172,7 @@ def main(args):
             scenario_chunks = np.array_split(large_chunk, args.settings.num_processes)
             tasks = [
                 (
+                    mode,
                     chunk[0],
                     chunk[-1] + 1,
                     scenarios,
@@ -196,10 +213,13 @@ def main(args):
                 pool.join()
 
             # Save processed data immediately to avoid large memory consumption
-            save_node_edge_data(net, node_path, edge_path, csv_data, adjacency_lists)
-            if not args.settings.no_stats:
-                global_stats.save(base_path)
-                plot_stats(base_path)
+            if len(adjacency_lists) > 0:
+                save_node_edge_data(
+                    net, node_path, edge_path, csv_data, adjacency_lists
+                )
+                if not args.settings.no_stats:
+                    global_stats.save(base_path)
+                    plot_stats(base_path)
 
             del csv_data, adjacency_lists, global_stats
             gc.collect()
@@ -212,7 +232,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--config",
         type=str,
-        default="scripts/config/test_powergraph.yaml",
+        default="scripts/config/default_contingency.yaml",
         help="Path to config file",
     )
 

@@ -1,6 +1,7 @@
 import pandas as pd
 import plotly.express as px
 import os
+import numpy as np
 
 
 def plot_stats(base_path):
@@ -24,6 +25,16 @@ def plot_stats(base_path):
         fig_trafos.update_layout(xaxis_title="Number of Transformers")
         f.write(fig_trafos.to_html(full_html=False, include_plotlyjs=False))
 
+        # Plot for n_overloads
+        fig_overloads = px.histogram(stats_to_plot.n_overloads)
+        fig_overloads.update_layout(xaxis_title="Number of Overloads")
+        f.write(fig_overloads.to_html(full_html=False, include_plotlyjs=False))
+
+        # Plot for max_loading
+        fig_max_loading = px.histogram(stats_to_plot.max_loading)
+        fig_max_loading.update_layout(xaxis_title="Max Loading")
+        f.write(fig_max_loading.to_html(full_html=False, include_plotlyjs=False))
+
 
 class Stats:
     """
@@ -42,6 +53,8 @@ class Stats:
         self.n_lines = []
         self.n_trafos = []
         self.n_generators = []
+        self.n_overloads = []
+        self.max_loading = []
 
     def update(self, net):
         """
@@ -53,6 +66,22 @@ class Stats:
         self.n_lines.append(len(net.line))
         self.n_trafos.append(len(net.trafo))
         self.n_generators.append(net.gen.in_service.sum() + net.sgen.in_service.sum())
+        self.n_overloads.append(
+            np.sum(
+                [
+                    (net.res_line["loading_percent"] > 100).sum(),
+                    (net.res_trafo["loading_percent"] > 100).sum(),
+                ]
+            )
+        )
+        self.max_loading.append(
+            np.max(
+                [
+                    net.res_line["loading_percent"].max(),
+                    net.res_trafo["loading_percent"].max(),
+                ]
+            )
+        )
 
     def merge(self, other):
         """
@@ -64,6 +93,8 @@ class Stats:
         self.n_lines.extend(other.n_lines)
         self.n_trafos.extend(other.n_trafos)
         self.n_generators.extend(other.n_generators)
+        self.n_overloads.extend(other.n_overloads)
+        self.max_loading.extend(other.max_loading)
 
     def save(self, base_path):
         """
@@ -80,6 +111,8 @@ class Stats:
                 "n_lines": self.n_lines,
                 "n_trafos": self.n_trafos,
                 "n_generators": self.n_generators,
+                "n_overloads": self.n_overloads,
+                "max_loading": self.max_loading,
             }
         )
 
@@ -105,3 +138,5 @@ class Stats:
         self.n_lines = df["n_lines"].values
         self.n_trafos = df["n_trafos"].values
         self.n_generators = df["n_generators"].values
+        self.n_overloads = df["n_overloads"].values
+        self.max_loading = df["max_loading"].values

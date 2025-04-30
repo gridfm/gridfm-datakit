@@ -12,7 +12,6 @@ def network_preprocessing(net: pandapowerNet):
     """
     Adds names to bus dataframe and bus types to load, bus, gen, sgen dataframes.
     """
-
     # Clean-Up things in Data-Frame // give numbered item names
     for i, row in net.bus.iterrows():
         net.bus.at[i, "name"] = "Bus " + str(i)
@@ -166,6 +165,61 @@ def get_adjacency_list(net: pandapowerNet) -> list:
     return adjacency_lists
 
 
+def process_scenario_contingency(
+    net,
+    scenarios,
+    scenario_index,
+    generator,
+    no_stats,
+    local_csv_data,
+    local_adjacency_lists,
+    local_stats,
+    error_log_file,
+):
+    """
+    Process a load scenario for contingency
+    """
+    net = copy.deepcopy(net)
+    net.load.p_mw = scenarios[:, scenario_index, 0]
+    net.load.q_mvar = scenarios[:, scenario_index, 1]
+    try:
+        run_opf(net)
+    except Exception as e:
+        with open(error_log_file, "a") as f:
+            f.write(
+                f"Caught an exception at scenario {scenario_index} in run_opf function: {e}\n"
+            )
+        return local_csv_data, local_adjacency_lists, local_stats
+
+    net_pf = copy.deepcopy(net)
+    net_pf = pf_preprocessing(net_pf)
+
+    # Generate perturbed topologies
+    perturbed_topologies = generator.generate(net_pf)
+
+    # to simulate contingency, we apply the topology perturbation after OPF
+    for perturbed_topology in perturbed_topologies:
+        try:
+            run_pf(perturbed_topology)
+        except Exception as e:
+            with open(error_log_file, "a") as f:
+                f.write(
+                    f"Caught an exception at scenario {scenario_index} in run_pf function: {e}\n"
+                )
+
+                continue
+
+                # TODO 1: What to do when the network does not converge for AC-PF? -> we dont have targets for regression!!
+
+        # Append processed power flow data
+        local_csv_data.extend(pf_post_processing(perturbed_topology))
+        local_adjacency_lists.append(get_adjacency_list(perturbed_topology))
+        if not no_stats:
+            local_stats.update(perturbed_topology)
+
+    return local_csv_data, local_adjacency_lists, local_stats
+
+
 def process_scenario(
     net,
     scenarios,
@@ -180,8 +234,10 @@ def process_scenario(
     """
     Process a load scenario
     """
-    net.load.p_mw = scenarios[net.load.bus, scenario_index, 0]
-    net.load.q_mvar = scenarios[net.load.bus, scenario_index, 1]
+    net.load.p_mw = scenarios[:, scenario_index, 0]  # get the active power of the load
+    net.load.q_mvar = scenarios[
+        :, scenario_index, 1
+    ]  # get the reactive power of the load
     # Generate perturbed topologies
     perturbed_topologies = generator.generate(net)
 
