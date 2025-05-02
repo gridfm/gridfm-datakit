@@ -4,9 +4,11 @@ from GridDataGen.utils.config import *
 from pandapower.auxiliary import pandapowerNet
 from typing import Tuple
 from pandapower import makeYbus_pypower
+from pandapower.pypower.makeYbus import branch_vectors
 import copy
 from GridDataGen.utils.solvers import *
-
+from pandapower.pypower.idx_brch import *
+from scipy.sparse import csr_matrix
 
 def network_preprocessing(net: pandapowerNet):
     """
@@ -146,7 +148,7 @@ def pf_post_processing(net: pandapowerNet) -> np.ndarray:
 
 
 def get_adjacency_list(net: pandapowerNet) -> list:
-    """'
+    """
     Get adjacency list for network
     """
     ppc = net._ppc
@@ -155,9 +157,19 @@ def get_adjacency_list(net: pandapowerNet) -> list:
     i, j = np.nonzero(
         Y_bus
     )  # This gives you the row and column indices of non-zero elements
+    
     s = Y_bus[i, j]
     G = np.real(s)
     B = np.imag(s)
+
+    Ytt, Yff, Yft, Ytf = branch_vectors(ppc["branch"], ppc["branch"].shape[0])
+    
+    from_bus = ppc["branch"][:, F_BUS]
+    to_bus = ppc["branch"][:, T_BUS]
+    from_to_bus = np.column_stack((from_bus, to_bus))
+    to_from_bus = np.column_stack((to_bus, from_bus))
+    Yff_mat = csr_matrix((np.hstack([Yff, Yft]), np.hstack([from_to_bus, from_to_bus])), shape=(net.bus.shape[0], net.bus.shape[0]))
+
 
     edge_index = np.column_stack((i, j))
     edge_attr = np.stack((G, B)).T
