@@ -292,4 +292,4 @@ def process_scenario(
         if not no_stats:
             local_stats.update(net_pf)
 
-    return local_csv_data, local_adjacency_lists, local_stats
+    return local_csv_data, local_adjacency_lists, local_branch_idx_removed, local_stats
