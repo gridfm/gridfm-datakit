@@ -9,3 +9,4 @@ __pycache__/
 notebooks/opf_pertubations.ipynb
 .DS_Store
 GridDataGen/grids
+notebooks/test_data

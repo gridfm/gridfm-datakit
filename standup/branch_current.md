@@ -55,10 +55,15 @@ $$
 To convert the per-unit current $I_f$ to physical units (kA), we use the base apparent power $S_{\text{base}}$ (in MVA) and base voltage $V_{\text{base}}$ (in kV):
 
 $$
-I_{f,\text{kA}} = \frac{I_f \cdot S_{\text{base}}}{\sqrt{3} \cdot V_{\text{base}}}
+(I_{f,\text{kA}})_b = \frac{I_{f_b} \cdot S_{\text{base}}}{\sqrt{3} \cdot V_{\text{base}_{\sigma_f(b)}}}
 $$
 
-This gives the phase current magnitude in kiloamperes under balanced conditions. The same applies for $I_t$.
+This gives the phase current magnitude in kiloamperes under balanced conditions. 
+
+Similarly, we have:
+$$
+(I_{t,\text{kA}})_b = \frac{I_{t_b} \cdot S_{\text{base}}}{\sqrt{3} \cdot V_{\text{base}_{\sigma_t(b)}}}
+$$
 
 ## Thermal Limits and Loading
 
@@ -68,4 +73,4 @@ $$
 \text{loading}_b = \frac{\max(|(I_{f,\text{kA}})_b|, |(I_{t,\text{kA}})_b|)}{\text{limit}_f(b)}
 $$
 
-Lines usually connect buses with the same voltage level, so $V_{\text{base}}$ and hence $\text{limit}_f$ are consistent for each voltage level.
+Lines usually connect buses with the same voltage level, so that $(I_{f,\text{kA}})_b = (I_{t,\text{kA}})_b$, which is not the case for transformers.

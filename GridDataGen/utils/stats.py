@@ -63,8 +63,8 @@ class Stats:
         Args:
             net: A power grid network object with attributes `line`, `trafo`, `gen`, and `sgen`.
         """
-        self.n_lines.append(len(net.line))
-        self.n_trafos.append(len(net.trafo))
+        self.n_lines.append(net.line.in_service.sum())
+        self.n_trafos.append(net.trafo.in_service.sum())
         self.n_generators.append(net.gen.in_service.sum() + net.sgen.in_service.sum())
         self.n_overloads.append(
             np.sum(

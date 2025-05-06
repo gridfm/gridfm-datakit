@@ -7,8 +7,10 @@ from pandapower import makeYbus_pypower
 from pandapower.pypower.makeYbus import branch_vectors
 import copy
 from GridDataGen.utils.solvers import *
-from pandapower.pypower.idx_brch import *
+from pandapower.pypower.idx_brch import T_BUS, F_BUS, RATE_A, BR_STATUS
+from pandapower.pypower.idx_bus import BUS_I, BUS_TYPE, VMIN, VMAX, BASE_KV
 from scipy.sparse import csr_matrix
+
 
 def network_preprocessing(net: pandapowerNet):
     """
@@ -157,24 +159,23 @@ def get_adjacency_list(net: pandapowerNet) -> list:
     i, j = np.nonzero(
         Y_bus
     )  # This gives you the row and column indices of non-zero elements
-    
+
     s = Y_bus[i, j]
     G = np.real(s)
     B = np.imag(s)
-
-    Ytt, Yff, Yft, Ytf = branch_vectors(ppc["branch"], ppc["branch"].shape[0])
-    
-    from_bus = ppc["branch"][:, F_BUS]
-    to_bus = ppc["branch"][:, T_BUS]
-    from_to_bus = np.column_stack((from_bus, to_bus))
-    to_from_bus = np.column_stack((to_bus, from_bus))
-    Yff_mat = csr_matrix((np.hstack([Yff, Yft]), np.hstack([from_to_bus, from_to_bus])), shape=(net.bus.shape[0], net.bus.shape[0]))
-
 
     edge_index = np.column_stack((i, j))
     edge_attr = np.stack((G, B)).T
     adjacency_lists = np.column_stack((edge_index, edge_attr))
     return adjacency_lists
+
+
+def get_branch_idx_removed(branch) -> list:
+    """
+    Get branch indices removed for network
+    """
+    in_service = branch[:, BR_STATUS]
+    return np.where(in_service == 0)[0].tolist()
 
 
 def process_scenario_contingency(
@@ -185,6 +186,7 @@ def process_scenario_contingency(
     no_stats,
     local_csv_data,
     local_adjacency_lists,
+    local_branch_idx_removed,
     local_stats,
     error_log_file,
 ):
@@ -226,10 +228,13 @@ def process_scenario_contingency(
         # Append processed power flow data
         local_csv_data.extend(pf_post_processing(perturbed_topology))
         local_adjacency_lists.append(get_adjacency_list(perturbed_topology))
+        local_branch_idx_removed.append(
+            get_branch_idx_removed(perturbed_topology._ppc["branch"])
+        )
         if not no_stats:
             local_stats.update(perturbed_topology)
 
-    return local_csv_data, local_adjacency_lists, local_stats
+    return local_csv_data, local_adjacency_lists, local_branch_idx_removed, local_stats
 
 
 def process_scenario(
@@ -240,6 +245,7 @@ def process_scenario(
     no_stats,
     local_csv_data,
     local_adjacency_lists,
+    local_branch_idx_removed,
     local_stats,
     error_log_file,
 ):
@@ -280,6 +286,9 @@ def process_scenario(
         # Append processed power flow data
         local_csv_data.extend(pf_post_processing(net_pf))
         local_adjacency_lists.append(get_adjacency_list(net_pf))
+        local_branch_idx_removed.append(
+            get_branch_idx_removed(perturbed_topology._ppc["branch"])
+        )
         if not no_stats:
             local_stats.update(net_pf)
 

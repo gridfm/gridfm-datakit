@@ -50,10 +50,15 @@ def process_scenario_chunk(
         local_stats = Stats()
     local_csv_data = []
     local_adjacency_lists = []
-
+    local_branch_idx_removed = []
     for scenario_index in range(start_idx, end_idx):
         if mode == "pf":
-            local_csv_data, local_adjacency_lists, local_stats = process_scenario(
+            (
+                local_csv_data,
+                local_adjacency_lists,
+                local_branch_idx_removed,
+                local_stats,
+            ) = process_scenario(
                 net,
                 scenarios,
                 scenario_index,
@@ -61,27 +66,32 @@ def process_scenario_chunk(
                 no_stats,
                 local_csv_data,
                 local_adjacency_lists,
+                local_branch_idx_removed,
                 local_stats,
                 error_log_path,
             )
         elif mode == "contingency":
-            local_csv_data, local_adjacency_lists, local_stats = (
-                process_scenario_contingency(
-                    net,
-                    scenarios,
-                    scenario_index,
-                    generator,
-                    no_stats,
-                    local_csv_data,
-                    local_adjacency_lists,
-                    local_stats,
-                    error_log_path,
-                )
+            (
+                local_csv_data,
+                local_adjacency_lists,
+                local_branch_idx_removed,
+                local_stats,
+            ) = process_scenario_contingency(
+                net,
+                scenarios,
+                scenario_index,
+                generator,
+                no_stats,
+                local_csv_data,
+                local_adjacency_lists,
+                local_branch_idx_removed,
+                local_stats,
+                error_log_path,
             )
 
         progress_queue.put(1)  # update queue
 
-    return local_csv_data, local_adjacency_lists, local_stats
+    return local_csv_data, local_adjacency_lists, local_branch_idx_removed, local_stats
 
 
 def main(args):
@@ -100,6 +110,9 @@ def main(args):
     args_log_path = os.path.join(base_path, "args.log")
     node_path = os.path.join(base_path, "pf_node.csv")
     edge_path = os.path.join(base_path, "pf_edge.csv")
+    branch_idx_removed_path = os.path.join(base_path, "branch_idx_removed.csv")
+    edge_params_path = os.path.join(base_path, "edge_params.csv")
+    bus_params_path = os.path.join(base_path, "bus_params.csv")
     scenarios_csv_path = os.path.join(
         base_path, "scenarios_" + args.load.generator + ".csv"
     )
@@ -136,7 +149,8 @@ def main(args):
     scenarios_df = load_scenarios_to_df(scenarios)
     scenarios_df.to_csv(scenarios_csv_path, index=False)
     plot_load_scenarios_combined(scenarios_df, scenarios_plot_path)
-
+    save_edge_params(net, edge_params_path)
+    save_bus_params(net, bus_params_path)
     # Initialize the topology generator
     generator = initialize_generator(
         args.topology_perturbation.type,
@@ -201,11 +215,19 @@ def main(args):
                 # Gather results from all processes
                 csv_data = []
                 adjacency_lists = []
+                branch_idx_removed = []
+
                 global_stats = Stats() if not args.settings.no_stats else None
                 for result in results:
-                    local_csv_data, local_adjacency_lists, local_stats = result.get()
+                    (
+                        local_csv_data,
+                        local_adjacency_lists,
+                        local_branch_idx_removed,
+                        local_stats,
+                    ) = result.get()
                     csv_data.extend(local_csv_data)
                     adjacency_lists.extend(local_adjacency_lists)
+                    branch_idx_removed.extend(local_branch_idx_removed)
                     if not args.settings.no_stats and local_stats:
                         global_stats.merge(local_stats)
 
@@ -217,6 +239,7 @@ def main(args):
                 save_node_edge_data(
                     net, node_path, edge_path, csv_data, adjacency_lists
                 )
+                save_branch_idx_removed(branch_idx_removed, branch_idx_removed_path)
                 if not args.settings.no_stats:
                     global_stats.save(base_path)
                     plot_stats(base_path)

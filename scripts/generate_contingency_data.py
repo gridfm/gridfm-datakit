@@ -38,6 +38,9 @@ def main(args):
     args_log_path = os.path.join(base_path, "args.log")
     node_path = os.path.join(base_path, "pf_node.csv")
     edge_path = os.path.join(base_path, "pf_edge.csv")
+    branch_idx_removed_path = os.path.join(base_path, "branch_idx_removed.csv")
+    edge_params_path = os.path.join(base_path, "edge_params.csv")
+    bus_params_path = os.path.join(base_path, "bus_params.csv")
     scenarios_csv_path = os.path.join(
         base_path, "scenarios_" + args.load.generator + ".csv"
     )
@@ -74,7 +77,8 @@ def main(args):
     scenarios_df = load_scenarios_to_df(scenarios)
     scenarios_df.to_csv(scenarios_csv_path, index=False)
     plot_load_scenarios_combined(scenarios_df, scenarios_plot_path)
-
+    save_edge_params(net, edge_params_path)
+    save_bus_params(net, bus_params_path)
     # Initialize the topology generator
     generator = initialize_generator(
         args.topology_perturbation.type,
@@ -87,6 +91,7 @@ def main(args):
     # Initialize data structures
     csv_data = []
     adjacency_lists = []
+    branch_idx_removed = []
     global_stats = Stats() if not args.settings.no_stats else None
 
     # Process scenarios sequentially
@@ -99,22 +104,27 @@ def main(args):
         for scenario_index in range(args.load.scenarios):
 
             # Process the scenario
-            csv_data, adjacency_lists, global_stats = process_scenario_contingency(
-                net,
-                scenarios,
-                scenario_index,
-                generator,
-                args.settings.no_stats,
-                csv_data,
-                adjacency_lists,
-                global_stats,
-                error_log_path,
+            csv_data, adjacency_lists, branch_idx_removed, global_stats = (
+                process_scenario_contingency(
+                    net,
+                    scenarios,
+                    scenario_index,
+                    generator,
+                    args.settings.no_stats,
+                    csv_data,
+                    adjacency_lists,
+                    branch_idx_removed,
+                    global_stats,
+                    error_log_path,
+                )
             )
 
             pbar.update(1)
 
     # Save final data
     save_node_edge_data(net, node_path, edge_path, csv_data, adjacency_lists)
+    # save branch_idx_removed to numpy array
+    save_branch_idx_removed(branch_idx_removed, branch_idx_removed_path)
     if not args.settings.no_stats:
         global_stats.save(base_path)
         plot_stats(base_path)

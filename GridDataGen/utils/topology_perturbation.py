@@ -165,15 +165,15 @@ class RandomComponentDropGenerator(TopologyGenerator):
 
             # Drop selected lines and transformers, turn off generators and static generators
             if lines_to_drop:
-                # perturbed_topology.line.loc[lines_to_drop, "in_service"] = False
+                perturbed_topology.line.loc[lines_to_drop, "in_service"] = False
                 # TODO: decide if we want to drop lines or just turn them off
                 # turn off lines:
-                pp.drop_lines(perturbed_topology, lines_to_drop)
+                # pp.drop_lines(perturbed_topology, lines_to_drop)
             if trafos_to_drop:
-                # perturbed_topology.trafo.loc[trafos_to_drop, "in_service"] = False
+                perturbed_topology.trafo.loc[trafos_to_drop, "in_service"] = False
                 # TODO: decide if we want to drop transformers or just turn them off
                 # turn off transformers:
-                pp.drop_trafos(perturbed_topology, trafos_to_drop)
+                # pp.drop_trafos(perturbed_topology, trafos_to_drop)
             if gens_to_turn_off:
                 perturbed_topology.gen.loc[gens_to_turn_off, "in_service"] = False
             if sgens_to_turn_off:

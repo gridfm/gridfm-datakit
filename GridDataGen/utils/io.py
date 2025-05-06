@@ -9,6 +9,9 @@ from pandapower.auxiliary import pandapowerNet
 import os
 from pandapower.converter import to_ppc
 import requests
+from pandapower.pypower.idx_brch import T_BUS, F_BUS, RATE_A, BR_STATUS
+from pandapower.pypower.idx_bus import BUS_I, BUS_TYPE, VMIN, VMAX, BASE_KV
+from pandapower.pypower.makeYbus import branch_vectors
 
 
 def load_net_from_pp(grid_name: str) -> pandapowerNet:
@@ -82,6 +85,100 @@ def load_net_from_pglib(grid_name: str) -> pp.pandapowerNet:
     pp.reindex_buses(network, bus_mapping)
 
     return network
+
+
+def save_edge_params(net: pandapowerNet, path: str):
+    """
+    Save edge parameters for network
+    """
+    pp.runpp(net)
+    ppc = net._ppc
+    to_bus = np.real(ppc["branch"][:, T_BUS])
+    from_bus = np.real(ppc["branch"][:, F_BUS])
+    Ytt, Yff, Yft, Ytf = branch_vectors(ppc["branch"], ppc["branch"].shape[0])
+    Ytt_r = np.real(Ytt)
+    Ytt_i = np.imag(Ytt)
+    Yff_r = np.real(Yff)
+    Yff_i = np.imag(Yff)
+    Yft_r = np.real(Yft)
+    Yft_i = np.imag(Yft)
+    Ytf_r = np.real(Ytf)
+    Ytf_i = np.imag(Ytf)
+
+    rate_a = np.real(ppc["branch"][:, RATE_A])
+    edge_params = pd.DataFrame(
+        np.column_stack(
+            (
+                from_bus,
+                to_bus,
+                Yff_r,
+                Yff_i,
+                Yft_r,
+                Yft_i,
+                Ytf_r,
+                Ytf_i,
+                Ytt_r,
+                Ytt_i,
+                rate_a,
+            )
+        ),
+        columns=[
+            "from_bus",
+            "to_bus",
+            "Yff_r",
+            "Yff_i",
+            "Yft_r",
+            "Yft_i",
+            "Ytf_r",
+            "Ytf_i",
+            "Ytt_r",
+            "Ytt_i",
+            "rate_a",
+        ],
+    )
+    # comvert everything to float32
+    edge_params = edge_params.astype(np.float32)
+    edge_params.to_csv(path, index=False)
+
+
+def save_bus_params(net: pandapowerNet, path: str):
+    """
+    Save bus parameters for network
+    """
+    pp.runpp(net)
+    ppc = net._ppc
+    bus = ppc["bus"]
+    idx = bus[:, BUS_I]
+    type = bus[:, BUS_TYPE]
+    vmin = bus[:, VMIN]
+    vmax = bus[:, VMAX]
+    base_kv = bus[:, BASE_KV]
+    bus_params = pd.DataFrame(
+        np.column_stack((idx, type, vmin, vmax, base_kv)),
+        columns=["bus", "type", "vmin", "vmax", "baseKV"],
+    )
+    bus_params.to_csv(path, index=False)
+
+
+def save_branch_idx_removed(branch_idx_removed, path: str):
+    """
+    Save index of removed branches for each scenario
+    """
+    if os.path.exists(path):
+        existing_df = pd.read_csv(path, usecols=["scenario"])
+        if not existing_df.empty:
+            last_scenario = existing_df["scenario"].iloc[-1]
+    else:
+        last_scenario = -1
+
+    scenario_idx = np.arange(
+        last_scenario + 1, last_scenario + 1 + len(branch_idx_removed)
+    )
+    branch_idx_removed_df = pd.DataFrame(branch_idx_removed)
+    branch_idx_removed_df.insert(0, "scenario", scenario_idx)
+    branch_idx_removed_df.to_csv(
+        path, mode="a", header=not os.path.exists(path), index=False
+    )
 
 
 def save_node_edge_data(
