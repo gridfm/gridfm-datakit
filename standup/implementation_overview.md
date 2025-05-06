@@ -1,4 +1,4 @@
-# Contingency Analysis Workflow (refer to handwritten version)
+# Contingency Analysis Workflow
 
 ## Overview Table
 
@@ -37,7 +37,7 @@ We also store the **scenario index** with each scenario, so we can map it to the
 
 We need additional **branch** and **bus parameters** to:
 
-- Compute the branch currents  
+- Compute the branch currents (see `branch_current.md`)
 - Check for violations
 
 This is why we had to include these in the data generation pipeline.
