@@ -23,7 +23,7 @@ topology_perturbation:
 settings:
   num_processes: 10 # Number of parallel processes to use
   data_dir: "../data_contingency" # Directory to save generated data
-  large_chunk_size: 1000 # Number of load scenarios processed before saving
+  large_chunk_size: 100 # Number of load scenarios processed before saving
   no_stats: false # If true, disables statistical calculations
   overwrite: true # If true, overwrites existing files
   mode: "contingency" # Mode of the script; options: contingency, pf

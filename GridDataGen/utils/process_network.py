@@ -203,7 +203,12 @@ def process_scenario_contingency(
             f.write(
                 f"Caught an exception at scenario {scenario_index} in run_opf function: {e}\n"
             )
-        return local_csv_data, local_adjacency_lists, local_stats
+        return (
+            local_csv_data,
+            local_adjacency_lists,
+            local_branch_idx_removed,
+            local_stats,
+        )
 
     net_pf = copy.deepcopy(net)
     net_pf = pf_preprocessing(net_pf)

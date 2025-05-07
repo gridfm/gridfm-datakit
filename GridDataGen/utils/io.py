@@ -91,7 +91,7 @@ def save_edge_params(net: pandapowerNet, path: str):
     """
     Save edge parameters for network
     """
-    pp.runpp(net)
+    pp.rundcpp(net)
     ppc = net._ppc
     to_bus = np.real(ppc["branch"][:, T_BUS])
     from_bus = np.real(ppc["branch"][:, F_BUS])
@@ -145,7 +145,7 @@ def save_bus_params(net: pandapowerNet, path: str):
     """
     Save bus parameters for network
     """
-    pp.runpp(net)
+    pp.rundcpp(net)
     ppc = net._ppc
     bus = ppc["bus"]
     idx = bus[:, BUS_I]
