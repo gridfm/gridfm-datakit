@@ -145,16 +145,14 @@ def save_bus_params(net: pandapowerNet, path: str):
     """
     Save bus parameters for network
     """
-    pp.rundcpp(net)
-    ppc = net._ppc
-    bus = ppc["bus"]
-    idx = bus[:, BUS_I]
-    type = bus[:, BUS_TYPE]
-    vmin = bus[:, VMIN]
-    vmax = bus[:, VMAX]
-    base_kv = bus[:, BASE_KV]
+    idx = net.bus.index
+    base_kv = net.bus.vn_kv
+    bus_type = net.bus.type
+    vmin = net.bus.min_vm_pu
+    vmax = net.bus.max_vm_pu
+
     bus_params = pd.DataFrame(
-        np.column_stack((idx, type, vmin, vmax, base_kv)),
+        np.column_stack((idx, bus_type, vmin, vmax, base_kv)),
         columns=["bus", "type", "vmin", "vmax", "baseKV"],
     )
     bus_params.to_csv(path, index=False)
