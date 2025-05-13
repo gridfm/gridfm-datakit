@@ -237,7 +237,12 @@ def main(args):
             # Save processed data immediately to avoid large memory consumption
             if len(adjacency_lists) > 0:
                 save_node_edge_data(
-                    net, node_path, edge_path, csv_data, adjacency_lists
+                    net,
+                    node_path,
+                    edge_path,
+                    csv_data,
+                    adjacency_lists,
+                    mode=args.settings.mode,
                 )
                 save_branch_idx_removed(branch_idx_removed, branch_idx_removed_path)
                 if not args.settings.no_stats:

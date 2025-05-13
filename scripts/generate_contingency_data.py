@@ -122,7 +122,9 @@ def main(args):
             pbar.update(1)
 
     # Save final data
-    save_node_edge_data(net, node_path, edge_path, csv_data, adjacency_lists)
+    save_node_edge_data(
+        net, node_path, edge_path, csv_data, adjacency_lists, mode=args.settings.mode
+    )
     # save branch_idx_removed to numpy array
     save_branch_idx_removed(branch_idx_removed, branch_idx_removed_path)
     if not args.settings.no_stats:

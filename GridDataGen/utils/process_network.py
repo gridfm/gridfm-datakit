@@ -100,13 +100,13 @@ def pf_preprocessing(net: pandapowerNet) -> pandapowerNet:
     return net
 
 
-def pf_post_processing(net: pandapowerNet) -> np.ndarray:
+def pf_post_processing(net: pandapowerNet, dcpf: bool = False) -> np.ndarray:
     """
     Post-process the PF data to build the final data representation for the given scenario, shape (n_buses, 10)
     columns are (bus, Pd, Qd, Pg, Qg, Vm, Va, PQ, PV, REF)
     rows are buses
     """
-    X = np.zeros((net.bus.shape[0], 10))
+    X = np.zeros((net.bus.shape[0], 12 if dcpf else 10))
     all_loads = (
         pd.concat([net.res_load])[["p_mw", "q_mvar", "bus"]].groupby("bus").sum()
     )  # shunt + loads
@@ -146,6 +146,9 @@ def pf_post_processing(net: pandapowerNet) -> np.ndarray:
     X[:, 6] = net.res_bus.va_degree  # voltage angle
     X[:, 7:10] = pd.get_dummies(net.bus["type"]).values
 
+    if dcpf:
+        X[:, 10] = net.bus["Vm_dc"]
+        X[:, 11] = net.bus["Va_dc"]
     return X
 
 
@@ -198,6 +201,9 @@ def process_scenario_contingency(
     net.load.q_mvar = scenarios[:, scenario_index, 1]
     try:
         run_opf(net)
+        # assert (
+        #     net.res_bus.vm_pu.min() >= 0.94 and net.res_bus.vm_pu.max() <= 1.06
+        # ), f"Voltage violation at scenario {scenario_index}"
     except Exception as e:
         with open(error_log_file, "a") as f:
             f.write(
@@ -219,11 +225,15 @@ def process_scenario_contingency(
     # to simulate contingency, we apply the topology perturbation after OPF
     for perturbed_topology in perturbed_topologies:
         try:
+            # run DCPF
+            pp.rundcpp(perturbed_topology)
+            perturbed_topology.bus["Vm_dc"] = perturbed_topology.res_bus.vm_pu
+            perturbed_topology.bus["Va_dc"] = perturbed_topology.res_bus.va_degree
             run_pf(perturbed_topology)
         except Exception as e:
             with open(error_log_file, "a") as f:
                 f.write(
-                    f"Caught an exception at scenario {scenario_index} in run_pf function: {e}\n"
+                    f"Caught an exception at scenario {scenario_index} when solving dcpf or in in run_pf function: {e}\n"
                 )
 
                 continue
@@ -231,7 +241,7 @@ def process_scenario_contingency(
                 # TODO 1: What to do when the network does not converge for AC-PF? -> we dont have targets for regression!!
 
         # Append processed power flow data
-        local_csv_data.extend(pf_post_processing(perturbed_topology))
+        local_csv_data.extend(pf_post_processing(perturbed_topology, dcpf=True))
         local_adjacency_lists.append(get_adjacency_list(perturbed_topology))
         local_branch_idx_removed.append(
             get_branch_idx_removed(perturbed_topology._ppc["branch"])

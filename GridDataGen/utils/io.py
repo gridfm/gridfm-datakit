@@ -185,6 +185,7 @@ def save_node_edge_data(
     edge_path: str,
     csv_data: list,
     adjacency_lists: list,
+    mode: str = "pf",
 ):
     """
     Save generated data to CSV files in the data directory, appending if the files already exist.
@@ -206,21 +207,40 @@ def save_node_edge_data(
             last_scenario = existing_df["scenario"].iloc[-1]
 
     # Create DataFrame for node data
-    df = pd.DataFrame(
-        csv_data,
-        columns=[
-            "bus",
-            "Pd",
-            "Qd",
-            "Pg",
-            "Qg",
-            "Vm",
-            "Va",
-            "PQ",
-            "PV",
-            "REF",
-        ],
-    )
+    if mode == "pf":
+        df = pd.DataFrame(
+            csv_data,
+            columns=[
+                "bus",
+                "Pd",
+                "Qd",
+                "Pg",
+                "Qg",
+                "Vm",
+                "Va",
+                "PQ",
+                "PV",
+                "REF",
+            ],
+        )
+    elif mode == "contingency":
+        df = pd.DataFrame(
+            csv_data,
+            columns=[
+                "bus",
+                "Pd",
+                "Qd",
+                "Pg",
+                "Qg",
+                "Vm",
+                "Va",
+                "PQ",
+                "PV",
+                "REF",
+                "Vm_dc",
+                "Va_dc",
+            ],
+        )
 
     df["bus"] = df["bus"].astype("int64")
 
