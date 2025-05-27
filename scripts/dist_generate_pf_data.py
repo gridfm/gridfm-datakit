@@ -153,10 +153,7 @@ def main(args):
     save_bus_params(net, bus_params_path)
     # Initialize the topology generator
     generator = initialize_generator(
-        args.topology_perturbation.type,
-        args.topology_perturbation.n_topology_variants,
-        args.topology_perturbation.k,
-        args.topology_perturbation.elements,
+        args.topology_perturbation,
         net,
     )
 

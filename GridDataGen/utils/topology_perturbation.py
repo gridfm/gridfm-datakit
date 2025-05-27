@@ -247,7 +247,73 @@ class MostOverloadedLineDropGenerator(TopologyGenerator):
                 n_generated_topologies += 1
 
 
-def initialize_generator(generator_type, n_topology_variants, k, elements, base_net):
+class FromListOfBusPairsGenerator(TopologyGenerator):
+    """
+    Generates perturbed topologies by droping the lines and transformers that connect the bus pairs in the list
+    """
+
+    def __init__(self, base_net, line_bus_pairs_csv):
+        super().__init__()
+        self.line_bus_pairs = pd.read_csv(line_bus_pairs_csv, header=None).values
+        bus0 = self.line_bus_pairs[:, 0]
+        bus1 = self.line_bus_pairs[:, 1]
+
+        # get all lines that connect the bus pairs
+        self.lines_to_drop = base_net.line.index[
+            (base_net.line.from_bus.isin(bus0) & base_net.line.to_bus.isin(bus1))
+            | (base_net.line.from_bus.isin(bus1) & base_net.line.to_bus.isin(bus0))
+        ].tolist()
+
+        # get all transformers that connect the bus pairs
+        self.trafos_to_drop = base_net.trafo.index[
+            (base_net.trafo.hv_bus.isin(bus0) & base_net.trafo.lv_bus.isin(bus1))
+            | (base_net.trafo.hv_bus.isin(bus1) & base_net.trafo.lv_bus.isin(bus0))
+        ].tolist()
+
+        self.max_n_topologies = len(self.lines_to_drop) + len(self.trafos_to_drop)
+
+    def generate(self, net):
+        """
+        Args:
+            net (pandapowerNet): The power network.
+
+        Returns:
+            list of pandapowerNet: A list of perturbed network topologies.
+        """
+
+        perturbed_topologies = []
+        n_infeasible_topologies = 0
+
+        for line_to_drop in self.lines_to_drop:
+            perturbed_topology = copy.deepcopy(net)
+            perturbed_topology.line.loc[line_to_drop, "in_service"] = False
+
+            # Check network feasibility
+            if not len(top.unsupplied_buses(perturbed_topology)):
+                perturbed_topologies.append(perturbed_topology)
+            else:
+                n_infeasible_topologies += 1
+
+        for trafo_to_drop in self.trafos_to_drop:
+            perturbed_topology = copy.deepcopy(net)
+            perturbed_topology.trafo.loc[trafo_to_drop, "in_service"] = False
+
+            # Check network feasibility
+            if not len(top.unsupplied_buses(perturbed_topology)):
+                perturbed_topologies.append(perturbed_topology)
+            else:
+                n_infeasible_topologies += 1
+
+        print(
+            f"Number of infeasible topologies: {n_infeasible_topologies}/ {self.max_n_topologies}"
+        )
+        print(f"Number of feasible topologies: {len(perturbed_topologies)}")
+        print(f"Number of bus pairs: {len(self.line_bus_pairs)}")
+
+        return perturbed_topologies
+
+
+def initialize_generator(args, base_net):
     """
     Initialize the appropriate topology generator based on the given generator type.
 
@@ -260,13 +326,17 @@ def initialize_generator(generator_type, n_topology_variants, k, elements, base_
     Returns:
         TopologyGenerator: The initialized topology generator.
     """
-    if generator_type == "n_minus_k":
-        return NMinusKGenerator(k, base_net)
-    elif generator_type == "random":
-        return RandomComponentDropGenerator(n_topology_variants, k, base_net, elements)
-    elif generator_type == "overloaded":
-        return MostOverloadedLineDropGenerator(n_topology_variants)
-    elif generator_type == "none":
+    if args.type == "n_minus_k":
+        return NMinusKGenerator(args.k, base_net)
+    elif args.type == "random":
+        return RandomComponentDropGenerator(
+            args.n_topology_variants, args.k, base_net, args.elements
+        )
+    elif args.type == "overloaded":
+        return MostOverloadedLineDropGenerator(args.n_topology_variants)
+    elif args.type == "none":
         return NoPerturbationGenerator()
+    elif args.type == "from_list_of_bus_pairs":
+        return FromListOfBusPairsGenerator(base_net, args.line_bus_pairs_csv_path)
     else:
-        raise ValueError(f"Unknown generator type: {generator_type}")
+        raise ValueError(f"Unknown generator type: {args.type}")
