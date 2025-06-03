@@ -69,8 +69,8 @@ class Stats:
         self.n_overloads.append(
             np.sum(
                 [
-                    (net.res_line["loading_percent"] > 100).sum(),
-                    (net.res_trafo["loading_percent"] > 100).sum(),
+                    (net.res_line["loading_percent"] > 100.01).sum(),
+                    (net.res_trafo["loading_percent"] > 100.01).sum(),
                 ]
             )
         )

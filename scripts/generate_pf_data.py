@@ -76,10 +76,7 @@ def main(args):
 
     # Initialize the topology generator
     generator = initialize_generator(
-        args.topology_perturbation.type,
-        args.topology_perturbation.n_topology_variants,
-        args.topology_perturbation.k,
-        args.topology_perturbation.elements,
+        args.topology_perturbation,
         net,
     )
 
@@ -87,6 +84,7 @@ def main(args):
     csv_data = []
     adjacency_lists = []
     global_stats = Stats() if not args.settings.no_stats else None
+    branch_idx_removed = []
 
     # Process scenarios sequentially
     with tqdm(
@@ -98,16 +96,19 @@ def main(args):
         for scenario_index in range(args.load.scenarios):
 
             # Process the scenario
-            csv_data, adjacency_lists, global_stats = process_scenario(
-                net,
-                scenarios,
-                scenario_index,
-                generator,
-                args.settings.no_stats,
-                csv_data,
-                adjacency_lists,
-                global_stats,
-                error_log_path,
+            csv_data, adjacency_lists, branch_idx_removed, global_stats = (
+                process_scenario(
+                    net,
+                    scenarios,
+                    scenario_index,
+                    generator,
+                    args.settings.no_stats,
+                    csv_data,
+                    adjacency_lists,
+                    branch_idx_removed,
+                    global_stats,
+                    error_log_path,
+                )
             )
 
             pbar.update(1)
@@ -126,7 +127,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--config",
         type=str,
-        default="scripts/config/test_powergraph.yaml",
+        default="scripts/config/default.yaml",
         help="Path to config file",
     )
 

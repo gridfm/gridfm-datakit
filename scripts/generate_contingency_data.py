@@ -15,7 +15,6 @@ from GridDataGen.utils.topology_perturbation import initialize_generator
 import psutil
 import shutil
 import yaml
-from GridDataGen.utils.process_network import process_scenario_contingency
 
 
 def write_ram_usage(tqdm_log):
@@ -28,6 +27,7 @@ def main(args):
     """
     Main routine that loads the network and processes scenarios sequentially.
     """
+    mode = args.settings.mode
     base_path = os.path.join(args.settings.data_dir, args.network.name, "raw")
     if os.path.exists(base_path) and args.settings.overwrite:
         shutil.rmtree(base_path)
@@ -81,10 +81,7 @@ def main(args):
     save_bus_params(net, bus_params_path)
     # Initialize the topology generator
     generator = initialize_generator(
-        args.topology_perturbation.type,
-        args.topology_perturbation.n_topology_variants,
-        args.topology_perturbation.k,
-        args.topology_perturbation.elements,
+        args.topology_perturbation,
         net,
     )
 
@@ -104,20 +101,36 @@ def main(args):
         for scenario_index in range(args.load.scenarios):
 
             # Process the scenario
-            csv_data, adjacency_lists, branch_idx_removed, global_stats = (
-                process_scenario_contingency(
-                    net,
-                    scenarios,
-                    scenario_index,
-                    generator,
-                    args.settings.no_stats,
-                    csv_data,
-                    adjacency_lists,
-                    branch_idx_removed,
-                    global_stats,
-                    error_log_path,
+            if mode == "pf":
+                csv_data, adjacency_lists, branch_idx_removed, global_stats = (
+                    process_scenario(
+                        net,
+                        scenarios,
+                        scenario_index,
+                        generator,
+                        args.settings.no_stats,
+                        csv_data,
+                        adjacency_lists,
+                        branch_idx_removed,
+                        global_stats,
+                        error_log_path,
+                    )
                 )
-            )
+            elif mode == "contingency":
+                csv_data, adjacency_lists, branch_idx_removed, global_stats = (
+                    process_scenario_contingency(
+                        net,
+                        scenarios,
+                        scenario_index,
+                        generator,
+                        args.settings.no_stats,
+                        csv_data,
+                        adjacency_lists,
+                        branch_idx_removed,
+                        global_stats,
+                        error_log_path,
+                    )
+                )
 
             pbar.update(1)
 

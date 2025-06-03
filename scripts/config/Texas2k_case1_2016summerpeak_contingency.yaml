@@ -8,7 +8,7 @@ load:
 
 topology_perturbation:
   type: "from_list_of_bus_pairs" # Type of topology generator; options: n_minus_k, random, overloaded, none, from_list_of_bus_pairs
-  line_bus_pairs_csv_path: "scripts/affected_line_nodes/affected_line_nodes_ike.csv"
+  line_bus_pairs_csv_path: "scripts/affected_line_nodes/affected_line_nodes_ike-wc.csv"
   
 
 settings:
