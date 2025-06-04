@@ -8,5 +8,6 @@ __pycache__/
 .venv
 notebooks/opf_pertubations.ipynb
 .DS_Store
-GridDataGen/grids
+GridDataGen/grids/*.m
 notebooks/test_data
+docs/
