@@ -11,19 +11,13 @@ from pandapower.auxiliary import pandapowerNet
 import gc
 from datetime import datetime
 from tqdm import tqdm
-from GridDataGen.utils.topology_perturbation import initialize_generator
+from GridDataGen.utils.param_handler import initialize_generator
 import psutil
 import shutil
 import yaml
 from multiprocessing import Pool, Manager
 from multiprocessing import Queue
 from math import ceil
-
-
-def write_ram_usage(tqdm_log):
-    process = psutil.Process(os.getpid())
-    mem_usage = process.memory_info().rss / 1024**2  # Memory in MB
-    tqdm_log.write(f"RAM usage: {mem_usage:.2f} MB\n")
 
 
 def process_one_scenario(

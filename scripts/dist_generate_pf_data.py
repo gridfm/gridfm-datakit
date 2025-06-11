@@ -15,89 +15,38 @@ from datetime import datetime
 from tqdm import tqdm
 from multiprocessing import Pool, Manager
 from multiprocessing import Queue
-from GridDataGen.utils.topology_perturbation import initialize_generator
-import psutil
+from GridDataGen.utils.param_handler import initialize_generator
 import shutil
+from GridDataGen.utils.io import write_ram_usage_distributed
 import yaml
+from typing import List, Tuple, Any, Dict, Optional, Union
+from GridDataGen.utils.topology_perturbation import TopologyGenerator
+from GridDataGen.utils.load import LoadScenarioGeneratorBase
 
 
-def write_ram_usage(tqdm_log):
-    process = psutil.Process(os.getpid())  # Parent process
-    mem_usage = process.memory_info().rss / 1024**2  # Parent memory in MB
+def main(args: NestedNamespace) -> None:
+    """Main routine for distributed data generation.
 
-    # Sum memory usage of all child processes
-    for child in process.children(recursive=True):
-        mem_usage += child.memory_info().rss / 1024**2
-
-    tqdm_log.write(f"Total RAM usage (Parent + Children): {mem_usage:.2f} MB\n")
-
-
-def process_scenario_chunk(
-    mode,
-    start_idx: int,
-    end_idx: int,
-    scenarios: np.ndarray,
-    net: pandapowerNet,
-    progress_queue: Queue,
-    generator,
-    no_stats: bool,
-    error_log_path,
-) -> list:
-    """
-    Create data for all scenarios in scenario indexed between start_idx and end_idx
-    """
-    if not no_stats:
-        local_stats = Stats()
-    local_csv_data = []
-    local_adjacency_lists = []
-    local_branch_idx_removed = []
-    for scenario_index in range(start_idx, end_idx):
-        if mode == "pf":
-            (
-                local_csv_data,
-                local_adjacency_lists,
-                local_branch_idx_removed,
-                local_stats,
-            ) = process_scenario(
-                net,
-                scenarios,
-                scenario_index,
-                generator,
-                no_stats,
-                local_csv_data,
-                local_adjacency_lists,
-                local_branch_idx_removed,
-                local_stats,
-                error_log_path,
-            )
-        elif mode == "contingency":
-            (
-                local_csv_data,
-                local_adjacency_lists,
-                local_branch_idx_removed,
-                local_stats,
-            ) = process_scenario_contingency(
-                net,
-                scenarios,
-                scenario_index,
-                generator,
-                no_stats,
-                local_csv_data,
-                local_adjacency_lists,
-                local_branch_idx_removed,
-                local_stats,
-                error_log_path,
-            )
-
-        progress_queue.put(1)  # update queue
-
-    return local_csv_data, local_adjacency_lists, local_branch_idx_removed, local_stats
-
-
-def main(args):
-    """
-    Main routine that loads the network, splits scenarios into large chunks of 10,000,
+    This function loads the network, splits scenarios into large chunks of scenarios,
     runs multiple processes in parallel, and saves data incrementally to avoid high memory usage.
+
+    Args:
+        args: Configuration namespace containing all parameters for data generation.
+            Must include settings, network, load, and topology_perturbation configurations.
+
+    Note:
+        The function creates several output files in the specified data directory:
+        - tqdm.log: Progress tracking
+        - error.log: Error messages
+        - args.log: Configuration parameters
+        - pf_node.csv: Node data
+        - pf_edge.csv: Edge data
+        - branch_idx_removed.csv: Removed branch indices
+        - edge_params.csv: Edge parameters
+        - bus_params.csv: Bus parameters
+        - scenarios_{generator}.csv: Load scenarios
+        - scenarios_{generator}.html: Scenario plots
+        - scenarios_{generator}.log: Scenario generation log
     """
     mode = args.settings.mode
     base_path = os.path.join(args.settings.data_dir, args.network.name, "raw")
@@ -144,7 +93,7 @@ def main(args):
     network_preprocessing(net)
     assert (net.sgen["scaling"] == 1).all(), "Scaling factor >1 not supported yet!"
 
-    load_scenario_generator = get_load_scenario_generator(args)
+    load_scenario_generator = get_load_scenario_generator(args.load)
     scenarios = load_scenario_generator(net, args.load.scenarios, scenarios_log)
     scenarios_df = load_scenarios_to_df(scenarios)
     scenarios_df.to_csv(scenarios_csv_path, index=False)
@@ -177,7 +126,7 @@ def main(args):
             tqdm_log.write(
                 f"\n=======\nProcessing large chunk {large_chunk_index + 1} of {len(large_chunks)}\n"
             )
-            write_ram_usage(tqdm_log)
+            write_ram_usage_distributed(tqdm_log)
             chunk_size = len(large_chunk)
             # Further split the large chunk into smaller parallel chunks
             scenario_chunks = np.array_split(large_chunk, args.settings.num_processes)
@@ -257,7 +206,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--config",
         type=str,
-        default="scripts/config/default_contingency.yaml",
+        default="scripts/config/default.yaml",
         help="Path to config file",
     )
 

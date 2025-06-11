@@ -11,16 +11,12 @@ from pandapower.auxiliary import pandapowerNet
 import gc
 from datetime import datetime
 from tqdm import tqdm
-from GridDataGen.utils.topology_perturbation import initialize_generator
+from GridDataGen.utils.param_handler import initialize_generator
 import psutil
 import shutil
 import yaml
 
 
-def write_ram_usage(tqdm_log):
-    process = psutil.Process(os.getpid())
-    mem_usage = process.memory_info().rss / 1024**2  # Memory in MB
-    tqdm_log.write(f"RAM usage: {mem_usage:.2f} MB\n")
 
 
 def main(args):
@@ -68,7 +64,7 @@ def main(args):
     network_preprocessing(net)
     assert (net.sgen["scaling"] == 1).all(), "Scaling factor >1 not supported yet!"
 
-    load_scenario_generator = get_load_scenario_generator(args)
+    load_scenario_generator = get_load_scenario_generator(args.load)
     scenarios = load_scenario_generator(net, args.load.scenarios, scenarios_log)
     scenarios_df = load_scenarios_to_df(scenarios)
     scenarios_df.to_csv(scenarios_csv_path, index=False)

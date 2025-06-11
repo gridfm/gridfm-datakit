@@ -2,11 +2,28 @@ import pandapower as pp
 import pandas as pd
 import numpy as np
 from pandapower.auxiliary import pandapowerNet
+from typing import Dict, Any
 
 
-def run_opf(net: pandapowerNet, **kwargs) -> bool:
-    """
-    Runs OPF and adds additional information (type and bus) to the network elements
+def run_opf(net: pandapowerNet, **kwargs: Any) -> bool:
+    """Runs Optimal Power Flow (OPF) and adds additional information to network elements.
+
+    This function runs the OPF calculation and adds bus index and type information to the
+    results dataframes. It also performs various validation checks on the results.
+
+    Args:
+        net: A pandapower network object containing the power system model.
+        **kwargs: Additional keyword arguments to pass to pp.runopp().
+
+    Returns:
+        bool: True if the OPF converged successfully, False otherwise.
+
+    Raises:
+        AssertionError: If any of the validation checks fail, including:
+            - Mismatch in active/reactive power
+            - Power bounds violations
+            - Bus power mismatches
+            - Power balance violations
     """
     pp.runopp(net, numba=True, **kwargs)
 
@@ -22,10 +39,13 @@ def run_opf(net: pandapowerNet, **kwargs) -> bool:
     net.res_bus["type"] = net.bus["type"]
 
     # The load of course stays the same as before
-    assert (net.load.p_mw == net.res_load.p_mw).all(), "Mismatch in active power"
-    assert (net.load.q_mvar == net.res_load.q_mvar).all(), "Mismatch in reactive power"
+    assert (net.load.p_mw == net.res_load.p_mw).all(), "Active power load has changed"
+    assert (
+        net.load.q_mvar == net.res_load.q_mvar
+    ).all(), "Reactive power load has changed"
 
     # Checking bounds on active and reactive power
+    # TODO: see with matteo how we want to handle this
     if len(net.gen) != 0:
         in_service_gen = net.gen[net.gen.in_service]
         in_service_res_gen = net.res_gen[net.gen.in_service]
@@ -127,7 +147,7 @@ def run_opf(net: pandapowerNet, **kwargs) -> bool:
         .groupby("bus")
         .sum()
     )  # all load
-    net_consumption = (
+    net_load = (
         pd.concat([all_loads, -all_gens])
         .groupby("bus")
         .sum()
@@ -136,19 +156,15 @@ def run_opf(net: pandapowerNet, **kwargs) -> bool:
     )  # net load = load - generation
 
     assert np.allclose(
-        net.res_bus[["p_mw", "q_mvar"]], net_consumption
-    ), f"Bus power mismatch in OPF: {net.res_bus[['p_mw', 'q_mvar']] - net_consumption}"
+        net.res_bus[["p_mw", "q_mvar"]], net_load
+    ), f"Mismatch between net load stored in res_bus and the net load computed by summing up the load and generation after solving OPF: {net.res_bus[['p_mw', 'q_mvar']] - net_load}"
 
     # check power balance taking into account tansformer and line losses
     total_q_diff = (
-        net_consumption.q_mvar.sum()
-        + net.res_line.ql_mvar.sum()
-        + net.res_trafo.ql_mvar.sum()
+        net_load.q_mvar.sum() + net.res_line.ql_mvar.sum() + net.res_trafo.ql_mvar.sum()
     )
     total_p_diff = (
-        net_consumption.p_mw.sum()
-        + net.res_line.pl_mw.sum()
-        + net.res_trafo.pl_mw.sum()
+        net_load.p_mw.sum() + net.res_line.pl_mw.sum() + net.res_trafo.pl_mw.sum()
     )
 
     num_buses = len(net.bus)
@@ -163,9 +179,23 @@ def run_opf(net: pandapowerNet, **kwargs) -> bool:
     return net.OPF_converged
 
 
-def run_pf(net: pandapowerNet, **kwargs) -> bool:
-    """
-    runs PF
+def run_pf(net: pandapowerNet, **kwargs: Any) -> bool:
+    """Runs Power Flow (PF) calculation and adds additional information to network elements.
+
+    This function runs the power flow calculation and adds bus index and type information
+    to the results dataframes. It also performs validation checks on the results.
+
+    Args:
+        net: A pandapower network object containing the power system model.
+        **kwargs: Additional keyword arguments to pass to pp.runpp().
+
+    Returns:
+        bool: True if the power flow converged successfully, False otherwise.
+
+    Raises:
+        AssertionError: If any of the validation checks fail, including:
+            - Bus power mismatches
+            - Power balance violations
     """
     pp.runpp(net, **kwargs)
 
@@ -196,7 +226,7 @@ def run_pf(net: pandapowerNet, **kwargs) -> bool:
         .groupby("bus")
         .sum()
     )  # all load
-    net_consumption = (
+    net_load = (
         pd.concat([all_loads, -all_gens])
         .groupby("bus")
         .sum()
@@ -205,19 +235,15 @@ def run_pf(net: pandapowerNet, **kwargs) -> bool:
     )  # net load = load - generation
 
     assert np.allclose(
-        net.res_bus[["p_mw", "q_mvar"]], net_consumption
-    ), f"Bus power mismatch in PF: {net.res_bus[['p_mw', 'q_mvar']] - net_consumption}"
+        net.res_bus[["p_mw", "q_mvar"]], net_load
+    ), f"Mismatch between net load stored in res_bus and the net load computed by summing up the load and generation after solving PF: {net.res_bus[['p_mw', 'q_mvar']] - net_load}"
 
     # check power balance taking into account tansformer and line losses
     total_q_diff = (
-        net_consumption.q_mvar.sum()
-        + net.res_line.ql_mvar.sum()
-        + net.res_trafo.ql_mvar.sum()
+        net_load.q_mvar.sum() + net.res_line.ql_mvar.sum() + net.res_trafo.ql_mvar.sum()
     )
     total_p_diff = (
-        net_consumption.p_mw.sum()
-        + net.res_line.pl_mw.sum()
-        + net.res_trafo.pl_mw.sum()
+        net_load.p_mw.sum() + net.res_line.pl_mw.sum() + net.res_trafo.pl_mw.sum()
     )
 
     num_buses = len(net.bus)
@@ -232,9 +258,22 @@ def run_pf(net: pandapowerNet, **kwargs) -> bool:
     return net.converged
 
 
-def run_dcpf(net: pandapowerNet, **kwargs) -> bool:
-    """
-    runs PF
+def run_dcpf(net: pandapowerNet, **kwargs: Any) -> bool:
+    """Runs DC Power Flow (DCPF) calculation and adds additional information to network elements.
+
+    This function runs the DC power flow calculation and adds bus index and type information
+    to the results dataframes. It also performs validation checks on the results.
+
+    Args:
+        net: A pandapower network object containing the power system model.
+        **kwargs: Additional keyword arguments to pass to pp.rundcpp().
+
+    Returns:
+        bool: True if the DC power flow converged successfully, False otherwise.
+
+    Raises:
+        AssertionError: If any of the validation checks fail, including:
+            - Bus power mismatches
     """
     pp.rundcpp(net, **kwargs)
 
@@ -265,7 +304,7 @@ def run_dcpf(net: pandapowerNet, **kwargs) -> bool:
         .groupby("bus")
         .sum()
     )  # all load
-    net_consumption = (
+    net_load = (
         pd.concat([all_loads, -all_gens])
         .groupby("bus")
         .sum()
@@ -274,24 +313,28 @@ def run_dcpf(net: pandapowerNet, **kwargs) -> bool:
     )  # net load = load - generation
 
     assert np.allclose(
-        net.res_bus[["p_mw", "q_mvar"]], net_consumption
-    ), f"Bus power mismatch in PF: {net.res_bus[['p_mw', 'q_mvar']] - net_consumption}"
+        net.res_bus[["p_mw", "q_mvar"]], net_load
+    ), f"Mismatch between net load stored in res_bus and the net load computed by summing up the load and generation after solving DCPF: {net.res_bus[['p_mw', 'q_mvar']] - net_load}"
 
     # check power balance taking into account tansformer and line losses
     total_q_diff = (
-        net_consumption.q_mvar.sum()
-        + net.res_line.ql_mvar.sum()
-        + net.res_trafo.ql_mvar.sum()
+        net_load.q_mvar.sum() + net.res_line.ql_mvar.sum() + net.res_trafo.ql_mvar.sum()
     )
     total_p_diff = (
-        net_consumption.p_mw.sum()
-        + net.res_line.pl_mw.sum()
-        + net.res_trafo.pl_mw.sum()
+        net_load.p_mw.sum() + net.res_line.pl_mw.sum() + net.res_trafo.pl_mw.sum()
     )
 
     num_buses = len(net.bus)
 
-    print("Total reactive power imbalance in PF: ", total_q_diff)
-    print("Total active power imbalance in PF: ", total_p_diff)
+    print(
+        "Total reactive power imbalance in DCPF: ",
+        total_q_diff,
+        " (It is normal that this is not 0 as we are using a DC model)",
+    )
+    print(
+        "Total active power imbalance in DCPF: ",
+        total_p_diff,
+        " (Should be close to 0)",
+    )
 
     return net.converged

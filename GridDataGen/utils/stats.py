@@ -2,9 +2,23 @@ import pandas as pd
 import plotly.express as px
 import os
 import numpy as np
+from typing import List, Union, Optional
+from pandapower.auxiliary import pandapowerNet
 
 
-def plot_stats(base_path):
+def plot_stats(base_path: str) -> None:
+    """Generates and saves HTML plots of network statistics.
+
+    Creates histograms for various network statistics including number of generators,
+    lines, transformers, overloads, and maximum loading. Saves the plots to an HTML file.
+
+    Args:
+        base_path: Directory path where the stats CSV file is located and where
+            the HTML plot will be saved.
+
+    Raises:
+        FileNotFoundError: If stats.csv is not found in the base_path directory.
+    """
     stats_to_plot = Stats()
     stats_to_plot.load(base_path)
     filename = base_path + "/stats_plot.html"
@@ -37,31 +51,32 @@ def plot_stats(base_path):
 
 
 class Stats:
-    """
-    A class to track and analyze statistics related to power grid networks.
+    """A class to track and analyze statistics related to power grid networks.
+
+    This class maintains data lists of various network metrics including
+    number of lines, transformers, generators, overloads, and maximum loading.
 
     Attributes:
-        n_lines (list): Tracks the number of lines in the network over time.
-        n_trafos (list): Tracks the number of transformers in the network over time.
-        n_generators (list): Tracks the number of in-service generators and static generators in the network over time.
+        n_lines: List of number of in-service lines over time.
+        n_trafos: List of number of in-service transformers over time.
+        n_generators: List of total in-service generators (gen + sgen) over time.
+        n_overloads: List of number of overloaded elements over time.
+        max_loading: List of maximum loading percentages over time.
     """
 
-    def __init__(self):
-        """
-        Initializes the Stats object with empty lists for n_lines, n_trafos, and n_generators.
-        """
+    def __init__(self) -> None:
+        """Initializes the Stats object with empty lists for all tracked metrics."""
         self.n_lines = []
         self.n_trafos = []
         self.n_generators = []
         self.n_overloads = []
         self.max_loading = []
 
-    def update(self, net):
-        """
-        Updates the statistics for the current state of the power grid network.
+    def update(self, net: pandapowerNet) -> None:
+        """Adds the current state of the network to the data lists.
 
         Args:
-            net: A power grid network object with attributes `line`, `trafo`, `gen`, and `sgen`.
+            net: A pandapower network object containing the current state of the grid.
         """
         self.n_lines.append(net.line.in_service.sum())
         self.n_trafos.append(net.trafo.in_service.sum())
@@ -74,6 +89,7 @@ class Stats:
                 ]
             )
         )
+
         self.max_loading.append(
             np.max(
                 [
@@ -83,12 +99,11 @@ class Stats:
             )
         )
 
-    def merge(self, other):
-        """
-        Merges another Stats object into this one.
+    def merge(self, other: "Stats") -> None:
+        """Merges another Stats object into this one.
 
         Args:
-            other (Stats): Another Stats object to merge with this one.
+            other: Another Stats object whose data will be merged into this one.
         """
         self.n_lines.extend(other.n_lines)
         self.n_trafos.extend(other.n_trafos)
@@ -96,13 +111,14 @@ class Stats:
         self.n_overloads.extend(other.n_overloads)
         self.max_loading.extend(other.max_loading)
 
-    def save(self, base_path):
-        """
-        Saves the tracked statistics to a CSV file, appending if the file already exists.
-        Ensures the index continues from the last entry instead of restarting from 0.
+    def save(self, base_path: str) -> None:
+        """Saves the tracked statistics to a CSV file.
+
+        If the file already exists, appends the new data with a continuous index.
+        If the file doesn't exist, creates a new file.
 
         Args:
-            base_path (str): The directory path where the CSV file will be saved.
+            base_path: Directory path where the CSV file will be saved.
         """
         filename = os.path.join(base_path, "stats.csv")
 
@@ -126,14 +142,16 @@ class Stats:
         else:
             new_data.to_csv(filename, index=True)
 
-    def load(self, base_path):
-        """
-        Loads the tracked statistics from a CSV file.
+    def load(self, base_path: str) -> None:
+        """Loads the tracked statistics from a CSV file.
 
         Args:
-            base_path (str): The directory path where the CSV file is saved.
+            base_path: Directory path where the CSV file is saved.
+
+        Raises:
+            FileNotFoundError: If stats.csv is not found in the base_path directory.
         """
-        filename = base_path + "/stats.csv"
+        filename = os.path.join(base_path, "stats.csv")
         df = pd.read_csv(filename)
         self.n_lines = df["n_lines"].values
         self.n_trafos = df["n_trafos"].values
