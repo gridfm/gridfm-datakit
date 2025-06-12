@@ -9,14 +9,21 @@ from abc import ABC, abstractmethod
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from copy import deepcopy
+from typing import List, Tuple, Union, Optional, Any
+from pandapower.auxiliary import pandapowerNet
 
 
 def load_scenarios_to_df(scenarios: np.ndarray) -> pd.DataFrame:
-    """
-    convert load scenarios to df.
-    """
+    """Converts load scenarios array to a DataFrame.
 
-    n_buses = scenarios.shape[0]
+    Args:
+        scenarios: 3D numpy array of shape (n_loads, n_scenarios, 2) containing p_mw and q_mvar values.
+
+    Returns:
+        DataFrame with columns: load_scenario, load, p_mw, q_mvar.
+    """
+    n_loads = scenarios.shape[0]
     n_scenarios = scenarios.shape[1]
 
     # Flatten the array
@@ -26,22 +33,23 @@ def load_scenarios_to_df(scenarios: np.ndarray) -> pd.DataFrame:
     df = pd.DataFrame(reshaped_array, columns=["p_mw", "q_mvar"])
 
     # Create load_scenario and bus columns
-    bus_idx = np.tile(np.arange(n_buses), n_scenarios)
-    scenarios_idx = np.repeat(np.arange(n_scenarios), n_buses)
+    load_idx = np.tile(np.arange(n_loads), n_scenarios)
+    scenarios_idx = np.repeat(np.arange(n_scenarios), n_loads)
 
     df.insert(0, "load_scenario", scenarios_idx)
-    df.insert(1, "bus", bus_idx)
+    df.insert(1, "load", load_idx)
 
     return df
 
 
-def plot_load_scenarios_combined(df, output_file):
-    """
-    Generate a combined Plotly plot with p_mw and q_mvar in the same file, one line per bus.
+def plot_load_scenarios_combined(df: pd.DataFrame, output_file: str) -> None:
+    """Generates a combined plot of active and reactive power load scenarios.
 
-    Parameters:
-    - df: DataFrame containing the load scenarios
-    - output_file: File name for the combined plot
+    Creates a two-subplot figure with p_mw and q_mvar plots, one line per bus.
+
+    Args:
+        df: DataFrame containing load scenarios with columns: load_scenario, load, p_mw, q_mvar.
+        output_file: Path where the HTML plot file should be saved.
     """
     # Create subplots
     fig = make_subplots(
@@ -53,28 +61,28 @@ def plot_load_scenarios_combined(df, output_file):
     )
 
     # Add p_mw plot
-    for bus in df["bus"].unique():
-        df_bus = df[df["bus"] == bus]
+    for load in df["load"].unique():
+        df_load = df[df["load"] == load]
         fig.add_trace(
             go.Scatter(
-                x=df_bus["load_scenario"],
-                y=df_bus["p_mw"],
+                x=df_load["load_scenario"],
+                y=df_load["p_mw"],
                 mode="lines",
-                name=f"Bus {bus} p_mw",
+                name=f"Load {load} p_mw",
             ),
             row=1,
             col=1,
         )
 
     # Add q_mvar plot
-    for bus in df["bus"].unique():
-        df_bus = df[df["bus"] == bus]
+    for load in df["load"].unique():
+        df_load = df[df["load"] == load]
         fig.add_trace(
             go.Scatter(
-                x=df_bus["load_scenario"],
-                y=df_bus["q_mvar"],
+                x=df_load["load_scenario"],
+                y=df_load["q_mvar"],
                 mode="lines",
-                name=f"Bus {bus} q_mvar",
+                name=f"Load {load} q_mvar",
             ),
             row=2,
             col=1,
@@ -88,15 +96,39 @@ def plot_load_scenarios_combined(df, output_file):
 
 
 class LoadScenarioGeneratorBase(ABC):
-    """Abstract base class for load scenario generators."""
+    """Abstract base class for load scenario generators.
+
+    This class defines the interface and common functionality for generating
+    load scenarios for power grid networks.
+    """
 
     @abstractmethod
-    def __call__(self, net, n_scenarios, scenario_log):
+    def __call__(
+        self, net: pandapowerNet, n_scenarios: int, scenario_log: str
+    ) -> np.ndarray:
+        """Generates load scenarios for a power network.
+
+        Args:
+            net: The power network.
+            n_scenarios: Number of scenarios to generate.
+            scenario_log: Path to log file for scenario generation details.
+
+        Returns:
+            numpy.ndarray: Array of shape (n_loads, n_scenarios, 2) containing p_mw and q_mvar values.
+        """
         pass
 
     @staticmethod
-    def interpolate_row(row, data_points):
-        """Interpolate a row of data to match the desired number of data points."""
+    def interpolate_row(row: np.ndarray, data_points: int) -> np.ndarray:
+        """Interpolates a row of data to match the desired number of data points.
+
+        Args:
+            row: Input data array to interpolate.
+            data_points: Number of points in the output array.
+
+        Returns:
+            numpy.ndarray: Interpolated data array of length data_points.
+        """
         if np.all(row == 0):
             return np.zeros(data_points)
         x_original = np.linspace(1, len(row), len(row))
@@ -104,7 +136,31 @@ class LoadScenarioGeneratorBase(ABC):
         return interp1d(x_original, row, kind="linear")(x_target)
 
     @staticmethod
-    def find_largest_scaling_factor(net, max_scaling, step_size, start):
+    def find_largest_scaling_factor(
+        net: pandapowerNet,
+        max_scaling: float,
+        step_size: float,
+        start: float,
+        change_reactive_power: bool,
+    ) -> float:
+        """Finds the largest load scaling factor that maintains OPF convergence.
+
+        Args:
+            net: The power network.
+            max_scaling: Maximum scaling factor to try.
+            step_size: Increment for scaling factor search.
+            start: Starting scaling factor.
+            change_reactive_power: Whether to scale reactive power.
+
+        Returns:
+            float: Largest scaling factor that maintains OPF convergence.
+
+        Raises:
+            RuntimeError: If OPF does not converge for the starting value.
+        """
+        net = deepcopy(
+            net
+        )  ## Without this, we change the base load of the network, whioch impacts the entire data gen
         p_ref = net.load["p_mw"]
         q_ref = net.load["q_mvar"]
         u = start
@@ -114,12 +170,17 @@ class LoadScenarioGeneratorBase(ABC):
         print("Finding upper limit u .", end="", flush=True)
 
         while (u <= max_scaling) and (converged == True):
-            net.load["p_mw"] = p_ref * u
-            net.load["q_mvar"] = q_ref * u
+            net.load["p_mw"] = p_ref * u  # we scale the active power
+            if (
+                change_reactive_power
+            ):  # if we want to change the reactive power, we scale it by the same factor as the active power
+                net.load["q_mvar"] = q_ref * u
+            else:
+                net.load["q_mvar"] = q_ref
 
             try:
                 pp.runopp(net, numba=True)
-                u += step_size
+                u += step_size  # we increment the scaling factor by the step size
                 print(".", end="", flush=True)
             except pp.OPFNotConverged as err:
                 if u == start:
@@ -136,27 +197,55 @@ class LoadScenarioGeneratorBase(ABC):
         return u
 
     @staticmethod
-    def min_max_scale(series, new_min, new_max):
-        """
-        Scale a series of values to a new range using min-max normalization.
+    def min_max_scale(series: np.ndarray, new_min: float, new_max: float) -> np.ndarray:
+        """Scales a series of values to a new range using min-max normalization.
+
+        Args:
+            series: Input data array to scale.
+            new_min: Minimum value of the output range.
+            new_max: Maximum value of the output range.
+
+        Returns:
+            numpy.ndarray: Scaled data array.
         """
         old_min, old_max = np.min(series), np.max(series)
-        return new_min + (series - old_min) * (new_max - new_min) / (old_max - old_min)
+        if old_max == old_min:
+            return np.ones_like(series) * new_min
+        else:
+            return new_min + (series - old_min) * (new_max - new_min) / (
+                old_max - old_min
+            )
 
 
 class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
-    """Load scenario generator using aggregated load profiles."""
+    """Load scenario generator using aggregated load profiles.
+
+    Generates load scenarios by scaling and adding noise to an aggregated load profile.
+
+    TODO: add better documentation
+    """
 
     def __init__(
         self,
-        agg_load_name,
-        sigma,
-        change_reactive_power,
-        global_range,
-        max_scaling_factor,
-        step_size,
-        start_scaling_factor,
+        agg_load_name: str,
+        sigma: float,
+        change_reactive_power: bool,
+        global_range: float,
+        max_scaling_factor: float,
+        step_size: float,
+        start_scaling_factor: float,
     ):
+        """Initializes the load scenario generator.
+
+        Args:
+            agg_load_name: Name of the aggregated load profile file.
+            sigma: Standard deviation for noise addition.
+            change_reactive_power: Whether to scale reactive power.
+            global_range: Range for scaling factor.
+            max_scaling_factor: Maximum scaling factor to try.
+            step_size: Increment for scaling factor search.
+            start_scaling_factor: Starting scaling factor.
+        """
         self.agg_load_name = agg_load_name
         self.sigma = sigma
         self.change_reactive_power = change_reactive_power
@@ -165,10 +254,23 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
         self.step_size = step_size
         self.start_scaling_factor = start_scaling_factor
 
-    def __call__(self, net, n_scenarios, scenarios_log):
-        """Generate load profiles for a power grid based on aggregated load data."""
+    def __call__(
+        self, net: pandapowerNet, n_scenarios: int, scenarios_log: str
+    ) -> np.ndarray:
+        """Generates load profiles based on aggregated load data.
 
-        if self.start_scaling_factor - self.global_range < 0:
+        Args:
+            net: The power network.
+            n_scenarios: Number of scenarios to generate.
+            scenarios_log: Path to log file for scenario generation details.
+
+        Returns:
+            numpy.ndarray: Array of shape (n_loads, n_scenarios, 2) containing p_mw and q_mvar values.
+
+        Raises:
+            ValueError: If start_scaling_factor is less than global_range.
+        """
+        if self.start_scaling_factor - self.global_range * self.start_scaling_factor < 0:
             raise ValueError(
                 "The start scaling factor must be larger than the global range."
             )
@@ -178,8 +280,11 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
             max_scaling=self.max_scaling_factor,
             step_size=self.step_size,
             start=self.start_scaling_factor,
+            change_reactive_power=self.change_reactive_power,
         )
-        l = u - self.global_range
+        l = (
+            u - self.global_range * u
+        )  ## The lower bound used to be set as e.g. u - 40%, while now it is set as u - 40% of u
 
         with open(scenarios_log, "a") as f:
             f.write("u=" + str(u) + "\n")
@@ -191,20 +296,14 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
         agg_load = pd.read_csv(agg_load_path).to_numpy()
         agg_load = agg_load.reshape(agg_load.shape[0])
         ref_curve = self.min_max_scale(agg_load, l, u)
+        print("min, max of ref_curve: {}, {}".format(ref_curve.min(), ref_curve.max()))
+        print("l, u: {}, {}".format(l, u))
 
-        # Get the bus indices from the network and compute load for each bus
-        bus_indices = net.bus.index.values
+        p_mw_array = (
+            net.load.p_mw.to_numpy()
+        )  # we now store the active power at the load elements level, we don't aggregate it at the bus level (which was probably not changing anything since there is usually max one load per bus)
 
-        p_mw_array = np.array(
-            [net.load.loc[net.load["bus"] == bus, "p_mw"].sum() for bus in bus_indices]
-        )
-
-        q_mvar_array = np.array(
-            [
-                net.load.loc[net.load["bus"] == bus, "q_mvar"].sum()
-                for bus in bus_indices
-            ]
-        )
+        q_mvar_array = net.load.q_mvar.to_numpy()
 
         # if the number of requested scenarios is smaller than the number of timesteps in the load profile, we cut the load profile
         if n_scenarios <= ref_curve.shape[0]:
@@ -242,31 +341,42 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
         # Stack profiles along the last dimension
         load_profiles = np.stack((load_profile_pmw, load_profile_qmvar), axis=-1)
 
-        buses_with_no_load_element = ~np.isin(
-            range(net.bus.shape[0]), net.load.bus.values
-        )
-
-        assert (
-            (load_profiles[buses_with_no_load_element, :] == 0).all()
-        ).all(), (
-            "there is a bus that has no load element but that has a load assigned to it"
-        )
-
         return load_profiles
 
 
 class Powergraph(LoadScenarioGeneratorBase):
-    """Load scenario generator as in powergraph."""
+    """Load scenario generator as in powergraph.
+
+    Generates load scenarios by scaling active power with a reference curve
+    while keeping reactive power constant.
+
+    TODO: add better documentation
+    """
 
     def __init__(
         self,
-        agg_load_name,
+        agg_load_name: str,
     ):
+        """Initializes the powergraph load scenario generator.
+
+        Args:
+            agg_load_name: Name of the aggregated load profile file.
+        """
         self.agg_load_name = agg_load_name
 
-    def __call__(self, net, n_scenarios, scenario_log):
-        """Generate load profiles for a power grid based on aggregated load data."""
+    def __call__(
+        self, net: pandapowerNet, n_scenarios: int, scenario_log: str
+    ) -> np.ndarray:
+        """Generates load profiles based on aggregated load data.
 
+        Args:
+            net: The power network.
+            n_scenarios: Number of scenarios to generate.
+            scenario_log: Path to log file for scenario generation details.
+
+        Returns:
+            numpy.ndarray: Array of shape (n_loads, n_scenarios, 2) containing p_mw and q_mvar values.
+        """
         agg_load_path = resources.files(f"GridDataGen.load_profiles").joinpath(
             f"{self.agg_load_name}.csv"
         )
@@ -275,19 +385,11 @@ class Powergraph(LoadScenarioGeneratorBase):
         ref_curve = agg_load / agg_load.max()
         print("u={}, l={}".format(ref_curve.max(), ref_curve.min()))
 
-        # Get the bus indices from the network and compute load for each bus
-        bus_indices = net.bus.index.values
+        p_mw_array = (
+            net.load.p_mw.to_numpy()
+        )  # we now store the active power at the load elements level, we don't aggregate it at the bus level (which was probably not changing anything since there is usually max one load per bus)
 
-        p_mw_array = np.array(
-            [net.load.loc[net.load["bus"] == bus, "p_mw"].sum() for bus in bus_indices]
-        )
-
-        q_mvar_array = np.array(
-            [
-                net.load.loc[net.load["bus"] == bus, "q_mvar"].sum()
-                for bus in bus_indices
-            ]
-        )
+        q_mvar_array = net.load.q_mvar.to_numpy()
 
         # if the number of requested scenarios is smaller than the number of timesteps in the load profile, we cut the load profile
         if n_scenarios <= ref_curve.shape[0]:
@@ -312,15 +414,5 @@ class Powergraph(LoadScenarioGeneratorBase):
 
         # Stack profiles along the last dimension
         load_profiles = np.stack((load_profile_pmw, load_profile_qmvar), axis=-1)
-
-        buses_with_no_load_element = ~np.isin(
-            range(net.bus.shape[0]), net.load.bus.values
-        )
-
-        assert (
-            (load_profiles[buses_with_no_load_element, :] == 0).all()
-        ).all(), (
-            "there is a bus that has no load element but that has a load assigned to it"
-        )
 
         return load_profiles

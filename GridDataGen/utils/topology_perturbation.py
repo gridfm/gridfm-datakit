@@ -11,50 +11,76 @@ import pandapower.topology as top
 import math
 import warnings
 import time
+from typing import Generator, List, Tuple, Union, Optional
+import pandas as pd
 
 
 # Abstract base class for topology generation
 class TopologyGenerator(ABC):
-    def __init__(self):
+    """Abstract base class for generating perturbed network topologies."""
+
+    def __init__(self) -> None:
+        """Initialize the topology generator."""
         pass
 
     @abstractmethod
-    def generate(self, net):
-        """
-        Abstract method for generating perturbed topologies.
+    def generate(
+        self, net: pp.pandapowerNet
+    ) -> Generator[pp.pandapowerNet, None, None]:
+        """Generate perturbed topologies.
 
         Args:
-            net (pandapowerNet): The power network.
+            net: The power network to perturb.
 
         Yields:
-            pandapowerNet: A perturbed network topology.
+            A perturbed network topology.
         """
         pass
 
 
 class NoPerturbationGenerator(TopologyGenerator):
-    def generate(self, net):
-        """
-        Yields the original network without any perturbations.
+    """Generator that yields the original network without any perturbations."""
+
+    def generate(
+        self, net: pp.pandapowerNet
+    ) -> Generator[pp.pandapowerNet, None, None]:
+        """Yield the original network without any perturbations.
 
         Args:
-            net (pandapowerNet): The power network.
+            net: The power network.
 
         Yields:
-            pandapowerNet: The original power network.
+            The original power network.
         """
         yield net
 
 
 class NMinusKGenerator(TopologyGenerator):
-    """
-    Generate perturbed topologies for N-k contingency analysis. Only considers lines and transformers
-    Generates ALL possible topologies with at most k dropped components (lines and transformers)
+    """Generate perturbed topologies for N-k contingency analysis.
+
+    Only considers lines and transformers. Generates ALL possible topologies with at most k
+    components set out of service (lines and transformers).
+
+    Only topologies that are feasible (= no unsupplied buses) are yielded.
+
+    Attributes:
+        k: Maximum number of components to drop.
+        components_to_drop: List of tuples containing component indices and types.
+        component_combinations: List of all possible combinations of components to drop.
     """
 
-    def __init__(self, k, base_net):
+    def __init__(self, k: int, base_net: pp.pandapowerNet) -> None:
+        """Initialize the N-k generator.
+
+        Args:
+            k: Maximum number of components to drop.
+            base_net: The base power network.
+
+        Raises:
+            ValueError: If k is 0.
+            Warning: If k > 1, as this may result in slow data generation.
+        """
         super().__init__()
-        # warn when k>1 as the number of combinations is exponential in k, which may result in slow data gen process
         if k > 1:
             warnings.warn("k>1. This may result in slow data generation process.")
         if k == 0:
@@ -77,15 +103,17 @@ class NMinusKGenerator(TopologyGenerator):
             f"Number of possible topologies with at most {self.k} dropped components: {len(self.component_combinations)}"
         )
 
-    def generate(self, net):
-        """
+    def generate(
+        self, net: pp.pandapowerNet
+    ) -> Generator[pp.pandapowerNet, None, None]:
+        """Generate perturbed topologies by dropping components.
+
         Args:
-            net (pandapowerNet): The power network.
+            net: The power network.
 
         Yields:
-            pandapowerNet: A perturbed network topology with at most k components removed.
+            A perturbed network topology with at most k components removed.
         """
-
         for selected_components in self.component_combinations:
             perturbed_topology = copy.deepcopy(net)
 
@@ -95,9 +123,9 @@ class NMinusKGenerator(TopologyGenerator):
 
             # Drop selected lines and transformers
             if lines_to_drop:
-                pp.drop_lines(perturbed_topology, lines_to_drop)
+                perturbed_topology.line.loc[lines_to_drop, "in_service"] = False
             if trafos_to_drop:
-                pp.drop_trafos(perturbed_topology, trafos_to_drop)
+                perturbed_topology.trafo.loc[trafos_to_drop, "in_service"] = False
 
             # Check network feasibility and yield the topology
             if not len(top.unsupplied_buses(perturbed_topology)):
@@ -105,31 +133,53 @@ class NMinusKGenerator(TopologyGenerator):
 
 
 class RandomComponentDropGenerator(TopologyGenerator):
-    """
-    Generates perturbed topologies by randomly dropping at most k components among lines, transformers, generators, and static generators.
-    Note that the generators and static generators are not dropped, but in_service is set to False!
+    """Generate perturbed topologies by randomly setting components out of service.
+
+    Generates perturbed topologies by randomly setting out of service at most k components among the selected element types.
+    Only topologies that are feasible (= no unsupplied buses) are yielded.
+
+    Attributes:
+        n_topology_variants: Number of topology variants to generate.
+        k: Maximum number of components to drop.
+        components_to_drop: List of tuples containing component indices and types.
     """
 
-    def __init__(self, n_topology_variants, k, base_net):
+    def __init__(
+        self,
+        n_topology_variants: int,
+        k: int,
+        base_net: pp.pandapowerNet,
+        elements: List[str] = ["line", "trafo", "gen", "sgen"],
+    ) -> None:
+        """Initialize the random component drop generator.
+
+        Args:
+            n_topology_variants: Number of topology variants to generate.
+            k: Maximum number of components to drop.
+            base_net: The base power network.
+            elements: List of element types to consider for dropping.
+        """
         super().__init__()
         self.n_topology_variants = n_topology_variants
         self.k = k
 
         # Create a list of all components that can be dropped
-        self.components_to_drop = (
-            [(index, "line") for index in base_net.line.index]
-            + [(index, "trafo") for index in base_net.trafo.index]
-            + [(index, "gen") for index in base_net.gen.index]
-            + [(index, "sgen") for index in base_net.sgen.index]
-        )
+        self.components_to_drop = []
+        for element in elements:
+            self.components_to_drop.extend(
+                [(index, element) for index in base_net[element].index]
+            )
 
-    def generate(self, net):
-        """
+    def generate(
+        self, net: pp.pandapowerNet
+    ) -> Generator[pp.pandapowerNet, None, None]:
+        """Generate perturbed topologies by randomly setting components out of service.
+
         Args:
-            net (pandapowerNet): The power network.
+            net: The power network.
 
         Yields:
-            pandapowerNet: A perturbed network topology.
+            A perturbed network topology.
         """
         n_generated_topologies = 0
 
@@ -138,7 +188,9 @@ class RandomComponentDropGenerator(TopologyGenerator):
             perturbed_topology = copy.deepcopy(net)
 
             # draw the number of components to drop from a uniform distribution
-            r = np.random.randint(0, self.k + 1)
+            r = np.random.randint(
+                1, self.k + 1
+            )  # TODO: decide if we want to be able to set 0 components out of service
 
             # Randomly select r<=k components to drop
             components = tuple(
@@ -158,9 +210,9 @@ class RandomComponentDropGenerator(TopologyGenerator):
 
             # Drop selected lines and transformers, turn off generators and static generators
             if lines_to_drop:
-                pp.drop_lines(perturbed_topology, lines_to_drop)
+                perturbed_topology.line.loc[lines_to_drop, "in_service"] = False
             if trafos_to_drop:
-                pp.drop_trafos(perturbed_topology, trafos_to_drop)
+                perturbed_topology.trafo.loc[trafos_to_drop, "in_service"] = False
             if gens_to_turn_off:
                 perturbed_topology.gen.loc[gens_to_turn_off, "in_service"] = False
             if sgens_to_turn_off:
@@ -173,22 +225,36 @@ class RandomComponentDropGenerator(TopologyGenerator):
 
 
 class MostOverloadedLineDropGenerator(TopologyGenerator):
-    """
-    Generates the n_topology_variants perturbed topologies obtained by dropping the most overloaded line or transformer.
-    Each topology has only one dropped component
+    """Generate topologies by setting out of service the most overloaded components.
+
+    Generates the n_topology_variants perturbed topologies obtained by setting out of service the most
+    overloaded line or transformer. Each topology has only one component set out of service.
+
+    Only topologies that are feasible (= no unsupplied buses) are yielded.
+
+    Attributes:
+        n_topology_variants: Number of topology variants to generate.
     """
 
-    def __init__(self, n_topology_variants):
+    def __init__(self, n_topology_variants: int) -> None:
+        """Initialize the most overloaded line drop generator.
+
+        Args:
+            n_topology_variants: Number of topology variants to generate.
+        """
         super().__init__()
         self.n_topology_variants = n_topology_variants
 
-    def generate(self, net):
-        """
+    def generate(
+        self, net: pp.pandapowerNet
+    ) -> Generator[pp.pandapowerNet, None, None]:
+        """Generate perturbed topologies by setting out of service the most overloaded components.
+
         Args:
-            net (pandapowerNet): The power network.
+            net: The power network.
 
         Yields:
-            pandapowerNet: A perturbed network topology.
+            A perturbed network topology.
         """
         success = run_opf(net)
         if not success:
@@ -213,7 +279,6 @@ class MostOverloadedLineDropGenerator(TopologyGenerator):
         n_generated_topologies = 0
 
         for component_to_drop in overloaded_components:
-
             if n_generated_topologies >= self.n_topology_variants:
                 break
 
@@ -224,9 +289,9 @@ class MostOverloadedLineDropGenerator(TopologyGenerator):
             components_to_drop = [component_to_drop[0]]
 
             if component_type == "line":
-                pp.drop_lines(perturbed_topology, components_to_drop)
+                perturbed_topology.line.loc[components_to_drop, "in_service"] = False
             else:
-                pp.drop_trafos(perturbed_topology, components_to_drop)
+                perturbed_topology.trafo.loc[components_to_drop, "in_service"] = False
 
             # Check network feasibility and yield the topology
             if not len(top.unsupplied_buses(perturbed_topology)):
@@ -234,26 +299,81 @@ class MostOverloadedLineDropGenerator(TopologyGenerator):
                 n_generated_topologies += 1
 
 
-def initialize_generator(generator_type, n_topology_variants, k, base_net):
-    """
-    Initialize the appropriate topology generator based on the given generator type.
+class FromListOfBusPairsGenerator(TopologyGenerator):
+    """Generate perturbed topologies by setting out of service components between specified bus pairs.
 
-    Args:
-        generator_type (str): Type of topology generator (e.g., "n_minus_k", "random", "overloaded").
-        n_topology_variants (int): Number of unique perturbed topologies to generate.
-        k (int): Max nb of components to drop in each perturbation.
-        base_net: Base topology: Make sure you call initialize_generator for every different base topology!!!
+    Generates perturbed topologies by setting out of service the lines and transformers that connect
+    the bus pairs specified in a CSV file.
 
-    Returns:
-        TopologyGenerator: The initialized topology generator.
+    Attributes:
+        line_bus_pairs: Array of bus pairs from the CSV file.
+        lines_to_drop: List of line indices to drop.
+        trafos_to_drop: List of transformer indices to drop.
+        max_n_topologies: Maximum number of possible topologies.
     """
-    if generator_type == "n_minus_k":
-        return NMinusKGenerator(k, base_net)
-    elif generator_type == "random":
-        return RandomComponentDropGenerator(n_topology_variants, k, base_net)
-    elif generator_type == "overloaded":
-        return MostOverloadedLineDropGenerator(n_topology_variants)
-    elif generator_type == "none":
-        return NoPerturbationGenerator()
-    else:
-        raise ValueError(f"Unknown generator type: {generator_type}")
+
+    def __init__(self, base_net: pp.pandapowerNet, line_bus_pairs_csv: str) -> None:
+        """Initialize the bus pairs generator.
+
+        Args:
+            base_net: The base power network.
+            line_bus_pairs_csv: Path to CSV file containing bus pairs.
+        """
+        super().__init__()
+        self.line_bus_pairs = pd.read_csv(line_bus_pairs_csv, header=None).values
+        bus0 = self.line_bus_pairs[:, 0]
+        bus1 = self.line_bus_pairs[:, 1]
+
+        # get all lines that connect the bus pairs
+        self.lines_to_drop = base_net.line.index[
+            (base_net.line.from_bus.isin(bus0) & base_net.line.to_bus.isin(bus1))
+            | (base_net.line.from_bus.isin(bus1) & base_net.line.to_bus.isin(bus0))
+        ].tolist()
+
+        # get all transformers that connect the bus pairs
+        self.trafos_to_drop = base_net.trafo.index[
+            (base_net.trafo.hv_bus.isin(bus0) & base_net.trafo.lv_bus.isin(bus1))
+            | (base_net.trafo.hv_bus.isin(bus1) & base_net.trafo.lv_bus.isin(bus0))
+        ].tolist()
+
+        self.max_n_topologies = len(self.lines_to_drop) + len(self.trafos_to_drop)
+
+    def generate(self, net: pp.pandapowerNet) -> List[pp.pandapowerNet]:
+        """Generate perturbed topologies by dropping components between bus pairs.
+
+        Args:
+            net: The power network.
+
+        Returns:
+            A list of perturbed network topologies.
+        """
+        perturbed_topologies = []
+        n_infeasible_topologies = 0
+
+        for line_to_drop in self.lines_to_drop:
+            perturbed_topology = copy.deepcopy(net)
+            perturbed_topology.line.loc[line_to_drop, "in_service"] = False
+
+            # Check network feasibility
+            if not len(top.unsupplied_buses(perturbed_topology)):
+                perturbed_topologies.append(perturbed_topology)
+            else:
+                n_infeasible_topologies += 1
+
+        for trafo_to_drop in self.trafos_to_drop:
+            perturbed_topology = copy.deepcopy(net)
+            perturbed_topology.trafo.loc[trafo_to_drop, "in_service"] = False
+
+            # Check network feasibility
+            if not len(top.unsupplied_buses(perturbed_topology)):
+                perturbed_topologies.append(perturbed_topology)
+            else:
+                n_infeasible_topologies += 1
+
+        print(
+            f"Number of infeasible topologies: {n_infeasible_topologies}/ {self.max_n_topologies}"
+        )
+        print(f"Number of feasible topologies: {len(perturbed_topologies)}")
+        print(f"Number of bus pairs: {len(self.line_bus_pairs)}")
+
+        return perturbed_topologies
