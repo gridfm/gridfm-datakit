@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools >= 80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "GridDataGen"
+description = "Grid Data Synthetic Generation"
+readme = "README.md"
+license = "Apache-2.0" 
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "ipykernel>=6.29.5",
+    "matplotlib>=3.10.3",
+    "matpowercaseframes>=1.1.4",
+    "nbformat>=5.10.4",
+    "numba>=0.61.2",
+    "numpy>=1.26.4",
+    "pandapower==2.14.11",
+    "pandas>=2.3.0",
+    "pathlib>=1.0.1",
+    "plotly>=6.1.2",
+    "pyaml>=25.5.0",
+    "requests>=2.32.4",
+]
+
+authors = [
+  {name = "Matteo Mazzonelli", email = "Matteo.Mazzonelli1@ibm.com"},
+  {name = "Alban Puech", email = "Alban.Puech1@ibm.com"},
+  {name = "Jonas Weiss", email= "jwe@zurich.ibm.com"},
+]
+
+maintainers = [
+  {name = "Alban Puech", email = "Alban.Puech1@ibm.com"},
+]
