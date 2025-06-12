@@ -4,6 +4,7 @@ import os
 import numpy as np
 from typing import List, Union, Optional
 from pandapower.auxiliary import pandapowerNet
+from GridDataGen.utils.solvers import calculate_power_imbalance
 
 
 def plot_stats(base_path: str) -> None:
@@ -49,12 +50,22 @@ def plot_stats(base_path: str) -> None:
         fig_max_loading.update_layout(xaxis_title="Max Loading")
         f.write(fig_max_loading.to_html(full_html=False, include_plotlyjs=False))
 
+        # Plot for total_p_diff
+        fig_total_p_diff = px.histogram(stats_to_plot.total_p_diff)
+        fig_total_p_diff.update_layout(xaxis_title="Total Active Power Imbalance")
+        f.write(fig_total_p_diff.to_html(full_html=False, include_plotlyjs=False))
+
+        # Plot for total_q_diff
+        fig_total_q_diff = px.histogram(stats_to_plot.total_q_diff)
+        fig_total_q_diff.update_layout(xaxis_title="Total Reactive Power Imbalance")
+        f.write(fig_total_q_diff.to_html(full_html=False, include_plotlyjs=False))
+
 
 class Stats:
     """A class to track and analyze statistics related to power grid networks.
 
     This class maintains data lists of various network metrics including
-    number of lines, transformers, generators, overloads, and maximum loading.
+    number of lines, transformers, generators, overloads, maximum loading, total active power imbalance, and total reactive power imbalance.
 
     Attributes:
         n_lines: List of number of in-service lines over time.
@@ -62,6 +73,8 @@ class Stats:
         n_generators: List of total in-service generators (gen + sgen) over time.
         n_overloads: List of number of overloaded elements over time.
         max_loading: List of maximum loading percentages over time.
+        total_p_diff: List of total active power imbalance over time.
+        total_q_diff: List of total reactive power imbalance over time.
     """
 
     def __init__(self) -> None:
@@ -71,6 +84,8 @@ class Stats:
         self.n_generators = []
         self.n_overloads = []
         self.max_loading = []
+        self.total_p_diff = []
+        self.total_q_diff = []
 
     def update(self, net: pandapowerNet) -> None:
         """Adds the current state of the network to the data lists.
@@ -98,6 +113,9 @@ class Stats:
                 ]
             )
         )
+        total_p_diff, total_q_diff = calculate_power_imbalance(net)
+        self.total_p_diff.append(total_p_diff)
+        self.total_q_diff.append(total_q_diff)
 
     def merge(self, other: "Stats") -> None:
         """Merges another Stats object into this one.
@@ -110,6 +128,8 @@ class Stats:
         self.n_generators.extend(other.n_generators)
         self.n_overloads.extend(other.n_overloads)
         self.max_loading.extend(other.max_loading)
+        self.total_p_diff.extend(other.total_p_diff)
+        self.total_q_diff.extend(other.total_q_diff)
 
     def save(self, base_path: str) -> None:
         """Saves the tracked statistics to a CSV file.
@@ -129,6 +149,8 @@ class Stats:
                 "n_generators": self.n_generators,
                 "n_overloads": self.n_overloads,
                 "max_loading": self.max_loading,
+                "total_p_diff": self.total_p_diff,
+                "total_q_diff": self.total_q_diff,
             }
         )
 
@@ -158,3 +180,5 @@ class Stats:
         self.n_generators = df["n_generators"].values
         self.n_overloads = df["n_overloads"].values
         self.max_loading = df["max_loading"].values
+        self.total_p_diff = df["total_p_diff"].values
+        self.total_q_diff = df["total_q_diff"].values

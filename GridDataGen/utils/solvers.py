@@ -2,7 +2,7 @@ import pandapower as pp
 import pandas as pd
 import numpy as np
 from pandapower.auxiliary import pandapowerNet
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
 
 
 def run_opf(net: pandapowerNet, **kwargs: Any) -> bool:
@@ -134,46 +134,12 @@ def run_opf(net: pandapowerNet, **kwargs: Any) -> bool:
                     f"{valid_q_sgen.min_q_mvar[valid_q_res_sgen.q_mvar - valid_q_sgen.min_q_mvar <= -1e-4]}"
                 )
 
-    # check if net power at each bus is coherent with power demand and power generation
-    all_gens = (
-        pd.concat([net.res_gen, net.res_sgen, net.res_ext_grid])[
-            ["p_mw", "q_mvar", "bus"]
-        ]
-        .groupby("bus")
-        .sum()
-    )
-    all_loads = (
-        pd.concat([net.res_load, net.res_shunt])[["p_mw", "q_mvar", "bus"]]
-        .groupby("bus")
-        .sum()
-    )  # all load
-    net_load = (
-        pd.concat([all_loads, -all_gens])
-        .groupby("bus")
-        .sum()
-        .reindex_like(net.res_bus[["p_mw", "q_mvar"]])
-        .fillna(0)
-    )  # net load = load - generation
-
-    assert np.allclose(
-        net.res_bus[["p_mw", "q_mvar"]], net_load
-    ), f"Mismatch between net load stored in res_bus and the net load computed by summing up the load and generation after solving OPF: {net.res_bus[['p_mw', 'q_mvar']] - net_load}"
-
-    # check power balance taking into account tansformer and line losses
-    total_q_diff = (
-        net_load.q_mvar.sum() + net.res_line.ql_mvar.sum() + net.res_trafo.ql_mvar.sum()
-    )
-    total_p_diff = (
-        net_load.p_mw.sum() + net.res_line.pl_mw.sum() + net.res_trafo.pl_mw.sum()
-    )
-
-    num_buses = len(net.bus)
-
+    total_p_diff, total_q_diff = calculate_power_imbalance(net)
     assert (
-        np.abs(total_q_diff / num_buses) < 1e-1
+        np.abs(total_q_diff) < 1e-1
     ), f"Total reactive power imbalance in OPF: {total_q_diff}"
     assert (
-        np.abs(total_p_diff / num_buses) < 1e-1
+        np.abs(total_p_diff) < 1e-1
     ), f"Total active power imbalance in OPF: {total_p_diff}"
 
     return net.OPF_converged
@@ -213,46 +179,13 @@ def run_pf(net: pandapowerNet, **kwargs: Any) -> bool:
     net.res_ext_grid["bus"] = net.ext_grid.bus
     net.res_bus["type"] = net.bus["type"]
 
-    # check net power at each bus
-    all_gens = (
-        pd.concat([net.res_gen, net.res_sgen, net.res_ext_grid])[
-            ["p_mw", "q_mvar", "bus"]
-        ]
-        .groupby("bus")
-        .sum()
-    )
-    all_loads = (
-        pd.concat([net.res_load, net.res_shunt])[["p_mw", "q_mvar", "bus"]]
-        .groupby("bus")
-        .sum()
-    )  # all load
-    net_load = (
-        pd.concat([all_loads, -all_gens])
-        .groupby("bus")
-        .sum()
-        .reindex_like(net.res_bus[["p_mw", "q_mvar"]])
-        .fillna(0)
-    )  # net load = load - generation
-
-    assert np.allclose(
-        net.res_bus[["p_mw", "q_mvar"]], net_load
-    ), f"Mismatch between net load stored in res_bus and the net load computed by summing up the load and generation after solving PF: {net.res_bus[['p_mw', 'q_mvar']] - net_load}"
-
-    # check power balance taking into account tansformer and line losses
-    total_q_diff = (
-        net_load.q_mvar.sum() + net.res_line.ql_mvar.sum() + net.res_trafo.ql_mvar.sum()
-    )
-    total_p_diff = (
-        net_load.p_mw.sum() + net.res_line.pl_mw.sum() + net.res_trafo.pl_mw.sum()
-    )
-
-    num_buses = len(net.bus)
+    total_p_diff, total_q_diff = calculate_power_imbalance(net)
 
     assert (
-        np.abs(total_q_diff / num_buses) < 1e-2
+        np.abs(total_q_diff) < 1e-2
     ), f"Total reactive power imbalance in PF: {total_q_diff}"
     assert (
-        np.abs(total_p_diff / num_buses) < 1e-2
+        np.abs(total_p_diff) < 1e-2
     ), f"Total active power imbalance in PF: {total_p_diff}"
 
     return net.converged
@@ -291,7 +224,33 @@ def run_dcpf(net: pandapowerNet, **kwargs: Any) -> bool:
     net.res_ext_grid["bus"] = net.ext_grid.bus
     net.res_bus["type"] = net.bus["type"]
 
+    total_p_diff, total_q_diff = calculate_power_imbalance(net)
+
+    print(
+        "Total reactive power imbalance in DCPF: ",
+        total_q_diff,
+        " (It is normal that this is not 0 as we are using a DC model)",
+    )
+    print(
+        "Total active power imbalance in DCPF: ",
+        total_p_diff,
+        " (Should be close to 0)",
+    )
+
+    return net.converged
+
+
+def calculate_power_imbalance(net: pandapowerNet) -> Tuple[float, float]:
+    """Calculates the power imbalance in the network normalized by the number of buses.
+
+    Args:
+        net: A pandapower network object containing the power system model.
+
+    Returns:
+        Tuple containing the total active and reactive power imbalance normalized by the number of buses.
+    """
     # check net power at each bus
+    num_buses = len(net.bus)
     all_gens = (
         pd.concat([net.res_gen, net.res_sgen, net.res_ext_grid])[
             ["p_mw", "q_mvar", "bus"]
@@ -324,17 +283,4 @@ def run_dcpf(net: pandapowerNet, **kwargs: Any) -> bool:
         net_load.p_mw.sum() + net.res_line.pl_mw.sum() + net.res_trafo.pl_mw.sum()
     )
 
-    num_buses = len(net.bus)
-
-    print(
-        "Total reactive power imbalance in DCPF: ",
-        total_q_diff,
-        " (It is normal that this is not 0 as we are using a DC model)",
-    )
-    print(
-        "Total active power imbalance in DCPF: ",
-        total_p_diff,
-        " (Should be close to 0)",
-    )
-
-    return net.converged
+    return total_p_diff / num_buses, total_q_diff / num_buses
