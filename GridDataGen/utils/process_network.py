@@ -15,6 +15,7 @@ from queue import Queue
 from GridDataGen.utils.stats import Stats
 from GridDataGen.utils.topology_perturbation import TopologyGenerator
 from GridDataGen.utils.load import LoadScenarioGeneratorBase
+import traceback
 
 
 def network_preprocessing(net: pandapowerNet) -> None:
@@ -325,55 +326,78 @@ def process_scenario_chunk(
     generator,
     no_stats: bool,
     error_log_path,
-) -> list:
+) -> Tuple[
+    Union[None, Exception],
+    Union[None, str],
+    List[np.ndarray],
+    List[np.ndarray],
+    List[List[int]],
+    Union[Stats, None],
+]:
     """
     Create data for all scenarios in scenario indexed between start_idx and end_idx
     """
-    local_stats = Stats() if not no_stats else None
-    local_csv_data = []
-    local_adjacency_lists = []
-    local_branch_idx_removed = []
-    for scenario_index in range(start_idx, end_idx):
-        if mode == "pf":
-            (
-                local_csv_data,
-                local_adjacency_lists,
-                local_branch_idx_removed,
-                local_stats,
-            ) = process_scenario(
-                net,
-                scenarios,
-                scenario_index,
-                generator,
-                no_stats,
-                local_csv_data,
-                local_adjacency_lists,
-                local_branch_idx_removed,
-                local_stats,
-                error_log_path,
-            )
-        elif mode == "contingency":
-            (
-                local_csv_data,
-                local_adjacency_lists,
-                local_branch_idx_removed,
-                local_stats,
-            ) = process_scenario_contingency(
-                net,
-                scenarios,
-                scenario_index,
-                generator,
-                no_stats,
-                local_csv_data,
-                local_adjacency_lists,
-                local_branch_idx_removed,
-                local_stats,
-                error_log_path,
-            )
+    try:
+        local_stats = Stats() if not no_stats else None
+        local_csv_data = []
+        local_adjacency_lists = []
+        local_branch_idx_removed = []
+        for scenario_index in range(start_idx, end_idx):
+            if mode == "pf":
+                (
+                    local_csv_data,
+                    local_adjacency_lists,
+                    local_branch_idx_removed,
+                    local_stats,
+                ) = process_scenario(
+                    net,
+                    scenarios,
+                    scenario_index,
+                    generator,
+                    no_stats,
+                    local_csv_data,
+                    local_adjacency_lists,
+                    local_branch_idx_removed,
+                    local_stats,
+                    error_log_path,
+                )
+            elif mode == "contingency":
+                (
+                    local_csv_data,
+                    local_adjacency_lists,
+                    local_branch_idx_removed,
+                    local_stats,
+                ) = process_scenario_contingency(
+                    net,
+                    scenarios,
+                    scenario_index,
+                    generator,
+                    no_stats,
+                    local_csv_data,
+                    local_adjacency_lists,
+                    local_branch_idx_removed,
+                    local_stats,
+                    error_log_path,
+                )
 
-        progress_queue.put(1)  # update queue
+            progress_queue.put(1)  # update queue
 
-    return local_csv_data, local_adjacency_lists, local_branch_idx_removed, local_stats
+        return (
+            None,
+            None,
+            local_csv_data,
+            local_adjacency_lists,
+            local_branch_idx_removed,
+            local_stats,
+        )
+    except Exception as e:
+        with open(error_log_path, "a") as f:
+            f.write(f"Caught an exception in process_scenario_chunk function: {e}\n")
+            f.write(traceback.format_exc())
+            f.write("\n")
+        for _ in range(end_idx - start_idx):
+            progress_queue.put(1)
+        return e, traceback.format_exc(), None, None, None, None
 
 
 def process_scenario(

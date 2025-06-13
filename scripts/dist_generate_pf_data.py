@@ -13,7 +13,7 @@ from pandapower.auxiliary import pandapowerNet
 import gc
 from datetime import datetime
 from tqdm import tqdm
-from multiprocessing import Pool, Manager
+from multiprocessing import Pool, Manager, Event
 from multiprocessing import Queue
 from GridDataGen.utils.param_handler import initialize_generator
 import shutil
@@ -22,6 +22,7 @@ import yaml
 from typing import List, Tuple, Any, Dict, Optional, Union
 from GridDataGen.utils.topology_perturbation import TopologyGenerator
 from GridDataGen.utils.load import LoadScenarioGeneratorBase
+import sys
 
 
 def main(args: NestedNamespace) -> None:
@@ -148,7 +149,11 @@ def main(args: NestedNamespace) -> None:
             # Run parallel processing
             with Pool(processes=args.settings.num_processes) as pool:
                 results = [
-                    pool.apply_async(process_scenario_chunk, task) for task in tasks
+                    pool.apply_async(
+                        process_scenario_chunk,
+                        task,
+                    )
+                    for task in tasks
                 ]
 
                 # Progress bar update
@@ -166,11 +171,17 @@ def main(args: NestedNamespace) -> None:
                 global_stats = Stats() if not args.settings.no_stats else None
                 for result in results:
                     (
+                        e,
+                        traceback,
                         local_csv_data,
                         local_adjacency_lists,
                         local_branch_idx_removed,
                         local_stats,
                     ) = result.get()
+                    if isinstance(e, Exception):
+                        print(f"Error in process_scenario_chunk: {e}")
+                        print(traceback)
+                        sys.exit(1)
                     csv_data.extend(local_csv_data)
                     adjacency_lists.extend(local_adjacency_lists)
                     branch_idx_removed.extend(local_branch_idx_removed)

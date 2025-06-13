@@ -16,7 +16,7 @@ load:
 topology_perturbation:
   k: 1 # Maximum number of components to drop in each perturbation
   n_topology_variants: 5 # Number of unique perturbed topologies per scenario
-  type: "n_minus_k" # Type of topology generator; options: n_minus_k, random, overloaded, none
+  type: "random" # Type of topology generator; options: n_minus_k, random, overloaded, none
   elements: ["line", "trafo", "gen", "sgen"] # elements to perturb options: line, trafo, gen, sgen
 
 settings:

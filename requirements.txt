@@ -10,3 +10,5 @@ matpowercaseframes
 numba
 requests
 pyaml
+urllib3<2
+ipywidgets
