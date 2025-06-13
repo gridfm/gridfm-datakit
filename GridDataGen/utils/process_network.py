@@ -329,8 +329,7 @@ def process_scenario_chunk(
     """
     Create data for all scenarios in scenario indexed between start_idx and end_idx
     """
-    if not no_stats:
-        local_stats = Stats()
+    local_stats = Stats() if not no_stats else None
     local_csv_data = []
     local_adjacency_lists = []
     local_branch_idx_removed = []

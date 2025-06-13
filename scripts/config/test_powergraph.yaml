@@ -4,20 +4,19 @@ network:
 
 load:
   generator: "powergraph" # Name of the load generator
-  agg_profile: "powergraph_ieee118" # Name of the aggregated load profile
-  scenarios: 500 # Number of different load scenarios to generate
+  agg_profile: "default" # Name of the aggregated load profile
+  scenarios: 1000 # Number of different load scenarios to generate
 
 
 topology_perturbation:
   k: 10 # Maximum number of components to drop in each perturbation
   n_topology_variants: 10 # Number of unique perturbed topologies per scenario
   type: "none" # Type of topology generator; options: n_minus_k, random, overloaded, none
-  elements: ["line", "trafo", "sgen", "gen"]
 
 settings:
   num_processes: 10 # Number of parallel processes to use
-  data_dir: "../data_test_new" # Directory to save generated data
-  large_chunk_size: 100 # Number of load scenarios processed before saving
+  data_dir: "../data_test_powergraph" # Directory to save generated data
+  large_chunk_size: 500 # Number of load scenarios processed before saving
   no_stats: false # If true, disables statistical calculations
   overwrite: true # If true, overwrites existing files
   mode: "pf" # Mode of the script; options: contingency, pf

@@ -26,7 +26,7 @@ class TopologyGenerator(ABC):
     @abstractmethod
     def generate(
         self, net: pp.pandapowerNet
-    ) -> Generator[pp.pandapowerNet, None, None]:
+    ) -> Union[Generator[pp.pandapowerNet, None, None], List[pp.pandapowerNet]]:
         """Generate perturbed topologies.
 
         Args:
