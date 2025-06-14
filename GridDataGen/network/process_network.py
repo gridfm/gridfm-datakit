@@ -1,20 +1,20 @@
 import numpy as np
 import pandas as pd
-from GridDataGen.utils.config import *
+from GridDataGen.config.config import *
 from pandapower.auxiliary import pandapowerNet
 from typing import Tuple, List, Optional, Any, Union
 from pandapower import makeYbus_pypower
 from pandapower.pypower.makeYbus import branch_vectors
 import copy
-from GridDataGen.utils.solvers import *
+from GridDataGen.network.solvers import *
 from pandapower.pypower.idx_brch import T_BUS, F_BUS, RATE_A, BR_STATUS
 from pandapower.pypower.idx_bus import BUS_I, BUS_TYPE, VMIN, VMAX, BASE_KV
 from scipy.sparse import csr_matrix
 from tqdm import tqdm
 from queue import Queue
-from GridDataGen.utils.stats import Stats
-from GridDataGen.utils.topology_perturbation import TopologyGenerator
-from GridDataGen.utils.load import LoadScenarioGeneratorBase
+from GridDataGen.io.stats import Stats
+from GridDataGen.perturbations.topology_perturbation import TopologyGenerator
+from GridDataGen.perturbations.load import LoadScenarioGeneratorBase
 import traceback
 
 

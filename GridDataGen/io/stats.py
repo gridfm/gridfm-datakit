@@ -4,7 +4,7 @@ import os
 import numpy as np
 from typing import List, Union, Optional
 from pandapower.auxiliary import pandapowerNet
-from GridDataGen.utils.solvers import calculate_power_imbalance
+from GridDataGen.network.solvers import calculate_power_imbalance
 
 
 def plot_stats(base_path: str) -> None:

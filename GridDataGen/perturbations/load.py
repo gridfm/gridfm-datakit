@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
-from GridDataGen.utils.io import load_net_from_pglib
+from GridDataGen.io.io import load_net_from_pglib
 import os
 from importlib import resources
 import pandapower as pp

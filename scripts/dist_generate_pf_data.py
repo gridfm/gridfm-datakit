@@ -3,25 +3,25 @@
 import numpy as np
 import os
 import argparse
-from GridDataGen.utils.io import *
-from GridDataGen.utils.process_network import *
-from GridDataGen.utils.config import *
-from GridDataGen.utils.stats import *
-from GridDataGen.utils.param_handler import *
-from GridDataGen.utils.load import *
+from GridDataGen.io.io import *
+from GridDataGen.network.process_network import *
+from GridDataGen.config.config import *
+from GridDataGen.io.stats import *
+from GridDataGen.config.param_handler import *
+from GridDataGen.perturbations.load import *
 from pandapower.auxiliary import pandapowerNet
 import gc
 from datetime import datetime
 from tqdm import tqdm
 from multiprocessing import Pool, Manager, Event
 from multiprocessing import Queue
-from GridDataGen.utils.param_handler import initialize_generator
+from GridDataGen.config.param_handler import initialize_generator
 import shutil
-from GridDataGen.utils.io import write_ram_usage_distributed
+from GridDataGen.io.io import write_ram_usage_distributed
 import yaml
 from typing import List, Tuple, Any, Dict, Optional, Union
-from GridDataGen.utils.topology_perturbation import TopologyGenerator
-from GridDataGen.utils.load import LoadScenarioGeneratorBase
+from GridDataGen.perturbations.topology_perturbation import TopologyGenerator
+from GridDataGen.perturbations.load import LoadScenarioGeneratorBase
 import sys
 
 

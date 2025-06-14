@@ -1,21 +1,20 @@
 import numpy as np
 import os
 import argparse
-from GridDataGen.utils.io import *
-from GridDataGen.utils.process_network import *
-from GridDataGen.utils.config import *
-from GridDataGen.utils.stats import *
-from GridDataGen.utils.param_handler import *
-from GridDataGen.utils.load import *
+from GridDataGen.io.io import *
+from GridDataGen.network.process_network import *
+from GridDataGen.config.config import *
+from GridDataGen.io.stats import *
+from GridDataGen.config.param_handler import *
+from GridDataGen.perturbations.load import *
 from pandapower.auxiliary import pandapowerNet
 import gc
 from datetime import datetime
 from tqdm import tqdm
-from GridDataGen.utils.param_handler import initialize_generator
+from GridDataGen.config.param_handler import initialize_generator
 import psutil
 import shutil
 import yaml
-
 
 
 def main(args):

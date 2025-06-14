@@ -1,16 +1,14 @@
 import yaml
 import argparse
 import itertools
-from GridDataGen.utils.load import *
+from GridDataGen.perturbations.load import *
 from typing import Dict, Any, Optional, Union, TypeVar, Generic
 import warnings
 from pandapower import pandapowerNet
-from GridDataGen.utils.topology_perturbation import (
+from GridDataGen.perturbations.topology_perturbation import (
     NMinusKGenerator,
     RandomComponentDropGenerator,
-    MostOverloadedLineDropGenerator,
     NoPerturbationGenerator,
-    FromListOfBusPairsGenerator,
     TopologyGenerator,
 )
 
@@ -221,28 +219,9 @@ def initialize_generator(args: Any, base_net: pandapowerNet) -> TopologyGenerato
             "elements": elements,
         }
 
-    elif args.type == "overloaded":
-        if not hasattr(args, "n_topology_variants"):
-            raise ValueError(
-                "n_topology_variants parameter is required for overloaded generator"
-            )
-        generator = MostOverloadedLineDropGenerator(args.n_topology_variants)
-        used_args = {"n_topology_variants": args.n_topology_variants}
-
     elif args.type == "none":
         generator = NoPerturbationGenerator()
         used_args = {}
-
-    elif args.type == "from_list_of_bus_pairs":
-        if not hasattr(args, "line_bus_pairs_csv_path"):
-            raise ValueError(
-                "line_bus_pairs_csv_path parameter is required for from_list_of_bus_pairs generator"
-            )
-        generator = FromListOfBusPairsGenerator(base_net, args.line_bus_pairs_csv_path)
-        used_args = {
-            "base_net": base_net,
-            "line_bus_pairs_csv_path": args.line_bus_pairs_csv_path,
-        }
 
     else:
         raise ValueError(f"Unknown generator type: {args.type}")
