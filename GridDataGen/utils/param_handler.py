@@ -1,7 +1,7 @@
 import yaml
 import argparse
 import itertools
-from GridDataGen.perturbations.load import *
+from GridDataGen.perturbations.load_perturbation import *
 from typing import Dict, Any, Optional, Union, TypeVar, Generic
 import warnings
 from pandapower import pandapowerNet

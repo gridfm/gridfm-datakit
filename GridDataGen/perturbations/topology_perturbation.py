@@ -1,9 +1,9 @@
 import numpy as np
 import pandapower as pp
-from GridDataGen.io.io import *
-from GridDataGen.network.process_network import *
-from GridDataGen.config.config import *
-from GridDataGen.network.solvers import *
+from GridDataGen.save import *
+from GridDataGen.process.process_network import *
+from GridDataGen.utils.config import *
+from GridDataGen.process.solvers import *
 import copy
 from itertools import combinations
 from abc import ABC, abstractmethod

@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
-from GridDataGen.io.io import load_net_from_pglib
+from GridDataGen.network import load_net_from_pglib
 import os
 from importlib import resources
 import pandapower as pp
@@ -270,7 +270,10 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
         Raises:
             ValueError: If start_scaling_factor is less than global_range.
         """
-        if self.start_scaling_factor - self.global_range * self.start_scaling_factor < 0:
+        if (
+            self.start_scaling_factor - self.global_range * self.start_scaling_factor
+            < 0
+        ):
             raise ValueError(
                 "The start scaling factor must be larger than the global range."
             )
