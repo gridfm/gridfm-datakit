@@ -1,74 +1,122 @@
-# Power Flow Data Generation Script
+# GridFM model evaluation
 
-This library generates power flow data with configurable parameters for load scenarios and topology perturbations.
 
-![image](https://github.ibm.com/PowerGrid-FM/grid_data_synthetic/assets/474695/e6b81dfa-13ac-4e55-b7b8-b986aad6a268)
+This library is brought to you by the GridFM team to generate power flow data to train machine learning and foundation models.
 
-## Setup
+---
 
-### Create a Python Virtual Environment and Install Requirements
+# Workflow
 
+<p align="center">
+  <img src="docs/figs/pipeline.png" alt=""/>
+  <br/>
+</p>
+
+
+---
+
+
+
+# Comparison with other PF datasets/ libraries
+
+| Feature                                                    | GraphNeuralSolver | OPFData | OPFLearn | PowerFlowNet | TypedGNN | PF△ | **GridFM** |
+| ---------------------------------------------------------- | ----------------- | ------- | -------- | ------------ | -------- | --- | ---------- |
+| Generator Profile                                          | ✅                 | ❌       | ❌        | ✅            | ✅        | ✅   | ❌          |
+| N-1                                                        | ❌                 | ✅       | ✅        | ✅            | ✅        | ✅   | ✅          |
+| > 1000 Buses                                               | ❌                 | ✅       | ✅        | ❌            | ❌        | ✅   | ✅          |
+| N-k, k > 1                                                 | ❌                 | ❌       | ❌        | ❌            | ❌        | ❌   | ✅          |
+| Load Scenarios from Real World Data                        | ❌                 | ❌       | ❌        | ❌            | ❌        | ❌   | ✅          |
+| Multi-processing and scalable to very large (1M+) datasets | ❌                 | ❌       | ❌        | ❌            | ❌        | ❌   | ✅          |
+
+
+# Installation
+1. Give the [repo](https://github.com/Grid-FM/grid_data_synthetic) a star on GitHub ;)
+
+2. Create a python virtual environment and install the requirements:
 ```bash
+git clone git@github.com:Grid-FM/grid_data_synthetic.git
+cd grid_data_synthetic
 python -m venv venv
-source venv/bin/activate
-pip install -e . 
+pip install .
+```
+# Getting Started
+
+## Option 1: Run data gen using interactive interface
+
+To use the interactive interface, either open `scripts/interactive_interface` or copy the following into a Jupyter notebook and follow the instructions:
+
+```python
+from GridDataGen.interactive_utils import interactive_interface
+interactive_interface()
 ```
 
-### Install the Package in Editable Mode During Development
+<br>
+
+## Option 2: Using the command line interface
+
+Run the data generation routine from the command line:
 
 ```bash
-pip install -e .
+gridfm_data path/to/config.yaml
 ```
 
-## Usage
+<br>
 
-```bash
-python dist_generate_pf_data.py --config path/to/config.yaml --data_path /path/to/data
+## Configuration Overview
+
+
+Sample configuration files are provided in `scripts/config`, e.g. `default.yaml`:
+
+```yaml
+network:
+  name: "case24_ieee_rts"          # Name of the power grid network
+  source: "pglib"                  # Data source; options: pglib, pandapower, file
+  network_dir: "grids"             # Directory containing the network files
+
+load:
+  generator: "agg_load_profile"    # Load generator; options: agg_load_profile, powergraph
+  agg_profile: "default"           # Aggregated load profile name
+  scenarios: 200                   # Number of load scenarios to generate
+  sigma: 0.05                      # Max local noise
+  change_reactive_power: true      # Whether to change reactive power values
+  global_range: 0.4                # Lower bound offset for global scaling factor
+  max_scaling_factor: 4.0          # Upper bound for global scaling factor
+  step_size: 0.025                 # Step size for scaling factor search
+  start_scaling_factor: 0.8        # Starting value for scaling factor
+
+topology_perturbation:
+  k: 1                             # Max number of components to drop per perturbation
+  n_topology_variants: 5           # Number of perturbed topologies per scenario
+  type: "random"                   # Perturbation type; options: n_minus_k, random, overloaded, none
+  elements: ["line", "trafo", "gen", "sgen"]  # Elements to perturb
+
+settings:
+  num_processes: 10                # Number of parallel processes
+  data_dir: "../data_test"         # Output directory for generated data
+  large_chunk_size: 50             # Number of scenarios processed before saving
+  no_stats: false                  # Disable statistical calculations if true
+  overwrite: true                  # Overwrite existing files if true
+  mode: "pf"                       # Run mode; options: contingency, pf
 ```
 
-### Command-Line Arguments
+<br>
 
-| Argument       | Type | Default               | Description                                                                                      |
-|----------------|------|-----------------------|--------------------------------------------------------------------------------------------------|
-| `--config`     | str  | `config/default.yaml` | (Required) Path to the configuration YAML file.                                                  |
-| `--data_path`  | str  | `../data`             | (Optional) Directory where to store the dataset. Defaults to the data folder one level up from the current working directory. |
+# Output Files
 
-### Example Commands
+The data generation process produces several output files in the specified data directory:
 
-1. **Basic Data Generation Run**
-   ```bash
-   python dist_generate_pf_data.py --config config/default.yaml
-   ```
+- **node_data.csv**: Contains data related to the nodes (buses) in the network, such as voltage levels and power injections.
+- **edge_data.csv**: Contains data related to the edges (lines and transformers) in the network, such as impedance and power flow.
+- **branch_indices.csv**: Lists the indices of the branches (lines and transformers) in the network.
+- **edge_params.csv**: Contains parameters for the edges, such as resistance and reactance.
+- **bus_params.csv**: Contains parameters for the buses, such as voltage limits and power limits.
+- **scenarios.csv**: Contains the generated load scenarios.
+- **scenarios_plot.html**: An HTML file with plots of the load scenarios.
+- **scenarios_log**: A log file containing information about the generation of load scenarios.
+- **stats.csv**: Contains statistical data about the network, such as the number of generators, lines, transformers, overloads, and maximum loading.
+- **stats_plot.html**: An HTML file with plots of the network statistics.
 
-2. **Custom Data Path**
-   ```bash
-   python dist_generate_pf_data.py --config config/default.yaml --data_path /dccstor/gridfm/data
-   ```
 
-## YAML Configuration Parameters
 
-| **Section**               | **Parameter**              | **Type**    | **Description**                                                                                   |
-|---------------------------|----------------------------|-------------|---------------------------------------------------------------------------------------------------|
-| **network**               | `name`                     | str         | Name of the power grid network.                                                                   |
-|                           | `source`                   | str         | Data source for the grid; options: `pglib`, `pandapower`, `file`.                                 |
-| **load**                  | `generator`                | str         | Name of the load generator; options: `agg_load_profile`, `powergraph`.                            |
-|                           | `agg_profile`              | str         | Name of the aggregated load profile; used when `generator` is `agg_load_profile`.                 |
-|                           | `scenarios`                | int         | Number of different load scenarios to generate.                                                   |
-|                           | `sigma`                    | float       | Max local noise; used when `generator` is `agg_load_profile`.                                     |
-|                           | `change_reactive_power`    | bool        | If true, changes reactive power of loads. If false, keeps the ones from the case file.            |
-|                           | `global_range`             | float       | Lower bound of the global scaling factor.                                                         |
-|                           | `max_scaling_factor`       | float       | Upper bound of the global scaling factor.                                                         |
-|                           | `step_size`                | float       | Step size when finding the upper bound of the global scaling factor.                              |
-|                           | `start_scaling_factor`     | float       | Initial value of the global scaling factor.                                                       |
-| **topology_perturbation** | `type`                     | str         | Type of topology generator; options: `n_minus_k`, `random`, `overloaded`, `none`.                 |
-|                           | `k`                        | int         | Maximum number of components to drop in each perturbation.                                        |
-|                           | `n_topology_variants`      | int         | Number of unique perturbed topologies per scenario.                                               |
-|                           | `elements`                 | list[str]   | Types of elements to perturb; options include any subset of `line`, `trafo`.                      |
-| **settings**              | `num_processes`            | int         | Number of parallel processes to use.                                                              |
-|                           | `data_dir`                 | str         | Directory to save generated data.                                                                 |
-|                           | `large_chunk_size`         | int         | Number of load scenarios processed before saving.                                                 |
-|                           | `no_stats`                 | bool        | If true, disables statistical calculations.                                                       |
-|                           | `overwrite`                | bool        | If true, overwrites existing files.                                                               |
-|                           | `mode`                     | str         | Mode of the script; options: `pf`, `contingency`.                                                 |
 
-> **Note:** Not all parameters are relevant depending on the `topology_perturbation.type` and `load.generator` options. Refer to your use case for applicable fields.
+
