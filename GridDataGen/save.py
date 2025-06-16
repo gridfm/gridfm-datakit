@@ -10,7 +10,7 @@ from pandapower.pypower.idx_brch import T_BUS, F_BUS, RATE_A, BR_STATUS
 from pandapower.pypower.idx_bus import BUS_I, BUS_TYPE, VMIN, VMAX, BASE_KV
 from pandapower.pypower.makeYbus import branch_vectors
 import psutil
-
+from typing import List
 
 
 def save_edge_params(net: pandapowerNet, path: str):
@@ -94,7 +94,7 @@ def save_bus_params(net: pandapowerNet, path: str):
     bus_params.to_csv(path, index=False)
 
 
-def save_branch_idx_removed(branch_idx_removed, path: str):
+def save_branch_idx_removed(branch_idx_removed: List[List[int]], path: str):
     """Saves indices of removed branches for each scenario.
 
     Appends the removed branch indices to an existing CSV file or creates a new one.

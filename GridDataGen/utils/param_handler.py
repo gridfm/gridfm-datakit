@@ -145,7 +145,7 @@ def merge_dict(base: Dict[str, Any], updates: Dict[str, Any]) -> None:
             base[key] = value
 
 
-def get_load_scenario_generator(args: Any) -> LoadScenarioGeneratorBase:
+def get_load_scenario_generator(args: NestedNamespace) -> LoadScenarioGeneratorBase:
     """Creates and returns a load scenario generator based on configuration.
 
     Args:
@@ -184,7 +184,9 @@ def get_load_scenario_generator(args: Any) -> LoadScenarioGeneratorBase:
         return Powergraph(args.agg_profile)
 
 
-def initialize_generator(args: Any, base_net: pandapowerNet) -> TopologyGenerator:
+def initialize_generator(
+    args: NestedNamespace, base_net: pandapowerNet
+) -> TopologyGenerator:
     """Initialize the appropriate topology generator based on the given arguments.
 
     Args:

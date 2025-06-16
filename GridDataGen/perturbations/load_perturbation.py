@@ -218,11 +218,49 @@ class LoadScenarioGeneratorBase(ABC):
 
 
 class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
-    """Load scenario generator using aggregated load profiles.
+    r"""
+    Generates load scenarios by scaling an aggregated load profile and adding local noise.
 
-    Generates load scenarios by scaling and adding noise to an aggregated load profile.
+    **Overview**
 
-    TODO: add better documentation
+    This generator uses an aggregated load profile (a time series of normalized demand values)
+    to simulate realistic variations in load over time. The process includes:
+
+    1. Determining an upper bound `u` for load scaling such that the network still
+       supports a feasible optimal power flow (OPF) solution.
+    2. Setting the lower bound `l = u - \text{global_range} \cdot u`.
+    3. Min-max scaling the aggregate profile to the interval \([l, u]\).
+    4. Applying this global scaling factor to each load's nominal value with additive uniform noise.
+
+    **Mathematical Model**
+
+    Let:
+    - $n$: Number of loads ($i \in \{1, \dots, n\}$)
+    - $K$: Number of scenarios ($k \in \{1, \dots, K\}$)
+    - $(p, q) \in (\mathbb{R}_{\geq 0}^n)^2$: Nominal active/reactive loads
+    - $\text{agg}^k$: Aggregated load profile value at time step $k$
+    - $u$: Maximum feasible global scaling factor (from OPF)
+    - $l = u - \text{global_range} \cdot u$: Minimum global scaling factor
+    - $\text{ref}^k = \text{MinMaxScale}(\text{agg}^k, [l, u])$: Scaled aggregate profile
+    - $\varepsilon_i^k \sim \mathcal{U}(1 - \sigma, 1 + \sigma)$: Active power noise
+    - $\eta_i^k \sim \mathcal{U}(1 - \sigma, 1 + \sigma)$: Reactive power noise (if enabled)
+
+    Then for each load $i$ and scenario $k$:
+    $$
+    \tilde{p}_i^k = p_i \cdot \text{ref}^k \cdot \varepsilon_i^k
+    $$
+    $$
+    \tilde{q}_i^k =
+    \begin{cases}
+    q_i \cdot \text{ref}^k \cdot \eta_i^k & \text{if } \texttt{change\_reactive\_power} = \texttt{True} \\
+    q_i & \text{otherwise}
+    \end{cases}
+    $$
+
+    **Notes**
+    - The upper bound `u` is automatically determined by gradually increasing the base load and solving the OPF until it fails.
+    - The lower bound `l` is computed as a relative percentage (`global_range`) of `u`.
+    - Noise helps simulate local variability across loads within a global trend.
     """
 
     def __init__(
@@ -348,13 +386,39 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
 
 
 class Powergraph(LoadScenarioGeneratorBase):
-    """Load scenario generator as in powergraph.
+    r"""
+    Load scenario generator using the PowerGraph method.
 
-    Generates load scenarios by scaling active power with a reference curve
-    while keeping reactive power constant.
+    Generates load scenarios by scaling the nominal active power profile
+    with a normalized reference curve while keeping reactive power fixed.
 
-    TODO: add better documentation
-    """
+    **Mathematical Model**
+
+    Let:
+
+    - $n$: Number of loads (indexed by $i \in \{1, \dots, n\}$)
+    - $K$: Number of scenarios (indexed by $k \in \{1, \dots, K\}$)
+    - $(p, q) \in (\mathbb{R}_{\geq 0}^n)^2$: Nominal active and reactive load vectors
+    - $\text{ref}^k \in [0, 1]$: Normalized aggregate reference profile at scenario $k$
+    - $(\tilde{p}_i^k, \tilde{q}_i^k) \in \mathbb{R}_{\geq 0}^2$: Active/reactive load at bus $i$ in scenario $k$
+
+    The reference profile is computed by normalizing an aggregated profile:
+
+    $$
+    \text{ref}^k = \frac{\text{agg}^k}{\max_k \text{agg}^k}
+    $$
+
+    Then, for each bus $i$ and scenario $k$:
+
+    $$
+    \tilde{p}_i^k = p_i \cdot \text{ref}^k
+    $$
+
+    and reactive power is kept constant:
+
+    $$
+    \tilde{q}_i^k = q_i
+    $$"""
 
     def __init__(
         self,

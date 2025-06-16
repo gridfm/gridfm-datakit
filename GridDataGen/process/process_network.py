@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from GridDataGen.utils.config import *
 from pandapower.auxiliary import pandapowerNet
-from typing import Tuple, List, Optional, Any, Union
+from typing import Tuple, List, Union
 from pandapower import makeYbus_pypower
 from pandapower.pypower.makeYbus import branch_vectors
 import copy
@@ -229,14 +229,14 @@ def process_scenario_contingency(
     net: pandapowerNet,
     scenarios: np.ndarray,
     scenario_index: int,
-    generator: Any,
+    generator: TopologyGenerator,
     no_stats: bool,
     local_csv_data: List[np.ndarray],
     local_adjacency_lists: List[np.ndarray],
     local_branch_idx_removed: List[List[int]],
-    local_stats: Any,
+    local_stats: Union[Stats, None],
     error_log_file: str,
-) -> Tuple[List[np.ndarray], List[np.ndarray], List[List[int]], Any]:
+) -> Tuple[List[np.ndarray], List[np.ndarray], List[List[int]], Union[Stats, None]]:
     """Processes a load scenario for contingency analysis.
 
     Args:
@@ -404,14 +404,14 @@ def process_scenario(
     net: pandapowerNet,
     scenarios: np.ndarray,
     scenario_index: int,
-    generator: Any,
+    generator: TopologyGenerator,
     no_stats: bool,
     local_csv_data: List[np.ndarray],
     local_adjacency_lists: List[np.ndarray],
     local_branch_idx_removed: List[List[int]],
-    local_stats: Any,
+    local_stats: Union[Stats, None],
     error_log_file: str,
-) -> Tuple[List[np.ndarray], List[np.ndarray], List[List[int]], Any]:
+) -> Tuple[List[np.ndarray], List[np.ndarray], List[List[int]], Union[Stats, None]]:
     """Processes a load scenario.
 
     Args:
@@ -482,9 +482,7 @@ def process_scenario(
         # Append processed power flow data
         local_csv_data.extend(pf_post_processing(net_pf))
         local_adjacency_lists.append(get_adjacency_list(net_pf))
-        local_branch_idx_removed.append(
-            get_branch_idx_removed(perturbed_topology._ppc["branch"])
-        )
+        local_branch_idx_removed.append(get_branch_idx_removed(net_pf._ppc["branch"]))
         if not no_stats:
             local_stats.update(net_pf)
 

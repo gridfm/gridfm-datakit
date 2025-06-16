@@ -5,6 +5,8 @@ import requests
 from importlib import resources
 import pandapower as pp
 import pandapower.networks as pn
+import warnings
+
 
 def load_net_from_pp(grid_name: str) -> pandapowerNet:
     """Loads a network from the pandapower library.
@@ -19,17 +21,18 @@ def load_net_from_pp(grid_name: str) -> pandapowerNet:
     return network
 
 
-def load_net_from_file(grid_name: str) -> pandapowerNet:
+def load_net_from_file(network_path: str) -> pandapowerNet:
     """Loads a network from a matpower file.
 
     Args:
-        grid_name: Name of the matpower file (without extension).
+        network_path: Path to the matpower file (without extension).
 
     Returns:
         pandapowerNet: Loaded power network configuration with reindexed buses.
     """
-    file_path = str(resources.files(f"GridDataGen.grids").joinpath(f"{grid_name}.m"))
-    network = pp.converter.from_mpc(str(file_path))
+    warnings.filterwarnings("ignore", category=FutureWarning)
+    network = pp.converter.from_mpc(str(network_path))
+    warnings.resetwarnings()
 
     old_bus_indices = network.bus.index
     new_bus_indices = range(len(network.bus))
@@ -76,7 +79,9 @@ def load_net_from_pglib(grid_name: str) -> pandapowerNet:
             f.write(response.content)
 
     # Load network from file
+    warnings.filterwarnings("ignore", category=FutureWarning)
     network = pp.converter.from_mpc(file_path)
+    warnings.resetwarnings()
 
     old_bus_indices = network.bus.index
     new_bus_indices = range(len(network.bus))
@@ -88,4 +93,3 @@ def load_net_from_pglib(grid_name: str) -> pandapowerNet:
     pp.reindex_buses(network, bus_mapping)
 
     return network
-
