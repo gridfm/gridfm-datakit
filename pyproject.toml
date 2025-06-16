@@ -25,6 +25,7 @@ dependencies = [
     "plotly",
     "pyaml",
     "requests",
+    "urllib3<2.0.0",
 ]
 
 authors = [
@@ -39,3 +40,15 @@ maintainers = [
 
 [project.scripts]
 gridfm_data = "GridDataGen.cli:main"
+
+[project.optional-dependencies]
+dev = [
+  "mkdocs",
+  "mkdocs-material",
+  "mkdocstrings[python]",
+]
+
+test = [
+  "pytest",
+  "pytest-cov"
+]

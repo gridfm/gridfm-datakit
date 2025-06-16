@@ -12,7 +12,7 @@ The module provides three topology perturbation strategies:
 
 - `RandomComponentDropGenerator` randomly generates a specified number of feasible topologies by disabling up to *k* randomly selected components, including lines, transformers, generators, and static generators. 
 
-### Comparison of Perturbation Strategies
+## Comparison of Perturbation Strategies
 
 | Feature                            | `NoPerturbationGenerator` | `NMinusKGenerator`        | `RandomComponentDropGenerator` |
 |-----------------------------------|----------------------------|---------------------------|--------------------------------|

@@ -1,4 +1,4 @@
-# Option 1: Run data gen using interactive interface
+## Option 1: Run data gen using interactive interface
 
 To use the interactive interface, either open `scripts/interactive_interface` or copy the following into a Jupyter notebook and follow the instructions:
 
@@ -7,9 +7,8 @@ from GridDataGen.interactive_utils import interactive_interface
 interactive_interface()
 ```
 
-<br>
 
-# Option 2: Using the command line interface
+## Option 2: Using the command line interface
 
 Run the data generation routine from the command line:
 
@@ -17,9 +16,8 @@ Run the data generation routine from the command line:
 gridfm_data path/to/config.yaml
 ```
 
-<br>
 
-# Configuration Overview
+## Configuration Overview
 
 Refer to the sections [Network](network.md), [Load Scenarios](load_scenarios.md), and [Topology perturbations](topology_perturbations.md) for a description of the configuration parameters:
 

@@ -228,7 +228,7 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
 
     1. Determining an upper bound `u` for load scaling such that the network still
        supports a feasible optimal power flow (OPF) solution.
-    2. Setting the lower bound `l = u - \text{global_range} \cdot u`.
+    2. Setting the lower bound \(l = u - \text{global_range} \cdot u\).
     3. Min-max scaling the aggregate profile to the interval \([l, u]\).
     4. Applying this global scaling factor to each load's nominal value with additive uniform noise.
 

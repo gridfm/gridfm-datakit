@@ -37,7 +37,7 @@ Let:
 
 - $u$: Maximum feasible global scaling factor (from OPF)
 
-- $l = u - \text{global_range} \cdot u$: Minimum global scaling factor
+- $l = u - \text{global\textunderscore range} \cdot u $: Minimum global scaling factor
 
 - $\text{ref}^k = \text{MinMaxScale}(\text{agg}^k, [l, u])$: Scaled aggregate profile
 
@@ -53,9 +53,9 @@ Generates load scenarios by scaling all loads of the grid using a global scaling
 
 The process includes:
 
-1. Determining an upper bound `u` for load scaling such that the network still
+1. Determining an upper bound $u$ for load scaling such that the network still
     supports a feasible optimal power flow (OPF) solution.
-2. Setting the lower bound `l = u - \text{global_range} \cdot u`.
+2. Setting the lower bound $l = u - \text{global\textunderscore range} \cdot u$.
 3. Min-max scaling the aggregate profile to the interval \([l, u]\).
 4. Applying this global scaling factor to each load's nominal value with additive uniform noise.
 
@@ -67,7 +67,7 @@ $$
 $$
 \tilde{q}_i^k =
 \begin{cases}
-q_i \cdot \text{ref}^k \cdot \eta_i^k & \text{if } \texttt{change\_reactive\_power} = \texttt{True} \\
+q_i \cdot \text{ref}^k \cdot \eta_i^k & \text{if } \texttt{change\textunderscore reactive\textunderscore power} = \texttt{True} \\
 q_i & \text{otherwise}
 \end{cases}
 $$
