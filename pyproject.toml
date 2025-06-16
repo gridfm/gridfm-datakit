@@ -2,26 +2,29 @@
 requires = ["setuptools >= 80.9.0"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.packages.find]
+include = ["GridDataGen*"]
+
 [project]
 name = "GridDataGen"
 description = "Grid Data Synthetic Generation"
 readme = "README.md"
 license = "Apache-2.0" 
 version = "0.1.0"
-requires-python = ">=3.10"
+requires-python = ">=3.9,<3.13"
 dependencies = [
-    "ipykernel>=6.29.5",
-    "matplotlib>=3.10.3",
-    "matpowercaseframes>=1.1.4",
-    "nbformat>=5.10.4",
-    "numba>=0.61.2",
-    "numpy>=1.26.4",
+    "ipykernel",
+    "matplotlib",
+    "matpowercaseframes",
+    "nbformat",
+    "numba",
+    "numpy",
     "pandapower==2.14.11",
-    "pandas>=2.3.0",
-    "pathlib>=1.0.1",
-    "plotly>=6.1.2",
-    "pyaml>=25.5.0",
-    "requests>=2.32.4",
+    "pandas",
+    "pathlib",
+    "plotly",
+    "pyaml",
+    "requests",
 ]
 
 authors = [
@@ -33,3 +36,6 @@ authors = [
 maintainers = [
   {name = "Alban Puech", email = "Alban.Puech1@ibm.com"},
 ]
+
+[project.scripts]
+gridfm_data = "GridDataGen.cli:main"
