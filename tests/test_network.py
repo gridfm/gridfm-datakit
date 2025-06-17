@@ -1,5 +1,5 @@
 """
-Test cases for loading network from config
+Test cases for loading network from config in GridDataGen.network module
 pytest tests/ --config scripts/config/default.yaml 
 """
 import pytest
