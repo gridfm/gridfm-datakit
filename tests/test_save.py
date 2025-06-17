@@ -13,6 +13,14 @@ from GridDataGen.network import *
 from GridDataGen.perturbations.load_perturbation import *
 from GridDataGen.perturbations.topology_perturbation import TopologyGenerator
 
+@pytest.fixture
+def conf():
+    path = "scripts/config/default.yaml"  # Default path to the config file
+    with open(path, 'r') as f:
+        base_config = yaml.safe_load(f)
+        args = NestedNamespace(**base_config)
+    return args
+
 def test_save_functions(conf):
         if conf.network.source == "pandapower":
             net = load_net_from_pp(conf.network.name)

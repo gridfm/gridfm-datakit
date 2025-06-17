@@ -28,6 +28,14 @@ from GridDataGen.perturbations.load_perturbation import LoadScenarioGeneratorBas
 from GridDataGen.generate import _setup_environment, _prepare_network_and_scenarios, generate_power_flow_data, generate_power_flow_data_distributed
 import sys
 
+@pytest.fixture
+def conf():
+    path = "scripts/config/default.yaml"  # Default path to the config file
+    with open(path, 'r') as f:
+        base_config = yaml.safe_load(f)
+        args = NestedNamespace(**base_config)
+    return args
+
 # Test set up environment function
 def test_setup_environment(conf):
     args, base_path, file_paths = _setup_environment(conf)
@@ -47,19 +55,34 @@ def test_prepare_network_and_scenarios(conf):
     net, scenarios = _prepare_network_and_scenarios(args, file_paths)
     
     assert isinstance(net, pandapowerNet), "Network should be a pandapowerNet object"
-    #assert isinstance(scenarios, list), "Scenarios should be a list"
     assert len(scenarios) > 0, "There should be at least one scenario"
     
     # Check if the network has been loaded correctly
     assert 'bus' in net.keys(), "Network should contain bus data"
     assert 'line' in net.keys(), "Network should contain line data"
 
+def test_fail_prepare_network_and_scenarios():
+    conf = 'scripts/config/non_existent_config.yaml'
+    with pytest.raises(FileNotFoundError):
+        args, base_path, file_paths = _setup_environment('non_existent_config.yaml')
+        net, scenarios = _prepare_network_and_scenarios(args, file_paths)
+
 # Test generate pf data function
 def test_generate_pf_data():
     config = 'scripts/config/default.yaml'
     file_paths = generate_power_flow_data(config)
 
+def test_fail_generate_pf_data():
+    config = 'scripts/config/non_existent_config.yaml'
+    with pytest.raises(FileNotFoundError):
+        file_paths = generate_power_flow_data(config)
+
 # Test generate pf data distributed function
 def test_generate_pf_data_distributed():
     config = 'scripts/config/default.yaml'
     file_paths = generate_power_flow_data_distributed(config)
+
+def test_fail_generate_pf_data_distributed():
+    config = 'scripts/config/non_existent_config.yaml'
+    with pytest.raises(FileNotFoundError):
+        file_paths = generate_power_flow_data_distributed(config)

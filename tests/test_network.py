@@ -12,6 +12,28 @@ from GridDataGen.utils.param_handler import *
 from GridDataGen.network import *
 from GridDataGen.perturbations.load_perturbation import *
 from GridDataGen.perturbations.topology_perturbation import TopologyGenerator
+import glob
+
+@pytest.mark.parametrize("yaml_path", glob.glob("tests/config/*.yaml"))
+def test_load_config(yaml_path):
+    """
+    Test loading configuration from a YAML file.
+    """
+    with open(yaml_path, 'r') as f:
+        base_config = yaml.safe_load(f)
+        args = NestedNamespace(**base_config)
+    
+    # Check if the configuration is loaded correctly
+    assert args.network.name is not None, "Network name should not be None"
+    assert args.network.source in ["pandapower", "pglib", "file"], "Network source should be one of ['pandapower', 'pglib', 'file']"
+
+@pytest.fixture
+def conf():
+    path = "scripts/config/default.yaml"  # Default path to the config file
+    with open(path, 'r') as f:
+        base_config = yaml.safe_load(f)
+        args = NestedNamespace(**base_config)
+    return args
 
 # Load from configuration - pglib
 def test_load_network_from_config(conf):
