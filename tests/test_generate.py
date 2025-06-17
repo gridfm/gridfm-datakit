@@ -35,6 +35,12 @@ def test_setup_environment(conf):
     assert 'edge_data' in file_paths, "Network file path should be in the dictionary"
     assert os.path.exists(base_path), "Base path should exist"
 
+def test_fail_setup_environment():
+    conf = 'scripts/config/non_existent_config.yaml'
+    # Test with a non-existent configuration file
+    with pytest.raises(FileNotFoundError):
+        args, base_path, file_paths = _setup_environment('non_existent_config.yaml')
+
 # Test prepare network and scenarios function
 def test_prepare_network_and_scenarios(conf):
     args, base_path, file_paths = _setup_environment(conf)
