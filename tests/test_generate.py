@@ -84,6 +84,22 @@ def test_fail_prepare_network_and_scenarios():
         args, base_path, file_paths = _setup_environment('non_existent_config.yaml')
         net, scenarios = _prepare_network_and_scenarios(args, file_paths)
 
+def test_fail_prepare_network_and_scenarios_config():
+    """
+    Tests if preparing network and scenarios fails with an incorrect grid name in the configuration file
+    """
+    # Test with a non-existent configuration file
+    config = 'tests/config/default.yaml'
+    args, base_path, file_paths = _setup_environment(config)
+    args.network.name = "non_existent_grid"
+    args.network.source = "pandapower"  
+    with pytest.raises(AttributeError, match="Invalid grid source!"):
+        if args.network.source == "pandapower":
+            try:
+                net, scenarios = _prepare_network_and_scenarios(args, file_paths)
+            except AttributeError:
+                raise AttributeError("Invalid grid source!")
+
 # Test save network function
 def test_save_generated_data(conf):
     """
@@ -264,13 +280,3 @@ def cleanup_session():
     """
     # Perform any necessary cleanup here, if needed
     pass
-# Note: The cleanup fixture is set to run automatically after all tests in the module.
-# It will remove the generated files and the base data directory if they exist.
-# This ensures that the test environment is clean for subsequent test runs.
-
-# Note: The test cases are designed to be run with pytest.
-# To run the tests, use the command: pytest tests/ --config scripts/config/default.yaml
-# Ensure that the necessary directories and files exist before running the tests
-# The tests will create and clean up the necessary files in the specified directories.
-# The cleanup fixture will ensure that the test environment is clean after the tests are run.
-# The tests cover the setup, preparation, saving, and generation of power flow data,
