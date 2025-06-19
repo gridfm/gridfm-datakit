@@ -1,20 +1,16 @@
 import numpy as np
 import pandas as pd
-from GridDataGen.utils.config import *
+from GridDataGen.utils.config import PQ, PV, REF
 from pandapower.auxiliary import pandapowerNet
 from typing import Tuple, List, Union
 from pandapower import makeYbus_pypower
-from pandapower.pypower.makeYbus import branch_vectors
+import pandapower as pp
 import copy
-from GridDataGen.process.solvers import *
-from pandapower.pypower.idx_brch import T_BUS, F_BUS, RATE_A, BR_STATUS
-from pandapower.pypower.idx_bus import BUS_I, BUS_TYPE, VMIN, VMAX, BASE_KV
-from scipy.sparse import csr_matrix
-from tqdm import tqdm
+from GridDataGen.process.solvers import run_opf, run_pf
+from pandapower.pypower.idx_brch import BR_STATUS
 from queue import Queue
 from GridDataGen.utils.stats import Stats
 from GridDataGen.perturbations.topology_perturbation import TopologyGenerator
-from GridDataGen.perturbations.load_perturbation import LoadScenarioGeneratorBase
 import traceback
 
 
@@ -62,14 +58,17 @@ def network_preprocessing(net: pandapowerNet) -> None:
     indices_slack = np.unique(np.array(net.ext_grid["bus"]))
 
     indices_PV = np.union1d(
-        np.unique(np.array(net.sgen["bus"])), np.unique(np.array(net.gen["bus"]))
+        np.unique(np.array(net.sgen["bus"])),
+        np.unique(np.array(net.gen["bus"])),
     )
     indices_PV = np.setdiff1d(
-        indices_PV, indices_slack
+        indices_PV,
+        indices_slack,
     )  # Exclude slack indices from PV indices
 
     indices_PQ = np.setdiff1d(
-        np.arange(num_buses), np.union1d(indices_PV, indices_slack)
+        np.arange(num_buses),
+        np.union1d(indices_PV, indices_slack),
     )
 
     bus_types[indices_PQ] = PQ  # Set PV bus types to 1
@@ -98,7 +97,7 @@ def network_preprocessing(net: pandapowerNet) -> None:
         == ~np.isin(
             range(net.bus.shape[0]),
             np.concatenate(
-                [net.ext_grid.bus.values, net.gen.bus.values, net.sgen.bus.values]
+                [net.ext_grid.bus.values, net.gen.bus.values, net.sgen.bus.values],
             ),
         )
     ).all()  # Buses which are NOT connected to a gen nor an ext grid
@@ -270,7 +269,7 @@ def process_scenario_contingency(
     except Exception as e:
         with open(error_log_file, "a") as f:
             f.write(
-                f"Caught an exception at scenario {scenario_index} in run_opf function: {e}\n"
+                f"Caught an exception at scenario {scenario_index} in run_opf function: {e}\n",
             )
         return (
             local_csv_data,
@@ -297,7 +296,7 @@ def process_scenario_contingency(
         except Exception as e:
             with open(error_log_file, "a") as f:
                 f.write(
-                    f"Caught an exception at scenario {scenario_index} when solving dcpf or in in run_pf function: {e}\n"
+                    f"Caught an exception at scenario {scenario_index} when solving dcpf or in in run_pf function: {e}\n",
                 )
 
                 continue
@@ -308,7 +307,7 @@ def process_scenario_contingency(
         local_csv_data.extend(pf_post_processing(perturbed_topology, dcpf=True))
         local_adjacency_lists.append(get_adjacency_list(perturbed_topology))
         local_branch_idx_removed.append(
-            get_branch_idx_removed(perturbed_topology._ppc["branch"])
+            get_branch_idx_removed(perturbed_topology._ppc["branch"]),
         )
         if not no_stats:
             local_stats.update(perturbed_topology)
@@ -440,14 +439,13 @@ def process_scenario(
     perturbed_topologies = generator.generate(net)
 
     for perturbed_topology in perturbed_topologies:
-
         try:
             # run OPF to get the gen set points. Here the set points account for the topology perturbation.
             run_opf(perturbed_topology)
         except Exception as e:
             with open(error_log_file, "a") as f:
                 f.write(
-                    f"Caught an exception at scenario {scenario_index} in run_opf function: {e}\n"
+                    f"Caught an exception at scenario {scenario_index} in run_opf function: {e}\n",
                 )
             continue
 
@@ -462,7 +460,7 @@ def process_scenario(
         except Exception as e:
             with open(error_log_file, "a") as f:
                 f.write(
-                    f"Caught an exception at scenario {scenario_index} in run_pf function: {e}\n"
+                    f"Caught an exception at scenario {scenario_index} in run_pf function: {e}\n",
                 )
             continue
 

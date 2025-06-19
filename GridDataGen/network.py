@@ -1,5 +1,4 @@
 import os
-import pandapower as pp
 from pandapower.auxiliary import pandapowerNet
 import requests
 from importlib import resources
@@ -63,7 +62,7 @@ def load_net_from_pglib(grid_name: str) -> pandapowerNet:
     """
     # Construct file paths
     file_path = str(
-        resources.files(f"GridDataGen.grids").joinpath(f"pglib_opf_{grid_name}.m")
+        resources.files("GridDataGen.grids").joinpath(f"pglib_opf_{grid_name}.m"),
     )
 
     # Create directory if it doesn't exist

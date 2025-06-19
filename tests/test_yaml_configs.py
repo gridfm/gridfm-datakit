@@ -1,18 +1,12 @@
 import pytest
 import yaml
 import glob
-from GridDataGen.save import *
-from GridDataGen.process.process_network import *
-from GridDataGen.utils.config import *
-from GridDataGen.utils.stats import *
-from GridDataGen.utils.param_handler import *
-from GridDataGen.network import *
-from GridDataGen.perturbations.load_perturbation import *
-from pandapower.auxiliary import pandapowerNet
-from GridDataGen.utils.param_handler import initialize_generator
-from GridDataGen.utils.utils import write_ram_usage_distributed, Tee
-from GridDataGen.perturbations.topology_perturbation import TopologyGenerator
-from GridDataGen.perturbations.load_perturbation import LoadScenarioGeneratorBase
+from GridDataGen.utils.param_handler import (
+    NestedNamespace,
+    get_load_scenario_generator,
+    initialize_generator,
+)
+
 
 @pytest.mark.parametrize("yaml_path", glob.glob("scripts/config/*.yaml"))
 def test_yaml_config_valid(yaml_path):

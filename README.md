@@ -115,8 +115,3 @@ The data generation process produces several output files in the specified data 
 - **scenarios_log**: A log file containing information about the generation of load scenarios.
 - **stats.csv**: Contains statistical data about the network, such as the number of generators, lines, transformers, overloads, and maximum loading.
 - **stats_plot.html**: An HTML file with plots of the network statistics.
-
-
-
-
-

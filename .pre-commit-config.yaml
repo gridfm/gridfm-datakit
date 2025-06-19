@@ -11,6 +11,11 @@ repos:
   hooks:
     - id: ruff-check
     - id: ruff-format
+-   repo: https://github.com/PyCQA/flake8
+    rev: 7.2.0
+    hooks:
+    -   id: flake8
+        args: ["--ignore=E501,W503,E203"]
 -   repo: https://github.com/asottile/add-trailing-comma
     rev: v3.2.0
     hooks:

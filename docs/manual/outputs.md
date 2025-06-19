@@ -77,4 +77,4 @@ Contains statistical data about the network, such as the number of generators, l
 
 ### `stats_plot.html`
 
-An HTML file with plots of the network statistics. This file is generated to visualize the network statistics. 
+An HTML file with plots of the network statistics. This file is generated to visualize the network statistics.

@@ -9,7 +9,7 @@ include = ["GridDataGen*"]
 name = "GridDataGen"
 description = "Grid Data Synthetic Generation"
 readme = "README.md"
-license = "Apache-2.0" 
+license = "Apache-2.0"
 version = "0.1.0"
 requires-python = ">=3.9,<3.13"
 dependencies = [

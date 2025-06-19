@@ -6,7 +6,7 @@ load:
   generator: "agg_load_profile" # Name of the load generator
   agg_profile: "default" # Name of the aggregated load profile
   scenarios: 1000 # Number of different load scenarios to generate
-  sigma: 0.05 # max local noise 
+  sigma: 0.05 # max local noise
   change_reactive_power: true # If true, changes reactive power of loads. If False, keeps the ones from the case file
   global_range: 0.4 # Range of the global scaling factor. used to set the lower bound of the scaling factor
   max_scaling_factor: 4.0 # Max upper bound of the global scaling factor
@@ -22,10 +22,8 @@ topology_perturbation:
 
 settings:
   num_processes: 12 # Number of parallel processes to use
-  data_dir: "../data_contingency" # Directory to save generated data
+  data_dir: "./data_contingency" # Directory to save generated data
   large_chunk_size: 100 # Number of load scenarios processed before saving
   no_stats: false # If true, disables statistical calculations
   overwrite: true # If true, overwrites existing files
   mode: "contingency" # Mode of the script; options: contingency, pf
-
-

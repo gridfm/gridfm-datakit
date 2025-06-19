@@ -16,7 +16,7 @@ Networks can be loaded from three different sources, specified in `source:
 e.g.
 ```yaml
 network:
-  source: "pglib"                  
+  source: "pglib"
   name: "case24_ieee_rts"   # Name of the power grid network **without the pglib prefix**
 ```
 
@@ -25,8 +25,8 @@ network:
 e.g.
 ```yaml
 network:
-  source: "pandapower"               
-  name: "case_ieee30"     
+  source: "pandapower"
+  name: "case_ieee30"
 ```
 
 ## Local matpower files
@@ -34,13 +34,7 @@ network:
 e.g.
 ```yaml
 network:
-  source: "Texas2k_case1_2016summerpeak"                 
+  source: "Texas2k_case1_2016summerpeak"
   name: "case24_ieee_rts"          # Name of the power grid network **without .m extension**
   network_dir: "scripts/grids"    # Directory containing the network files
 ```
-
-
-
-
-
-

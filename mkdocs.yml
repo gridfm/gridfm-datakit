@@ -53,8 +53,8 @@ plugins:
         python:
           options:
             docstring_style: google
-            heading_level: 0       
-            show_root_heading: false 
+            heading_level: 0
+            show_root_heading: false
 
 
 markdown_extensions:
@@ -64,7 +64,7 @@ markdown_extensions:
   - pymdownx.arithmatex:
       generic: true
   - md_in_html
-    
+
 
 extra_javascript:
   - javascripts/katex.js
@@ -74,6 +74,3 @@ extra_javascript:
 extra_css:
   - stylesheets/extra.css
   - https://unpkg.com/katex@0/dist/katex.min.css
-
-
-

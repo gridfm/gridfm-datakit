@@ -26,4 +26,4 @@ This module provides utilities for handling and manipulating configuration param
 
 ### `NestedNamespace`
 
-::: GridDataGen.utils.param_handler.NestedNamespace 
+::: GridDataGen.utils.param_handler.NestedNamespace

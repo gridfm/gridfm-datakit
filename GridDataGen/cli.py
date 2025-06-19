@@ -10,7 +10,7 @@ from GridDataGen.generate import (
 def main():
     """Command-line interface for the data generation script."""
     parser = argparse.ArgumentParser(
-        description="Generate power flow data for grid analysis"
+        description="Generate power flow data for grid analysis",
     )
 
     parser.add_argument(

@@ -10,7 +10,7 @@ The module provides three topology perturbation strategies:
 
 - `NMinusKGenerator` generates all possible combinations of up to *k* components (lines and transformers) being out of service. Only feasible topologies with no unsupplied buses are returned.
 
-- `RandomComponentDropGenerator` randomly generates a specified number of feasible topologies by disabling up to *k* randomly selected components, including lines, transformers, generators, and static generators. 
+- `RandomComponentDropGenerator` randomly generates a specified number of feasible topologies by disabling up to *k* randomly selected components, including lines, transformers, generators, and static generators.
 
 ## Comparison of Perturbation Strategies
 
@@ -19,5 +19,3 @@ The module provides three topology perturbation strategies:
 | **Number of topologies**          | 1 (original)               | All feasible (up to k elements losts)    | User-defined (random)         |
 | **Component types supported**     | –                          | Lines, Transformers       | Lines, Transformers, Gens, Sgens |
 | **Randomized generation**         | ❌ No                      | ❌ No                     | ✅ Yes                         |
-
-

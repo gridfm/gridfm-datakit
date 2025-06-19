@@ -28,5 +28,3 @@ This module provides functions and classes for generating load scenarios.
 ### `plot_load_scenarios_combined`
 
 ::: GridDataGen.perturbations.load_perturbation.plot_load_scenarios_combined
-
-

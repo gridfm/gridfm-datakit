@@ -10,4 +10,4 @@ This module provides functions and classes for tracking and analyzing statistics
 
 ### `Stats`
 
-::: GridDataGen.utils.stats.Stats 
+::: GridDataGen.utils.stats.Stats

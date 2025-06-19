@@ -1,8 +1,10 @@
-import yaml
 import argparse
-import itertools
-from GridDataGen.perturbations.load_perturbation import *
-from typing import Dict, Any, Optional, Union, TypeVar, Generic
+from GridDataGen.perturbations.load_perturbation import (
+    LoadScenarioGeneratorBase,
+    LoadScenariosFromAggProfile,
+    Powergraph,
+)
+from typing import Dict, Any
 import warnings
 from pandapower import pandapowerNet
 from GridDataGen.perturbations.topology_perturbation import (
@@ -72,7 +74,9 @@ class NestedNamespace(argparse.Namespace):
 
 
 def flatten_dict(
-    d: Dict[str, Any], parent_key: str = "", sep: str = "."
+    d: Dict[str, Any],
+    parent_key: str = "",
+    sep: str = ".",
 ) -> Dict[str, Any]:
     """Flattens a nested dictionary into a single-level dictionary.
 
@@ -136,7 +140,7 @@ def merge_dict(base: Dict[str, Any], updates: Dict[str, Any]) -> None:
         if isinstance(value, dict):
             if not isinstance(base[key], dict):
                 raise TypeError(
-                    f"Default config expects  {type(base[key])}, but got a dict at key '{key}'"
+                    f"Default config expects  {type(base[key])}, but got a dict at key '{key}'",
                 )
             # Recursively merge dictionaries
             merge_dict(base[key], value)
@@ -169,7 +173,6 @@ def get_load_scenario_generator(args: NestedNamespace) -> LoadScenarioGeneratorB
             args.start_scaling_factor,
         )
     if args.generator == "powergraph":
-
         unused_args = {
             key: value
             for key, value in args.flatten().items()
@@ -185,7 +188,8 @@ def get_load_scenario_generator(args: NestedNamespace) -> LoadScenarioGeneratorB
 
 
 def initialize_generator(
-    args: NestedNamespace, base_net: pandapowerNet
+    args: NestedNamespace,
+    base_net: pandapowerNet,
 ) -> TopologyGenerator:
     """Initialize the appropriate topology generator based on the given arguments.
 
@@ -208,11 +212,14 @@ def initialize_generator(
     elif args.type == "random":
         if not all(hasattr(args, attr) for attr in ["n_topology_variants", "k"]):
             raise ValueError(
-                "n_topology_variants and k parameters are required for random generator"
+                "n_topology_variants and k parameters are required for random generator",
             )
         elements = getattr(args, "elements", ["line", "trafo", "gen", "sgen"])
         generator = RandomComponentDropGenerator(
-            args.n_topology_variants, args.k, base_net, elements
+            args.n_topology_variants,
+            args.k,
+            base_net,
+            elements,
         )
         used_args = {
             "n_topology_variants": args.n_topology_variants,

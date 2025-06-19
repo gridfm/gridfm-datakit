@@ -1,18 +1,11 @@
 import numpy as np
 import pandapower as pp
-from GridDataGen.save import *
-from GridDataGen.process.process_network import *
-from GridDataGen.utils.config import *
-from GridDataGen.process.solvers import *
 import copy
 from itertools import combinations
 from abc import ABC, abstractmethod
 import pandapower.topology as top
-import math
 import warnings
-import time
-from typing import Generator, List, Tuple, Union, Optional
-import pandas as pd
+from typing import Generator, List, Union
 
 
 # Abstract base class for topology generation
@@ -25,7 +18,8 @@ class TopologyGenerator(ABC):
 
     @abstractmethod
     def generate(
-        self, net: pp.pandapowerNet
+        self,
+        net: pp.pandapowerNet,
     ) -> Union[Generator[pp.pandapowerNet, None, None], List[pp.pandapowerNet]]:
         """Generate perturbed topologies.
 
@@ -42,7 +36,8 @@ class NoPerturbationGenerator(TopologyGenerator):
     """Generator that yields the original network without any perturbations."""
 
     def generate(
-        self, net: pp.pandapowerNet
+        self,
+        net: pp.pandapowerNet,
     ) -> Generator[pp.pandapowerNet, None, None]:
         """Yield the original network without any perturbations.
 
@@ -85,7 +80,7 @@ class NMinusKGenerator(TopologyGenerator):
             warnings.warn("k>1. This may result in slow data generation process.")
         if k == 0:
             raise ValueError(
-                'k must be greater than 0. Use "none" as argument for the generator_type if you don\'t want to generate any perturbation'
+                'k must be greater than 0. Use "none" as argument for the generator_type if you don\'t want to generate any perturbation',
             )
         self.k = k
 
@@ -100,11 +95,12 @@ class NMinusKGenerator(TopologyGenerator):
             self.component_combinations.extend(combinations(self.components_to_drop, r))
 
         print(
-            f"Number of possible topologies with at most {self.k} dropped components: {len(self.component_combinations)}"
+            f"Number of possible topologies with at most {self.k} dropped components: {len(self.component_combinations)}",
         )
 
     def generate(
-        self, net: pp.pandapowerNet
+        self,
+        net: pp.pandapowerNet,
     ) -> Generator[pp.pandapowerNet, None, None]:
         """Generate perturbed topologies by dropping components.
 
@@ -167,11 +163,12 @@ class RandomComponentDropGenerator(TopologyGenerator):
         self.components_to_drop = []
         for element in elements:
             self.components_to_drop.extend(
-                [(index, element) for index in base_net[element].index]
+                [(index, element) for index in base_net[element].index],
             )
 
     def generate(
-        self, net: pp.pandapowerNet
+        self,
+        net: pp.pandapowerNet,
     ) -> Generator[pp.pandapowerNet, None, None]:
         """Generate perturbed topologies by randomly setting components out of service.
 
@@ -189,12 +186,13 @@ class RandomComponentDropGenerator(TopologyGenerator):
 
             # draw the number of components to drop from a uniform distribution
             r = np.random.randint(
-                1, self.k + 1
+                1,
+                self.k + 1,
             )  # TODO: decide if we want to be able to set 0 components out of service
 
             # Randomly select r<=k components to drop
             components = tuple(
-                np.random.choice(range(len(self.components_to_drop)), r, replace=False)
+                np.random.choice(range(len(self.components_to_drop)), r, replace=False),
             )
 
             # Convert indices back to actual components

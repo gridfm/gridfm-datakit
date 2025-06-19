@@ -16,4 +16,4 @@ This module provides functions for processing power networks.
 
 ### `get_adjacency_list`
 
-::: GridDataGen.process.process_network.get_adjacency_list 
+::: GridDataGen.process.process_network.get_adjacency_list

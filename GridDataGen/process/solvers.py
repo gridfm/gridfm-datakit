@@ -2,7 +2,7 @@ import pandapower as pp
 import pandas as pd
 import numpy as np
 from pandapower.auxiliary import pandapowerNet
-from typing import Dict, Any, Tuple
+from typing import Any, Tuple
 
 
 def run_opf(net: pandapowerNet, **kwargs: Any) -> bool:
@@ -40,9 +40,9 @@ def run_opf(net: pandapowerNet, **kwargs: Any) -> bool:
 
     # The load of course stays the same as before
     assert (net.load.p_mw == net.res_load.p_mw).all(), "Active power load has changed"
-    assert (
-        net.load.q_mvar == net.res_load.q_mvar
-    ).all(), "Reactive power load has changed"
+    assert (net.load.q_mvar == net.res_load.q_mvar).all(), (
+        "Reactive power load has changed"
+    )
 
     # Checking bounds on active and reactive power
     # TODO: see with matteo how we want to handle this
@@ -52,7 +52,8 @@ def run_opf(net: pandapowerNet, **kwargs: Any) -> bool:
 
         if "max_p_mw" in net.gen.columns and "min_p_mw" in net.gen.columns:
             valid_gen = in_service_gen.dropna(
-                subset=["max_p_mw", "min_p_mw"], how="any"
+                subset=["max_p_mw", "min_p_mw"],
+                how="any",
             )
             valid_res_gen = in_service_res_gen.loc[valid_gen.index]
 
@@ -70,7 +71,8 @@ def run_opf(net: pandapowerNet, **kwargs: Any) -> bool:
 
         if "max_q_mvar" in net.gen.columns and "min_q_mvar" in net.gen.columns:
             valid_q_gen = in_service_gen.dropna(
-                subset=["max_q_mvar", "min_q_mvar"], how="any"
+                subset=["max_q_mvar", "min_q_mvar"],
+                how="any",
             )
             valid_q_res_gen = in_service_res_gen.loc[valid_q_gen.index]
 
@@ -96,7 +98,8 @@ def run_opf(net: pandapowerNet, **kwargs: Any) -> bool:
 
         if "max_p_mw" in net.sgen.columns and "min_p_mw" in net.sgen.columns:
             valid_sgen = in_service_sgen.dropna(
-                subset=["max_p_mw", "min_p_mw"], how="any"
+                subset=["max_p_mw", "min_p_mw"],
+                how="any",
             )
             valid_res_sgen = in_service_res_sgen.loc[valid_sgen.index]
 
@@ -114,7 +117,8 @@ def run_opf(net: pandapowerNet, **kwargs: Any) -> bool:
 
         if "max_q_mvar" in net.sgen.columns and "min_q_mvar" in net.sgen.columns:
             valid_q_sgen = in_service_sgen.dropna(
-                subset=["max_q_mvar", "min_q_mvar"], how="any"
+                subset=["max_q_mvar", "min_q_mvar"],
+                how="any",
             )
             valid_q_res_sgen = in_service_res_sgen.loc[valid_q_sgen.index]
 
@@ -135,12 +139,12 @@ def run_opf(net: pandapowerNet, **kwargs: Any) -> bool:
                 )
 
     total_p_diff, total_q_diff = calculate_power_imbalance(net)
-    assert (
-        np.abs(total_q_diff) < 1e-1
-    ), f"Total reactive power imbalance in OPF: {total_q_diff}"
-    assert (
-        np.abs(total_p_diff) < 1e-1
-    ), f"Total active power imbalance in OPF: {total_p_diff}"
+    assert np.abs(total_q_diff) < 1e-1, (
+        f"Total reactive power imbalance in OPF: {total_q_diff}"
+    )
+    assert np.abs(total_p_diff) < 1e-1, (
+        f"Total active power imbalance in OPF: {total_p_diff}"
+    )
 
     return net.OPF_converged
 
@@ -181,12 +185,12 @@ def run_pf(net: pandapowerNet, **kwargs: Any) -> bool:
 
     total_p_diff, total_q_diff = calculate_power_imbalance(net)
 
-    assert (
-        np.abs(total_q_diff) < 1e-2
-    ), f"Total reactive power imbalance in PF: {total_q_diff}"
-    assert (
-        np.abs(total_p_diff) < 1e-2
-    ), f"Total active power imbalance in PF: {total_p_diff}"
+    assert np.abs(total_q_diff) < 1e-2, (
+        f"Total reactive power imbalance in PF: {total_q_diff}"
+    )
+    assert np.abs(total_p_diff) < 1e-2, (
+        f"Total active power imbalance in PF: {total_p_diff}"
+    )
 
     return net.converged
 
@@ -271,9 +275,9 @@ def calculate_power_imbalance(net: pandapowerNet) -> Tuple[float, float]:
         .fillna(0)
     )  # net load = load - generation
 
-    assert np.allclose(
-        net.res_bus[["p_mw", "q_mvar"]], net_load
-    ), f"Mismatch between net load stored in res_bus and the net load computed by summing up the load and generation after solving DCPF: {net.res_bus[['p_mw', 'q_mvar']] - net_load}"
+    assert np.allclose(net.res_bus[["p_mw", "q_mvar"]], net_load), (
+        f"Mismatch between net load stored in res_bus and the net load computed by summing up the load and generation after solving DCPF: {net.res_bus[['p_mw', 'q_mvar']] - net_load}"
+    )
 
     # check power balance taking into account tansformer and line losses
     total_q_diff = (

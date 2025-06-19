@@ -1,6 +1,7 @@
 import os
 import psutil
 
+
 def write_ram_usage_distributed(tqdm_log):
     process = psutil.Process(os.getpid())  # Parent process
     mem_usage = process.memory_info().rss / 1024**2  # Parent memory in MB

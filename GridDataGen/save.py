@@ -1,15 +1,10 @@
 import pandapower as pp
-import pandapower.networks as pn
 import numpy as np
 import pandas as pd
-from importlib import resources
 from pandapower.auxiliary import pandapowerNet
 import os
-import requests
-from pandapower.pypower.idx_brch import T_BUS, F_BUS, RATE_A, BR_STATUS
-from pandapower.pypower.idx_bus import BUS_I, BUS_TYPE, VMIN, VMAX, BASE_KV
+from pandapower.pypower.idx_brch import T_BUS, F_BUS, RATE_A
 from pandapower.pypower.makeYbus import branch_vectors
-import psutil
 from typing import List
 
 
@@ -51,7 +46,7 @@ def save_edge_params(net: pandapowerNet, path: str):
                 Ytt_r,
                 Ytt_i,
                 rate_a,
-            )
+            ),
         ),
         columns=[
             "from_bus",
@@ -111,12 +106,16 @@ def save_branch_idx_removed(branch_idx_removed: List[List[int]], path: str):
         last_scenario = -1
 
     scenario_idx = np.arange(
-        last_scenario + 1, last_scenario + 1 + len(branch_idx_removed)
+        last_scenario + 1,
+        last_scenario + 1 + len(branch_idx_removed),
     )
     branch_idx_removed_df = pd.DataFrame(branch_idx_removed)
     branch_idx_removed_df.insert(0, "scenario", scenario_idx)
     branch_idx_removed_df.to_csv(
-        path, mode="a", header=not os.path.exists(path), index=False
+        path,
+        mode="a",
+        header=not os.path.exists(path),
+        index=False,
     )  # append to existing file or create new one
 
 
@@ -192,7 +191,8 @@ def save_node_edge_data(
 
     # Shift scenario indices
     scenario_indices = np.repeat(
-        range(last_scenario + 1, last_scenario + 1 + (df.shape[0] // n_buses)), n_buses
+        range(last_scenario + 1, last_scenario + 1 + (df.shape[0] // n_buses)),
+        n_buses,
     )  # repeat each scenario index n_buses times since there are n_buses rows for each scenario
     df.insert(0, "scenario", scenario_indices)
 
@@ -212,11 +212,14 @@ def save_node_edge_data(
         [
             np.full(adjacency_lists[i].shape[0], last_scenario + 1 + i, dtype="int64")
             for i in range(len(adjacency_lists))
-        ]
+        ],
     )  # for each scenario, we repeat the scenario index as many times as there are edges in the scenario
     adj_df.insert(0, "scenario", scenario_indices)
 
     # Append to CSV
     adj_df.to_csv(
-        edge_path, mode="a", header=not os.path.exists(edge_path), index=False
+        edge_path,
+        mode="a",
+        header=not os.path.exists(edge_path),
+        index=False,
     )

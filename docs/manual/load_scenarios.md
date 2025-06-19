@@ -47,7 +47,7 @@ Let:
 
 
 
-### `LoadScenariosFromAggProfile` 
+### `LoadScenariosFromAggProfile`
 
 Generates load scenarios by scaling all loads of the grid using a global scaling factor derived from an aggregated load profile, while also applying local (load-level) noise to introduce heterogeneity across buses. Both active and reactive power can be perturbed.
 
@@ -94,7 +94,7 @@ load:
 
 
 
-### `Powergraph` 
+### `Powergraph`
 Generates load scenarios by scaling all loads of the grid with a normalized global scaling factor, derived from an aggregated load profile. Only the active power is perturbed; reactive power remains fixed across all scenarios. This follows the implementation of [PowerGraph: A power grid benchmark dataset for graph neural networks](https://arxiv.org/abs/2402.02827)
 
 
@@ -120,7 +120,7 @@ Sample config parameters:
 
 ```yaml
 load:
-  generator: "powergraph"    
+  generator: "powergraph"
   agg_profile: "default"           # Aggregated load profile name
   scenarios: 200                   # Number of load scenarios to generate
 ```
@@ -142,7 +142,3 @@ The following load profiles are available in the `GridDataGen/load_profiles` dir
     - `ercot_load_act_hr_2024_north_central.csv`: ERCOT load profile for the North Central region.
     - `ercot_load_act_hr_2024_coast.csv`: ERCOT load profile for the Coast region.
     - `ercot_load_act_hr_2024_east.csv`: ERCOT load profile for the East region.
-
-
-
-

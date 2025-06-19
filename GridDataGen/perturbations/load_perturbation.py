@@ -1,16 +1,12 @@
 import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
-from GridDataGen.network import load_net_from_pglib
-import os
 from importlib import resources
 import pandapower as pp
 from abc import ABC, abstractmethod
-import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from copy import deepcopy
-from typing import List, Tuple, Union, Optional, Any
 from pandapower.auxiliary import pandapowerNet
 
 
@@ -104,7 +100,10 @@ class LoadScenarioGeneratorBase(ABC):
 
     @abstractmethod
     def __call__(
-        self, net: pandapowerNet, n_scenarios: int, scenario_log: str
+        self,
+        net: pandapowerNet,
+        n_scenarios: int,
+        scenario_log: str,
     ) -> np.ndarray:
         """Generates load scenarios for a power network.
 
@@ -159,8 +158,8 @@ class LoadScenarioGeneratorBase(ABC):
             RuntimeError: If OPF does not converge for the starting value.
         """
         net = deepcopy(
-            net
-        )  ## Without this, we change the base load of the network, whioch impacts the entire data gen
+            net,
+        )  # Without this, we change the base load of the network, whioch impacts the entire data gen
         p_ref = net.load["p_mw"]
         q_ref = net.load["q_mvar"]
         u = start
@@ -169,11 +168,9 @@ class LoadScenarioGeneratorBase(ABC):
         converged = True
         print("Finding upper limit u .", end="", flush=True)
 
-        while (u <= max_scaling) and (converged == True):
+        while (u <= max_scaling) and (converged is True):
             net.load["p_mw"] = p_ref * u  # we scale the active power
-            if (
-                change_reactive_power
-            ):  # if we want to change the reactive power, we scale it by the same factor as the active power
+            if change_reactive_power:  # if we want to change the reactive power, we scale it by the same factor as the active power
                 net.load["q_mvar"] = q_ref * u
             else:
                 net.load["q_mvar"] = q_ref
@@ -185,10 +182,10 @@ class LoadScenarioGeneratorBase(ABC):
             except pp.OPFNotConverged as err:
                 if u == start:
                     raise RuntimeError(
-                        f"OPF did not converge for the starting value of u={u:.3f}"
+                        f"OPF did not converge for the starting value of u={u:.3f}, {err}",
                     )
                 print(
-                    f"\nOPF did not converge for u={u:.3f}. Using u={u-step_size:.3f} for upper limit",
+                    f"\nOPF did not converge for u={u:.3f}. Using u={u - step_size:.3f} for upper limit",
                     flush=True,
                 )
                 u -= step_size
@@ -293,7 +290,10 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
         self.start_scaling_factor = start_scaling_factor
 
     def __call__(
-        self, net: pandapowerNet, n_scenarios: int, scenarios_log: str
+        self,
+        net: pandapowerNet,
+        n_scenarios: int,
+        scenarios_log: str,
     ) -> np.ndarray:
         """Generates load profiles based on aggregated load data.
 
@@ -313,7 +313,7 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
             < 0
         ):
             raise ValueError(
-                "The start scaling factor must be larger than the global range."
+                "The start scaling factor must be larger than the global range.",
             )
 
         u = self.find_largest_scaling_factor(
@@ -323,26 +323,24 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
             start=self.start_scaling_factor,
             change_reactive_power=self.change_reactive_power,
         )
-        l = (
+        lower = (
             u - self.global_range * u
-        )  ## The lower bound used to be set as e.g. u - 40%, while now it is set as u - 40% of u
+        )  # The lower bound used to be set as e.g. u - 40%, while now it is set as u - 40% of u
 
         with open(scenarios_log, "a") as f:
             f.write("u=" + str(u) + "\n")
-            f.write("l=" + str(l) + "\n")
+            f.write("l=" + str(lower) + "\n")
 
-        agg_load_path = resources.files(f"GridDataGen.load_profiles").joinpath(
-            f"{self.agg_load_name}.csv"
+        agg_load_path = resources.files("GridDataGen.load_profiles").joinpath(
+            f"{self.agg_load_name}.csv",
         )
         agg_load = pd.read_csv(agg_load_path).to_numpy()
         agg_load = agg_load.reshape(agg_load.shape[0])
-        ref_curve = self.min_max_scale(agg_load, l, u)
+        ref_curve = self.min_max_scale(agg_load, lower, u)
         print("min, max of ref_curve: {}, {}".format(ref_curve.min(), ref_curve.max()))
-        print("l, u: {}, {}".format(l, u))
+        print("l, u: {}, {}".format(lower, u))
 
-        p_mw_array = (
-            net.load.p_mw.to_numpy()
-        )  # we now store the active power at the load elements level, we don't aggregate it at the bus level (which was probably not changing anything since there is usually max one load per bus)
+        p_mw_array = net.load.p_mw.to_numpy()  # we now store the active power at the load elements level, we don't aggregate it at the bus level (which was probably not changing anything since there is usually max one load per bus)
 
         q_mvar_array = net.load.q_mvar.to_numpy()
 
@@ -350,29 +348,35 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
         if n_scenarios <= ref_curve.shape[0]:
             print(
                 "cutting the load profile (original length: {}, requested length: {})".format(
-                    ref_curve.shape[0], n_scenarios
-                )
+                    ref_curve.shape[0],
+                    n_scenarios,
+                ),
             )
             ref_curve = ref_curve[:n_scenarios]
         # if it is larger, we interpolate it
         else:
             print(
                 "interpolating the load profile (original length: {}, requested length: {})".format(
-                    ref_curve.shape[0], n_scenarios
-                )
+                    ref_curve.shape[0],
+                    n_scenarios,
+                ),
             )
             ref_curve = self.interpolate_row(ref_curve, data_points=n_scenarios)
 
         load_profile_pmw = p_mw_array[:, np.newaxis] * ref_curve
         noise = np.random.uniform(
-            1 - self.sigma, 1 + self.sigma, size=load_profile_pmw.shape
+            1 - self.sigma,
+            1 + self.sigma,
+            size=load_profile_pmw.shape,
         )  # Add uniform noise
         load_profile_pmw *= noise
 
         if self.change_reactive_power:
             load_profile_qmvar = q_mvar_array[:, np.newaxis] * ref_curve
             noise = np.random.uniform(
-                1 - self.sigma, 1 + self.sigma, size=load_profile_qmvar.shape
+                1 - self.sigma,
+                1 + self.sigma,
+                size=load_profile_qmvar.shape,
             )  # Add uniform noise
             load_profile_qmvar *= noise
         else:
@@ -432,7 +436,10 @@ class Powergraph(LoadScenarioGeneratorBase):
         self.agg_load_name = agg_load_name
 
     def __call__(
-        self, net: pandapowerNet, n_scenarios: int, scenario_log: str
+        self,
+        net: pandapowerNet,
+        n_scenarios: int,
+        scenario_log: str,
     ) -> np.ndarray:
         """Generates load profiles based on aggregated load data.
 
@@ -444,17 +451,15 @@ class Powergraph(LoadScenarioGeneratorBase):
         Returns:
             numpy.ndarray: Array of shape (n_loads, n_scenarios, 2) containing p_mw and q_mvar values.
         """
-        agg_load_path = resources.files(f"GridDataGen.load_profiles").joinpath(
-            f"{self.agg_load_name}.csv"
+        agg_load_path = resources.files("GridDataGen.load_profiles").joinpath(
+            f"{self.agg_load_name}.csv",
         )
         agg_load = pd.read_csv(agg_load_path).to_numpy()
         agg_load = agg_load.reshape(agg_load.shape[0])
         ref_curve = agg_load / agg_load.max()
         print("u={}, l={}".format(ref_curve.max(), ref_curve.min()))
 
-        p_mw_array = (
-            net.load.p_mw.to_numpy()
-        )  # we now store the active power at the load elements level, we don't aggregate it at the bus level (which was probably not changing anything since there is usually max one load per bus)
+        p_mw_array = net.load.p_mw.to_numpy()  # we now store the active power at the load elements level, we don't aggregate it at the bus level (which was probably not changing anything since there is usually max one load per bus)
 
         q_mvar_array = net.load.q_mvar.to_numpy()
 
@@ -462,16 +467,18 @@ class Powergraph(LoadScenarioGeneratorBase):
         if n_scenarios <= ref_curve.shape[0]:
             print(
                 "cutting the load profile (original length: {}, requested length: {})".format(
-                    ref_curve.shape[0], n_scenarios
-                )
+                    ref_curve.shape[0],
+                    n_scenarios,
+                ),
             )
             ref_curve = ref_curve[:n_scenarios]
         # if it is larger, we interpolate it
         else:
             print(
                 "interpolating the load profile (original length: {}, requested length: {})".format(
-                    ref_curve.shape[0], n_scenarios
-                )
+                    ref_curve.shape[0],
+                    n_scenarios,
+                ),
             )
             ref_curve = self.interpolate_row(ref_curve, data_points=n_scenarios)
 

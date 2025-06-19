@@ -17,4 +17,4 @@ This module provides classes for generating perturbed network topologies.
 
 ### `RandomComponentDropGenerator`
 
-::: GridDataGen.perturbations.topology_perturbation.RandomComponentDropGenerator 
+::: GridDataGen.perturbations.topology_perturbation.RandomComponentDropGenerator

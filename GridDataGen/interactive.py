@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 
 import ipywidgets as widgets
-from IPython.display import display, HTML
+from IPython.display import display
 import yaml
-import os
-import subprocess
 from pathlib import Path
 from importlib import resources
 
@@ -136,7 +134,8 @@ def interactive_interface():
 
     network_source.observe(update_network_name, names="value")
     pglib_grid_dropdown.observe(
-        lambda change: network_name.value == change["new"], names="value"
+        lambda change: network_name.value == change["new"],
+        names="value",
     )
     update_network_name()
 
@@ -364,7 +363,7 @@ def interactive_interface():
     load_advanced_box = widgets.VBox(
         [
             widgets.HTML(
-                "<p style='margin: 5px 0; color: #666;'>Parameters for searching the aggregated load profile scaling factors</p>"
+                "<p style='margin: 5px 0; color: #666;'>Parameters for searching the aggregated load profile scaling factors</p>",
             ),
             global_range,
             max_scaling_factor,
@@ -394,10 +393,10 @@ def interactive_interface():
     network_box = widgets.VBox(
         [
             widgets.HTML(
-                "<h3 style='color: #2196F3; margin: 10px 0;'>📡 Network Configuration</h3>"
+                "<h3 style='color: #2196F3; margin: 10px 0;'>📡 Network Configuration</h3>",
             ),
             widgets.HTML(
-                "<p style='margin: 5px 0; color: #666;'>Select the power grid network to analyze</p>"
+                "<p style='margin: 5px 0; color: #666;'>Select the power grid network to analyze</p>",
             ),
             network_source,
             pglib_grid_dropdown,
@@ -416,10 +415,10 @@ def interactive_interface():
     load_basic_box = widgets.VBox(
         [
             widgets.HTML(
-                "<h3 style='color: #4CAF50; margin: 10px 0;'>⚡ Load Configuration - Basic Parameters</h3>"
+                "<h3 style='color: #4CAF50; margin: 10px 0;'>⚡ Load Configuration - Basic Parameters</h3>",
             ),
             widgets.HTML(
-                "<p style='margin: 5px 0; color: #666;'>Configure how load scenarios are generated</p>"
+                "<p style='margin: 5px 0; color: #666;'>Configure how load scenarios are generated</p>",
             ),
             load_generator,
             agg_profile,
@@ -439,10 +438,10 @@ def interactive_interface():
     topology_box = widgets.VBox(
         [
             widgets.HTML(
-                "<h3 style='color: #9C27B0; margin: 10px 0;'>🔌 Topology Perturbation Configuration</h3>"
+                "<h3 style='color: #9C27B0; margin: 10px 0;'>🔌 Topology Perturbation Configuration</h3>",
             ),
             widgets.HTML(
-                "<p style='margin: 5px 0; color: #666;'>Simulate equipment failures and contingencies</p>"
+                "<p style='margin: 5px 0; color: #666;'>Simulate equipment failures and contingencies</p>",
             ),
             perturbation_type,
             k,
@@ -461,10 +460,10 @@ def interactive_interface():
     execution_box = widgets.VBox(
         [
             widgets.HTML(
-                "<h3 style='color: #795548; margin: 10px 0;'>⚙️ Execution Settings</h3>"
+                "<h3 style='color: #795548; margin: 10px 0;'>⚙️ Execution Settings</h3>",
             ),
             widgets.HTML(
-                "<p style='margin: 5px 0; color: #666;'>Configure computational and output settings</p>"
+                "<p style='margin: 5px 0; color: #666;'>Configure computational and output settings</p>",
             ),
             num_processes,
             data_dir,
