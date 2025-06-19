@@ -99,6 +99,21 @@ def test_fail_prepare_network_and_scenarios_config():
                 net, scenarios = _prepare_network_and_scenarios(args, file_paths)
             except AttributeError:
                 raise AttributeError("Invalid grid source!")
+            
+def test_prepare_network_and_scenarios_from_file(conf):
+    """
+    Tests if network and scenarios are prepared correctly
+    """
+    # Ensure the configuration is valid
+    args, base_path, file_paths = _setup_environment(conf)
+    args.network.source = "file"
+    net, scenarios = _prepare_network_and_scenarios(args, file_paths)
+    
+    assert isinstance(net, pandapowerNet), "Network should be a pandapowerNet object"
+    assert len(scenarios) > 0, "There should be at least one scenario"
+    # Check if the network has been loaded correctly
+    assert 'bus' in net.keys(), "Network should contain bus data"
+    assert 'line' in net.keys(), "Network should contain line data"
 
 # Test save network function
 def test_save_generated_data(conf):

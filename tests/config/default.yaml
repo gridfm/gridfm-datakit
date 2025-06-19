@@ -1,7 +1,8 @@
 network:
   name: "case24_ieee_rts" # Name of the power grid network
   source: "pglib" # Data source for the grid; options: pglib, pandapower, file
-
+  network_dir: "GridDataGen/grids" # Path to the grid data file
+  
 load:
   generator: "agg_load_profile" # Name of the load generator; options: agg_load_profile, powergraph
   agg_profile: "default" # Name of the aggregated load profile

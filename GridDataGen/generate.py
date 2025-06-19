@@ -110,7 +110,7 @@ def _prepare_network_and_scenarios(
         net = load_net_from_pglib(args.network.name)
     elif args.network.source == "file":
         net = load_net_from_file(
-            os.path.join(args.network.network_dir, args.network.name)
+            os.path.join(args.network.network_dir, args.network.name) + ".m"
         )
     else:
         raise ValueError("Invalid grid source!")
