@@ -331,7 +331,7 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
             f.write("u=" + str(u) + "\n")
             f.write("l=" + str(lower) + "\n")
 
-        agg_load_path = resources.files("GridDataGen.load_profiles").joinpath(
+        agg_load_path = resources.files("gridfm_datakit.load_profiles").joinpath(
             f"{self.agg_load_name}.csv",
         )
         agg_load = pd.read_csv(agg_load_path).to_numpy()
@@ -451,7 +451,7 @@ class Powergraph(LoadScenarioGeneratorBase):
         Returns:
             numpy.ndarray: Array of shape (n_loads, n_scenarios, 2) containing p_mw and q_mvar values.
         """
-        agg_load_path = resources.files("GridDataGen.load_profiles").joinpath(
+        agg_load_path = resources.files("gridfm_datakit.load_profiles").joinpath(
             f"{self.agg_load_name}.csv",
         )
         agg_load = pd.read_csv(agg_load_path).to_numpy()

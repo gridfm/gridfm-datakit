@@ -11,7 +11,7 @@ def get_available_load_profiles():
     """Get list of available aggregated load profiles."""
     try:
         # Get all .csv files from the load_profiles directory
-        load_profiles_path = resources.files("GridDataGen.load_profiles")
+        load_profiles_path = resources.files("gridfm_datakit.load_profiles")
         profiles = []
 
         for file in load_profiles_path.iterdir():
@@ -508,7 +508,7 @@ def interactive_interface():
             yaml.dump(config, f, default_flow_style=False)
 
         # Run the generation function directly
-        from GridDataGen.generate import generate_power_flow_data_distributed
+        from gridfm_datakit.generate import generate_power_flow_data_distributed
 
         generate_power_flow_data_distributed(str(config_path))
 

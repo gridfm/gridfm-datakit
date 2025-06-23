@@ -1,7 +1,7 @@
 import pytest
 import yaml
 import glob
-from GridDataGen.utils.param_handler import (
+from gridfm_datakit.utils.param_handler import (
     NestedNamespace,
     get_load_scenario_generator,
     initialize_generator,

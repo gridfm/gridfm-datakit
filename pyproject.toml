@@ -3,11 +3,11 @@ requires = ["setuptools >= 80.9.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["GridDataGen*"]
+include = ["gridfm_datakit*"]
 
 [project]
-name = "GridDataGen"
-description = "Grid Data Synthetic Generation"
+name = "gridfm_datakit"
+description = "GridFM Synthetic Data Generation Kit"
 readme = "README.md"
 license = "Apache-2.0"
 version = "0.1.0"
@@ -39,7 +39,7 @@ maintainers = [
 ]
 
 [project.scripts]
-gridfm_data = "GridDataGen.cli:main"
+gridfm_datakit = "gridfm_datakit.cli:main"
 
 [project.optional-dependencies]
 dev = [

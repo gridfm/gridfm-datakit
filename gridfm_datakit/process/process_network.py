@@ -1,16 +1,16 @@
 import numpy as np
 import pandas as pd
-from GridDataGen.utils.config import PQ, PV, REF
+from gridfm_datakit.utils.config import PQ, PV, REF
 from pandapower.auxiliary import pandapowerNet
 from typing import Tuple, List, Union
 from pandapower import makeYbus_pypower
 import pandapower as pp
 import copy
-from GridDataGen.process.solvers import run_opf, run_pf
+from gridfm_datakit.process.solvers import run_opf, run_pf
 from pandapower.pypower.idx_brch import BR_STATUS
 from queue import Queue
-from GridDataGen.utils.stats import Stats
-from GridDataGen.perturbations.topology_perturbation import TopologyGenerator
+from gridfm_datakit.utils.stats import Stats
+from gridfm_datakit.perturbations.topology_perturbation import TopologyGenerator
 import traceback
 
 

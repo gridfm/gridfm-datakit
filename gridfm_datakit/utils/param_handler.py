@@ -1,5 +1,5 @@
 import argparse
-from GridDataGen.perturbations.load_perturbation import (
+from gridfm_datakit.perturbations.load_perturbation import (
     LoadScenarioGeneratorBase,
     LoadScenariosFromAggProfile,
     Powergraph,
@@ -7,7 +7,7 @@ from GridDataGen.perturbations.load_perturbation import (
 from typing import Dict, Any
 import warnings
 from pandapower import pandapowerNet
-from GridDataGen.perturbations.topology_perturbation import (
+from gridfm_datakit.perturbations.topology_perturbation import (
     NMinusKGenerator,
     RandomComponentDropGenerator,
     NoPerturbationGenerator,
