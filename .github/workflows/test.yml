@@ -1,0 +1,21 @@
+name: test_pipeline
+on:
+  push:
+    branches:
+      - feature/ci_test
+  pull_request:
+    branches:
+      - feature/ci_test
+jobs:
+  pre-commit-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+      - name: Run pre-commit
+        run: pre-commit run --verbose  --all-files
