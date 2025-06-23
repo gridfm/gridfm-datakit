@@ -13,5 +13,3 @@ notebooks/test_data
 tests/test_data
 tests/test_data_contingency
 build/
-GridDataGen.egg-info/
-GridDataGen/grids/

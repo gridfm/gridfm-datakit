@@ -127,7 +127,7 @@ load:
 
 ## Aggregated load profiles
 
-The following load profiles are available in the `GridDataGen/load_profiles` directory:
+The following load profiles are available in the `gridfm-datakit/load_profiles` directory:
 
 - `default.csv`: Default load profile.
 

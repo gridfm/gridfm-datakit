@@ -7,7 +7,7 @@ include = ["gridfm_datakit*"]
 
 [project]
 name = "gridfm_datakit"
-description = "GridFM Synthetic Data Generation Kit"
+description = "Data Generation Kit"
 readme = "README.md"
 license = "Apache-2.0"
 version = "0.1.0"
