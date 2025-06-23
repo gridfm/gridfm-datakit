@@ -46,6 +46,8 @@ dev = [
   "mkdocs",
   "mkdocs-material",
   "mkdocstrings[python]",
+  "pre-commit",
+  "bandit"
 ]
 
 test = [
