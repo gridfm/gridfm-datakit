@@ -22,7 +22,7 @@ jobs:
 
   security-test:
       runs-on: ubuntu-latest
-      container: python:3.13-slim
+      container: python:3.10-slim
 
       steps:
       - name: Checkout
