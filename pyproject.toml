@@ -11,7 +11,7 @@ description = "Grid Data Synthetic Generation"
 readme = "README.md"
 license = "Apache-2.0"
 version = "0.1.0"
-requires-python = ">=3.10,<3.13.3"
+requires-python = ">=3.10,<=3.13.3"
 dependencies = [
     "ipykernel",
     "matplotlib",
