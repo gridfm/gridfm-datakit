@@ -10,7 +10,7 @@ cd grid_data_synthetic
 python3 -m venv venv
 source venv/bin/activate
 python -m pip install --upgrade pip  # Upgrade pip to ensure compatibility with pyproject.toml
-pip install .
+pip3 install .
 ```
 
 ### For Developers
@@ -18,5 +18,5 @@ pip install .
 Install with development and testing dependencies:
 
 ```bash
-pip install -e '.[test,dev]'
+pip3 install -e '.[test,dev]'
 ```

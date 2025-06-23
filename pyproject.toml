@@ -26,6 +26,7 @@ dependencies = [
     "pyaml",
     "requests",
     "urllib3<2.0.0",
+    "ipywidgets",
 ]
 
 authors = [

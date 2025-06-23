@@ -1,6 +1,7 @@
 network:
   name: "Texas2k_case1_2016summerpeak" # Name of the power grid network
   source: "file" # Data source for the grid; options: pglib, pandapower, file
+  network_dir: "scripts/grids/"
 
 load:
   generator: "agg_load_profile" # Name of the load generator

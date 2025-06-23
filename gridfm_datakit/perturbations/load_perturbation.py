@@ -232,14 +232,23 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
     **Mathematical Model**
 
     Let:
+
     - $n$: Number of loads ($i \in \{1, \dots, n\}$)
+
     - $K$: Number of scenarios ($k \in \{1, \dots, K\}$)
+
     - $(p, q) \in (\mathbb{R}_{\geq 0}^n)^2$: Nominal active/reactive loads
+
     - $\text{agg}^k$: Aggregated load profile value at time step $k$
+
     - $u$: Maximum feasible global scaling factor (from OPF)
-    - $l = u - \text{global_range} \cdot u$: Minimum global scaling factor
+
+    - $l = u - \text{global\textunderscore range} \cdot u$: Minimum global scaling factor
+
     - $\text{ref}^k = \text{MinMaxScale}(\text{agg}^k, [l, u])$: Scaled aggregate profile
+
     - $\varepsilon_i^k \sim \mathcal{U}(1 - \sigma, 1 + \sigma)$: Active power noise
+
     - $\eta_i^k \sim \mathcal{U}(1 - \sigma, 1 + \sigma)$: Reactive power noise (if enabled)
 
     Then for each load $i$ and scenario $k$:

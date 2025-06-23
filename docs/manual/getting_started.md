@@ -1,6 +1,6 @@
 ## Option 1: Run data gen using interactive interface
 
-To use the interactive interface, either open `scripts/interactive_interface` or copy the following into a Jupyter notebook and follow the instructions:
+To use the interactive interface, either open `scripts/interactive_interface.ipynb` or copy the following into a Jupyter notebook and follow the instructions:
 
 ```python
 from gridfm_datakit.interactive_utils import interactive_interface

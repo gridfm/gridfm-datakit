@@ -16,6 +16,6 @@ The module provides three topology perturbation strategies:
 
 | Feature                            | `NoPerturbationGenerator` | `NMinusKGenerator`        | `RandomComponentDropGenerator` |
 |-----------------------------------|----------------------------|---------------------------|--------------------------------|
-| **Number of topologies**          | 1 (original)               | All feasible (up to k elements losts)    | User-defined (random)         |
+| **Number of topologies**          | 1 (original)               | All feasible (up to k elements lost)    | User-defined (random)         |
 | **Component types supported**     | –                          | Lines, Transformers       | Lines, Transformers, Gens, Sgens |
 | **Randomized generation**         | ❌ No                      | ❌ No                     | ✅ Yes                         |
