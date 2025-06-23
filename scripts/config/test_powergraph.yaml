@@ -15,7 +15,7 @@ topology_perturbation:
 
 settings:
   num_processes: 10 # Number of parallel processes to use
-  data_dir: "../data_test_powergraph" # Directory to save generated data
+  data_dir: "./data_test_powergraph" # Directory to save generated data
   large_chunk_size: 500 # Number of load scenarios processed before saving
   no_stats: false # If true, disables statistical calculations
   overwrite: true # If true, overwrites existing files

@@ -2,9 +2,8 @@ import pandas as pd
 import plotly.express as px
 import os
 import numpy as np
-from typing import List, Union, Optional
 from pandapower.auxiliary import pandapowerNet
-from GridDataGen.utils.solvers import calculate_power_imbalance
+from GridDataGen.process.solvers import calculate_power_imbalance
 
 
 def plot_stats(base_path: str) -> None:
@@ -101,8 +100,8 @@ class Stats:
                 [
                     (net.res_line["loading_percent"] > 100.01).sum(),
                     (net.res_trafo["loading_percent"] > 100.01).sum(),
-                ]
-            )
+                ],
+            ),
         )
 
         self.max_loading.append(
@@ -110,8 +109,8 @@ class Stats:
                 [
                     net.res_line["loading_percent"].max(),
                     net.res_trafo["loading_percent"].max(),
-                ]
-            )
+                ],
+            ),
         )
         total_p_diff, total_q_diff = calculate_power_imbalance(net)
         self.total_p_diff.append(total_p_diff)
@@ -151,7 +150,7 @@ class Stats:
                 "max_loading": self.max_loading,
                 "total_p_diff": self.total_p_diff,
                 "total_q_diff": self.total_q_diff,
-            }
+            },
         )
 
         if os.path.exists(filename):
