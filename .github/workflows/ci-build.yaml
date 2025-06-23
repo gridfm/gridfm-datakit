@@ -2,10 +2,10 @@ name: CI Build
 on:
   push:
     branches:
-      - ci_test
+      - main
   pull_request:
     branches:
-      - ci_test
+      - main
 jobs:
   pre-commit-run:
     runs-on: ubuntu-latest
