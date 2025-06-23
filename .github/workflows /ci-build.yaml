@@ -20,7 +20,7 @@ jobs:
       - name: Run pre-commit
         run: pre-commit run --verbose  --all-files
 
-  security:
+  security-test:
       runs-on: ubuntu-latest
       container: python:3.12-slim
 
