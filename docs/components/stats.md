@@ -4,10 +4,10 @@ This module provides functions and classes for tracking and analyzing statistics
 
 ### `plot_stats`
 
-::: GridDataGen.utils.stats.plot_stats
+::: gridfm_datakit.utils.stats.plot_stats
 
 ## Classes
 
 ### `Stats`
 
-::: GridDataGen.utils.stats.Stats
+::: gridfm_datakit.utils.stats.Stats

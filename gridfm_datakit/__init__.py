@@ -1,6 +1,6 @@
 """GridDataGen - A library for generating synthetic power grid data."""
 
-from GridDataGen.generate import (
+from gridfm_datakit.generate import (
     generate_power_flow_data,
     generate_power_flow_data_distributed,
 )

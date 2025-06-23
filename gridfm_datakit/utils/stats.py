@@ -3,7 +3,7 @@ import plotly.express as px
 import os
 import numpy as np
 from pandapower.auxiliary import pandapowerNet
-from GridDataGen.process.solvers import calculate_power_imbalance
+from gridfm_datakit.process.solvers import calculate_power_imbalance
 
 
 def plot_stats(base_path: str) -> None:

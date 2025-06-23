@@ -1,31 +1,31 @@
-"""Main data generation module for GridDataGen."""
+"""Main data generation module for gridfm_datakit."""
 
 import numpy as np
 import os
-from GridDataGen.save import (
+from gridfm_datakit.save import (
     save_edge_params,
     save_bus_params,
     save_branch_idx_removed,
     save_node_edge_data,
 )
-from GridDataGen.process.process_network import (
+from gridfm_datakit.process.process_network import (
     network_preprocessing,
     process_scenario,
     process_scenario_contingency,
     process_scenario_chunk,
 )
-from GridDataGen.utils.stats import plot_stats, Stats
-from GridDataGen.utils.param_handler import (
+from gridfm_datakit.utils.stats import plot_stats, Stats
+from gridfm_datakit.utils.param_handler import (
     NestedNamespace,
     get_load_scenario_generator,
     initialize_generator,
 )
-from GridDataGen.network import (
+from gridfm_datakit.network import (
     load_net_from_pp,
     load_net_from_file,
     load_net_from_pglib,
 )
-from GridDataGen.perturbations.load_perturbation import (
+from gridfm_datakit.perturbations.load_perturbation import (
     load_scenarios_to_df,
     plot_load_scenarios_combined,
 )
@@ -35,7 +35,7 @@ from datetime import datetime
 from tqdm import tqdm
 from multiprocessing import Pool, Manager
 import shutil
-from GridDataGen.utils.utils import write_ram_usage_distributed, Tee
+from gridfm_datakit.utils.utils import write_ram_usage_distributed, Tee
 import yaml
 from typing import List, Tuple, Any, Dict, Optional, Union
 import sys

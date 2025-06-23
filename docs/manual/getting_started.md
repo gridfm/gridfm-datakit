@@ -3,7 +3,7 @@
 To use the interactive interface, either open `scripts/interactive_interface` or copy the following into a Jupyter notebook and follow the instructions:
 
 ```python
-from GridDataGen.interactive_utils import interactive_interface
+from gridfm_datakit.interactive_utils import interactive_interface
 interactive_interface()
 ```
 
@@ -13,7 +13,7 @@ interactive_interface()
 Run the data generation routine from the command line:
 
 ```bash
-gridfm_data path/to/config.yaml
+gridfm_datakit path/to/config.yaml
 ```
 
 

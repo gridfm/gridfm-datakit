@@ -1,5 +1,5 @@
 """
-Test cases for genertaing data from GridDataGen.generate module
+Test cases for genertaing data from gridfm_datakit.generate module
 pytest tests/ --config scripts/config/default.yaml
 """
 
@@ -7,17 +7,17 @@ import pytest
 import os
 from pandapower.auxiliary import pandapowerNet
 from tqdm import tqdm
-from GridDataGen.utils.param_handler import initialize_generator
+from gridfm_datakit.utils.param_handler import initialize_generator
 import shutil
-from GridDataGen.utils.utils import Tee
+from gridfm_datakit.utils.utils import Tee
 import yaml
-from GridDataGen.utils.param_handler import NestedNamespace
-from GridDataGen.utils.stats import Stats
-from GridDataGen.process.process_network import (
+from gridfm_datakit.utils.param_handler import NestedNamespace
+from gridfm_datakit.utils.stats import Stats
+from gridfm_datakit.process.process_network import (
     process_scenario_contingency,
     process_scenario,
 )
-from GridDataGen.generate import (
+from gridfm_datakit.generate import (
     _setup_environment,
     _prepare_network_and_scenarios,
     _save_generated_data,
