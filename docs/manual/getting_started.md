@@ -19,40 +19,44 @@ gridfm_datakit path/to/config.yaml
 
 ## Configuration Overview
 
-Refer to the sections [Network](network.md), [Load Scenarios](load_scenarios.md), and [Topology perturbations](topology_perturbations.md) for a description of the configuration parameters:
+Refer to the sections [Network](network.md), [Load Scenarios](load_scenarios.md), and [Topology perturbations](topology_perturbations.md) for a description of the configuration parameters.
 
 Sample configuration files are provided in `scripts/config`, e.g. `default.yaml`:
 
 ```yaml
 network:
-  name: "case24_ieee_rts"          # Name of the power grid network
-  source: "pglib"                  # Data source; options: pglib, pandapower, file
-  network_dir: "grids"             # Directory containing the network files
+  name: "case24_ieee_rts" # Name of the power grid network (without extension)
+  source: "pglib" # Data source for the grid; options: pglib, pandapower, file
+  network_dir: "scripts/grids" # if using source "file", this is the directory containing the network file (relative to the project root)
+
 
 load:
-  generator: "agg_load_profile"    # Load generator; options: agg_load_profile, powergraph
-  agg_profile: "default"           # Aggregated load profile name
-  scenarios: 200                   # Number of load scenarios to generate
-  sigma: 0.05                      # Max local noise
-  change_reactive_power: true      # Whether to change reactive power values
-  global_range: 0.4                # Lower bound offset for global scaling factor
-  max_scaling_factor: 4.0          # Upper bound for global scaling factor
-  step_size: 0.025                 # Step size for scaling factor search
-  start_scaling_factor: 0.8        # Starting value for scaling factor
+  generator: "agg_load_profile" # Name of the load generator; options: agg_load_profile, powergraph
+  agg_profile: "default" # Name of the aggregated load profile
+  scenarios: 200 # Number of different load scenarios to generate
+  # WARNING: the following parameters are only used if generator is "agg_load_profile"
+  # if using generator "powergraph", these parameters are ignored
+  sigma: 0.05 # max local noise
+  change_reactive_power: true # If true, changes reactive power of loads. If False, keeps the ones from the case file
+  global_range: 0.4 # Range of the global scaling factor. used to set the lower bound of the scaling factor
+  max_scaling_factor: 4.0 # Max upper bound of the global scaling factor
+  step_size: 0.025 # Step size when finding the upper bound of the global scaling factor
+  start_scaling_factor: 0.8 # Initial value of the global scaling factor
 
 topology_perturbation:
-  k: 1                             # Max number of components to drop per perturbation
-  n_topology_variants: 5           # Number of perturbed topologies per scenario
-  type: "random"                   # Perturbation type; options: n_minus_k, random, overloaded, none
-  elements: ["line", "trafo", "gen", "sgen"]  # Elements to perturb
+  type: "random" # Type of topology generator; options: n_minus_k, random, none
+  # WARNING: the following parameters are only used if type is not "none"
+  k: 1 # Maximum number of components to drop in each perturbation
+  n_topology_variants: 5 # Number of unique perturbed topologies per scenario
+  elements: ["line", "trafo", "gen", "sgen"] # elements to perturb options: line, trafo, gen, sgen
 
 settings:
-  num_processes: 10                # Number of parallel processes
-  data_dir: "../data_test"         # Output directory for generated data
-  large_chunk_size: 50             # Number of scenarios processed before saving
-  no_stats: false                  # Disable statistical calculations if true
-  overwrite: true                  # Overwrite existing files if true
-  mode: "pf"                       # Run mode; options: contingency, pf
+  num_processes: 10 # Number of parallel processes to use
+  data_dir: "./data_out" # Directory to save generated data relative to the project root
+  large_chunk_size: 50 # Number of load scenarios processed before saving
+  no_stats: false # If true, disables statistical calculations
+  overwrite: true # If true, overwrites existing files, if false, appends to files (note that bus_params.csv, edge_params.csv, scenarios_{load.generator}.csv and scenarios_{load.generator}.html will still be overwritten)
+  mode: "pf" # Mode of the script; options: contingency, pf
 ```
 
 <br>
@@ -61,13 +65,16 @@ settings:
 
 The data generation process produces several output files in the specified data directory:
 
-- **node_data.csv**: Contains data related to the nodes (buses) in the network, such as voltage levels and power injections.
-- **edge_data.csv**: Contains data related to the edges (lines and transformers) in the network, such as impedance and power flow.
-- **branch_indices.csv**: Lists the indices of the branches (lines and transformers) in the network.
-- **edge_params.csv**: Contains parameters for the edges, such as resistance and reactance.
-- **bus_params.csv**: Contains parameters for the buses, such as voltage limits and power limits.
-- **scenarios.csv**: Contains the generated load scenarios.
-- **scenarios_plot.html**: An HTML file with plots of the load scenarios.
-- **scenarios_log**: A log file containing information about the generation of load scenarios.
-- **stats.csv**: Contains statistical data about the network, such as the number of generators, lines, transformers, overloads, and maximum loading.
-- **stats_plot.html**: An HTML file with plots of the network statistics.
+- **tqdm.log**: Progress bar log.
+- **error.log**: Log of the errors raised during data generation.
+- **args.log**: Copy of the config file used.
+- **pf_node.csv**: Data related to the nodes (buses) in the network, such as voltage levels and power injections.
+- **pf_edge.csv**: Branch admittance matrix for each pf case.
+- **branch_idx_removed.csv**: List of the indices of the branches (lines and transformers) that got removed when perturbing the topologies.
+- **edge_params.csv**: Branch admittance matrix and branch rate limits for the unperturbed topology.
+- **bus_params.csv**: Parameters for the buses (voltage limits and the base voltage).
+- **scenario_{args.load.generator}.csv**: Load element-level load profile obtained after using the load scenario generator.
+- **scenario_{args.load.generator}.html**: Plots of the element-level load profile.
+- **scenario_{args.load.generator}.log**: If generator is "agg_load_profile", stores the upper and lower bounds for the global scaling factor.
+- **stats.csv**: Stats about the generated data.
+- **stats_plot.html**: Plots of the stats about the generated data.

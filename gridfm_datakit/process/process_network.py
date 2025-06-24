@@ -18,6 +18,7 @@ def network_preprocessing(net: pandapowerNet) -> None:
     """Adds names to bus dataframe and bus types to load, bus, gen, sgen dataframes.
 
     This function performs several preprocessing steps:
+
     1. Assigns names to all network components
     2. Determines bus types (PQ, PV, REF)
     3. Assigns bus types to connected components
@@ -107,6 +108,7 @@ def pf_preprocessing(net: pandapowerNet) -> pandapowerNet:
     """Sets variables to the results of OPF.
 
     Updates the following network components with OPF results:
+
     - sgen.p_mw: active power generation for static generators
     - gen.p_mw, gen.vm_pu: active power and voltage magnitude for generators
 

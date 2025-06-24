@@ -37,7 +37,7 @@ Let:
 
 - $u$: Maximum feasible global scaling factor (from OPF)
 
-- $l = u - \text{global\_range} \cdot u $: Minimum global scaling factor
+- $l = (1 - \text{global\textunderscore range}) \cdot u$: Minimum global scaling factor
 
 - $\text{ref}^k = \text{MinMaxScale}(\text{agg}^k, [l, u])$: Scaled aggregate profile
 
@@ -55,7 +55,7 @@ The process includes:
 
 1. Determining an upper bound $u$ for load scaling such that the network still
     supports a feasible optimal power flow (OPF) solution.
-2. Setting the lower bound $l = u - \text{global\_range} \cdot u$.
+2. Setting the lower bound $l = (1 - \text{global\textunderscore range}) \cdot u$.
 3. Min-max scaling the aggregate profile to the interval \([l, u]\).
 4. Applying this global scaling factor to each load's nominal value with additive uniform noise.
 
@@ -64,32 +64,36 @@ For each load $i$ and scenario $k$:
 $$
 \tilde{p}_i^k = p_i \cdot \text{ref}^k \cdot \varepsilon_i^k
 $$
+
 $$
 \tilde{q}_i^k =
 \begin{cases}
-q_i \cdot \text{ref}^k \cdot \eta_i^k & \text{if } \texttt{change\_reactive\_power} = \texttt{True} \\
+q_i \cdot \text{ref}^k \cdot \eta_i^k & \text{if } \texttt{change\textunderscore reactive\textunderscore power} = \texttt{True} \\
 q_i & \text{otherwise}
 \end{cases}
 $$
 
 **Notes**
-- The upper bound `u` is automatically determined by gradually increasing the base load (doing steps of size `step_size` and solving the OPF until it fails or reaches `max_scaling_factor`.
-- The lower bound `l` is computed as a relative percentage (`global_range`) of `u`.
+
+- The upper bound `u` is automatically determined by gradually increasing the base load (doing steps of size `step_size` and solving the OPF until it fails or reaches `max_scaling_factor`).
+
+- The lower bound `l` is computed as a relative percentage (1-`global_range`) of `u`.
+
 - Noise helps simulate local variability across loads within a global trend.
 
 Sample config parameters:
 
 ```yaml
 load:
-  generator: "agg_load_profile"    # Load generator; options: agg_load_profile, powergraph
-  agg_profile: "default"           # Aggregated load profile name
-  scenarios: 200                   # Number of load scenarios to generate
-  sigma: 0.05                      # Max local noise
-  change_reactive_power: true      # Whether to change reactive power values
-  global_range: 0.4                # Lower bound offset for global scaling factor
-  max_scaling_factor: 4.0          # Upper bound for global scaling factor
-  step_size: 0.025                 # Step size for scaling factor search
-  start_scaling_factor: 0.8        # Starting value for scaling factor
+  generator: "agg_load_profile" # Name of the load generator; options: agg_load_profile, powergraph
+  agg_profile: "default" # Name of the aggregated load profile
+  scenarios: 200 # Number of different load scenarios to generate
+  sigma: 0.05 # max local noise
+  change_reactive_power: true # If true, changes reactive power of loads. If False, keeps the ones from the case file
+  global_range: 0.4 # Range of the global scaling factor. used to set the lower bound of the scaling factor
+  max_scaling_factor: 4.0 # Max upper bound of the global scaling factor
+  step_size: 0.025 # Step size when finding the upper bound of the global scaling factor
+  start_scaling_factor: 0.8 # Initial value of the global scaling factor
 ```
 
 

@@ -225,7 +225,7 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
 
     1. Determining an upper bound `u` for load scaling such that the network still
        supports a feasible optimal power flow (OPF) solution.
-    2. Setting the lower bound \(l = u - \text{global_range} \cdot u\).
+    2. Setting the lower bound $l = (1 - \text{global\textunderscore range}) \cdot u$.
     3. Min-max scaling the aggregate profile to the interval \([l, u]\).
     4. Applying this global scaling factor to each load's nominal value with additive uniform noise.
 
@@ -243,7 +243,7 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
 
     - $u$: Maximum feasible global scaling factor (from OPF)
 
-    - $l = u - \text{global\textunderscore range} \cdot u$: Minimum global scaling factor
+    - $l = (1 - \text{global\textunderscore range}) \cdot u$: Minimum global scaling factor
 
     - $\text{ref}^k = \text{MinMaxScale}(\text{agg}^k, [l, u])$: Scaled aggregate profile
 
@@ -252,20 +252,26 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
     - $\eta_i^k \sim \mathcal{U}(1 - \sigma, 1 + \sigma)$: Reactive power noise (if enabled)
 
     Then for each load $i$ and scenario $k$:
+
+    For each load $i$ and scenario $k$:
     $$
     \tilde{p}_i^k = p_i \cdot \text{ref}^k \cdot \varepsilon_i^k
     $$
+
     $$
     \tilde{q}_i^k =
     \begin{cases}
-    q_i \cdot \text{ref}^k \cdot \eta_i^k & \text{if } \texttt{change\_reactive\_power} = \texttt{True} \\
+    q_i \cdot \text{ref}^k \cdot \eta_i^k & \text{if } \texttt{change\textunderscore reactive\textunderscore power} = \texttt{True} \\
     q_i & \text{otherwise}
     \end{cases}
     $$
 
     **Notes**
+
     - The upper bound `u` is automatically determined by gradually increasing the base load and solving the OPF until it fails.
-    - The lower bound `l` is computed as a relative percentage (`global_range`) of `u`.
+
+    - The lower bound `l` is computed as a relative percentage (1-`global_range`) of `u`.
+
     - Noise helps simulate local variability across loads within a global trend.
     """
 

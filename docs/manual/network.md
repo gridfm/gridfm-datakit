@@ -4,9 +4,10 @@ The network parameters are the following:
 
 ```yaml
 network:
-  source: "pglib"                  # Data source; options: pglib, pandapower, file
-  name: "case24_ieee_rts"          # Name of the power grid network
-  network_dir: "grids"             # Directory containing the network files
+  name: "case24_ieee_rts" # Name of the power grid network (without extension)
+  source: "pglib" # Data source for the grid; options: pglib, pandapower, file
+  network_dir: "scripts/grids" # if using source "file", this is the directory containing the network file (relative to the project root)
+
 ```
 
 Networks can be loaded from three different sources, specified in `source:

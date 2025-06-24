@@ -1,11 +1,14 @@
 network:
-  name: "case240_pserc" # Name of the power grid network
+  name: "case118_ieee" # Name of the power grid network (without extension)
   source: "pglib" # Data source for the grid; options: pglib, pandapower, file
+  network_dir: "scripts/grids" # if using source "file", this is the directory containing the network file (relative to the project root)
 
 load:
-  generator: "agg_load_profile" # Name of the load generator
+  generator: "agg_load_profile" # Name of the load generator; options: agg_load_profile, powergraph
   agg_profile: "default" # Name of the aggregated load profile
   scenarios: 10000 # Number of different load scenarios to generate
+  # WARNING: the following parameters are only used if generator is "agg_load_profile"
+  # if using generator "powergraph", these parameters are ignored
   sigma: 0.05 # max local noise
   change_reactive_power: true # If true, changes reactive power of loads. If False, keeps the ones from the case file
   global_range: 0.4 # Range of the global scaling factor. used to set the lower bound of the scaling factor
@@ -14,16 +17,16 @@ load:
   start_scaling_factor: 0.8 # Initial value of the global scaling factor
 
 topology_perturbation:
+  type: "random" # Type of topology generator; options: n_minus_k, random, none
+  # WARNING: the following parameters are only used if type is not "none"
   k: 2 # Maximum number of components to drop in each perturbation
   n_topology_variants: 20 # Number of unique perturbed topologies per scenario
-  type: "random" # Type of topology generator; options: n_minus_k, random, overloaded, none
-  elements: ["line"]
-
+  elements: ["line"] # elements to perturb options: line, trafo, gen, sgen
 
 settings:
   num_processes: 10 # Number of parallel processes to use
-  data_dir: "./data_contingency" # Directory to save generated data
+  data_dir: "./data_out" # Directory to save generated data relative to the project root
   large_chunk_size: 1000 # Number of load scenarios processed before saving
   no_stats: false # If true, disables statistical calculations
-  overwrite: true # If true, overwrites existing files
-  mode: "contingency" # Mode of the script; options: contingency, pf
+  overwrite: true # If true, overwrites existing files, if false, appends to files (note that bus_params.csv, edge_params.csv, scenarios_{load.generator}.csv and scenarios_{load.generator}.html will still be overwritten)
+  mode: "pf" # Mode of the script; options: contingency, pf
