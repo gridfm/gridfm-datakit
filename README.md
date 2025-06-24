@@ -1,4 +1,5 @@
 [![Docs](https://img.shields.io/badge/docs-available-brightgreen)](https://gridfm.github.io/gridfm-datakit/)
+![Coverage](https://img.shields.io/badge/coverage-76%25-yellow)
 
 
 # Overview
