@@ -30,13 +30,16 @@ dependencies = [
 ]
 
 authors = [
-  {name = "Alban Puech", email = "Alban.Puech1@ibm.com"},
-  {name = "Matteo Mazzonelli", email = "Matteo.Mazzonelli1@ibm.com"},
+  {name = "Alban Puech", email = "apuech@seas.harvard.edu"},
+  {name = "Matteo Mazzonelli", email = "matteo.mazzonelli1@ibm.com"},
+  {name = "Tamara Govindasamy", email= "tamara.govindasamy@ibm.com"},
+  {name = "Mangaliso Mngomezulu", email= "mngomezulum@ibm.com"},
+  {name = "Etienne Vos", email= "etienne.vos@ibm.com"},
   {name = "Jonas Weiss", email= "jwe@zurich.ibm.com"},
 ]
 
 maintainers = [
-  {name = "Alban Puech", email = "Alban.Puech1@ibm.com"},
+  {name = "Alban Puech", email = "apuech@seas.harvard.edu"},
 ]
 
 [project.scripts]
