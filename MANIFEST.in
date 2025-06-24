@@ -1,0 +1,2 @@
+recursive-include gridfm_datakit/load_profiles *.csv
+recursive-include gridfm_datakit/grids *.m
