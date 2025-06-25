@@ -95,11 +95,7 @@ def interactive_interface():
     available_profiles = get_available_load_profiles()
 
     # Network Configuration
-    global \
-        network_source, \
-        pglib_grid_dropdown, \
-        pandapower_grid_dropdown, \
-        network_file_chooser
+    global network_source, pglib_grid_dropdown, pandapower_grid_dropdown, network_file_chooser
 
     network_source = widgets.Dropdown(
         options=[
