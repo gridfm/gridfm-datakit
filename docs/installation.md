@@ -4,10 +4,10 @@
 
 2. Run:
 
-    ```bash
-    python -m pip install --upgrade pip  # Upgrade pip
-    pip install gridfm-datakit
-    ```
+```bash
+python -m pip install --upgrade pip  # Upgrade pip
+pip install gridfm-datakit
+```
 
 
 ### For Developers
