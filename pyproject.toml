@@ -30,6 +30,7 @@ dependencies = [
     "requests",
     "urllib3<2.0.0",
     "ipywidgets",
+    "ipyfilechooser",
 ]
 
 authors = [
