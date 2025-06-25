@@ -1,0 +1,30 @@
+load:
+  agg_profile: default
+  change_reactive_power: true
+  generator: agg_load_profile
+  global_range: 0.4
+  max_scaling_factor: 4.0
+  scenarios: 200
+  sigma: 0.05
+  start_scaling_factor: 0.7999999999999999
+  step_size: 0.025
+network:
+  name: case30_ieee
+  network_dir: none
+  source: pglib
+settings:
+  data_dir: data/
+  large_chunk_size: 50
+  mode: pf
+  no_stats: false
+  num_processes: 10
+  overwrite: true
+topology_perturbation:
+  elements:
+  - line
+  - trafo
+  - gen
+  - sgen
+  k: 2
+  n_topology_variants: 5
+  type: random

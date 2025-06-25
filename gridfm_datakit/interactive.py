@@ -5,6 +5,7 @@ from IPython.display import display
 import yaml
 from pathlib import Path
 from importlib import resources
+from ipyfilechooser import FileChooser
 
 
 def get_available_load_profiles():
@@ -40,10 +41,24 @@ def get_available_load_profiles():
 
 def create_config():
     """Create configuration dictionary from widget values."""
+    if network_source.value == "file":
+        if not network_file_chooser.selected:
+            raise ValueError("Please select a network file")
+        file_path = Path(network_file_chooser.selected)
+        name = file_path.stem
+        network_dir = str(file_path.parent)
+    elif network_source.value == "pglib":
+        name = pglib_grid_dropdown.value
+        network_dir = "none"
+    else:  # pandapower
+        name = pandapower_grid_dropdown.value
+        network_dir = "none"
+
     config = {
         "network": {
-            "name": str(network_name.value),
+            "name": name,
             "source": str(network_source.value),
+            "network_dir": network_dir,
         },
         "load": {
             "generator": str(load_generator.value),
@@ -80,15 +95,11 @@ def interactive_interface():
     available_profiles = get_available_load_profiles()
 
     # Network Configuration
-
-    global network_name, network_source
-    network_name = widgets.Text(
-        value="case24_ieee_rts",
-        description="Network Name:",
-        placeholder="e.g., case24_ieee_rts, case118_ieee",
-        style={"description_width": "150px"},
-        layout=widgets.Layout(width="450px"),
-    )
+    global \
+        network_source, \
+        pglib_grid_dropdown, \
+        pandapower_grid_dropdown, \
+        network_file_chooser
 
     network_source = widgets.Dropdown(
         options=[
@@ -104,6 +115,7 @@ def interactive_interface():
 
     # --- NEW: pglib grid dropdown ---
     pglib_grids = [
+        # Existing grids first
         "case24_ieee_rts",
         "case30_ieee",
         "case118_ieee",
@@ -113,6 +125,64 @@ def interactive_interface():
         "case240_pserc",
         "case300_ieee",
         "case1354_pegase",
+        # Additional grids
+        "case3_lmbd",
+        "case5_pjm",
+        "case14_ieee",
+        "case30_as",
+        "case39_epri",
+        "case57_ieee",
+        "case60_c",
+        "case73_ieee_rts",
+        "case89_pegase",
+        "case162_ieee_dtc",
+        "case500_goc",
+        "case588_sdet",
+        "case793_goc",
+        "case1803_snem",
+        "case1888_rte",
+        "case1951_rte",
+        "case2000_goc",
+        "case2312_goc",
+        "case2383wp_k",
+        "case2736sp_k",
+        "case2737sop_k",
+        "case2742_goc",
+        "case2746wop_k",
+        "case2746wp_k",
+        "case2848_rte",
+        "case2853_sdet",
+        "case2868_rte",
+        "case2869_pegase",
+        "case3012wp_k",
+        "case3022_goc",
+        "case3120sp_k",
+        "case3375wp_k",
+        "case3970_goc",
+        "case4020_goc",
+        "case4601_goc",
+        "case4619_goc",
+        "case4661_sdet",
+        "case4837_goc",
+        "case4917_goc",
+        "case5658_epigrids",
+        "case6468_rte",
+        "case6470_rte",
+        "case6495_rte",
+        "case6515_rte",
+        "case7336_epigrids",
+        "case8387_pegase",
+        "case9241_pegase",
+        "case9591_goc",
+        "case10000_goc",
+        "case10192_epigrids",
+        "case10480_goc",
+        "case13659_pegase",
+        "case19402_goc",
+        "case20758_epigrids",
+        "case24464_goc",
+        "case30000_goc",
+        "case78484_epigrids",
     ]
     pglib_grid_dropdown = widgets.Dropdown(
         options=pglib_grids,
@@ -122,39 +192,71 @@ def interactive_interface():
         layout=widgets.Layout(width="550px"),
     )
 
-    def update_network_name(*args):
-        if network_source.value == "pglib":
-            network_name.value = pglib_grid_dropdown.value
-        pglib_grid_dropdown.layout.display = (
-            "block" if network_source.value == "pglib" else "none"
-        )
-        network_name.layout.display = (
-            "none" if network_source.value == "pglib" else "block"
-        )
-
-    network_source.observe(update_network_name, names="value")
-    pglib_grid_dropdown.observe(
-        lambda change: network_name.value == change["new"],
-        names="value",
-    )
-    update_network_name()
-
-    # --- NEW: network_dir for file source ---
-    network_dir = widgets.Text(
-        value="grids",
-        description="Network Dir:",
-        placeholder="e.g., grids",
+    # --- NEW: pandapower grid dropdown ---
+    pandapower_grids = [
+        "GBnetwork",
+        "GBreducednetwork",
+        "case118",
+        "case11_iwamoto",
+        "case1354pegase",
+        "case14",
+        "case145",
+        "case1888rte",
+        "case24_ieee_rts",
+        "case2848rte",
+        "case2869pegase",
+        "case30",
+        "case300",
+        "case3120sp",
+        "case33bw",
+        "case39",
+        "case4gs",
+        "case5",
+        "case57",
+        "case5_demo_gridcal",
+        "case6470rte",
+        "case6495rte",
+        "case6515rte",
+        "case6ww",
+        "case89pegase",
+        "case9",
+        "case9241pegase",
+        "case_ieee30",
+        "case_illinois200",
+        "iceland",
+    ]
+    pandapower_grid_dropdown = widgets.Dropdown(
+        options=pandapower_grids,
+        value="case14",
+        description="Pandapower Grid:",
         style={"description_width": "150px"},
-        layout=widgets.Layout(width="450px"),
+        layout=widgets.Layout(width="550px"),
     )
 
-    def update_network_dir(*args):
-        network_dir.layout.display = (
-            "block" if network_source.value == "file" else "none"
-        )
+    # --- File chooser for network files ---
+    network_file_chooser = FileChooser(
+        title="Select Network File:",
+        show_hidden=False,
+        directory_only=False,
+        filter_pattern="*.m",
+    )
 
-    network_source.observe(update_network_dir, names="value")
-    update_network_dir()
+    def update_network_visibility(*args):
+        if network_source.value == "pglib":
+            pglib_grid_dropdown.layout.display = "block"
+            pandapower_grid_dropdown.layout.display = "none"
+            network_file_chooser.layout.display = "none"
+        elif network_source.value == "pandapower":
+            pglib_grid_dropdown.layout.display = "none"
+            pandapower_grid_dropdown.layout.display = "block"
+            network_file_chooser.layout.display = "none"
+        else:  # file
+            pglib_grid_dropdown.layout.display = "none"
+            pandapower_grid_dropdown.layout.display = "none"
+            network_file_chooser.layout.display = "block"
+
+    network_source.observe(update_network_visibility, names="value")
+    update_network_visibility()
 
     # Load Configuration - Basic
 
@@ -400,8 +502,8 @@ def interactive_interface():
             ),
             network_source,
             pglib_grid_dropdown,
-            network_name,
-            network_dir,
+            pandapower_grid_dropdown,
+            network_file_chooser,
         ],
         layout=widgets.Layout(
             border="2px solid #E3F2FD",

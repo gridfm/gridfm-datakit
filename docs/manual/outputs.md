@@ -19,6 +19,7 @@ Copy of the configuration file used for the data generation run.
 
 #### `pf_node.csv`
 Contains data related to the nodes (buses) in the network:
+
 - **scenario**: Index of the scenario (This is not the load scenario index, but a unique identifier of the pf case. There can be many scenarios per load scenario in case of topology perturbation)
 - **bus**: Index of the bus
 - **Pd**: Active power demand at the bus
@@ -42,6 +43,7 @@ List of the indices of the branches (lines and transformers) that got removed wh
 
 #### `edge_params.csv`
 Branch admittance matrix and branch rate limits for the unperturbed topology. Contains the following columns:
+
 - **from_bus**: Index of the source bus
 - **to_bus**: Index of the destination bus
 - **Yff_r**: Real part of the self-admittance at the source bus
@@ -56,6 +58,7 @@ Branch admittance matrix and branch rate limits for the unperturbed topology. Co
 
 #### `bus_params.csv`
 Parameters for the buses, such as voltage limits and the base voltage. Contains the following columns:
+
 - **bus**: Index of the bus
 - **type**: Type of the bus (e.g., PQ, PV, REF)
 - **vmin**: Minimum voltage limit at the bus
@@ -77,6 +80,7 @@ If generator is "agg_load_profile", this file stores the upper and lower bounds 
 
 #### `stats.csv`
 Statistics about the generated data, including metrics such as:
+
 - Number of generators
 - Number of lines and transformers
 - Number of overloads
