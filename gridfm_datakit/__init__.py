@@ -5,6 +5,12 @@ from gridfm_datakit.generate import (
     generate_power_flow_data_distributed,
 )
 
+from gridfm_datakit.interactive import interactive_interface
+
 __version__ = "0.1.0"
 
-__all__ = ["generate_power_flow_data", "generate_power_flow_data_distributed"]
+__all__ = [
+    "generate_power_flow_data",
+    "generate_power_flow_data_distributed",
+    "interactive_interface",
+]
