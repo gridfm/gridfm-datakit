@@ -14,7 +14,12 @@ from gridfm_datakit.process.process_network import (
     process_scenario_contingency,
     process_scenario_chunk,
 )
-from gridfm_datakit.utils.stats import plot_stats, Stats
+from gridfm_datakit.utils.stats import (
+    plot_stats,
+    Stats,
+    PowerFlowDataset,
+    plot_feature_distributions,
+)
 from gridfm_datakit.utils.param_handler import (
     NestedNamespace,
     get_load_scenario_generator,
@@ -190,6 +195,20 @@ def _save_generated_data(
             plot_stats(base_path)
 
 
+def _plot_features(node_file: str, edge_file: str):
+    """Plot data diversity and features of the generated.
+
+    Args:
+        node_file: Path to the node data CSV file
+        edge_file: Path to the edge data CSV file
+    """
+    dataset = PowerFlowDataset(node_file, edge_file)
+    data_dir = os.path.dirname(node_file)
+    output_dir = os.path.join(data_dir, "plots_data")
+    os.makedirs(output_dir, exist_ok=True)
+    plot_feature_distributions(dataset, output_dir)
+
+
 def generate_power_flow_data(
     config: Union[str, Dict, NestedNamespace],
 ) -> Dict[str, str]:
@@ -297,6 +316,9 @@ def generate_power_flow_data(
         base_path,
         args,
     )
+    # Plot features
+    _plot_features(file_paths["node_data"], file_paths["edge_data"])
+
     return file_paths
 
 
@@ -445,5 +467,8 @@ def generate_power_flow_data_distributed(
 
                 del csv_data, adjacency_lists, global_stats
                 gc.collect()
+
+    # Plot features
+    _plot_features(file_paths["node_data"], file_paths["edge_data"])
 
     return file_paths
