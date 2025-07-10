@@ -8,7 +8,7 @@ This library is brought to you by the GridFM team to generate power flow data to
 ### Workflow
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/gridfm/gridfm-datakit/refs/heads/main/docs/figs/pipeline.png" alt=""/>
+  <img src="https://raw.githubusercontent.com/gridfm/gridfm-datakit/refs/heads/main/docs/figs/pipeline_docs.png" alt=""/>
   <br/>
 </p>
 
