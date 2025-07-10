@@ -10,7 +10,7 @@ This library is brought to you by the GridFM team to generate power flow data to
 
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/gridfm/gridfm-datakit/refs/heads/main/docs/figs/pipeline.png" alt=""/>
+  <img src="https://raw.githubusercontent.com/gridfm/gridfm-datakit/refs/heads/main/docs/figs/pipeline_readme.png" alt=""/>
   <br/>
 </p>
 
