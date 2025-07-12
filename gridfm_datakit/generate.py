@@ -17,7 +17,7 @@ from gridfm_datakit.process.process_network import (
 from gridfm_datakit.utils.stats import (
     plot_stats,
     Stats,
-    PowerFlowDataset,
+    create_dataset,
     plot_feature_distributions,
 )
 from gridfm_datakit.utils.param_handler import (
@@ -202,7 +202,7 @@ def _plot_features(node_file: str, edge_file: str):
         node_file: Path to the node data CSV file
         edge_file: Path to the edge data CSV file
     """
-    dataset = PowerFlowDataset(node_file, edge_file)
+    dataset = create_dataset(node_file, edge_file)
     data_dir = os.path.dirname(node_file)
     output_dir = os.path.join(data_dir, "plots_data")
     os.makedirs(output_dir, exist_ok=True)
