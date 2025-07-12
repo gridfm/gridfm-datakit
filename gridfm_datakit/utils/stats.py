@@ -1,8 +1,6 @@
 import pandas as pd
 import plotly.express as px
 from pandapower.auxiliary import pandapowerNet
-import torch
-from torch_geometric.data import InMemoryDataset, Data
 from gridfm_datakit.process.solvers import calculate_power_imbalance
 from typing import List, Tuple
 from tqdm import tqdm
@@ -225,143 +223,119 @@ def get_adj_matrix(edge_attr, edge_list, n):
     return A
 
 
-class PowerFlowDataset(InMemoryDataset):
-    def __init__(
-        self,
-        node_file: str,
-        edge_file: str,
-    ):
-        """
-        Initialize the PowerFlowDataset.
+def create_dataset(node_file, edge_file):
+    """
+    Create the PowerFlowDataset.
 
-        Args:
-            node_file: Path to the node data CSV file
-            edge_file: Path to the edge data CSV file
-        """
-        super().__init__()
-        self.node_data = pd.read_csv(node_file)
-        self.edge_data = pd.read_csv(edge_file)
+    Args:
+        node_file: Path to the node data CSV file
+        edge_file: Path to the edge data CSV file
+    """
+    node_data = pd.read_csv(node_file)
+    edge_data = pd.read_csv(edge_file)
 
-        # Group data by scenario
-        self.scenarios = self.node_data["scenario"].unique()
+    # Group data by scenario
+    # scenarios = node_data["scenario"].unique()
 
-        # Normalize power values
-        self.node_data["Pd"] = self.node_data["Pd"] / Sbase
-        self.node_data["Qd"] = self.node_data["Qd"] / Sbase
-        self.node_data["Pg"] = self.node_data["Pg"] / Sbase
-        self.node_data["Qg"] = self.node_data["Qg"] / Sbase
+    # Normalize power values
+    node_data["Pd"] = node_data["Pd"] / Sbase
+    node_data["Qd"] = node_data["Qd"] / Sbase
+    node_data["Pg"] = node_data["Pg"] / Sbase
+    node_data["Qg"] = node_data["Qg"] / Sbase
 
-        # Compute net power injections
-        self.node_data["P_net"] = self.node_data["Pg"] - self.node_data["Pd"]
-        self.node_data["Q_net"] = self.node_data["Qg"] - self.node_data["Qd"]
+    # Compute net power injections
+    node_data["P_net"] = node_data["Pg"] - node_data["Pd"]
+    node_data["Q_net"] = node_data["Qg"] - node_data["Qd"]
 
-        # Convert voltage angles to sin and cos
-        self.node_data["Va_sin"] = np.sin(self.node_data["Va"] * np.pi / 180)
-        self.node_data["Va_cos"] = np.cos(self.node_data["Va"] * np.pi / 180)
+    # Convert voltage angles to sin and cos
+    node_data["Va_sin"] = np.sin(node_data["Va"] * np.pi / 180)
+    node_data["Va_cos"] = np.cos(node_data["Va"] * np.pi / 180)
 
-        # Process all data at once
-        # Add node type column
-        self.node_data["bus_type"] = np.argmax(
-            self.node_data[["PQ", "PV", "REF"]],
-            axis=1,
-        )
+    # Process all data at once
+    # Add node type column
+    node_data["bus_type"] = np.argmax(
+        node_data[["PQ", "PV", "REF"]],
+        axis=1,
+    )
 
-        # Select features
-        feature_cols = ["P_net", "Q_net", "Vm", "Va_sin", "Va_cos", "PQ", "PV", "REF"]
+    # Select features
+    feature_cols = ["P_net", "Q_net", "Vm", "Va_sin", "Va_cos", "PQ", "PV", "REF"]
 
-        # Group both nodes and edges by scenario
-        node_groups = self.node_data.groupby("scenario")
-        edge_groups = self.edge_data.groupby("scenario")
+    # Group both nodes and edges by scenario
+    node_groups = node_data.groupby("scenario")
+    edge_groups = edge_data.groupby("scenario")
 
-        # Process all scenarios without explicit loops
-        self.data_list = []
-        for scenario, group in tqdm(node_groups):
-            # Get node features
-            x = group[feature_cols].values
+    # Process all scenarios without explicit loops
+    data_list = []
+    for scenario, group in tqdm(node_groups):
+        # Get node features
+        x = group[feature_cols].values
 
-            # Get edge information
-            edges = edge_groups.get_group(scenario)
-            edge_index = edges[["index1", "index2"]].to_numpy().T
-            G = edges["G"].values
-            B = edges["B"].values
-            # build adjacency matrix G based on adjacency list edge_index
-            G_mat = get_adj_matrix(G, edge_index, len(x))
-            B_mat = get_adj_matrix(B, edge_index, len(x))
+        # Get edge information
+        edges = edge_groups.get_group(scenario)
+        edge_index = edges[["index1", "index2"]].to_numpy().T
+        G = edges["G"].values
+        B = edges["B"].values
+        # build adjacency matrix G based on adjacency list edge_index
+        G_mat = get_adj_matrix(G, edge_index, len(x))
+        B_mat = get_adj_matrix(B, edge_index, len(x))
 
-            # check sum is the same
-            assert np.allclose(np.sum(G_mat.flatten()), np.sum(G))
-            assert np.allclose(np.sum(B_mat.flatten()), np.sum(B))
+        # check sum is the same
+        assert np.allclose(np.sum(G_mat.flatten()), np.sum(G))
+        assert np.allclose(np.sum(B_mat.flatten()), np.sum(B))
 
-            # Get voltage states
-            vm = x[:, IDX_VM]
-            va_sin = x[:, IDX_VA_SIN]
-            va_cos = x[:, IDX_VA_COS]
-            va = np.arctan2(va_sin, va_cos)
+        # Get voltage states
+        vm = x[:, IDX_VM]
+        va_sin = x[:, IDX_VA_SIN]
+        va_cos = x[:, IDX_VA_COS]
+        va = np.arctan2(va_sin, va_cos)
 
-            # Pre-compute power flows
-            P_flow, Q_flow = get_flows(vm, va, G_mat, B_mat, debug=False)
-            P_inj, Q_inj = get_injections(vm, va, G_mat, B_mat, debug=False)
+        # Pre-compute power flows
+        P_flow, Q_flow = get_flows(vm, va, G_mat, B_mat, debug=False)
+        P_inj, Q_inj = get_injections(vm, va, G_mat, B_mat, debug=False)
 
-            # convert flows to edge_attr format
-            P_flow_edge_attr = get_edge_attr(P_flow, edge_index)
-            Q_flow_edge_attr = get_edge_attr(Q_flow, edge_index)
-            flows = np.stack((P_flow_edge_attr, Q_flow_edge_attr), axis=1)
+        # convert flows to edge_attr format
+        P_flow_edge_attr = get_edge_attr(P_flow, edge_index)
+        Q_flow_edge_attr = get_edge_attr(Q_flow, edge_index)
+        flows = np.stack((P_flow_edge_attr, Q_flow_edge_attr), axis=1)
 
-            # admittance matrix
-            admittance_matrix = np.stack((G, B), axis=1)
+        # admittance matrix
+        admittance_matrix = np.stack((G, B), axis=1)
 
-            # standardize admittance matrix
-            admittance_matrix = (
-                admittance_matrix - np.mean(admittance_matrix, axis=0)
-            ) / np.std(admittance_matrix, axis=0)
+        # standardize admittance matrix
+        admittance_matrix = (
+            admittance_matrix - np.mean(admittance_matrix, axis=0)
+        ) / np.std(admittance_matrix, axis=0)
 
-            # check if P and Q are close to x[:, IDX_P_NET] and x[:, IDX_Q_NET]
-            assert np.allclose(P_inj, x[:, IDX_P_NET])
-            assert np.allclose(Q_inj, x[:, IDX_Q_NET])
+        # check if P and Q are close to x[:, IDX_P_NET] and x[:, IDX_Q_NET]
+        assert np.allclose(P_inj, x[:, IDX_P_NET])
+        assert np.allclose(Q_inj, x[:, IDX_Q_NET])
 
-            # replace x[:, IDX_P_NET] and x[:, IDX_Q_NET] with P_inj and Q_inj for consistency
-            x[:, IDX_P_NET] = P_inj
-            x[:, IDX_Q_NET] = Q_inj
+        # replace x[:, IDX_P_NET] and x[:, IDX_Q_NET] with P_inj and Q_inj for consistency
+        x[:, IDX_P_NET] = P_inj
+        x[:, IDX_Q_NET] = Q_inj
 
-            # convert to tensors
-            x = torch.tensor(x, dtype=torch.float)
-            edge_index = torch.tensor(edge_index, dtype=torch.long)
-            G = torch.tensor(G, dtype=torch.float)
-            B = torch.tensor(B, dtype=torch.float)
-            admittance_matrix = torch.tensor(admittance_matrix, dtype=torch.float)
-            flows = torch.tensor(flows, dtype=torch.float)
-
-            # Create data object with pre-computed measurements
-            data = Data(
-                x=x,
-                edge_index=edge_index,
-                G=G,
-                B=B,
-                bus_type=torch.tensor(group["bus_type"].values, dtype=torch.long),
-                flows=flows,
-                admittance_matrix=admittance_matrix,
-                scenario=scenario,
-            )
-
-            # Add noisy measurements
-            # if self.add_noise_state_estimation:
-            #    data = add_noisy_measurements(
-            #        data,
-            #        self.noise_std,
-            #        self.percentage_branch_meas,
-            #        self.percentage_buses_meas,
-            #    )
-
-            self.data_list.append(data)
-
-        # Convert to tensors for faster processing
-        self.data, self.slices = self.collate(self.data_list)
-
-    def len(self):
-        return len(self.data_list)
-
-    def get(self, idx):
-        return self.data_list[idx]
+        # convert to array
+        x = np.array(x, dtype=np.float64)
+        edge_index = np.array(edge_index, dtype=np.int64)
+        G = np.array(G, dtype=np.float64)
+        B = np.array(B, dtype=np.float64)
+        admittance_matrix = np.array(admittance_matrix, dtype=np.float64)
+        flows = np.array(flows, dtype=np.float64)
+        bus_type = np.array(group["bus_type"].values, dtype=np.float64)
+        # Create data object with pre-computed measurements
+        data = [
+            x,
+            edge_index,
+            G,
+            B,
+            bus_type,
+            flows,
+            admittance_matrix,
+            scenario,
+        ]
+        data_list.append(data)
+    return data_list
 
 
 def get_feature_data(dataset, bus_idx: int, feature_idx: int) -> np.ndarray:
@@ -378,7 +352,7 @@ def get_feature_data(dataset, bus_idx: int, feature_idx: int) -> np.ndarray:
     """
     data = []
     for sample in dataset:
-        data.append(sample.x[bus_idx, feature_idx].item())
+        data.append(sample[0][bus_idx, feature_idx].item())
     return np.array(data)
 
 
@@ -541,7 +515,7 @@ def plot_feature_distributions(dataset, output_dir: str) -> None:
         ("REF", IDX_REF),
     ]
 
-    n_buses = dataset[0].x.shape[0]
+    n_buses = dataset[0][0].shape[0]
 
     for feature_name, feature_idx in features:
         fig, ax = plt.subplots(figsize=(15, 6))
