@@ -335,7 +335,21 @@ def create_dataset(node_file, edge_file):
             scenario,
         ]
         data_list.append(data)
-    return data_list
+    # add to df
+    data_df = pd.DataFrame(
+        data=data_list,
+        columns=[
+            "x",
+            "edge_index",
+            "G",
+            "B",
+            "bus_type",
+            "flows",
+            "admittance_matrix",
+            "scenario",
+        ],
+    )
+    return data_df
 
 
 def get_feature_data(dataset, bus_idx: int, feature_idx: int) -> np.ndarray:
@@ -351,8 +365,8 @@ def get_feature_data(dataset, bus_idx: int, feature_idx: int) -> np.ndarray:
         numpy.ndarray: Array of feature values for the specified bus
     """
     data = []
-    for sample in dataset:
-        data.append(sample[0][bus_idx, feature_idx].item())
+    for sample in dataset.x:
+        data.append(sample[bus_idx, feature_idx].item())
     return np.array(data)
 
 
@@ -515,7 +529,7 @@ def plot_feature_distributions(dataset, output_dir: str) -> None:
         ("REF", IDX_REF),
     ]
 
-    n_buses = dataset[0][0].shape[0]
+    n_buses = dataset.x[0].shape[0]
 
     for feature_name, feature_idx in features:
         fig, ax = plt.subplots(figsize=(15, 6))
