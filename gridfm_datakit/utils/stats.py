@@ -18,10 +18,6 @@ from gridfm_datakit.utils.config import (
     IDX_REF,
     Sbase,
 )
-from gridfm_datakit.utils.power_calculations import (
-    get_flows,
-    get_injections,
-)
 
 
 def plot_stats(base_path: str) -> None:
@@ -223,136 +219,7 @@ def get_adj_matrix(edge_attr, edge_list, n):
     return A
 
 
-def create_dataset(node_file, edge_file):
-    """
-    Create the PowerFlowDataset.
-
-    Args:
-        node_file: Path to the node data CSV file
-        edge_file: Path to the edge data CSV file
-    """
-    node_data = pd.read_csv(node_file)
-    edge_data = pd.read_csv(edge_file)
-
-    # Group data by scenario
-    # scenarios = node_data["scenario"].unique()
-
-    # Normalize power values
-    node_data["Pd"] = node_data["Pd"] / Sbase
-    node_data["Qd"] = node_data["Qd"] / Sbase
-    node_data["Pg"] = node_data["Pg"] / Sbase
-    node_data["Qg"] = node_data["Qg"] / Sbase
-
-    # Compute net power injections
-    node_data["P_net"] = node_data["Pg"] - node_data["Pd"]
-    node_data["Q_net"] = node_data["Qg"] - node_data["Qd"]
-
-    # Convert voltage angles to sin and cos
-    node_data["Va_sin"] = np.sin(node_data["Va"] * np.pi / 180)
-    node_data["Va_cos"] = np.cos(node_data["Va"] * np.pi / 180)
-
-    # Process all data at once
-    # Add node type column
-    node_data["bus_type"] = np.argmax(
-        node_data[["PQ", "PV", "REF"]],
-        axis=1,
-    )
-
-    # Select features
-    feature_cols = ["P_net", "Q_net", "Vm", "Va_sin", "Va_cos", "PQ", "PV", "REF"]
-
-    # Group both nodes and edges by scenario
-    node_groups = node_data.groupby("scenario")
-    edge_groups = edge_data.groupby("scenario")
-
-    # Process all scenarios without explicit loops
-    data_list = []
-    for scenario, group in tqdm(node_groups):
-        # Get node features
-        x = group[feature_cols].values
-
-        # Get edge information
-        edges = edge_groups.get_group(scenario)
-        edge_index = edges[["index1", "index2"]].to_numpy().T
-        G = edges["G"].values
-        B = edges["B"].values
-        # build adjacency matrix G based on adjacency list edge_index
-        G_mat = get_adj_matrix(G, edge_index, len(x))
-        B_mat = get_adj_matrix(B, edge_index, len(x))
-
-        # check sum is the same
-        assert np.allclose(np.sum(G_mat.flatten()), np.sum(G))
-        assert np.allclose(np.sum(B_mat.flatten()), np.sum(B))
-
-        # Get voltage states
-        vm = x[:, IDX_VM]
-        va_sin = x[:, IDX_VA_SIN]
-        va_cos = x[:, IDX_VA_COS]
-        va = np.arctan2(va_sin, va_cos)
-
-        # Pre-compute power flows
-        P_flow, Q_flow = get_flows(vm, va, G_mat, B_mat, debug=False)
-        P_inj, Q_inj = get_injections(vm, va, G_mat, B_mat, debug=False)
-
-        # convert flows to edge_attr format
-        P_flow_edge_attr = get_edge_attr(P_flow, edge_index)
-        Q_flow_edge_attr = get_edge_attr(Q_flow, edge_index)
-        flows = np.stack((P_flow_edge_attr, Q_flow_edge_attr), axis=1)
-
-        # admittance matrix
-        admittance_matrix = np.stack((G, B), axis=1)
-
-        # standardize admittance matrix
-        admittance_matrix = (
-            admittance_matrix - np.mean(admittance_matrix, axis=0)
-        ) / np.std(admittance_matrix, axis=0)
-
-        # check if P and Q are close to x[:, IDX_P_NET] and x[:, IDX_Q_NET]
-        assert np.allclose(P_inj, x[:, IDX_P_NET])
-        assert np.allclose(Q_inj, x[:, IDX_Q_NET])
-
-        # replace x[:, IDX_P_NET] and x[:, IDX_Q_NET] with P_inj and Q_inj for consistency
-        x[:, IDX_P_NET] = P_inj
-        x[:, IDX_Q_NET] = Q_inj
-
-        # convert to array
-        x = np.array(x, dtype=np.float64)
-        edge_index = np.array(edge_index, dtype=np.int64)
-        G = np.array(G, dtype=np.float64)
-        B = np.array(B, dtype=np.float64)
-        admittance_matrix = np.array(admittance_matrix, dtype=np.float64)
-        flows = np.array(flows, dtype=np.float64)
-        bus_type = np.array(group["bus_type"].values, dtype=np.float64)
-        # Create data object with pre-computed measurements
-        data = [
-            x,
-            edge_index,
-            G,
-            B,
-            bus_type,
-            flows,
-            admittance_matrix,
-            scenario,
-        ]
-        data_list.append(data)
-    # add to df
-    data_df = pd.DataFrame(
-        data=data_list,
-        columns=[
-            "x",
-            "edge_index",
-            "G",
-            "B",
-            "bus_type",
-            "flows",
-            "admittance_matrix",
-            "scenario",
-        ],
-    )
-    return data_df
-
-
-def get_feature_data(dataset, bus_idx: int, feature_idx: int) -> np.ndarray:
+def get_feature_data(data_list, bus_idx: int, feature_idx: int) -> np.ndarray:
     """
     Extract feature data for a specific bus from the dataset.
 
@@ -365,12 +232,12 @@ def get_feature_data(dataset, bus_idx: int, feature_idx: int) -> np.ndarray:
         numpy.ndarray: Array of feature values for the specified bus
     """
     data = []
-    for sample in dataset.x:
+    for sample in data_list:
         data.append(sample[bus_idx, feature_idx].item())
     return np.array(data)
 
 
-def get_va_deg(dataset, bus_idx: int) -> np.ndarray:
+def get_va_deg(data_list, bus_idx: int) -> np.ndarray:
     """
     Calculate voltage angle in degrees for a specific bus.
 
@@ -381,12 +248,12 @@ def get_va_deg(dataset, bus_idx: int) -> np.ndarray:
     Returns:
         numpy.ndarray: Array of voltage angles in degrees
     """
-    va_sin = get_feature_data(dataset, bus_idx, IDX_VA_SIN)
-    va_cos = get_feature_data(dataset, bus_idx, IDX_VA_COS)
+    va_sin = get_feature_data(data_list, bus_idx, IDX_VA_SIN)
+    va_cos = get_feature_data(data_list, bus_idx, IDX_VA_COS)
     return np.degrees(np.arctan2(va_sin, va_cos))
 
 
-def plot_bus_level_features(dataset, bus_idx: int, output_dir: str) -> None:
+def plot_bus_level_features(data_list, bus_idx: int, output_dir: str) -> None:
     """
     Create and save histograms, line plots, and violin plots for all features of a specific bus.
 
@@ -419,9 +286,9 @@ def plot_bus_level_features(dataset, bus_idx: int, output_dir: str) -> None:
     for row, (feature_name, feature_idx) in enumerate(features):
         # Get feature data
         if feature_idx == -1:  # Special case for voltage angle in degrees
-            feature_data = get_va_deg(dataset, bus_idx)
+            feature_data = get_va_deg(data_list, bus_idx)
         else:
-            feature_data = get_feature_data(dataset, bus_idx, feature_idx)
+            feature_data = get_feature_data(data_list, bus_idx, feature_idx)
 
         # Plot histogram
         ax_hist = axes[row, 0]
@@ -496,7 +363,7 @@ def plot_bus_level_features(dataset, bus_idx: int, output_dir: str) -> None:
     plt.close()
 
 
-def plot_bus_features(dataset, bus_idx: int, output_dir: str) -> None:
+def plot_bus_features(data_list, bus_idx: int, output_dir: str) -> None:
     """
     Create and save all plots for a specific bus.
 
@@ -505,10 +372,10 @@ def plot_bus_features(dataset, bus_idx: int, output_dir: str) -> None:
         bus_idx: Index of the bus to plot features for
         output_dir: Directory to save the plots
     """
-    plot_bus_level_features(dataset, bus_idx, output_dir)
+    plot_bus_level_features(data_list, bus_idx, output_dir)
 
 
-def plot_feature_distributions(dataset, output_dir: str) -> None:
+def plot_feature_distributions(node_file, output_dir: str) -> None:
     """
     Create and save violin plots showing the distribution of each feature across all buses.
 
@@ -516,6 +383,42 @@ def plot_feature_distributions(dataset, output_dir: str) -> None:
         dataset: The dataset containing power system data
         output_dir: Directory to save the plots
     """
+    node_data = pd.read_csv(node_file)
+
+    # Normalize power values
+    node_data["Pd"] = node_data["Pd"] / Sbase
+    node_data["Qd"] = node_data["Qd"] / Sbase
+    node_data["Pg"] = node_data["Pg"] / Sbase
+    node_data["Qg"] = node_data["Qg"] / Sbase
+
+    # Compute net power injections
+    node_data["P_net"] = node_data["Pg"] - node_data["Pd"]
+    node_data["Q_net"] = node_data["Qg"] - node_data["Qd"]
+
+    # Convert voltage angles to sin and cos
+    node_data["Va_sin"] = np.sin(node_data["Va"] * np.pi / 180)
+    node_data["Va_cos"] = np.cos(node_data["Va"] * np.pi / 180)
+
+    # Process all data at once
+    # Add node type column
+    node_data["bus_type"] = np.argmax(
+        node_data[["PQ", "PV", "REF"]],
+        axis=1,
+    )
+    # Select features
+    feature_cols = ["P_net", "Q_net", "Vm", "Va_sin", "Va_cos", "PQ", "PV", "REF"]
+
+    # Group both nodes and edges by scenario
+    node_groups = node_data.groupby("scenario")
+
+    data_list = []
+
+    for scenario, group in tqdm(node_groups):
+        # Get node features
+        x = group[feature_cols].values
+        data_list.append(x)
+    # data_df = pd.DataFrame(data=data_list, columns=["x"])
+
     # Feature names and indices
     features: List[Tuple[str, int]] = [
         ("P_net", IDX_P_NET),
@@ -529,7 +432,7 @@ def plot_feature_distributions(dataset, output_dir: str) -> None:
         ("REF", IDX_REF),
     ]
 
-    n_buses = dataset.x[0].shape[0]
+    n_buses = len(node_data["bus"].unique())
 
     for feature_name, feature_idx in features:
         fig, ax = plt.subplots(figsize=(15, 6))
@@ -538,9 +441,9 @@ def plot_feature_distributions(dataset, output_dir: str) -> None:
         all_bus_data = []
         for bus in range(n_buses):
             if feature_idx == -1:  # Special case for voltage angle in degrees
-                bus_data = get_va_deg(dataset, bus)
+                bus_data = get_va_deg(data_list, bus)
             else:
-                bus_data = get_feature_data(dataset, bus, feature_idx)
+                bus_data = get_feature_data(data_list, bus, feature_idx)
             all_bus_data.append(bus_data)
 
         # Create violin plot
@@ -580,25 +483,6 @@ def plot_feature_distributions(dataset, output_dir: str) -> None:
 
         # Add grid for better readability
         ax.grid(True, alpha=0.3)
-
-        # # Add statistics as text
-        # stats_text = []
-        # for i, data in enumerate(all_bus_data):
-        #     mean = np.mean(data)
-        #     std = np.std(data)
-        #     stats_text.append(f"Bus {i}:\nMean: {mean:.3f}\nStd: {std:.3f}")
-
-        # Add statistics text box
-        # props = dict(boxstyle="round", facecolor="wheat", alpha=0.5)
-        # ax.text(
-        #     0.02,
-        #     0.98,
-        #     "\n".join(stats_text[:5]),
-        #     transform=ax.transAxes,
-        #     verticalalignment="top",
-        #     bbox=props,
-        #     fontsize=8,
-        # )
 
         # Adjust layout and save
         plt.tight_layout()
