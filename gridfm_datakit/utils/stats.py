@@ -198,27 +198,6 @@ class Stats:  # network stats
 
 
 # Plotting functions for bus-level features and distributions
-def get_edge_attr(matrix, edge_list):
-    """
-    Get the edge attributes from the adjacency matrix and edge list.
-    """
-    i = edge_list[0]
-    j = edge_list[1]
-    edge_attr = matrix[i, j]
-    return edge_attr
-
-
-def get_adj_matrix(edge_attr, edge_list, n):
-    """
-    Get the adjacency matrix from the edge attributes and edge list.
-    """
-    # TODO: optimize this
-    A = np.zeros((n, n))
-    for idx, (i, j) in enumerate(edge_list.T):
-        A[i, j] = edge_attr[idx]
-    return A
-
-
 def get_feature_data(data_list, bus_idx: int, feature_idx: int) -> np.ndarray:
     """
     Extract feature data for a specific bus from the dataset.
