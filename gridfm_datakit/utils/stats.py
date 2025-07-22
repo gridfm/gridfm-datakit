@@ -224,7 +224,7 @@ def get_feature_data(data_list, bus_idx: int, feature_idx: int) -> np.ndarray:
     Extract feature data for a specific bus from the dataset.
 
     Args:
-        dataset: The dataset containing power system data
+        data_list: List of node features grouped by scenario
         bus_idx: Index of the bus to extract data for
         feature_idx: Index of the feature to extract
 
@@ -242,7 +242,7 @@ def get_va_deg(data_list, bus_idx: int) -> np.ndarray:
     Calculate voltage angle in degrees for a specific bus.
 
     Args:
-        dataset: The dataset containing power system data
+        data_list: List of node features grouped by scenario
         bus_idx: Index of the bus to calculate voltage angle for
 
     Returns:
@@ -253,134 +253,12 @@ def get_va_deg(data_list, bus_idx: int) -> np.ndarray:
     return np.degrees(np.arctan2(va_sin, va_cos))
 
 
-def plot_bus_level_features(data_list, bus_idx: int, output_dir: str) -> None:
-    """
-    Create and save histograms, line plots, and violin plots for all features of a specific bus.
-
-    Args:
-        dataset: The dataset containing power system data
-        bus_idx: Index of the bus to plot features for
-        output_dir: Directory to save the plots
-    """
-    # Feature names and indices
-    features: List[Tuple[str, int]] = [
-        ("P_net", IDX_P_NET),
-        ("Q_net", IDX_Q_NET),
-        ("Vm", IDX_VM),
-        ("Va_sin", IDX_VA_SIN),
-        ("Va_cos", IDX_VA_COS),
-        ("Va_deg", -1),  # Special case for voltage angle in degrees
-        ("PQ", IDX_PQ),
-        ("PV", IDX_PV),
-        ("REF", IDX_REF),
-    ]
-
-    # Create a figure with subplots for each feature (3 rows per feature: histogram, line plot, and violin plot)
-    fig, axes = plt.subplots(9, 3, figsize=(20, 45))
-    fig.suptitle(
-        f"Feature Distributions and Time Series for Bus {bus_idx}",
-        fontsize=16,
-    )
-
-    # Plot histograms, line plots, and violin plots for each feature
-    for row, (feature_name, feature_idx) in enumerate(features):
-        # Get feature data
-        if feature_idx == -1:  # Special case for voltage angle in degrees
-            feature_data = get_va_deg(data_list, bus_idx)
-        else:
-            feature_data = get_feature_data(data_list, bus_idx, feature_idx)
-
-        # Plot histogram
-        ax_hist = axes[row, 0]
-        ax_hist.hist(feature_data, bins=50, alpha=0.7)
-        ax_hist.set_title(f"{feature_name} - Distribution")
-        ax_hist.set_xlabel("Value")
-        ax_hist.set_ylabel("Frequency")
-
-        # Add statistics to histogram
-        mean = np.mean(feature_data)
-        std = np.std(feature_data)
-        ax_hist.text(
-            0.05,
-            0.95,
-            f"Mean: {mean:.4f}\nStd: {std:.4f}",
-            transform=ax_hist.transAxes,
-            verticalalignment="top",
-        )
-
-        # Plot line plot
-        ax_line = axes[row, 1]
-        ax_line.plot(feature_data, alpha=0.7)
-        ax_line.set_title(f"{feature_name} - Time Series")
-        ax_line.set_xlabel("Sample Index")
-        ax_line.set_ylabel("Value")
-
-        # Add statistics to line plot
-        ax_line.text(
-            0.05,
-            0.95,
-            f"Mean: {mean:.4f}\nStd: {std:.4f}",
-            transform=ax_line.transAxes,
-            verticalalignment="top",
-        )
-
-        # Add grid to line plot for better readability
-        ax_line.grid(True, alpha=0.3)
-
-        # Plot violin plot
-        ax_violin = axes[row, 2]
-        parts = ax_violin.violinplot(feature_data, vert=True, showmeans=True)
-
-        # Customize violin plot appearance
-        for pc in parts["bodies"]:
-            pc.set_facecolor("#D43F3A")
-            pc.set_alpha(0.7)
-
-        # Add individual data points
-        x = np.random.normal(1, 0.04, size=len(feature_data))
-        ax_violin.scatter(x, feature_data, alpha=0.1, s=10, color="black")
-
-        # Add box plot on top
-        ax_violin.boxplot(
-            feature_data,
-            vert=True,
-            widths=0.15,
-            showfliers=False,
-            showbox=True,
-            showcaps=True,
-            showmeans=False,
-            medianprops=dict(color="black", linewidth=1.5),
-        )
-
-        ax_violin.set_title(f"{feature_name} - Distribution")
-        ax_violin.set_ylabel("Value")
-        ax_violin.set_xticks([1])
-        ax_violin.set_xticklabels([f"Bus {bus_idx}"])
-
-    # Adjust layout and save
-    plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, f"feature_plots_bus_{bus_idx}.png"))
-    plt.close()
-
-
-def plot_bus_features(data_list, bus_idx: int, output_dir: str) -> None:
-    """
-    Create and save all plots for a specific bus.
-
-    Args:
-        dataset: The dataset containing power system data
-        bus_idx: Index of the bus to plot features for
-        output_dir: Directory to save the plots
-    """
-    plot_bus_level_features(data_list, bus_idx, output_dir)
-
-
 def plot_feature_distributions(node_file, output_dir: str) -> None:
     """
     Create and save violin plots showing the distribution of each feature across all buses.
 
     Args:
-        dataset: The dataset containing power system data
+        node_file: Path to the generated node data CSV file
         output_dir: Directory to save the plots
     """
     node_data = pd.read_csv(node_file)
@@ -417,7 +295,6 @@ def plot_feature_distributions(node_file, output_dir: str) -> None:
         # Get node features
         x = group[feature_cols].values
         data_list.append(x)
-    # data_df = pd.DataFrame(data=data_list, columns=["x"])
 
     # Feature names and indices
     features: List[Tuple[str, int]] = [

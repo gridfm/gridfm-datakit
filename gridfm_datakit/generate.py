@@ -194,12 +194,11 @@ def _save_generated_data(
             plot_stats(base_path)
 
 
-def _plot_features(node_file: str, edge_file: str):
-    """Plot data diversity and features of the generated.
+def _plot_features(node_file: str):
+    """Plot data diversity and features of the generated data.
 
     Args:
         node_file: Path to the node data CSV file
-        edge_file: Path to the edge data CSV file
     """
     data_dir = os.path.dirname(node_file)
     output_dir = os.path.join(data_dir, "plots_data")
@@ -315,7 +314,7 @@ def generate_power_flow_data(
         args,
     )
     # Plot features
-    _plot_features(file_paths["node_data"], file_paths["edge_data"])
+    _plot_features(file_paths["node_data"])
 
     return file_paths
 
@@ -467,6 +466,6 @@ def generate_power_flow_data_distributed(
                 gc.collect()
 
     # Plot features
-    _plot_features(file_paths["node_data"], file_paths["edge_data"])
+    _plot_features(file_paths["node_data"])
 
     return file_paths
