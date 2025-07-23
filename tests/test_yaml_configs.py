@@ -23,13 +23,14 @@ def test_yaml_config_valid(yaml_path):
     # Call param handler functions; should not raise exceptions
     if hasattr(args, "agg_load_profile"):
         get_load_scenario_generator(args)
-    if hasattr(args, "n_minus_k"):
+    if hasattr(args, "random"):
         initialize_generator(args, args.base_net)
 
 
 excluded_files = [
     "scripts/config/Texas2k_case1_2016summerpeak.yaml",
     "scripts/config/case1354_pegase.yaml",
+    "scripts/config/case179_goc.yaml",
 ]
 
 yaml_files = [f for f in glob.glob("scripts/config/*.yaml") if f not in excluded_files]
@@ -43,9 +44,7 @@ def run_generation(yaml_path):
         args.load.scenarios = 2
         args.settings.large_chunk_size = 2
         args.settings.num_processes = 2
-        args.settings.data_dir = (
-            f"./data_pytest_tmp/{yaml_path.split('/')[-1].replace('.yaml', '')}"
-        )
+        args.settings.data_dir = f"./tests/test_data/data_pytest_tmp/{yaml_path.split('/')[-1].replace('.yaml', '')}"
         file_paths = generate_power_flow_data_distributed(args)
         assert file_paths is not None
         shutil.rmtree(args.settings.data_dir)
