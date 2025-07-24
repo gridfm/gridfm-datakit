@@ -14,7 +14,11 @@ from gridfm_datakit.process.process_network import (
     process_scenario_contingency,
     process_scenario_chunk,
 )
-from gridfm_datakit.utils.stats import plot_stats, Stats
+from gridfm_datakit.utils.stats import (
+    plot_stats,
+    Stats,
+    plot_feature_distributions,
+)
 from gridfm_datakit.utils.param_handler import (
     NestedNamespace,
     get_load_scenario_generator,
@@ -91,6 +95,7 @@ def _setup_environment(
             base_path,
             f"scenarios_{args.load.generator}.log",
         ),
+        "feature_plots": os.path.join(base_path, "feature_plots"),
     }
 
     # Initialize logs
@@ -297,6 +302,16 @@ def generate_power_flow_data(
         base_path,
         args,
     )
+    # Plot features
+    if os.path.exists(file_paths["node_data"]):
+        plot_feature_distributions(
+            file_paths["node_data"],
+            file_paths["feature_plots"],
+            net.sn_mva,
+        )
+    else:
+        print("No node data file generated. Skipping feature plotting.")
+
     return file_paths
 
 
@@ -445,5 +460,16 @@ def generate_power_flow_data_distributed(
 
                 del csv_data, adjacency_lists, global_stats
                 gc.collect()
+
+    # Plot features
+    # check if node_data csv file exists
+    if os.path.exists(file_paths["node_data"]):
+        plot_feature_distributions(
+            file_paths["node_data"],
+            file_paths["feature_plots"],
+            net.sn_mva,
+        )
+    else:
+        print("No node data file generated. Skipping feature plotting.")
 
     return file_paths

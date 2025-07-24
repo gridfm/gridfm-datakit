@@ -1,9 +1,10 @@
 import pandas as pd
 import plotly.express as px
-import os
-import numpy as np
 from pandapower.auxiliary import pandapowerNet
 from gridfm_datakit.process.solvers import calculate_power_imbalance
+import matplotlib.pyplot as plt
+import numpy as np
+import os
 
 
 def plot_stats(base_path: str) -> None:
@@ -60,7 +61,7 @@ def plot_stats(base_path: str) -> None:
         f.write(fig_total_q_diff.to_html(full_html=False, include_plotlyjs=False))
 
 
-class Stats:
+class Stats:  # network stats
     """A class to track and analyze statistics related to power grid networks.
 
     This class maintains data lists of various network metrics including
@@ -181,3 +182,69 @@ class Stats:
         self.max_loading = df["max_loading"].values
         self.total_p_diff = df["total_p_diff"].values
         self.total_q_diff = df["total_q_diff"].values
+
+
+def plot_feature_distributions(node_file: str, output_dir: str, sn_mva: float) -> None:
+    """
+    Create and save violin plots showing the distribution of each feature across all buses.
+
+    Args:
+        node_file: CSV file containing node data with a 'bus' column.
+        output_dir: Directory to save the plots.
+    """
+    node_data = pd.read_csv(node_file)
+    os.makedirs(output_dir, exist_ok=True)
+
+    feature_cols = ["Pd", "Qd", "Pg", "Qg", "Vm", "Va", "PQ", "PV", "REF"]
+
+    # normalize by sn_mva
+    for col in ["Pd", "Qd", "Pg", "Qg"]:
+        node_data[col] = node_data[col] / sn_mva
+
+    # Group data by bus
+    bus_groups = node_data.groupby("bus")
+    sorted_buses = sorted(bus_groups.groups.keys())
+
+    for feature_name in feature_cols:
+        fig, ax = plt.subplots(figsize=(15, 6))
+
+        # Efficient and readable data gathering
+        bus_data = [
+            bus_groups.get_group(bus)[feature_name].values for bus in sorted_buses
+        ]
+
+        # Violin plot
+        parts = ax.violinplot(bus_data, showmeans=True)
+
+        for pc in parts["bodies"]:
+            pc.set_facecolor("#D43F3A")
+            pc.set_alpha(0.7)
+
+        # Add box plot overlay
+        ax.boxplot(
+            bus_data,
+            widths=0.15,
+            showfliers=False,
+            showcaps=True,
+            medianprops=dict(color="black", linewidth=1.5),
+        )
+
+        ax.set_title(f"{feature_name} Distribution Across Buses")
+        ax.set_xlabel("Bus Index")
+        ax.set_ylabel(feature_name)
+        ax.set_xticks(range(1, len(sorted_buses) + 1))
+        ax.set_xticklabels(
+            [f"Bus {bus}" for bus in sorted_buses],
+            rotation=45,
+            ha="right",
+        )
+
+        ax.grid(True, alpha=0.3)
+        plt.tight_layout()
+
+        out_path = os.path.join(
+            output_dir,
+            f"distribution_{feature_name}_all_buses.png",
+        )
+        plt.savefig(out_path)
+        plt.close()

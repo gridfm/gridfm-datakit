@@ -272,20 +272,12 @@ def cleanup_generated_files():
     Cleans up generated files after tests.
     This fixture runs after all tests in the module have completed.
     """
-    # Define the paths to the generated files
-    generated_files = ["tests/test_data/*", "tests/test_data_contingency/*"]
-
-    # Remove the generated files if they exist
-    for file_path in generated_files:
-        if os.path.exists(file_path):
-            os.remove(file_path)
-
     # Remove the base data directory if it exists
-    if os.path.exists("tests/test_data"):
-        shutil.rmtree("tests/test_data")
+    if os.path.exists("./tests/test_data"):
+        shutil.rmtree("./tests/test_data")
     # Remove the base data directory if it exists
-    if os.path.exists("tests/test_data_contingency"):
-        shutil.rmtree("tests/test_data_contingency")
+    if os.path.exists("./tests/test_data_contingency"):
+        shutil.rmtree("./tests/test_data_contingency")
 
 
 # Run the cleanup fixture after all tests in the module
