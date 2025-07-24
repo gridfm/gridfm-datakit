@@ -314,11 +314,7 @@ def generate_power_flow_data(
         args,
     )
     # Plot features
-    if file_paths["node_data"] is not None:
-        _plot_features(file_paths["node_data"])
-    else:
-        print("No node data file generated. Skipping feature plotting.")
-
+    _plot_features(file_paths["node_data"])
     return file_paths
 
 
@@ -469,9 +465,5 @@ def generate_power_flow_data_distributed(
                 gc.collect()
 
     # Plot features
-    if file_paths["node_data"] is not None:
-        _plot_features(file_paths["node_data"])
-    else:
-        print("No node data file generated. Skipping feature plotting.")
-
+    _plot_features(file_paths["node_data"])
     return file_paths
