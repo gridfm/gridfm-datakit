@@ -25,6 +25,7 @@ def run_opf(net: pandapowerNet, **kwargs: Any) -> bool:
             - Bus power mismatches
             - Power balance violations
     """
+
     pp.runopp(net, numba=True, **kwargs)
 
     # add bus index and type to dataframe of opf results
