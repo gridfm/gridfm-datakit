@@ -95,6 +95,7 @@ def _setup_environment(
             base_path,
             f"scenarios_{args.load.generator}.log",
         ),
+        "feature_plots": os.path.join(base_path, "feature_plots"),
     }
 
     # Initialize logs
@@ -192,19 +193,6 @@ def _save_generated_data(
         if not args.settings.no_stats and global_stats:
             global_stats.save(base_path)
             plot_stats(base_path)
-
-
-def _plot_features(node_file: str, edge_file: str):
-    """Plot data diversity and features of the generated.
-
-    Args:
-        node_file: Path to the node data CSV file
-        edge_file: Path to the edge data CSV file
-    """
-    data_dir = os.path.dirname(node_file)
-    output_dir = os.path.join(data_dir, "plots_data")
-    os.makedirs(output_dir, exist_ok=True)
-    plot_feature_distributions(node_file, output_dir)
 
 
 def generate_power_flow_data(
@@ -315,7 +303,14 @@ def generate_power_flow_data(
         args,
     )
     # Plot features
-    _plot_features(file_paths["node_data"], file_paths["edge_data"])
+    if os.path.exists(file_paths["node_data"]):
+        plot_feature_distributions(
+            file_paths["node_data"],
+            file_paths["feature_plots"],
+            net.sn_mva,
+        )
+    else:
+        print("No node data file generated. Skipping feature plotting.")
 
     return file_paths
 
@@ -467,6 +462,14 @@ def generate_power_flow_data_distributed(
                 gc.collect()
 
     # Plot features
-    _plot_features(file_paths["node_data"], file_paths["edge_data"])
+    # check if node_data csv file exists
+    if os.path.exists(file_paths["node_data"]):
+        plot_feature_distributions(
+            file_paths["node_data"],
+            file_paths["feature_plots"],
+            net.sn_mva,
+        )
+    else:
+        print("No node data file generated. Skipping feature plotting.")
 
     return file_paths

@@ -14,7 +14,7 @@ description = "Data Generation Kit"
 readme = "README.md"
 license = "Apache-2.0"
 version = "0.0.6"
-requires-python = ">=3.10.13"
+requires-python = ">=3.9,<3.13"
 dependencies = [
     "ipykernel",
     "matplotlib",
