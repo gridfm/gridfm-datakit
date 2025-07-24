@@ -11,6 +11,7 @@ from pandapower.pypower.idx_brch import BR_STATUS
 from queue import Queue
 from gridfm_datakit.utils.stats import Stats
 from gridfm_datakit.perturbations.topology_perturbation import TopologyGenerator
+from gridfm_datakit.perturbations.generator_perturbation import GenerationGenerator
 import traceback
 
 
@@ -230,7 +231,8 @@ def process_scenario_contingency(
     net: pandapowerNet,
     scenarios: np.ndarray,
     scenario_index: int,
-    generator: TopologyGenerator,
+    topology_generator: TopologyGenerator,
+    generation_generator: GenerationGenerator,
     no_stats: bool,
     local_csv_data: List[np.ndarray],
     local_adjacency_lists: List[np.ndarray],
@@ -284,17 +286,20 @@ def process_scenario_contingency(
     net_pf = pf_preprocessing(net_pf)
 
     # Generate perturbed topologies
-    perturbed_topologies = generator.generate(net_pf)
+    perturbations = topology_generator.generate(net_pf)
+
+    # Apply generation perturbations
+    perturbations = generation_generator.generate(perturbations)
 
     # to simulate contingency, we apply the topology perturbation after OPF
-    for perturbed_topology in perturbed_topologies:
+    for perturbation in perturbations:
         try:
             # run DCPF for benchmarking purposes
-            pp.rundcpp(perturbed_topology)
-            perturbed_topology.bus["Vm_dc"] = perturbed_topology.res_bus.vm_pu
-            perturbed_topology.bus["Va_dc"] = perturbed_topology.res_bus.va_degree
+            pp.rundcpp(perturbation)
+            perturbation.bus["Vm_dc"] = perturbation.res_bus.vm_pu
+            perturbation.bus["Va_dc"] = perturbation.res_bus.va_degree
             # run AC-PF to get the new state of the network after contingency (we don't model any remedial actions)
-            run_pf(perturbed_topology)
+            run_pf(perturbation)
         except Exception as e:
             with open(error_log_file, "a") as f:
                 f.write(
@@ -306,13 +311,13 @@ def process_scenario_contingency(
                 # TODO: What to do when the network does not converge for AC-PF? -> we dont have targets for regression!!
 
         # Append processed power flow data
-        local_csv_data.extend(pf_post_processing(perturbed_topology, dcpf=True))
-        local_adjacency_lists.append(get_adjacency_list(perturbed_topology))
+        local_csv_data.extend(pf_post_processing(perturbation, dcpf=True))
+        local_adjacency_lists.append(get_adjacency_list(perturbation))
         local_branch_idx_removed.append(
-            get_branch_idx_removed(perturbed_topology._ppc["branch"]),
+            get_branch_idx_removed(perturbation._ppc["branch"]),
         )
         if not no_stats:
-            local_stats.update(perturbed_topology)
+            local_stats.update(perturbation)
 
     return local_csv_data, local_adjacency_lists, local_branch_idx_removed, local_stats
 
@@ -324,7 +329,8 @@ def process_scenario_chunk(
     scenarios: np.ndarray,
     net: pandapowerNet,
     progress_queue: Queue,
-    generator,
+    topology_generator: TopologyGenerator,
+    generation_generator: GenerationGenerator,
     no_stats: bool,
     error_log_path,
 ) -> Tuple[
@@ -354,7 +360,8 @@ def process_scenario_chunk(
                     net,
                     scenarios,
                     scenario_index,
-                    generator,
+                    topology_generator,
+                    generation_generator,
                     no_stats,
                     local_csv_data,
                     local_adjacency_lists,
@@ -372,7 +379,8 @@ def process_scenario_chunk(
                     net,
                     scenarios,
                     scenario_index,
-                    generator,
+                    topology_generator,
+                    generation_generator,
                     no_stats,
                     local_csv_data,
                     local_adjacency_lists,
@@ -405,7 +413,8 @@ def process_scenario(
     net: pandapowerNet,
     scenarios: np.ndarray,
     scenario_index: int,
-    generator: TopologyGenerator,
+    topology_generator: TopologyGenerator,
+    generation_generator: GenerationGenerator,
     no_stats: bool,
     local_csv_data: List[np.ndarray],
     local_adjacency_lists: List[np.ndarray],
@@ -437,13 +446,17 @@ def process_scenario(
     # apply the load scenario to the network
     net.load.p_mw = scenarios[:, scenario_index, 0]
     net.load.q_mvar = scenarios[:, scenario_index, 1]
-    # Generate perturbed topologies
-    perturbed_topologies = generator.generate(net)
 
-    for perturbed_topology in perturbed_topologies:
+    # Generate perturbed topologies
+    perturbations = topology_generator.generate(net)
+
+    # Apply generation perturbations
+    perturbations = generation_generator.generate(perturbations)
+
+    for perturbation in perturbations:
         try:
             # run OPF to get the gen set points. Here the set points account for the topology perturbation.
-            run_opf(perturbed_topology)
+            run_opf(perturbation)
         except Exception as e:
             with open(error_log_file, "a") as f:
                 f.write(
@@ -451,7 +464,7 @@ def process_scenario(
                 )
             continue
 
-        net_pf = copy.deepcopy(perturbed_topology)
+        net_pf = copy.deepcopy(perturbation)
 
         net_pf = pf_preprocessing(net_pf)
 
@@ -475,7 +488,7 @@ def process_scenario(
 
         assert (
             net_pf.res_gen.vm_pu[net_pf.res_gen.type == 2]
-            - perturbed_topology.res_gen.vm_pu[perturbed_topology.res_gen.type == 2]
+            - perturbation.res_gen.vm_pu[perturbation.res_gen.type == 2]
             < 1e-3
         ).all(), "Generator voltage at PV buses is not the same after PF"
 
