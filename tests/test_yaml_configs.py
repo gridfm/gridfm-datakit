@@ -8,7 +8,6 @@ import shutil
 excluded_files = [
     "scripts/config/Texas2k_case1_2016summerpeak.yaml",
     "scripts/config/case1354_pegase.yaml",
-    "scripts/config/case179_goc.yaml",
 ]
 
 yaml_files = [f for f in glob.glob("scripts/config/*.yaml") if f not in excluded_files]
@@ -40,7 +39,3 @@ def test_all_yaml_configs_in_parallel():
     for yaml_path, status in results:
         print(f"{yaml_path}: {status}")
         assert status == "OK"
-
-
-if __name__ == "__main__":
-    run_generation("scripts/config/case179_goc.yaml")
