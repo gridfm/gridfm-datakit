@@ -8,6 +8,7 @@ import shutil
 excluded_files = [
     "scripts/config/Texas2k_case1_2016summerpeak.yaml",
     "scripts/config/case1354_pegase.yaml",
+    "scripts/config/case179_goc.yaml",
 ]
 
 yaml_files = [f for f in glob.glob("scripts/config/*.yaml") if f not in excluded_files]

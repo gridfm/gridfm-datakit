@@ -195,6 +195,18 @@ def _save_generated_data(
             plot_stats(base_path)
 
 
+def _plot_features(node_file: str):
+    """Plot data diversity and features of the generated data.
+
+    Args:
+        node_file: Path to the node data CSV file
+    """
+    data_dir = os.path.dirname(node_file)
+    output_dir = os.path.join(data_dir, "plots_data")
+    os.makedirs(output_dir, exist_ok=True)
+    plot_feature_distributions(node_file, output_dir)
+
+
 def generate_power_flow_data(
     config: Union[str, Dict, NestedNamespace],
 ) -> Dict[str, str]:

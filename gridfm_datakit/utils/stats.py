@@ -62,6 +62,7 @@ def plot_stats(base_path: str) -> None:
 
 
 class Stats:  # network stats
+class Stats:  # network stats
     """A class to track and analyze statistics related to power grid networks.
 
     This class maintains data lists of various network metrics including
