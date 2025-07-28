@@ -264,7 +264,7 @@ def initialize_generation_generator(
 
     Args:
         args: Configuration arguments containing generator type and parameters.
-        base_net: Base network to analyze.
+        base_net: Base network to use.
 
     Returns:
         GenerationGenerator: The initialized generation generator.

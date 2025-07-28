@@ -23,7 +23,7 @@ This library is brought to you by the GridFM team to generate power flow data to
 
 | Feature                                                    | GraphNeuralSolver [\[1\]](https://doi.org/10.1016/j.epsr.2020.106547) | OPFData [\[2\]](https://arxiv.org/abs/2406.07234) | OPFLearn [\[3\]](https://arxiv.org/abs/2111.01228) | PowerFlowNet [\[4\]](https://arxiv.org/abs/2311.03415) | TypedGNN [\[5\]](https://doi.org/10.1016/j.engappai.2022.105567) | PF△ [\[6\]](https://www.climatechange.ai/papers/iclr2025/67) | **PGLearn** [\[7\]](https://openreview.net/pdf?id=cecIf0CKnH) | **gridfm-datakit** [\[8\]](https://www.cell.com/joule/fulltext/S2542-4351(24)00470-7) |
 | ---------------------------------------------------------- | ----------------- | ------- | -------- | ------------- | -------- | --- | ----------------------------- | ---------- |
-| Generator Profile                                          | ✅                | ❌      | ❌       | ✅            | ✅       | ✅  | ❌                            | ❌         |
+| Generator Profile                                          | ✅                | ❌      | ❌       | ✅            | ✅       | ✅  | ❌                            | ✅         |
 | N-1                                                        | ❌                | ✅      | ❌       | ❌            | ✅       | ✅  | ✅                            | ✅         |
 | > 1000 Buses                                               | ❌                | ✅      | ✅       | ❌            | ❌       | ✅  | ✅                            | ✅         |
 | N-k, k > 1                                                 | ❌                | ❌      | ❌       | ❌            | ❌       | ❌  | ❌                            | ✅         |
@@ -95,6 +95,11 @@ topology_perturbation:
   k: 1 # Maximum number of components to drop in each perturbation
   n_topology_variants: 5 # Number of unique perturbed topologies per scenario
   elements: ["line", "trafo", "gen", "sgen"] # elements to perturb options: line, trafo, gen, sgen
+
+generation_perturbation:
+  type: "cost_permutation" # Type of generation perturbation; options: cost_permutation, cost_perturbation, none
+  # WARNING: the following parameters are onlyused if type is "cost_perturbation"
+  sigma: 1.0 # Size of range use for sampling scaling factor
 
 settings:
   num_processes: 10 # Number of parallel processes to use

@@ -77,6 +77,10 @@ def create_config():
             "type": str(perturbation_type.value),
             "elements": [str(e) for e in elements.value],
         },
+        "generation_perturbation": {
+            "type": gen_perturbation_type.value,
+            "sigma": gen_sigma.value,
+        },
         "settings": {
             "num_processes": num_processes.value,
             "data_dir": str(data_dir.value),
@@ -409,6 +413,33 @@ def interactive_interface():
         layout=widgets.Layout(width="550px", height="120px"),
     )
 
+    # Topology Perturbation Configuration
+
+    global gen_perturbation_type, gen_sigma
+
+    gen_perturbation_type = widgets.Dropdown(
+        options=[
+            ("cost_permutation", "cost_permutation"),
+            ("cost_perturbation", "cost_perturbation"),
+            ("none", "none"),
+        ],
+        value="cost_permutation",
+        description="Perturbation Type:",
+        style={"description_width": "150px"},
+        layout=widgets.Layout(width="250px"),
+    )
+
+    gen_sigma = widgets.FloatSlider(
+        value=1.0,
+        min=0.0,
+        max=3.0,
+        step=0.1,
+        description="Perturbation Scale (σ):",
+        style={"description_width": "150px"},
+        layout=widgets.Layout(width="550px"),
+        readout_format=".2f",
+    )
+
     # Execution Settings
 
     global num_processes, data_dir, large_chunk_size, no_stats, overwrite, mode
@@ -558,6 +589,26 @@ def interactive_interface():
         ),
     )
 
+    # Generation Configuration Box
+    generation_box = widgets.VBox(
+        [
+            widgets.HTML(
+                "<h3 style='color: #9C27B0; margin: 10px 0;'>🔋 Generation Perturbation Configuration</h3>",
+            ),
+            widgets.HTML(
+                "<p style='margin: 5px 0; color: #666;'>Configure how cost of generation components are perturbed</p>",
+            ),
+            gen_perturbation_type,
+            gen_sigma,
+        ],
+        layout=widgets.Layout(
+            border="2px solid #F3E5F5",
+            padding="15px",
+            margin="5px 0",
+            border_radius="10px",
+        ),
+    )
+
     # Execution Settings Box
     execution_box = widgets.VBox(
         [
@@ -634,6 +685,7 @@ def interactive_interface():
     display(load_basic_box)
     display(load_advanced_box)
     display(topology_box)
+    display(generation_box)
     display(execution_box)
     display(config_filename)
     display(save_config_button)
