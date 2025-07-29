@@ -242,7 +242,7 @@ def generate_power_flow_data(
     # Prepare network and scenarios
     net, scenarios = _prepare_network_and_scenarios(args, file_paths)
 
-    # Initialize topology generator and data structures
+    # Initialize topology and generation generators, and data structures
     topology_generator = initialize_topology_generator(args.topology_perturbation, net)
     generation_generator = initialize_generation_generator(
         args.generation_perturbation,
