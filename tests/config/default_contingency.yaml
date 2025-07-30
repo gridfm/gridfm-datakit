@@ -19,6 +19,9 @@ topology_perturbation:
   type: "random" # Type of topology generator; options: n_minus_k, random, overloaded, none
   elements: ["line"]
 
+generation_perturbation:
+  type: "cost_perturbation" # Type of generation perturbation; options: cost_permutation, cost_perturbation, none
+  sigma: 1.0 # Size of range use for sampling scaling factor
 
 settings:
   num_processes: 2 # Number of parallel processes to use

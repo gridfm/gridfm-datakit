@@ -23,6 +23,10 @@ topology_perturbation:
   n_topology_variants: 20 # Number of unique perturbed topologies per scenario
   elements: ["line"] # elements to perturb options: line, trafo, gen, sgen
 
+generation_perturbation:
+  type: "cost_permutation" # Type of generation perturbation; options: cost_permutation, cost_perturbation, none
+  sigma: 1.0 # Size of range use for sampling scaling factor
+
 settings:
   num_processes: 10 # Number of parallel processes to use
   data_dir: "./data_out" # Directory to save generated data relative to the project root

@@ -13,6 +13,12 @@ from gridfm_datakit.perturbations.topology_perturbation import (
     NoPerturbationGenerator,
     TopologyGenerator,
 )
+from gridfm_datakit.perturbations.generator_perturbation import (
+    PermuteGenCostGenerator,
+    PerturbGenCostGenerator,
+    NoGenPerturbationGenerator,
+    GenerationGenerator,
+)
 
 
 class NestedNamespace(argparse.Namespace):
@@ -187,7 +193,7 @@ def get_load_scenario_generator(args: NestedNamespace) -> LoadScenarioGeneratorB
         return Powergraph(args.agg_profile)
 
 
-def initialize_generator(
+def initialize_topology_generator(
     args: NestedNamespace,
     base_net: pandapowerNet,
 ) -> TopologyGenerator:
@@ -244,6 +250,56 @@ def initialize_generator(
     if unused_args:
         warnings.warn(
             f'The following arguments are not used by the topology generator "{args.type}": {unused_args}',
+            UserWarning,
+        )
+
+    return generator
+
+
+def initialize_generation_generator(
+    args: NestedNamespace,
+    base_net: pandapowerNet,
+) -> GenerationGenerator:
+    """Initialize the appropriate generation generator based on the given arguments.
+
+    Args:
+        args: Configuration arguments containing generator type and parameters.
+        base_net: Base network to use.
+
+    Returns:
+        GenerationGenerator: The initialized generation generator.
+
+    Raises:
+        ValueError: If the generator type is unknown.
+    """
+    if args.type == "cost_permutation":
+        generator = PermuteGenCostGenerator(base_net)
+        used_args = {"base_net": base_net}
+
+    elif args.type == "cost_perturbation":
+        if not hasattr(args, "sigma"):
+            raise ValueError(
+                "sigma parameter is required for cost_perturbation generator",
+            )
+        generator = PerturbGenCostGenerator(base_net, args.sigma)
+        used_args = {"sigma": args.sigma, "base_net": base_net}
+
+    elif args.type == "none":
+        generator = NoGenPerturbationGenerator()
+        used_args = {}
+
+    else:
+        raise ValueError(f"Unknown generator type: {args.type}")
+
+    # Check for unused arguments
+    unused_args = {
+        key: value
+        for key, value in args.flatten().items()
+        if key not in used_args and key != "type"
+    }
+    if unused_args:
+        warnings.warn(
+            f'The following arguments are not used by the generation generator "{args.type}": {unused_args}',
             UserWarning,
         )
 
