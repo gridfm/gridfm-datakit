@@ -10,6 +10,7 @@ nav:
       - Network: manual/network.md
       - Load Scenarios: manual/load_scenarios.md
       - Topology Perturbations: manual/topology_perturbations.md
+      - Generation Perturbations: manual/generation_perturbations.md
       - Outputs: manual/outputs.md
   - Components:
     - Network: components/network.md

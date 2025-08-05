@@ -113,8 +113,8 @@ class PerturbGenCostGenerator(GenerationGenerator):
         self.base_net = base_net
         self.num_gens = len(base_net.poly_cost)
         self.perturb_cols = self.base_net.poly_cost.columns[2:]
-        self.lower = 1 - sigma
-        self.upper = 1 + sigma
+        self.lower = np.max([0.0, 1.0 - sigma])
+        self.upper = 1.0 + sigma
         self.sample_size = [self.num_gens, len(self.perturb_cols)]
 
     def generate(
@@ -128,7 +128,7 @@ class PerturbGenCostGenerator(GenerationGenerator):
             sigma: A constant that specifies the range from which to draw
                 samples from a uniform distribution to be used as a scaling
                 factor for cost coefficient perturbations. The range is
-                set as [1-sigma, 1+sigma]
+                set as [max([0,1-sigma]), 1+sigma)
 
         Yields:
             A topology scenario with cost coeffiecients in the poly_cost
