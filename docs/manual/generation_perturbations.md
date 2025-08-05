@@ -1,7 +1,7 @@
 # Generation Perturbations
 
 ## Overview
-Generation perturbations introduce random changes to the cost functions of generator elements (PV nodes) in the Panda Power `poly_cost` table.  The effect of this is that the cost of operating generators in the grid changes across examples, which allows them to be utilised differently when executing optimal power flow.  As aresult, examples produced will have more diverse generator setpoints which is beneficial for training ML models to improve generalisation.  Generation perturbation is applied to the existing topology perturbations.
+Generation perturbations introduce random changes to the cost functions of generators and static generators (`gens` and `sgens`) in the Panda Power `poly_cost` table.  The effect of this is that the cost of operating generators in the grid changes across examples, which allows them to be utilised differently when executing optimal power flow.  As a result, examples produced will have more diverse generator setpoints which is beneficial for training ML models to improve generalisation.  Generation perturbation is applied to the existing topology perturbations.
 
 The module provides three options for generation perturbation strategies:
 
