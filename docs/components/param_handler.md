@@ -18,9 +18,13 @@ This module provides utilities for handling and manipulating configuration param
 
 ::: gridfm_datakit.utils.param_handler.get_load_scenario_generator
 
-### `initialize_generator`
+### `initialize_topology_generator`
 
-::: gridfm_datakit.utils.param_handler.initialize_generator
+::: gridfm_datakit.utils.param_handler.initialize_topology_generator
+
+### `initialize_generation_generator`
+
+::: gridfm_datakit.utils.param_handler.initialize_generation_generator
 
 ## Classes
 
