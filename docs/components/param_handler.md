@@ -26,6 +26,10 @@ This module provides utilities for handling and manipulating configuration param
 
 ::: gridfm_datakit.utils.param_handler.initialize_generation_generator
 
+### `initialize_admittance_generator`
+
+::: gridfm_datakit.utils.param_handler.initialize_admittance_generator
+
 ## Classes
 
 ### `NestedNamespace`

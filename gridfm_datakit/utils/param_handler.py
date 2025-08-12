@@ -19,6 +19,11 @@ from gridfm_datakit.perturbations.generator_perturbation import (
     NoGenPerturbationGenerator,
     GenerationGenerator,
 )
+from gridfm_datakit.perturbations.admittance_perturbation import (
+    PerturbAdmittanceGenerator,
+    NoAdmittancePerturbationGenerator,
+    AdmittanceGenerator,
+)
 
 
 class NestedNamespace(argparse.Namespace):
@@ -300,6 +305,52 @@ def initialize_generation_generator(
     if unused_args:
         warnings.warn(
             f'The following arguments are not used by the generation generator "{args.type}": {unused_args}',
+            UserWarning,
+        )
+
+    return generator
+
+
+def initialize_admittance_generator(
+    args: NestedNamespace,
+    base_net: pandapowerNet,
+) -> AdmittanceGenerator:
+    """Initialize the appropriate line admittance generator based on the given arguments.
+
+    Args:
+        args: Configuration arguments containing admittance generator type and parameters.
+        base_net: Base network to use.
+
+    Returns:
+        AdmittanceGenerator: The initialized line admittance generator.
+
+    Raises:
+        ValueError: If the generator type is unknown.
+    """
+    if args.type == "random_perturbation":
+        if not hasattr(args, "sigma"):
+            raise ValueError(
+                "sigma parameter is required for admittance_perturbation generator",
+            )
+        generator = PerturbAdmittanceGenerator(base_net, args.sigma)
+        used_args = {"base_net": base_net, "sigma": args.sigma}
+
+    elif args.type == "none":
+        generator = NoAdmittancePerturbationGenerator()
+        used_args = {}
+
+    else:
+        raise ValueError(f"Unknown generator type: {args.type}")
+
+    # Check for unused arguments
+    unused_args = {
+        key: value
+        for key, value in args.flatten().items()
+        if key not in used_args and key != "type"
+    }
+    if unused_args:
+        warnings.warn(
+            f'The following arguments are not used by the admittance generator "{args.type}": {unused_args}',
             UserWarning,
         )
 
