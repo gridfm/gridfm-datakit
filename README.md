@@ -28,7 +28,7 @@ This library is brought to you by the GridFM team to generate power flow data to
 | > 1000 Buses                                               | ❌                | ✅      | ✅       | ❌            | ❌       | ✅  | ✅                            | ✅         |
 | N-k, k > 1                                                 | ❌                | ❌      | ❌       | ❌            | ❌       | ❌  | ❌                            | ✅         |
 | Load Scenarios from Real World Data                        | ❌                | ❌      | ❌       | ❌            | ❌       | ❌  | ❌                            | ✅         |
-| Line Admittance                                            | ❌                | ❌      | ❌       | ❌            | ❌       | ❌  | ❌                            | ✅         |
+| Net Param Perturbation                                     | ✅                | ❌      | ❌       | ✅            | ✅       | ❌  | ❌                            | ✅         |
 | Multi-processing and scalable to very large (1M+) datasets | ❌                | ❌      | ❌       | ❌            | ❌       | ❌  | ✅                            | ✅         |
 
 
