@@ -81,6 +81,10 @@ def create_config():
             "type": gen_perturbation_type.value,
             "sigma": gen_sigma.value,
         },
+        "admittance_perturbation": {
+            "type": admittance_perturbation_type.value,
+            "sigma": admittance_sigma.value,
+        },
         "settings": {
             "num_processes": num_processes.value,
             "data_dir": str(data_dir.value),
@@ -413,7 +417,7 @@ def interactive_interface():
         layout=widgets.Layout(width="550px", height="120px"),
     )
 
-    # Topology Perturbation Configuration
+    # Generation Perturbation Configuration
 
     global gen_perturbation_type, gen_sigma
 
@@ -434,7 +438,33 @@ def interactive_interface():
         min=0.0,
         max=3.0,
         step=0.1,
-        description="Perturbation Scale (σ):",
+        description="Perturbation Range (σ):",
+        style={"description_width": "150px"},
+        layout=widgets.Layout(width="550px"),
+        readout_format=".2f",
+    )
+
+    # Admittance Perturbation Configuration
+
+    global admittance_perturbation_type, admittance_sigma
+
+    admittance_perturbation_type = widgets.Dropdown(
+        options=[
+            ("random_perturbation", "random_perturbation"),
+            ("none", "none"),
+        ],
+        value="random_perturbation",
+        description="Perturbation Type:",
+        style={"description_width": "150px"},
+        layout=widgets.Layout(width="250px"),
+    )
+
+    admittance_sigma = widgets.FloatSlider(
+        value=0.2,
+        min=0.0,
+        max=1.0,
+        step=0.05,
+        description="Perturbation Range (σ):",
         style={"description_width": "150px"},
         layout=widgets.Layout(width="550px"),
         readout_format=".2f",
@@ -609,6 +639,26 @@ def interactive_interface():
         ),
     )
 
+    # Admittance Configuration Box
+    admittance_box = widgets.VBox(
+        [
+            widgets.HTML(
+                "<h3 style='color: #9C27B0; margin: 10px 0;'>🎛️ Line Admittance Perturbation Configuration</h3>",
+            ),
+            widgets.HTML(
+                "<p style='margin: 5px 0; color: #666;'>Configure how line admittances are perturbed</p>",
+            ),
+            admittance_perturbation_type,
+            admittance_sigma,
+        ],
+        layout=widgets.Layout(
+            border="2px solid #F3E5F5",
+            padding="15px",
+            margin="5px 0",
+            border_radius="10px",
+        ),
+    )
+
     # Execution Settings Box
     execution_box = widgets.VBox(
         [
@@ -686,6 +736,7 @@ def interactive_interface():
     display(load_advanced_box)
     display(topology_box)
     display(generation_box)
+    display(admittance_box)
     display(execution_box)
     display(config_filename)
     display(save_config_button)

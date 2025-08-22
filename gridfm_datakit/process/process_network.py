@@ -12,6 +12,7 @@ from queue import Queue
 from gridfm_datakit.utils.stats import Stats
 from gridfm_datakit.perturbations.topology_perturbation import TopologyGenerator
 from gridfm_datakit.perturbations.generator_perturbation import GenerationGenerator
+from gridfm_datakit.perturbations.admittance_perturbation import AdmittanceGenerator
 import traceback
 
 
@@ -233,6 +234,7 @@ def process_scenario_contingency(
     scenario_index: int,
     topology_generator: TopologyGenerator,
     generation_generator: GenerationGenerator,
+    admittance_generator: AdmittanceGenerator,
     no_stats: bool,
     local_csv_data: List[np.ndarray],
     local_adjacency_lists: List[np.ndarray],
@@ -246,7 +248,9 @@ def process_scenario_contingency(
         net: The power network.
         scenarios: Array of load scenarios.
         scenario_index: Index of the current scenario.
-        generator: Topology perturbation generator.
+        topology_generator: Topology perturbation generator.
+        generation_generator: Generator cost perturbation generator.
+        admittance_generator: Line admittance perturbation generator.
         no_stats: Whether to skip statistics collection.
         local_csv_data: List to store processed CSV data.
         local_adjacency_lists: List to store adjacency lists.
@@ -291,6 +295,9 @@ def process_scenario_contingency(
     # Apply generation perturbations
     perturbations = generation_generator.generate(perturbations)
 
+    # Apply admittance perturbations
+    perturbations = admittance_generator.generate(perturbations)
+
     # to simulate contingency, we apply the topology perturbation after OPF
     for perturbation in perturbations:
         try:
@@ -331,6 +338,7 @@ def process_scenario_chunk(
     progress_queue: Queue,
     topology_generator: TopologyGenerator,
     generation_generator: GenerationGenerator,
+    admittance_generator: AdmittanceGenerator,
     no_stats: bool,
     error_log_path,
 ) -> Tuple[
@@ -362,6 +370,7 @@ def process_scenario_chunk(
                     scenario_index,
                     topology_generator,
                     generation_generator,
+                    admittance_generator,
                     no_stats,
                     local_csv_data,
                     local_adjacency_lists,
@@ -381,6 +390,7 @@ def process_scenario_chunk(
                     scenario_index,
                     topology_generator,
                     generation_generator,
+                    admittance_generator,
                     no_stats,
                     local_csv_data,
                     local_adjacency_lists,
@@ -415,6 +425,7 @@ def process_scenario(
     scenario_index: int,
     topology_generator: TopologyGenerator,
     generation_generator: GenerationGenerator,
+    admittance_generator: AdmittanceGenerator,
     no_stats: bool,
     local_csv_data: List[np.ndarray],
     local_adjacency_lists: List[np.ndarray],
@@ -428,7 +439,9 @@ def process_scenario(
         net: The power network.
         scenarios: Array of load scenarios.
         scenario_index: Index of the current scenario.
-        generator: Topology perturbation generator.
+        topology_generator: Topology perturbation generator.
+        generation_generator: Generator cost perturbation generator.
+        admittance_generator: Line admittance perturbation generator.
         no_stats: Whether to skip statistics collection.
         local_csv_data: List to store processed CSV data.
         local_adjacency_lists: List to store adjacency lists.
@@ -452,6 +465,9 @@ def process_scenario(
 
     # Apply generation perturbations
     perturbations = generation_generator.generate(perturbations)
+
+    # Apply admittance perturbations
+    perturbations = admittance_generator.generate(perturbations)
 
     for perturbation in perturbations:
         try:

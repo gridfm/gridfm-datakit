@@ -27,6 +27,10 @@ generation_perturbation:
   type: "cost_perturbation" # Type of generation perturbation; options: cost_permutation, cost_perturbation, none
   sigma: 1.0 # Size of range use for sampling scaling factor
 
+admittance_perturbation:
+  type: random_perturbation # Type of admittance perturbation; options: random_perturbation, none
+  sigma: 0.2 # Size of range used for sampling scaling factor
+
 settings:
   num_processes: 12 # Number of parallel processes to use
   data_dir: "./data_out" # Directory to save generated data relative to the project root

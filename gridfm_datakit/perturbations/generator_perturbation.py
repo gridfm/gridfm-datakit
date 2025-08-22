@@ -15,13 +15,13 @@ class GenerationGenerator(ABC):
     @abstractmethod
     def generate(
         self,
-        top_generator: Generator[pp.pandapowerNet, None, None],
+        example_generator: Generator[pp.pandapowerNet, None, None],
     ) -> Union[Generator[pp.pandapowerNet, None, None], List[pp.pandapowerNet]]:
         """Generate generation perturbations.
 
         Args:
-            top_generator: The topology generator to which generation
-            perturbations are added.
+            example_generator: A generator producing example (load/topology/generation)
+            scenarios to which line admittance perturbations are added.
 
         Yields:
             A generation-perturbed scenario.
@@ -38,18 +38,20 @@ class NoGenPerturbationGenerator(GenerationGenerator):
 
     def generate(
         self,
-        top_generator: Generator[pp.pandapowerNet, None, None],
+        example_generator: Generator[pp.pandapowerNet, None, None],
     ) -> Generator[pp.pandapowerNet, None, None]:
-        """Yield the original network without any perturbations.
+        """Yield the original examples without any perturbations.
 
         Args:
-            top_generator: A topology generator of a power network.
+            example_generator: A generator producing example
+            (load/topology/generation) scenarios to which generator
+            cost perturbations should be applied.
 
         Yields:
-            A topology scenario without additional generation perturbation.
+            The original example produced by the example_generator.
         """
-        for scenario in top_generator:
-            yield scenario
+        for example in example_generator:
+            yield example
 
 
 class PermuteGenCostGenerator(GenerationGenerator):
@@ -73,18 +75,20 @@ class PermuteGenCostGenerator(GenerationGenerator):
 
     def generate(
         self,
-        top_generator: Generator[pp.pandapowerNet, None, None],
+        example_generator: Generator[pp.pandapowerNet, None, None],
     ) -> Generator[pp.pandapowerNet, None, None]:
         """Generate a network with permuted generator cost coefficients.
 
         Args:
-            top_generator: A topology generator of a power network.
+            example_generator: A generator producing example
+                (load/topology/generation) scenarios to which generator
+                cost coefficient permutations should be applied.
 
         Yields:
-            A topology scenario with cost coeffiecients in the
+            An example scenario with cost coeffiecients in the
             poly_cost table permuted
         """
-        for scenario in top_generator:
+        for scenario in example_generator:
             new_idx = np.random.permutation(self.num_gens)
             scenario.poly_cost[self.permute_cols] = (
                 scenario.poly_cost[self.permute_cols]
@@ -119,28 +123,30 @@ class PerturbGenCostGenerator(GenerationGenerator):
 
     def generate(
         self,
-        top_generator: Generator[pp.pandapowerNet, None, None],
+        example_generator: Generator[pp.pandapowerNet, None, None],
     ) -> Generator[pp.pandapowerNet, None, None]:
         """Generate a network with perturbed generator cost coefficients.
 
         Args:
-            top_generator: A topology generator of a power network.
+            example_generator: A generator producing example
+                (load/topology) scenarios to which generator cost coefficient
+                perturbations should be added.
             sigma: A constant that specifies the range from which to draw
                 samples from a uniform distribution to be used as a scaling
                 factor for cost coefficient perturbations. The range is
                 set as [max([0,1-sigma]), 1+sigma)
 
         Yields:
-            A topology scenario with cost coeffiecients in the poly_cost
+            An example scenario with cost coeffiecients in the poly_cost
             table perturbed by multiplying with a scaling factor.
         """
-        for scenario in top_generator:
+        for example in example_generator:
             scale_fact = np.random.uniform(
                 low=self.lower,
                 high=self.upper,
                 size=self.sample_size,
             )
-            scenario.poly_cost[self.perturb_cols] = (
-                scenario.poly_cost[self.perturb_cols] * scale_fact
+            example.poly_cost[self.perturb_cols] = (
+                example.poly_cost[self.perturb_cols] * scale_fact
             )
-            yield scenario
+            yield example

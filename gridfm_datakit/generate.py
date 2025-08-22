@@ -24,6 +24,7 @@ from gridfm_datakit.utils.param_handler import (
     get_load_scenario_generator,
     initialize_topology_generator,
     initialize_generation_generator,
+    initialize_admittance_generator,
 )
 from gridfm_datakit.network import (
     load_net_from_pp,
@@ -242,12 +243,21 @@ def generate_power_flow_data(
     # Prepare network and scenarios
     net, scenarios = _prepare_network_and_scenarios(args, file_paths)
 
-    # Initialize topology and generation generators, and data structures
+    # Initialize topology generator
     topology_generator = initialize_topology_generator(args.topology_perturbation, net)
+
+    # Initialize generation generator
     generation_generator = initialize_generation_generator(
         args.generation_perturbation,
         net,
     )
+
+    # Initialize admittance generator
+    admittance_generator = initialize_admittance_generator(
+        args.admittance_perturbation,
+        net,
+    )
+
     csv_data = []
     adjacency_lists = []
     branch_idx_removed = []
@@ -271,6 +281,7 @@ def generate_power_flow_data(
                             scenario_index,
                             topology_generator,
                             generation_generator,
+                            admittance_generator,
                             args.settings.no_stats,
                             csv_data,
                             adjacency_lists,
@@ -287,6 +298,7 @@ def generate_power_flow_data(
                             scenario_index,
                             topology_generator,
                             generation_generator,
+                            admittance_generator,
                             args.settings.no_stats,
                             csv_data,
                             adjacency_lists,
@@ -378,6 +390,12 @@ def generate_power_flow_data_distributed(
         net,
     )
 
+    # Initialize admittance generator
+    admittance_generator = initialize_admittance_generator(
+        args.admittance_perturbation,
+        net,
+    )
+
     # Setup multiprocessing
     manager = Manager()
     progress_queue = manager.Queue()
@@ -413,6 +431,7 @@ def generate_power_flow_data_distributed(
                         progress_queue,
                         topology_generator,
                         generation_generator,
+                        admittance_generator,
                         args.settings.no_stats,
                         file_paths["error_log"],
                     )

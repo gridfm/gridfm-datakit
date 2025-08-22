@@ -9,6 +9,7 @@ from pandapower.auxiliary import pandapowerNet
 from tqdm import tqdm
 from gridfm_datakit.utils.param_handler import initialize_topology_generator
 from gridfm_datakit.utils.param_handler import initialize_generation_generator
+from gridfm_datakit.utils.param_handler import initialize_admittance_generator
 import shutil
 from gridfm_datakit.utils.utils import Tee
 import yaml
@@ -118,10 +119,14 @@ def test_save_generated_data(conf):
     # Prepare network and scenarios
     net, scenarios = _prepare_network_and_scenarios(args, file_paths)
 
-    # Initialize topology and generation generators, and data structures
+    # Initialize topology, generation, and admittance generators, and data structures
     topology_generator = initialize_topology_generator(args.topology_perturbation, net)
     generation_generator = initialize_generation_generator(
         args.generation_perturbation,
+        net,
+    )
+    admittance_generator = initialize_admittance_generator(
+        args.admittance_perturbation,
         net,
     )
 
@@ -148,6 +153,7 @@ def test_save_generated_data(conf):
                             scenario_index,
                             topology_generator,
                             generation_generator,
+                            admittance_generator,
                             args.settings.no_stats,
                             csv_data,
                             adjacency_lists,
@@ -164,6 +170,7 @@ def test_save_generated_data(conf):
                             scenario_index,
                             topology_generator,
                             generation_generator,
+                            admittance_generator,
                             args.settings.no_stats,
                             csv_data,
                             adjacency_lists,
