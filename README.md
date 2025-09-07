@@ -1,19 +1,19 @@
-[![Docs](https://img.shields.io/badge/docs-available-brightgreen)](https://gridfm.github.io/gridfm-datakit/)
-![Coverage](https://img.shields.io/badge/coverage-76%25-yellow)
-
-
-# Overview
-
-
-This library is brought to you by the GridFM team to generate power flow data to train machine learning and foundation models.
-
-
-
 <p align="center">
-  <img src="https://raw.githubusercontent.com/gridfm/gridfm-datakit/refs/heads/main/docs/figs/pipeline_readme.png" alt=""/>
+  <img src="https://raw.githubusercontent.com/gridfm/gridfm-datakit/refs/heads/main/docs/figs/KIT_logo.png" alt="GridFM logo" style="width: 40%; height: auto;"/>
   <br/>
 </p>
 
+<p align="center" style="font-size: 25px;">
+    <b>gridfm-datakit</b>
+</p>
+
+[![Docs](https://img.shields.io/badge/docs-available-brightgreen)](https://gridfm.github.io/gridfm-datakit/)
+![Coverage](https://img.shields.io/badge/coverage-76%25-yellow)
+![Python](https://img.shields.io/badge/python-3.10%20%E2%80%93%203.12-blue)
+![License](https://img.shields.io/badge/license-Apache%202.0-blue)
+
+
+This library is brought to you by the GridFM team to generate power flow data to train machine learning and foundation models.
 
 ---
 
