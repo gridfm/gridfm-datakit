@@ -45,8 +45,8 @@ theme:
     - search.suggest
     - navigation.instant
     - navigation.instant.progress
-  logo: figs/logo_full.png
-  favicon: figs/logo_small.png
+  logo: figs/KIT_logo.png
+  favicon: figs/KIT_logo.png
 
 plugins:
   - search
