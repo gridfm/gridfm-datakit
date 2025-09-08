@@ -156,6 +156,30 @@ def _prepare_network_and_scenarios(
     save_edge_params(net, file_paths["edge_params"])
     save_bus_params(net, file_paths["bus_params"])
 
+    # PQ_idx = net.bus.index[~np.isin(net.bus.index, net.gen.bus)]
+
+    # # Increase max loading
+    # net.line.max_loading_percent *= 10
+    # # net.trafo.max_loading_percent *= 10
+
+    # # Increase max voltage and lower min voltage
+    # net.bus.max_vm_pu.loc[PQ_idx] *= 1.2
+    # net.bus.min_vm_pu.loc[PQ_idx] *= 0.8
+
+    # # Increase max generation power and lower min generation power
+    # net.gen.max_p_mw *= 1.2
+    # net.gen.min_p_mw *= 0.8
+    # net.gen.max_q_mvar *= 1.2
+    # net.gen.min_q_mvar *= 0.8
+
+    # if net.sgen.shape[0] > 0:
+
+    #     # same for sgen
+    #     net.sgen.max_p_mw *= 1.2
+    #     net.sgen.min_p_mw *= 0.8
+    #     net.sgen.max_q_mvar *= 1.2
+    #     net.sgen.min_q_mvar *= 0.8
+
     return net, scenarios
 
 
