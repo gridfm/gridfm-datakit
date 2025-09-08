@@ -113,11 +113,15 @@ def interactive_interface():
             margin="10px 0",
             height="300px",
             overflow="auto",
-        )
+        ),
     )
 
     # Network Configuration
-    global network_source, pglib_grid_dropdown, pandapower_grid_dropdown, network_file_chooser
+    global \
+        network_source, \
+        pglib_grid_dropdown, \
+        pandapower_grid_dropdown, \
+        network_file_chooser
 
     network_source = widgets.Dropdown(
         options=[
