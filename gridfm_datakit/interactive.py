@@ -7,6 +7,9 @@ from pathlib import Path
 from importlib import resources
 from ipyfilechooser import FileChooser
 
+# Run the generation function directly
+from gridfm_datakit.generate import generate_power_flow_data_distributed
+
 
 def get_available_load_profiles():
     """Get list of available aggregated load profiles."""
@@ -102,12 +105,19 @@ def interactive_interface():
     # Get available load profiles
     available_profiles = get_available_load_profiles()
 
+    # Dedicated output box
+    output_box = widgets.Output(
+        layout=widgets.Layout(
+            border="1px solid #bbb",
+            padding="10px",
+            margin="10px 0",
+            height="300px",
+            overflow="auto",
+        )
+    )
+
     # Network Configuration
-    global \
-        network_source, \
-        pglib_grid_dropdown, \
-        pandapower_grid_dropdown, \
-        network_file_chooser
+    global network_source, pglib_grid_dropdown, pandapower_grid_dropdown, network_file_chooser
 
     network_source = widgets.Dropdown(
         options=[
@@ -386,8 +396,8 @@ def interactive_interface():
         min=1,
         max=20,
         step=1,
-        description="Topology Variants per load scenario:",
-        style={"description_width": "150px"},
+        description="Top. Variants per load scenario:",
+        style={"description_width": "200px"},
         layout=widgets.Layout(width="550px"),
         readout_format="d",
     )
@@ -417,7 +427,7 @@ def interactive_interface():
         layout=widgets.Layout(width="550px", height="120px"),
     )
 
-    # Generation Perturbation Configuration
+    # Generation Configuration
 
     global gen_perturbation_type, gen_sigma
 
@@ -508,15 +518,15 @@ def interactive_interface():
     no_stats = widgets.Checkbox(
         value=False,
         description="Disable statistical calculations (faster)",
-        style={"description_width": "200px"},
-        layout=widgets.Layout(width="350px"),
+        style={"description_width": "100px"},
+        layout=widgets.Layout(width="500px"),
     )
 
     overwrite = widgets.Checkbox(
         value=True,
         description="Overwrite existing files (vs. append)",
-        style={"description_width": "200px"},
-        layout=widgets.Layout(width="350px"),
+        style={"description_width": "100px"},
+        layout=widgets.Layout(width="500px"),
     )
 
     # Set mode to "pf"
@@ -695,25 +705,48 @@ def interactive_interface():
 
     # Button to create YAML config only
     def save_config_only(b):
-        config = create_config()
-        config_path = Path(config_filename.value)
-        with open(config_path, "w") as f:
-            yaml.dump(config, f, default_flow_style=False)
-        print(f"YAML configuration saved to {config_path}")
+        with output_box:
+            output_box.clear_output()
+            try:
+                config = create_config()
+                config_path = Path(config_filename.value)
+                with open(config_path, "w") as f:
+                    yaml.dump(config, f, default_flow_style=False)
+                print(f"YAML configuration saved to {config_path.resolve()}")
+            except Exception as e:
+                print("Error while saving configuration:")
+                print(e)
 
     def save_and_run_config(b):
         """Save configuration and run the generation script."""
-        config = create_config()
+        # Grey/disable both buttons immediately
+        run_button.description = "Running…"
+        run_button.disabled = True
+        save_config_button.disabled = True
 
-        # Save config to file
-        config_path = Path(config_filename.value)
-        with open(config_path, "w") as f:
-            yaml.dump(config, f, default_flow_style=False)
+        with output_box:
+            output_box.clear_output()
+            try:
+                config = create_config()
 
-        # Run the generation function directly
-        from gridfm_datakit.generate import generate_power_flow_data_distributed
+                # Save config to file
+                config_path = Path(config_filename.value)
+                with open(config_path, "w") as f:
+                    yaml.dump(config, f, default_flow_style=False)
+                print(f"\nConfiguration written to: {config_path.resolve()}\n")
 
-        generate_power_flow_data_distributed(str(config_path))
+                # Run the generator (stdout/stderr will appear here)
+                print("Starting generation...")
+                generate_power_flow_data_distributed(str(config_path))
+                print("\nGeneration completed successfully.")
+            except Exception as e:
+                print("Error during generation:")
+                print(e)
+            finally:
+                # Re-enable buttons and restore label regardless of success/failure
+                run_button.description = "Generate and Run Configuration"
+                run_button.disabled = False
+                save_config_button.disabled = False
 
     save_config_button = widgets.Button(
         description="Create YAML Config",
@@ -739,5 +772,8 @@ def interactive_interface():
     display(admittance_box)
     display(execution_box)
     display(config_filename)
-    display(save_config_button)
-    display(run_button)
+    display(save_config_button, run_button)
+
+    # Display the dedicated output area last so it is close to the buttons
+    display(widgets.HTML("<b>Output</b>"))
+    display(output_box)
