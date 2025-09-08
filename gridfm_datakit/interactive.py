@@ -317,7 +317,7 @@ def interactive_interface():
     )
 
     sigma = widgets.FloatSlider(
-        value=0.05,
+        value=0.2,
         min=0.0,
         max=0.3,
         step=0.01,
@@ -507,7 +507,7 @@ def interactive_interface():
     )
 
     large_chunk_size = widgets.IntSlider(
-        value=50,
+        value=200,
         min=10,
         max=500,
         step=10,
