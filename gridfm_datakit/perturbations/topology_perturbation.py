@@ -51,7 +51,7 @@ class NoPerturbationGenerator(TopologyGenerator):
 
 
 class NMinusKGenerator(TopologyGenerator):
-    """Generate perturbed topologies for N-k contingency analysis.
+    """Generate N-K perturbed topologies.
 
     Only considers lines and transformers. Generates ALL possible topologies with at most k
     components set out of service (lines and transformers).
@@ -85,8 +85,14 @@ class NMinusKGenerator(TopologyGenerator):
         self.k = k
 
         # Prepare the list of components to drop
-        self.components_to_drop = [(index, "line") for index in base_net.line.index] + [
-            (index, "trafo") for index in base_net.trafo.index
+        self.components_to_drop = [
+            (index, "line")
+            for index in base_net.line.index
+            if base_net.line.loc[index, "in_service"]
+        ] + [
+            (index, "trafo")
+            for index in base_net.trafo.index
+            if base_net.trafo.loc[index, "in_service"]
         ]
 
         # Generate all combinations of at most k components
@@ -163,7 +169,11 @@ class RandomComponentDropGenerator(TopologyGenerator):
         self.components_to_drop = []
         for element in elements:
             self.components_to_drop.extend(
-                [(index, element) for index in base_net[element].index],
+                [
+                    (index, element)
+                    for index in base_net[element].index
+                    if base_net[element].loc[index, "in_service"]
+                ],
             )
 
     def generate(

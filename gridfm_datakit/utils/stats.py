@@ -5,6 +5,8 @@ from gridfm_datakit.process.solvers import calculate_power_imbalance
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+from gridfm_datakit.utils.config import BUS_COLUMNS, DC_BUS_COLUMNS
+from typing import List
 
 
 def plot_stats(base_path: str) -> None:
@@ -184,7 +186,13 @@ class Stats:  # network stats
         self.total_q_diff = df["total_q_diff"].values
 
 
-def plot_feature_distributions(node_file: str, output_dir: str, sn_mva: float) -> None:
+def plot_feature_distributions(
+    node_file: str,
+    output_dir: str,
+    sn_mva: float,
+    dcpf: bool,
+    buses: List[int] = None,
+) -> None:
     """
     Create and save violin plots showing the distribution of each feature across all buses.
 
@@ -195,7 +203,15 @@ def plot_feature_distributions(node_file: str, output_dir: str, sn_mva: float) -
     node_data = pd.read_csv(node_file)
     os.makedirs(output_dir, exist_ok=True)
 
-    feature_cols = ["Pd", "Qd", "Pg", "Qg", "Vm", "Va", "PQ", "PV", "REF"]
+    if not buses:
+        # sample 30 buses randomly
+        buses = np.random.choice(
+            node_data["bus"].unique(),
+            size=min(20, len(node_data["bus"].unique())),
+            replace=False,
+        )
+
+    node_data = node_data[node_data["bus"].isin(buses)]
 
     # normalize by sn_mva
     for col in ["Pd", "Qd", "Pg", "Qg"]:
@@ -204,6 +220,15 @@ def plot_feature_distributions(node_file: str, output_dir: str, sn_mva: float) -
     # Group data by bus
     bus_groups = node_data.groupby("bus")
     sorted_buses = sorted(bus_groups.groups.keys())
+
+    if dcpf:
+        feature_cols = BUS_COLUMNS + DC_BUS_COLUMNS
+    else:
+        feature_cols = BUS_COLUMNS
+
+    assert node_data.shape[1] == len(feature_cols) + 1, (
+        "Node data has the wrong number of columns"
+    )
 
     for feature_name in feature_cols:
         fig, ax = plt.subplots(figsize=(15, 6))

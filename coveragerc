@@ -1,0 +1,4 @@
+[run]
+omit =
+    gridfm_datakit/interactive.py
+    gridfm_datakit/validation.py

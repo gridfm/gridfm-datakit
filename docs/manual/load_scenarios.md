@@ -88,7 +88,7 @@ load:
   generator: "agg_load_profile" # Name of the load generator; options: agg_load_profile, powergraph
   agg_profile: "default" # Name of the aggregated load profile
   scenarios: 200 # Number of different load scenarios to generate
-  sigma: 0.05 # max local noise
+  sigma: 0.2 # max local noise
   change_reactive_power: true # If true, changes reactive power of loads. If False, keeps the ones from the case file
   global_range: 0.4 # Range of the global scaling factor. used to set the lower bound of the scaling factor
   max_scaling_factor: 4.0 # Max upper bound of the global scaling factor

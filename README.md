@@ -83,7 +83,7 @@ load:
   scenarios: 200 # Number of different load scenarios to generate
   # WARNING: the following parameters are only used if generator is "agg_load_profile"
   # if using generator "powergraph", these parameters are ignored
-  sigma: 0.05 # max local noise
+  sigma: 0.2 # max local noise
   change_reactive_power: true # If true, changes reactive power of loads. If False, keeps the ones from the case file
   global_range: 0.4 # Range of the global scaling factor. used to set the lower bound of the scaling factor
   max_scaling_factor: 4.0 # Max upper bound of the global scaling factor
@@ -107,26 +107,27 @@ settings:
   data_dir: "./data_out" # Directory to save generated data relative to the project root
   large_chunk_size: 50 # Number of load scenarios processed before saving
   no_stats: false # If true, disables statistical calculations
-  overwrite: true # If true, overwrites existing files, if false, appends to files (note that bus_params.csv, edge_params.csv, scenarios_{load.generator}.csv and scenarios_{load.generator}.html will still be overwritten)
-  mode: "pf" # Mode of the script; options: contingency, pf
+  overwrite: true # If true, overwrites existing files, if false, appends to files
+  mode: "unsecure" # Mode of the script; options: secure, unsecure. Unsecure mode generates unsecure scenarios, i.e. scenarios where the the generator setpoints are obtained for the base topology, before the topology is perturbed.
 ```
 
 <br>
 
 ## Output Files
 
-The data generation process produces several output files in the specified data directory:
+The data generation process writes the following artifacts under:
+`{settings.data_dir}/{network.name}/raw`
 
 - **tqdm.log**: Progress bar log.
-- **error.log**: Log of the errors raised during data generation.
-- **args.log**: Copy of the config file used.
-- **pf_node.csv**: Data related to the nodes (buses) in the network, such as voltage levels and power injections.
-- **pf_edge.csv**: Branch admittance matrix for each pf case.
-- **branch_idx_removed.csv**: List of the indices of the branches (lines and transformers) that got removed when perturbing the topologies.
-- **edge_params.csv**: Branch admittance matrix and branch rate limits for the unperturbed topology.
-- **bus_params.csv**: Parameters for the buses (voltage limits and the base voltage).
-- **scenario_{args.load.generator}.csv**: Load element-level load profile obtained after using the load scenario generator.
-- **scenario_{args.load.generator}.html**: Plots of the element-level load profile.
-- **scenario_{args.load.generator}.log**: If generator is "agg_load_profile", stores the upper and lower bounds for the global scaling factor.
-- **stats.csv**: Stats about the generated data.
-- **stats_plot.html**: Plots of the stats about the generated data.
+- **error.log**: Error messages captured during generation.
+- **args.log**: YAML dump of the configuration used for this run.
+- **scenarios_{generator}.csv**: Load scenarios (per-element time series) produced by the selected load generator.
+- **scenarios_{generator}.html**: Plot of the generated load scenarios.
+- **scenarios_{generator}.log**: Generator-specific notes (e.g., bounds for the global scaling factor when using `agg_load_profile`).
+- **bus_data.csv**: Bus-level features for each processed scenario (columns `BUS_COLUMNS` and, if `settings.dcpf=True`, also `DC_BUS_COLUMNS`).
+- **gen_data.csv**: Generator/ext_grid/sgen features per scenario (columns `GEN_COLUMNS`).
+- **branch_data.csv**: Branch features per scenario (columns `BRANCH_COLUMNS`).
+- **y_bus_data.csv**: Nonzero Y-bus entries per scenario with columns `[scenario, index1, index2, G, B]`.
+- **stats.csv**: (if `settings.no_stats=False`) Aggregated statistics collected during generation.
+- **stats_plot.html**: (if `settings.no_stats=False`) HTML dashboard of the aggregated statistics.
+- **feature_plots/**: Created if `bus_data.csv` exists; contains violin plots per feature named `distribution_{feature_name}_all_buses.png`.

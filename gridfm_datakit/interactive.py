@@ -94,7 +94,8 @@ def create_config():
             "large_chunk_size": large_chunk_size.value,
             "no_stats": no_stats.value,
             "overwrite": overwrite.value,
-            "mode": str(mode),
+            "mode": str(mode.value),
+            "dcpf": dcpf.value,
         },
     }
     return config
@@ -441,7 +442,7 @@ def interactive_interface():
 
     # Execution Settings
 
-    global num_processes, data_dir, large_chunk_size, no_stats, overwrite, mode
+    global num_processes, data_dir, large_chunk_size, no_stats, overwrite, mode, dcpf
     num_processes = widgets.IntSlider(
         value=10,
         min=1,
@@ -488,8 +489,31 @@ def interactive_interface():
         layout=widgets.Layout(width="500px"),
     )
 
-    # Set mode to "pf"
-    mode = "pf"
+    # Mode selection
+    mode = widgets.Dropdown(
+        options=[
+            (
+                "unsecure - Generate unsecure scenarios (setpoints before topology perturbation)",
+                "unsecure",
+            ),
+            (
+                "secure - Generate secure scenarios (setpoints after topology perturbation)",
+                "secure",
+            ),
+        ],
+        value="unsecure",
+        description="Processing Mode:",
+        style={"description_width": "150px"},
+        layout=widgets.Layout(width="650px"),
+    )
+
+    # DC Power Flow option
+    dcpf = widgets.Checkbox(
+        value=False,
+        description="Include DC Power Flow results (Vm_dc, Va_dc columns)",
+        style={"description_width": "100px"},
+        layout=widgets.Layout(width="500px"),
+    )
 
     # Load Configuration - Advanced Box
     load_advanced_box = widgets.VBox(
@@ -566,6 +590,25 @@ def interactive_interface():
         ),
     )
 
+    # Create containers for topology perturbation components
+    topology_components_container = widgets.VBox([k, n_topology_variants, elements])
+
+    # Function to update topology perturbation component visibility
+    def update_topology_perturbation_visibility(*args):
+        if perturbation_type.value == "none":
+            topology_components_container.layout.display = "none"
+        elif perturbation_type.value == "n_minus_k":
+            # For n_minus_k, only show k parameter, hide variants and elements
+            topology_components_container.children = [k]
+            topology_components_container.layout.display = "block"
+        else:
+            # For random, show all components
+            topology_components_container.children = [k, n_topology_variants, elements]
+            topology_components_container.layout.display = "block"
+
+    perturbation_type.observe(update_topology_perturbation_visibility, names="value")
+    update_topology_perturbation_visibility()  # Set initial state
+
     # Topology Configuration Box
     topology_box = widgets.VBox(
         [
@@ -576,9 +619,7 @@ def interactive_interface():
                 "<p style='margin: 5px 0; color: #666;'>Simulate equipment failures and contingencies</p>",
             ),
             perturbation_type,
-            k,
-            n_topology_variants,
-            elements,
+            topology_components_container,
         ],
         layout=widgets.Layout(
             border="2px solid #F3E5F5",
@@ -587,6 +628,25 @@ def interactive_interface():
             border_radius="10px",
         ),
     )
+
+    # Create container for generation perturbation components
+    generation_components_container = widgets.VBox([gen_sigma])
+
+    # Function to update generation perturbation component visibility
+    def update_generation_perturbation_visibility(*args):
+        if (
+            gen_perturbation_type.value == "none"
+            or gen_perturbation_type.value == "cost_permutation"
+        ):
+            generation_components_container.layout.display = "none"
+        else:
+            generation_components_container.layout.display = "block"
+
+    gen_perturbation_type.observe(
+        update_generation_perturbation_visibility,
+        names="value",
+    )
+    update_generation_perturbation_visibility()  # Set initial state
 
     # Generation Configuration Box
     generation_box = widgets.VBox(
@@ -598,7 +658,7 @@ def interactive_interface():
                 "<p style='margin: 5px 0; color: #666;'>Configure how cost of generation components are perturbed</p>",
             ),
             gen_perturbation_type,
-            gen_sigma,
+            generation_components_container,
         ],
         layout=widgets.Layout(
             border="2px solid #F3E5F5",
@@ -607,6 +667,22 @@ def interactive_interface():
             border_radius="10px",
         ),
     )
+
+    # Create container for admittance perturbation components
+    admittance_components_container = widgets.VBox([admittance_sigma])
+
+    # Function to update admittance perturbation component visibility
+    def update_admittance_perturbation_visibility(*args):
+        if admittance_perturbation_type.value == "none":
+            admittance_components_container.layout.display = "none"
+        else:
+            admittance_components_container.layout.display = "block"
+
+    admittance_perturbation_type.observe(
+        update_admittance_perturbation_visibility,
+        names="value",
+    )
+    update_admittance_perturbation_visibility()  # Set initial state
 
     # Admittance Configuration Box
     admittance_box = widgets.VBox(
@@ -618,7 +694,7 @@ def interactive_interface():
                 "<p style='margin: 5px 0; color: #666;'>Configure how line admittances are perturbed</p>",
             ),
             admittance_perturbation_type,
-            admittance_sigma,
+            admittance_components_container,
         ],
         layout=widgets.Layout(
             border="2px solid #F3E5F5",
@@ -640,10 +716,10 @@ def interactive_interface():
             num_processes,
             data_dir,
             large_chunk_size,
-            widgets.HBox(
-                [no_stats, overwrite],
-                layout=widgets.Layout(justify_content="flex-start"),
-            ),
+            mode,
+            no_stats,
+            overwrite,
+            dcpf,
         ],
         layout=widgets.Layout(
             border="2px solid #EFEBE9",

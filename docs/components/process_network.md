@@ -1,6 +1,6 @@
 # Process Network
 
-This module provides functions for processing power networks.
+This module provides functions for processing power networks and scenarios.
 
 ### `network_preprocessing`
 
@@ -14,6 +14,14 @@ This module provides functions for processing power networks.
 
 ::: gridfm_datakit.process.process_network.pf_post_processing
 
-### `get_adjacency_list`
+### `process_scenario_secure`
 
-::: gridfm_datakit.process.process_network.get_adjacency_list
+::: gridfm_datakit.process.process_network.process_scenario_secure
+
+### `process_scenario_unsecure`
+
+::: gridfm_datakit.process.process_network.process_scenario_unsecure
+
+### `process_scenario_chunk`
+
+::: gridfm_datakit.process.process_network.process_scenario_chunk
