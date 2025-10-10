@@ -12,15 +12,15 @@ load:
   max_scaling_factor: 4.0
   step_size: 0.025
   start_scaling_factor: 0.8
+  find_limit: false
+  upper_limit: 1.2
 topology_perturbation:
   type: random
   k: 4
-  n_topology_variants: 10
+  n_topology_variants: 15
   elements:
   - line
   - trafo
-  - gen
-  - sgen
 generation_perturbation:
   type: cost_perturbation
   sigma: 1.0
@@ -30,10 +30,10 @@ admittance_perturbation:
 settings:
   num_processes: 10
   data_dir: ./data_out/
-  large_chunk_size: 1000
-  no_stats: 'false'
-  overwrite: 'true'
+  large_chunk_size: 100
+  no_stats: false
+  overwrite: true
   mode: unsecure
-  dcpf: 'false'
-  julia: 'true'
+  dcpf: false
+  julia: true
   pm_solver: ipopt

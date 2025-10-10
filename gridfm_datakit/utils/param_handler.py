@@ -182,6 +182,8 @@ def get_load_scenario_generator(args: NestedNamespace) -> LoadScenarioGeneratorB
             args.max_scaling_factor,
             args.step_size,
             args.start_scaling_factor,
+            args.find_limit,
+            args.upper_limit,
         )
     if args.generator == "powergraph":
         unused_args = {

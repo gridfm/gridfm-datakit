@@ -15,6 +15,8 @@ load:
   max_scaling_factor: 4.0 # Max upper bound of the global scaling factor
   step_size: 0.05 # Step size when finding the upper bound of the global scaling factor
   start_scaling_factor: 0.8 # Initial value of the global scaling factor
+  find_limit: true # If set to true, will run opf with pandapower run OPF to find upper limit. Set to false if using Julia to run OPF
+  upper_limit: 1.2 # Upper limit for load profile
 
 topology_perturbation:
   type: "random" # Type of topology generator; options: n_minus_k, random, none

@@ -284,6 +284,8 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
         max_scaling_factor: float,
         step_size: float,
         start_scaling_factor: float,
+        find_limit: bool,
+        upper_limit: float,
     ):
         """Initializes the load scenario generator.
 
@@ -303,6 +305,8 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
         self.max_scaling_factor = max_scaling_factor
         self.step_size = step_size
         self.start_scaling_factor = start_scaling_factor
+        self.find_limit = find_limit
+        self.upper_limit = upper_limit
 
     def __call__(
         self,
@@ -330,14 +334,16 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
             raise ValueError(
                 "The start scaling factor must be larger than the global range.",
             )
-
-        u = self.find_largest_scaling_factor(
-            net,
-            max_scaling=self.max_scaling_factor,
-            step_size=self.step_size,
-            start=self.start_scaling_factor,
-            change_reactive_power=self.change_reactive_power,
-        )
+        if self.find_limit:
+            u = self.find_largest_scaling_factor(
+                net,
+                max_scaling=self.max_scaling_factor,
+                step_size=self.step_size,
+                start=self.start_scaling_factor,
+                change_reactive_power=self.change_reactive_power,
+            )
+        else:
+            u = self.upper_limit
         lower = (
             u - self.global_range * u
         )  # The lower bound used to be set as e.g. u - 40%, while now it is set as u - 40% of u
