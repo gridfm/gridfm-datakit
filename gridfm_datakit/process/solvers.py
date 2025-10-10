@@ -5,7 +5,7 @@ from pandapower.auxiliary import pandapowerNet
 from typing import Any, Tuple
 
 
-def run_opf(net: pandapowerNet, **kwargs: Any) -> bool:
+def run_opf(net: pandapowerNet, julia: bool, pm_solver: str, **kwargs: Any) -> bool:
     """Runs Optimal Power Flow (OPF) and adds additional information to network elements.
 
     This function runs the OPF calculation and adds bus index and type information to the
@@ -13,6 +13,8 @@ def run_opf(net: pandapowerNet, **kwargs: Any) -> bool:
 
     Args:
         net: A pandapower network object containing the power system model.
+        julia: Use PowerModels through Julia to run OPF.
+        pm_solver: pm_solver argument for runpm_ac_opf Julia function.
         **kwargs: Additional keyword arguments to pass to pp.runopp().
 
     Returns:
@@ -25,8 +27,13 @@ def run_opf(net: pandapowerNet, **kwargs: Any) -> bool:
             - Bus power mismatches
             - Power balance violations
     """
+    if julia:
+        from julia.api import Julia
 
-    pp.runopp(net, numba=True, **kwargs)
+        jl = Julia(compiled_modules=False)
+        pp.runpm_ac_opf(net, pm_log_level=5, pm_solver=pm_solver)
+    else:
+        pp.runopp(net, numba=True, **kwargs)
 
     # add bus index and type to dataframe of opf results
     net.res_gen["bus"] = net.gen.bus
@@ -146,7 +153,7 @@ def run_opf(net: pandapowerNet, **kwargs: Any) -> bool:
     assert np.abs(total_p_diff) < 1e-1, (
         f"Total active power imbalance in OPF: {total_p_diff}"
     )
-
+    del jl
     return net.OPF_converged
 
 

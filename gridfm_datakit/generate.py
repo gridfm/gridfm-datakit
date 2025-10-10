@@ -147,6 +147,7 @@ def _prepare_network_and_scenarios(
         args.load.scenarios,
         file_paths["scenarios_log"],
     )
+    # need to kill julia import here
     scenarios_df = load_scenarios_to_df(scenarios)
     scenarios_df.to_csv(file_paths["scenarios"], index=False)
     plot_load_scenarios_combined(scenarios_df, file_paths["scenarios_plot"])
@@ -277,6 +278,8 @@ def generate_power_flow_data(
                         global_stats,
                         file_paths["error_log"],
                         args.settings.dcpf,
+                        args.settings.julia,
+                        args.settings.pm_solver,
                     )
                 elif args.settings.mode == "unsecure":
                     processed_data, global_stats = process_scenario_unsecure(
@@ -291,6 +294,8 @@ def generate_power_flow_data(
                         global_stats,
                         file_paths["error_log"],
                         args.settings.dcpf,
+                        args.settings.julia,
+                        args.settings.pm_solver,
                     )
                 else:
                     raise ValueError("Invalid mode!")
@@ -417,6 +422,8 @@ def generate_power_flow_data_distributed(
                         args.settings.no_stats,
                         file_paths["error_log"],
                         args.settings.dcpf,
+                        args.settings.julia,
+                        args.settings.pm_solver,
                     )
                     for chunk in scenario_chunks
                 ]

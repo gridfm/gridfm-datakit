@@ -40,3 +40,5 @@ settings:
   overwrite: true # If true, overwrites existing files, if false, appends to files
   mode: "unsecure" # Mode of the script; options: secure, unsecure. Unsecure mode generates unsecure scenarios, i.e. scenarios where the the generator setpoints are obtained for the base topology, before the topology is perturbed.
   dcpf: false # If true, also stores the results of dc power flow (in addition to the results AC power flow)
+  julia: false # If true, uses Julia PowerModels to run OPF. If false, uses PandaPower OPF function.
+  pm_solver: "ipopt" # Ipopt solver as default; update for ma27, ma57. Will be updated to pp.runpm_ac_opf(net, pm_log_level=5, pm_solver=pm_solver) if julia: true in solvers.py

@@ -344,6 +344,8 @@ def process_scenario_unsecure(
     local_stats: Union[Stats, None],
     error_log_file: str,
     dcpf: bool,
+    julia: bool,
+    pm_solver: str,
 ) -> Tuple[List[np.ndarray], Union[Stats, None]]:
     """Generates one or more unsecure operating points for the given load scenario.
 
@@ -363,6 +365,8 @@ def process_scenario_unsecure(
         local_stats: Statistics object for collecting network performance metrics.
         error_log_file: Path to error log file for recording failures.
         dcpf: Whether to include DC power flow results in output.
+        julia: Use PowerModels through Julia to run OPF.
+        pm_solver: pm_solver argument for runpm_ac_opf Julia function.
 
     Returns:
         Tuple containing:
@@ -385,7 +389,7 @@ def process_scenario_unsecure(
 
     # first run OPF to get the gen set points
     try:
-        run_opf(net)
+        run_opf(net, julia, pm_solver)
     except Exception as e:
         with open(error_log_file, "a") as f:
             f.write(
@@ -441,6 +445,8 @@ def process_scenario_chunk(
     no_stats: bool,
     error_log_path: str,
     dcpf: bool,
+    julia: bool,
+    pm_solver: str,
 ) -> Tuple[
     Union[None, Exception],
     Union[None, str],
@@ -465,6 +471,8 @@ def process_scenario_chunk(
         no_stats: Whether to skip statistics collection.
         error_log_path: Path to error log file for recording failures.
         dcpf: Whether to include DC power flow results in output.
+        julia: Use PowerModels through Julia to run OPF.
+        pm_solver: pm_solver argument for runpm_ac_opf Julia function.
 
     Returns:
         Tuple containing:
@@ -493,6 +501,8 @@ def process_scenario_chunk(
                     local_stats,
                     error_log_path,
                     dcpf,
+                    julia,
+                    pm_solver,
                 )
             elif mode == "unsecure":
                 (
@@ -510,6 +520,8 @@ def process_scenario_chunk(
                     local_stats,
                     error_log_path,
                     dcpf,
+                    julia,
+                    pm_solver,
                 )
 
             progress_queue.put(1)  # update queue
@@ -542,6 +554,8 @@ def process_scenario_secure(
     local_stats: Union[Stats, None],
     error_log_file: str,
     dcpf: bool,
+    julia: bool,
+    pm_solver: str,
 ) -> Tuple[List[np.ndarray], Union[Stats, None]]:
     """Processes a load scenario in secure mode.
 
@@ -561,6 +575,8 @@ def process_scenario_secure(
         local_stats: Statistics object for collecting network performance metrics.
         error_log_file: Path to error log file for recording failures.
         dcpf: Whether to include DC power flow results in output.
+        julia: Use PowerModels through Julia to run OPF.
+        pm_solver: pm_solver argument for runpm_ac_opf Julia function.
 
     Returns:
         Tuple containing:
@@ -595,7 +611,7 @@ def process_scenario_secure(
                 )
         try:
             # run OPF to get the gen set points. Here the set points account for the topology perturbation.
-            run_opf(perturbation)
+            run_opf(perturbation, julia, pm_solver)
         except Exception as e:
             with open(error_log_file, "a") as f:
                 f.write(

@@ -1,0 +1,39 @@
+network:
+  name: case2848_rte
+  source: pglib
+  network_dir: scripts/grids
+load:
+  generator: agg_load_profile
+  agg_profile: default
+  scenarios: 10000
+  sigma: 0.2
+  change_reactive_power: true
+  global_range: 0.4
+  max_scaling_factor: 4.0
+  step_size: 0.025
+  start_scaling_factor: 0.8
+topology_perturbation:
+  type: random
+  k: 143
+  n_topology_variants: 10
+  elements:
+  - line
+  - trafo
+  - gen
+  - sgen
+generation_perturbation:
+  type: cost_perturbation
+  sigma: 1.0
+admittance_perturbation:
+  type: random_perturbation
+  sigma: 0.2
+settings:
+  num_processes: 10
+  data_dir: ./data_out/
+  large_chunk_size: 1000
+  no_stats: 'false'
+  overwrite: 'true'
+  mode: unsecure
+  dcpf: 'false'
+  julia: 'true'
+  pm_solver: ipopt

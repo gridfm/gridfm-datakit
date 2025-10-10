@@ -96,6 +96,8 @@ def create_config():
             "overwrite": overwrite.value,
             "mode": str(mode.value),
             "dcpf": dcpf.value,
+            "julia": julia.value,
+            "pm_solver": pm_solver.value,
         },
     }
     return config
@@ -442,7 +444,16 @@ def interactive_interface():
 
     # Execution Settings
 
-    global num_processes, data_dir, large_chunk_size, no_stats, overwrite, mode, dcpf
+    global \
+        num_processes, \
+        data_dir, \
+        large_chunk_size, \
+        no_stats, \
+        overwrite, \
+        mode, \
+        dcpf, \
+        julia, \
+        pm_solver
     num_processes = widgets.IntSlider(
         value=10,
         min=1,
@@ -513,6 +524,32 @@ def interactive_interface():
         description="Include DC Power Flow results (Vm_dc, Va_dc columns)",
         style={"description_width": "100px"},
         layout=widgets.Layout(width="500px"),
+    )
+
+    # Julia PowerModels option
+    julia = widgets.Checkbox(
+        value=False,
+        description="Use PowerModels through Julia for AC OPF solution",
+        style={"description_width": "100px"},
+        layout=widgets.Layout(width="500px"),
+    )
+
+    # PowerModels solver selection
+    pm_solver = widgets.Dropdown(
+        options=[
+            (
+                "ipopt - default",
+                "ipopt",
+            ),
+            (
+                "ma27 - HSL linear solver",
+                "ma27",
+            ),
+        ],
+        value="ipopt",
+        description="PM Solver:",
+        style={"description_width": "150px"},
+        layout=widgets.Layout(width="650px"),
     )
 
     # Load Configuration - Advanced Box
@@ -720,6 +757,8 @@ def interactive_interface():
             no_stats,
             overwrite,
             dcpf,
+            julia,
+            pm_solver,
         ],
         layout=widgets.Layout(
             border="2px solid #EFEBE9",

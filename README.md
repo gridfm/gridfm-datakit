@@ -60,7 +60,7 @@ interactive_interface()
 Run the data generation routine from the command line:
 
 ```bash
-gridfm_datakit path/to/config.yaml
+gridfm_datakit generate path/to/config.yaml
 ```
 
 

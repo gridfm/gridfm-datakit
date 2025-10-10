@@ -17,12 +17,13 @@ version = "0.0.8"
 requires-python = ">=3.10,<3.13"
 dependencies = [
     "ipykernel",
+    "julia==0.6.2",
     "matplotlib",
     "matpowercaseframes",
     "nbformat",
     "numba",
     "numpy",
-    "pandapower==2.14.11",
+    "pandapower==3.1.1",
     "pandas",
     "pathlib",
     "plotly",
