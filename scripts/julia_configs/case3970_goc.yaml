@@ -22,7 +22,7 @@ topology_perturbation:
   - line
   - trafo
 generation_perturbation:
-  type: cost_perturbation
+  type: cost_permutation
   sigma: 1.0
 admittance_perturbation:
   type: random_perturbation
