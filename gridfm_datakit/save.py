@@ -1,14 +1,68 @@
-import numpy as np
-import pandas as pd
-from pandapower.auxiliary import pandapowerNet
 import os
-from gridfm_datakit.utils.config import (
-    BUS_COLUMNS,
-    BRANCH_COLUMNS,
-    GEN_COLUMNS,
-    DC_BUS_COLUMNS,
-)
-from typing import List
+import pandas as pd
+import numpy as np
+from concurrent.futures import ThreadPoolExecutor
+from typing import List, Tuple
+from pandapower import pandapowerNet
+from gridfm_datakit.utils.config import BUS_COLUMNS, DC_BUS_COLUMNS, GEN_COLUMNS, BRANCH_COLUMNS
+import time
+
+
+def _process_and_save(args):
+    """Worker function for one dataset type (bus/gen/branch/y_bus)."""
+    data_type, processed_data, path, last_scenario, n_buses, dcpf = args
+
+    if data_type == "bus":
+        bus_columns = BUS_COLUMNS + DC_BUS_COLUMNS if dcpf else BUS_COLUMNS
+        bus_data = np.concatenate([item[0] for item in processed_data], axis=0)
+        df = pd.DataFrame(bus_data, columns=bus_columns)
+        df["bus"] = df["bus"].astype("int64")
+        scenario_indices = np.repeat(
+            range(last_scenario + 1, last_scenario + 1 + (df.shape[0] // n_buses)),
+            n_buses,
+        )
+        df.insert(0, "scenario", scenario_indices)
+
+    elif data_type == "gen":
+        gen_data = np.concatenate([item[1] for item in processed_data], axis=0)
+        df = pd.DataFrame(gen_data, columns=GEN_COLUMNS)
+        df["bus"] = df["bus"].astype("int64")
+        scenario_indices = np.concatenate(
+            [
+                np.full(item[1].shape[0], last_scenario + 1 + i, dtype="int64")
+                for i, item in enumerate(processed_data)
+            ]
+        )
+        df.insert(0, "scenario", scenario_indices)
+
+    elif data_type == "branch":
+        branch_data = np.concatenate([item[2] for item in processed_data], axis=0)
+        df = pd.DataFrame(branch_data, columns=BRANCH_COLUMNS)
+        df[["from_bus", "to_bus"]] = df[["from_bus", "to_bus"]].astype("int64")
+        scenario_indices = np.concatenate(
+            [
+                np.full(item[2].shape[0], last_scenario + 1 + i, dtype="int64")
+                for i, item in enumerate(processed_data)
+            ]
+        )
+        df.insert(0, "scenario", scenario_indices)
+
+    elif data_type == "y_bus":
+        y_bus_data = np.concatenate([item[3] for item in processed_data])
+        df = pd.DataFrame(y_bus_data, columns=["index1", "index2", "G", "B"])
+        df[["index1", "index2"]] = df[["index1", "index2"]].astype("int64")
+        scenario_indices = np.concatenate(
+            [
+                np.full(item[3].shape[0], last_scenario + 1 + i, dtype="int64")
+                for i, item in enumerate(processed_data)
+            ]
+        )
+        df.insert(0, "scenario", scenario_indices)
+
+    else:
+        raise ValueError(f"Unknown data type: {data_type}")
+
+    df.to_csv(path, mode="a", header=not os.path.exists(path), index=False)
 
 
 def save_node_edge_data(
@@ -17,123 +71,33 @@ def save_node_edge_data(
     branch_path: str,
     gen_path: str,
     y_bus_path: str,
-    processed_data: List[tuple],
+    processed_data: List[Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]],
     dcpf: bool = False,
 ) -> None:
-    """Save generated power flow data to CSV files.
-
-    This function takes processed power flow results and saves them to four CSV files:
-    - Bus data (bus_data.csv): Bus-level features for each scenario
-    - Generator data (gen_data.csv): Generator features for each scenario
-    - Branch data (branch_data.csv): Branch features and admittances for each scenario
-    - Y-bus data (y_bus_data.csv): Nonzero Y-bus entries for each scenario
-
-    The arrays must conform to the column schemas declared in `gridfm_datakit.utils.config`:
-    - Bus data uses BUS_COLUMNS (+ DC_BUS_COLUMNS if dcpf=True)
-    - Generator data uses GEN_COLUMNS
-    - Branch data uses BRANCH_COLUMNS
-    - Y-bus data uses ["index1", "index2", "G", "B"]
-
-    Each CSV file includes a "scenario" column as the first column to identify
-    which power flow scenario each row belongs to.
-
-    Args:
-        net: Pandapower network (used for determining bus count for scenario indexing).
-        node_path: Output file path for bus data CSV (bus_data.csv).
-        branch_path: Output file path for branch data CSV (branch_data.csv).
-        gen_path: Output file path for generator data CSV (gen_data.csv).
-        y_bus_path: Output file path for Y-bus data CSV (y_bus_data.csv).
-        processed_data: List of tuples, each containing (bus_array, gen_array, branch_array, y_bus_array)
-            from power flow post-processing for one or more scenarios.
-        dcpf: If True, includes DC power flow results (Vm_dc, Va_dc columns) in bus data.
-
-    Note:
-        - Files are created in append mode, allowing incremental data generation
-        - Scenario indices are automatically assigned based on existing data
-        - Bus and generator indices are converted to int64 for consistency
-        - Headers are only written if the file doesn't already exist
-    """
+    """Fully parallel version — each (bus, gen, branch, y_bus) runs in its own process."""
     n_buses = net.bus.shape[0]
+    
+    start_time = time.time()
 
-    # Determine last scenario index
+    # Determine last scenario index (only once)
     last_scenario = -1
     if os.path.exists(node_path):
         existing_df = pd.read_csv(node_path, usecols=["scenario"])
         if not existing_df.empty:
             last_scenario = existing_df["scenario"].iloc[-1]
 
-    # Select columns for bus data
-    if dcpf:
-        bus_columns = BUS_COLUMNS + DC_BUS_COLUMNS
-    else:
-        bus_columns = BUS_COLUMNS
+    # Define arguments per data type
+    tasks = [
+        ("bus", processed_data, node_path, last_scenario, n_buses, dcpf),
+        ("gen", processed_data, gen_path, last_scenario, n_buses, dcpf),
+        ("branch", processed_data, branch_path, last_scenario, n_buses, dcpf),
+        ("y_bus", processed_data, y_bus_path, last_scenario, n_buses, dcpf),
+    ]
 
-    # --- BUS DATA ---
-    bus_data = np.concatenate([item[0] for item in processed_data], axis=0)
-    bus_df = pd.DataFrame(bus_data, columns=bus_columns)
-    bus_df["bus"] = bus_df["bus"].astype("int64")
-    scenario_indices = np.repeat(
-        range(last_scenario + 1, last_scenario + 1 + (bus_df.shape[0] // n_buses)),
-        n_buses,
-    )
-    bus_df.insert(0, "scenario", scenario_indices)
-    bus_df.to_csv(
-        node_path,
-        mode="a",
-        header=not os.path.exists(node_path),
-        index=False,
-    )
+    # Run in parallel — one core per data type
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        futures = [pool.submit(_process_and_save, task) for task in tasks]
+        pool.shutdown(wait=True)
 
-    # --- GEN DATA ---
-    gen_data = np.concatenate([item[1] for item in processed_data], axis=0)
-    gen_df = pd.DataFrame(gen_data, columns=GEN_COLUMNS)
-    gen_df["bus"] = gen_df["bus"].astype("int64")
-    # Each scenario may have a different number of generators, so count per scenario
-    scenario_indices = np.concatenate(
-        [
-            np.full(processed_data[i][1].shape[0], last_scenario + 1 + i, dtype="int64")
-            for i in range(len(processed_data))
-        ],
-    )
-    gen_df.insert(0, "scenario", scenario_indices)
-    gen_df.to_csv(gen_path, mode="a", header=not os.path.exists(gen_path), index=False)
-
-    # --- BRANCH DATA ---
-    branch_data = np.concatenate([item[2] for item in processed_data], axis=0)
-    branch_df = pd.DataFrame(branch_data, columns=BRANCH_COLUMNS)
-    branch_df[["from_bus", "to_bus"]] = branch_df[["from_bus", "to_bus"]].astype(
-        "int64",
-    )
-    scenario_indices = np.concatenate(
-        [
-            np.full(processed_data[i][2].shape[0], last_scenario + 1 + i, dtype="int64")
-            for i in range(len(processed_data))
-        ],
-    )
-    branch_df.insert(0, "scenario", scenario_indices)
-    branch_df.to_csv(
-        branch_path,
-        mode="a",
-        header=not os.path.exists(branch_path),
-        index=False,
-    )
-
-    # --- Y-BUS DATA (nonzero admittance matrix entries) ---
-    y_bus_df = pd.DataFrame(
-        np.concatenate([item[3] for item in processed_data]),
-        columns=["index1", "index2", "G", "B"],
-    )
-    y_bus_df[["index1", "index2"]] = y_bus_df[["index1", "index2"]].astype("int64")
-    scenario_indices = np.concatenate(
-        [
-            np.full(processed_data[i][3].shape[0], last_scenario + 1 + i, dtype="int64")
-            for i in range(len(processed_data))
-        ],
-    )
-    y_bus_df.insert(0, "scenario", scenario_indices)
-    y_bus_df.to_csv(
-        y_bus_path,
-        mode="a",
-        header=not os.path.exists(y_bus_path),
-        index=False,
-    )
+    end_time = time.time()
+    print(f"Time taken: {end_time - start_time} seconds")

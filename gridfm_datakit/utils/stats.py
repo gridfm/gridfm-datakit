@@ -207,7 +207,7 @@ def plot_feature_distributions(
         # sample 30 buses randomly
         buses = np.random.choice(
             node_data["bus"].unique(),
-            size=min(20, len(node_data["bus"].unique())),
+            size=min(30, len(node_data["bus"].unique())),
             replace=False,
         )
 

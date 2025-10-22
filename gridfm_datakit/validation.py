@@ -251,6 +251,7 @@ def validate_computed_vs_stored_power_flows(generated_data):
         Va_rad = {bus: np.radians(angle) for bus, angle in Va_deg.items()}
 
         for _, branch in active_branches.iterrows():
+            
             from_bus = int(branch["from_bus"])
             to_bus = int(branch["to_bus"])
 
@@ -275,10 +276,12 @@ def validate_computed_vs_stored_power_flows(generated_data):
 
             tolerance = 1e-3
             assert abs(Pf_computed - branch["pf"]) < tolerance, (
-                f"Scenario {scenario}, Branch {from_bus}->{to_bus}: Pf mismatch"
+                f"Scenario {scenario}, Branch {from_bus}->{to_bus}: Pf mismatch: {Pf_computed} != {branch['pf']} | "
+                f"Yff_r: {Yff_r}, Yff_i: {Yff_i}, Yft_r: {Yft_r}, Yft_i: {Yft_i}"
             )
             assert abs(Qf_computed - branch["qf"]) < tolerance, (
-                f"Scenario {scenario}, Branch {from_bus}->{to_bus}: Qf mismatch"
+                f"Scenario {scenario}, Branch {from_bus}->{to_bus}: Qf mismatch: {Qf_computed} != {branch['qf']} | "
+                f"Yff_r: {Yff_r}, Yff_i: {Yff_i}, Yft_r: {Yft_r}, Yft_i: {Yft_i}"
             )
 
     print("    Computed vs stored power flows: OK")
