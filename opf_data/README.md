@@ -5,8 +5,21 @@ It processes input files in parallel and in fixed-size chunks, appending sorted 
 ### Example usage
 
 ```bash
-python batch_convert.py path_to_opf_data_dir/ out_dir/ "case57_ieee"
+python batch_convert.py path_to_opf_data_dir/ out_dir/ "case57_ieee" --n-1 True
 ```
+
+### Required Arguments
+
+- `data_dir`: Directory containing example*.json files (searched recursively)
+- `out_dir`: Directory for aggregated CSV outputs
+- `network`: Network name (without pglib prefix)
+- `--n-1`: Boolean flag indicating whether using N-1 contingency analysis (True) or full topology (False)
+
+### Optional Arguments
+
+- `--chunk-size`: Files per processing chunk (default: 20000)
+- `--atol`: Absolute tolerance for Ybus equality (default: 1e-5)
+- `--rtol`: Relative tolerance for Ybus equality (default: 1e-5)
 
 ## 1. Fields Not Used
 
@@ -89,4 +102,3 @@ python batch_convert.py path_to_opf_data_dir/ out_dir/ "case57_ieee"
 | `is_sgen`     | 0              | No static generators.          |
 | `is_ext_grid` | 0              | No external grid sources.      |
 | `in_service`  | 1              | All generators active.         |
-

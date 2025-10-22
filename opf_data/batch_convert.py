@@ -54,7 +54,8 @@ def inv_complex(z: complex) -> complex:
 
 def ensure_len(name: str, a, b):
     require(
-        len(a) == len(b), f"Inconsistent list lengths for {name}: {len(a)} vs {len(b)}."
+        len(a) == len(b),
+        f"Inconsistent list lengths for {name}: {len(a)} vs {len(b)}.",
     )
 
 
@@ -86,7 +87,8 @@ def convert_one(
     n_1: bool,
 ) -> Tuple[List[dict], List[dict], List[dict], List[dict]]:
     require(
-        "grid" in data and "solution" in data, "Missing 'grid' or 'solution' sections."
+        "grid" in data and "solution" in data,
+        "Missing 'grid' or 'solution' sections.",
     )
 
     grid = data["grid"]
@@ -107,7 +109,9 @@ def convert_one(
     nl = len(loads)
     load_link = grid["edges"]["load_link"]
     ensure_len(
-        "load_link senders/receivers", load_link["senders"], load_link["receivers"]
+        "load_link senders/receivers",
+        load_link["senders"],
+        load_link["receivers"],
     )
     require(
         len(load_link["senders"]) == nl,
@@ -123,7 +127,9 @@ def convert_one(
 
     gen_link = grid["edges"]["generator_link"]
     ensure_len(
-        "generator_link senders/receivers", gen_link["senders"], gen_link["receivers"]
+        "generator_link senders/receivers",
+        gen_link["senders"],
+        gen_link["receivers"],
     )
     require(
         len(gen_link["senders"]) == ng,
@@ -180,7 +186,8 @@ def convert_one(
         check_index("transformer sender", f, nb)
         check_index("transformer receiver", t, nb)
         require(
-            len(tf_feat[i]) >= 11, "transformer feature must have at least 11 elements."
+            len(tf_feat[i]) >= 11,
+            "transformer feature must have at least 11 elements.",
         )
         require(
             len(sol_tf["features"][i]) >= 4,
@@ -288,7 +295,7 @@ def convert_one(
                 "br_x": br_x,
                 "b_fr": b_fr,
                 "b_to": b_to,
-            }
+            },
         )
 
         add_to_Y(f, f, Yff)
@@ -359,7 +366,7 @@ def convert_one(
                 "br_x": br_x,
                 "b_fr": b_fr,
                 "b_to": b_to,
-            }
+            },
         )
 
         add_to_Y(f, f, Yff)
@@ -402,7 +409,7 @@ def convert_one(
                 "max_vm_pu": max_vm[b],
                 "GS": GS[b],
                 "BS": BS[b],
-            }
+            },
         )
 
     # ---- Generator rows and cost check ----
@@ -435,7 +442,7 @@ def convert_one(
                 "is_sgen": 0,
                 "is_ext_grid": 0,
                 "in_service": 1,
-            }
+            },
         )
 
     assert (cost - objective) < 1e-6, (
@@ -453,21 +460,23 @@ def convert_one(
                     "index2": j,
                     "G": y.real,
                     "B": y.imag,
-                }
+                },
             )
 
     if (not n_1) and (
         not np.allclose(
             np.asarray(list(Y.values())).view(np.complex128),
             Ybus_baseline[
-                np.array([i for i, _ in Y.keys()]), np.array([j for _, j in Y.keys()])
+                np.array([i for i, _ in Y.keys()]),
+                np.array([j for _, j in Y.keys()]),
             ],
             atol=atol,
             rtol=rtol,
         )
     ):
         for i, j in zip(
-            np.array([i for i, _ in Y.keys()]), np.array([j for _, j in Y.keys()])
+            np.array([i for i, _ in Y.keys()]),
+            np.array([j for _, j in Y.keys()]),
         ):
             if not np.isclose(Y[(i, j)], Ybus_baseline[i, j], atol=atol, rtol=rtol):
                 print(f"Y[{i}, {j}] = {Y[(i, j)]}")
@@ -505,7 +514,7 @@ def append_df(out_path: Path, df: pd.DataFrame):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Batch-convert JSON grid/solution files to aggregated CSVs with Ybus validation (chunked, append-per-chunk)."
+        description="Batch-convert JSON grid/solution files to aggregated CSVs with Ybus validation (chunked, append-per-chunk).",
     )
     parser.add_argument(
         "data_dir",
@@ -562,10 +571,13 @@ def main():
     net = load_net_from_pglib(args.network)
     pp.runpp(net)
     _Ytt, _Yff, _Yft, _Ytf = branch_vectors(
-        net._ppc["branch"], net._ppc["branch"].shape[0]
+        net._ppc["branch"],
+        net._ppc["branch"].shape[0],
     )
     Ybus_baseline, _, _ = makeYbus(
-        net._ppc["baseMVA"], net._ppc["bus"], net._ppc["branch"]
+        net._ppc["baseMVA"],
+        net._ppc["bus"],
+        net._ppc["branch"],
     )
 
     # ---- Collect files, parse indices, sort by scenario index ----
@@ -597,7 +609,7 @@ def main():
         # ---- Multiprocessing pool ----
         with Pool(cpu_count()) as pool:
             print(
-                f"Processing chunk {chunk_id + 1}/{num_chunks} with {cpu_count()} processes"
+                f"Processing chunk {chunk_id + 1}/{num_chunks} with {cpu_count()} processes",
             )
             results = list(
                 tqdm(
@@ -605,7 +617,7 @@ def main():
                     total=len(pool_args),
                     desc=f"Chunk {chunk_id + 1}/{num_chunks}",
                     leave=True,
-                )
+                ),
             )
 
         # results is a list of tuples: (b_rows, u_rows, g_rows, y_rows)
@@ -623,16 +635,20 @@ def main():
 
         # Sort within the chunk to maintain global ordering upon append
         branch_df = pd.DataFrame(all_branch).sort_values(
-            by=["scenario", "from_bus", "to_bus"], kind="mergesort"
+            by=["scenario", "from_bus", "to_bus"],
+            kind="mergesort",
         )
         bus_df = pd.DataFrame(all_bus).sort_values(
-            by=["scenario", "bus"], kind="mergesort"
+            by=["scenario", "bus"],
+            kind="mergesort",
         )
         gen_df = pd.DataFrame(all_gen).sort_values(
-            by=["scenario", "bus", "element"], kind="mergesort"
+            by=["scenario", "bus", "element"],
+            kind="mergesort",
         )
         ybus_df = pd.DataFrame(all_ybus).sort_values(
-            by=["scenario", "index1", "index2"], kind="mergesort"
+            by=["scenario", "index1", "index2"],
+            kind="mergesort",
         )
 
         # Append to final CSVs
