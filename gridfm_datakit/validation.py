@@ -251,7 +251,6 @@ def validate_computed_vs_stored_power_flows(generated_data):
         Va_rad = {bus: np.radians(angle) for bus, angle in Va_deg.items()}
 
         for _, branch in active_branches.iterrows():
-            
             from_bus = int(branch["from_bus"])
             to_bus = int(branch["to_bus"])
 

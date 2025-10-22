@@ -31,7 +31,6 @@ def validate_data_directory(data_path, n_scenarios=100):
         "y_bus_data": "y_bus_data.csv",
     }
 
-
     try:
         with open(data_path / "args.log", "r") as f:
             lines = f.readlines()

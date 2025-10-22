@@ -4,8 +4,12 @@ import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Tuple
 from pandapower import pandapowerNet
-from gridfm_datakit.utils.config import BUS_COLUMNS, DC_BUS_COLUMNS, GEN_COLUMNS, BRANCH_COLUMNS
-import time
+from gridfm_datakit.utils.config import (
+    BUS_COLUMNS,
+    DC_BUS_COLUMNS,
+    GEN_COLUMNS,
+    BRANCH_COLUMNS,
+)
 
 
 def _process_and_save(args):
@@ -31,7 +35,7 @@ def _process_and_save(args):
             [
                 np.full(item[1].shape[0], last_scenario + 1 + i, dtype="int64")
                 for i, item in enumerate(processed_data)
-            ]
+            ],
         )
         df.insert(0, "scenario", scenario_indices)
 
@@ -43,7 +47,7 @@ def _process_and_save(args):
             [
                 np.full(item[2].shape[0], last_scenario + 1 + i, dtype="int64")
                 for i, item in enumerate(processed_data)
-            ]
+            ],
         )
         df.insert(0, "scenario", scenario_indices)
 
@@ -55,7 +59,7 @@ def _process_and_save(args):
             [
                 np.full(item[3].shape[0], last_scenario + 1 + i, dtype="int64")
                 for i, item in enumerate(processed_data)
-            ]
+            ],
         )
         df.insert(0, "scenario", scenario_indices)
 
@@ -76,8 +80,6 @@ def save_node_edge_data(
 ) -> None:
     """Fully parallel version — each (bus, gen, branch, y_bus) runs in its own process."""
     n_buses = net.bus.shape[0]
-    
-    start_time = time.time()
 
     # Determine last scenario index (only once)
     last_scenario = -1
@@ -94,10 +96,7 @@ def save_node_edge_data(
         ("y_bus", processed_data, y_bus_path, last_scenario, n_buses, dcpf),
     ]
 
-    # Run in parallel — one core per data type
     with ThreadPoolExecutor(max_workers=4) as pool:
         futures = [pool.submit(_process_and_save, task) for task in tasks]
-        pool.shutdown(wait=True)
-
-    end_time = time.time()
-    print(f"Time taken: {end_time - start_time} seconds")
+        for f in futures:
+            f.result()  # wait for each task to finish
