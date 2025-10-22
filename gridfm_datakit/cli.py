@@ -18,7 +18,6 @@ def validate_data_directory(data_path, n_scenarios=100):
     Args:
         data_path (str): Path to directory containing generated CSV files
         n_scenarios (int): Number of scenarios to sample for validation (0 = all scenarios)
-
     Returns:
         bool: True if all validations pass, False otherwise
     """
@@ -32,7 +31,7 @@ def validate_data_directory(data_path, n_scenarios=100):
         "y_bus_data": "y_bus_data.csv",
     }
 
-    # read mode from args_log
+
     try:
         with open(data_path / "args.log", "r") as f:
             lines = f.readlines()
@@ -44,7 +43,7 @@ def validate_data_directory(data_path, n_scenarios=100):
     except Exception as e:
         print(f"   Could not read mode from args.log: {e}")
         print("   Using default mode: unsecure")
-        mode = "unsecure"
+        mode = "secure"
 
     # Check if all required files exist
     file_paths = {}
