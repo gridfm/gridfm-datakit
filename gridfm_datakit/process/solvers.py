@@ -3,7 +3,59 @@ import pandas as pd
 import numpy as np
 from pandapower.auxiliary import pandapowerNet
 from typing import Any, Tuple
+from pandapower.converter.pandamodels.to_pm import convert_to_pm_structure, dump_pm_json
+import time
 
+import numpy as np
+
+def numpy_to_matlab_matrix(array, name):
+    """Format NumPy array as MATLAB matrix string."""
+    lines = [f"mpc.{name} = ["]
+    for row in array:
+        formatted_row = "  ".join(f"{v}" for v in row)
+        lines.append(f"    {formatted_row};")
+    lines.append("];\n")
+    return "\n".join(lines)
+
+def dict_to_matpower(data, filename="case_from_dict.m"):
+    """
+    Convert a dictionary containing 'mpc' data (as shown) into a MATPOWER .m file.
+    """
+    mpc = data["mpc"]
+
+    with open(filename, "w") as f:
+        f.write("function mpc = case_from_dict\n")
+        f.write("% Automatically generated MATPOWER case file\n\n")
+
+        # version and baseMVA
+        f.write(f"mpc.version = '{mpc.get('version', '2')}';\n")
+        f.write(f"mpc.baseMVA = {mpc.get('baseMVA', 100)};\n\n")
+
+        # Convert main matrices if they exist
+        arr = np.array(mpc["bus"])
+        f.write(numpy_to_matlab_matrix(arr[:,:13], "bus"))
+        
+        arr = np.array(mpc["gen"])
+        f.write(numpy_to_matlab_matrix(arr[:,:21], "gen"))
+        
+        arr = np.array(mpc["branch"])
+        f.write(numpy_to_matlab_matrix(arr[:,:13], "branch"))
+
+        # Optional sections (if present)
+        for key in ["gencost", "dcline"]:
+            if key in mpc:
+                arr = np.array(mpc[key])
+                f.write(numpy_to_matlab_matrix(arr, key))
+
+    print(f"✅ MATPOWER case file saved as {filename}")
+
+
+
+def run_pm_opf(net: pandapowerNet, **kwargs: Any) -> bool:
+    net._options["correct_pm_network_data"] 
+    net, pm, ppc, ppci = convert_to_pm_structure(net, **kwargs)
+    buffer_file = dump_pm_json(pm, "pm_net.json")
+    return buffer_file
 
 def run_opf(net: pandapowerNet, **kwargs: Any) -> bool:
     """Runs Optimal Power Flow (OPF) and adds additional information to network elements.
@@ -27,6 +79,35 @@ def run_opf(net: pandapowerNet, **kwargs: Any) -> bool:
     """
 
     pp.runopp(net, numba=True, **kwargs)
+    
+    
+    ####
+    from juliacall import Main as jl
+
+    # Initialize Julia with required packages
+    mpc = pp.converter.to_mpc(net, init="flat")
+    dict_to_matpower(mpc, "case_from_pandapower.m")
+    try:
+        jl.seval("""
+        using PowerModels
+        using Ipopt
+
+        function run_opf(case_file)
+            result = solve_ac_opf(case_file, Ipopt.Optimizer)
+            return result
+        end
+    """)
+    except Exception as e:
+        print(f"Error: {e}")
+    start_time = time.time()
+    try:
+        result = jl.solve_ac_opf("case_from_pandapower.m", jl.Ipopt.Optimizer)
+    except Exception as e:
+        print(f"Error: {e}")
+    run_time = time.time() - start_time
+    print(f"Julia run time: {run_time} seconds")
+    ####
+    
 
     # add bus index and type to dataframe of opf results
     net.res_gen["bus"] = net.gen.bus

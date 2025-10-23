@@ -11,6 +11,7 @@ if __name__ == "__main__":
     args = NestedNamespace(**config_dict)
     args.load.scenarios = 10
     args.settings.large_chunk_size = 10
-    args.settings.num_processes = 10
+    args.settings.num_processes = 2
     args.settings.data_dir = "debug_data"
+    args.settings.mode = "secure"
     file_paths = generate_power_flow_data_distributed(args)
