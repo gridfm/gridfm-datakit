@@ -14,13 +14,13 @@ This module provides functions for processing power networks and scenarios.
 
 ::: gridfm_datakit.process.process_network.pf_post_processing
 
-### `process_scenario_secure`
+### `process_scenario_opf_mode`
 
-::: gridfm_datakit.process.process_network.process_scenario_secure
+::: gridfm_datakit.process.process_network.process_scenario_opf_mode
 
-### `process_scenario_unsecure`
+### `process_scenario_pf_mode`
 
-::: gridfm_datakit.process.process_network.process_scenario_unsecure
+::: gridfm_datakit.process.process_network.process_scenario_pf_mode
 
 ### `process_scenario_chunk`
 

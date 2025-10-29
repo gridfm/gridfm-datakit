@@ -28,8 +28,8 @@ Generator-specific notes (e.g., bounds for the global scaling factor when using 
 
 ### Network Data Files
 
-#### `bus_data.csv`
-Bus-level features for each processed scenario. Contains the following columns:
+#### `bus_data.parquet`
+Bus-level features for each processed scenario. Columns (BUS_COLUMNS):
 
 - **scenario**: Index of the scenario (unique identifier of the power flow case)
 - **bus**: Index of the bus
@@ -45,20 +45,18 @@ Bus-level features for each processed scenario. Contains the following columns:
 - **vn_kv**: Nominal voltage level at the bus (kV)
 - **min_vm_pu**: Minimum voltage magnitude limit (p.u.)
 - **max_vm_pu**: Maximum voltage magnitude limit (p.u.)
-- **GS**: Shunt conductance at the bus (p.u.)
-- **BS**: Shunt susceptance at the bus (p.u.)
+- **GS**: Shunt conductance at the bus (p.u. demanded at V = 1.0 p.u.)
+- **BS**: Shunt susceptance at the bus (p.u. injected at V = 1.0 p.u.)
 
-If `settings.dcpf=True`, also includes DC power flow columns:
-- **Vm_dc**: DC voltage magnitude
-- **Va_dc**: DC voltage angle
+If `settings.dcpf=True`, also includes DC power flow columns (DC_BUS_COLUMNS):
+- **Va_dc**: DC voltage angle (degrees)
 
-#### `gen_data.csv`
-Generator/ext_grid/sgen features per scenario. Contains the following columns:
+#### `gen_data.parquet`
+Generator features per scenario. Columns (GEN_COLUMNS):
 
 - **scenario**: Index of the scenario
+- **idx**: Generator row index (0-based)
 - **bus**: Bus index where the generator is connected
-- **et**: Element type identifier
-- **element**: Element name/identifier
 - **p_mw**: Active power output (MW)
 - **q_mvar**: Reactive power output (MVAr)
 - **min_p_mw**: Minimum active power limit (MW)
@@ -68,15 +66,14 @@ Generator/ext_grid/sgen features per scenario. Contains the following columns:
 - **cp0_eur**: Constant cost coefficient (EUR)
 - **cp1_eur_per_mw**: Linear cost coefficient (EUR/MW)
 - **cp2_eur_per_mw2**: Quadratic cost coefficient (EUR/MW²)
-- **is_gen**: Indicates if element is a generator (1 if true, 0 if false)
-- **is_sgen**: Indicates if element is a static generator (1 if true, 0 if false)
-- **is_ext_grid**: Indicates if element is an external grid (1 if true, 0 if false)
-- **in_service**: Indicates if element is in service (1 if true, 0 if false)
+- **in_service**: 1 if generator is in service, else 0
+- **is_slack_gen**: 1 if generator is at the reference bus, else 0
 
-#### `branch_data.csv`
-Branch features per scenario. Contains the following columns:
+#### `branch_data.parquet`
+Branch features per scenario. Columns (BRANCH_COLUMNS):
 
 - **scenario**: Index of the scenario
+- **idx**: Branch row index (0-based)
 - **from_bus**: Index of the source bus
 - **to_bus**: Index of the destination bus
 - **pf**: Active power flow from source to destination (MW)
@@ -92,12 +89,13 @@ Branch features per scenario. Contains the following columns:
 - **Ytt_r**: Real part of the self-admittance at the destination bus (p.u.)
 - **Ytt_i**: Imaginary part of the self-admittance at the destination bus (p.u.)
 - **tap**: Transformer tap ratio
+- **shift**: Phase shift (degrees)
 - **ang_min**: Minimum angle limit (degrees)
 - **ang_max**: Maximum angle limit (degrees)
 - **rate_a**: Rate limit of the branch (MVA)
 - **br_status**: Branch status (1 if in service, 0 if out of service)
 
-#### `y_bus_data.csv`
+#### `y_bus_data.parquet`
 Nonzero Y-bus entries per scenario with columns:
 
 - **scenario**: Index of the scenario
@@ -123,4 +121,4 @@ HTML dashboard of the aggregated statistics (if `settings.no_stats=False`).
 ### Feature Visualization
 
 #### `feature_plots/`
-Directory created if `bus_data.csv` exists; contains violin plots per feature named `distribution_{feature_name}_all_buses.png`.
+Directory created if `bus_data.parquet` exists; contains violin plots per feature named `distribution_{feature_name}.png`.

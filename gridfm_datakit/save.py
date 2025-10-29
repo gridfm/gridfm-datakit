@@ -1,19 +1,36 @@
+"""
+Data saving and export functionality for power system scenarios.
+
+This module provides functions for saving processed power system data
+to parquet files with proper formatting and scenario indexing.
+"""
+
 import os
 import pandas as pd
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Tuple
-from pandapower import pandapowerNet
-from gridfm_datakit.utils.config import (
+from gridfm_datakit.utils.column_names import (
     BUS_COLUMNS,
     DC_BUS_COLUMNS,
     GEN_COLUMNS,
     BRANCH_COLUMNS,
 )
+from gridfm_datakit.network import Network
 
 
-def _process_and_save(args):
-    """Worker function for one dataset type (bus/gen/branch/y_bus)."""
+def _process_and_save(args: Tuple[str, List[np.ndarray], str, int, int, bool]) -> None:
+    """Worker function for processing and saving one dataset type (bus/gen/branch/y_bus).
+
+    Args:
+        args: Tuple containing:
+            - data_type: Type of data to process ("bus", "gen", "branch", "y_bus")
+            - processed_data: List of processed data arrays
+            - path: Output file path
+            - last_scenario: Last scenario index processed
+            - n_buses: Number of buses in the network
+            - dcpf: Whether DC power flow data is included
+    """
     data_type, processed_data, path, last_scenario, n_buses, dcpf = args
 
     if data_type == "bus":
@@ -66,11 +83,16 @@ def _process_and_save(args):
     else:
         raise ValueError(f"Unknown data type: {data_type}")
 
-    df.to_csv(path, mode="a", header=not os.path.exists(path), index=False)
+    df.to_parquet(
+        path,
+        append=True if os.path.exists(path) else False,
+        engine="fastparquet",
+        index=False,
+    )
 
 
 def save_node_edge_data(
-    net: pandapowerNet,
+    net: Network,
     node_path: str,
     branch_path: str,
     gen_path: str,
@@ -78,13 +100,30 @@ def save_node_edge_data(
     processed_data: List[Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]],
     dcpf: bool = False,
 ) -> None:
-    """Fully parallel version — each (bus, gen, branch, y_bus) runs in its own process."""
-    n_buses = net.bus.shape[0]
+    """Save processed power system data to parquet files using parallel processing.
+
+    This function saves bus, generator, branch, and Y-bus data to separate parquet files
+    using parallel processing for improved performance.
+
+    Args:
+        net: Network object containing system topology information.
+        node_path: Path for saving bus/node data parquet file.
+        branch_path: Path for saving branch data parquet file.
+        gen_path: Path for saving generator data parquet file.
+        y_bus_path: Path for saving Y-bus data parquet file.
+        processed_data: List of tuples containing processed data arrays for each scenario.
+        dcpf: Whether DC power flow data is included in the output.
+    """
+    n_buses = net.buses.shape[0]
 
     # Determine last scenario index (only once)
     last_scenario = -1
     if os.path.exists(node_path):
-        existing_df = pd.read_csv(node_path, usecols=["scenario"])
+        existing_df = pd.read_parquet(
+            node_path,
+            columns=["scenario"],
+            engine="fastparquet",
+        )
         if not existing_df.empty:
             last_scenario = existing_df["scenario"].iloc[-1]
 

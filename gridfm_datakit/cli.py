@@ -9,14 +9,15 @@ from gridfm_datakit.generate import (
     generate_power_flow_data_distributed,
 )
 from gridfm_datakit.validation import validate_generated_data
+from gridfm_datakit.utils.stats import plot_stats
 
 
-def validate_data_directory(data_path, n_scenarios=100):
+def validate_data_directory(data_path: str, n_scenarios: int = 100) -> bool:
     """
     Validate generated power flow data in a directory.
 
     Args:
-        data_path (str): Path to directory containing generated CSV files
+        data_path (str): Path to directory containing generated files
         n_scenarios (int): Number of scenarios to sample for validation (0 = all scenarios)
     Returns:
         bool: True if all validations pass, False otherwise
@@ -25,10 +26,10 @@ def validate_data_directory(data_path, n_scenarios=100):
 
     # Expected file names for validation
     expected_files = {
-        "bus_data": "bus_data.csv",
-        "branch_data": "branch_data.csv",
-        "gen_data": "gen_data.csv",
-        "y_bus_data": "y_bus_data.csv",
+        "bus_data": "bus_data.parquet",
+        "branch_data": "branch_data.parquet",
+        "gen_data": "gen_data.parquet",
+        "y_bus_data": "y_bus_data.parquet",
     }
 
     try:
@@ -41,8 +42,8 @@ def validate_data_directory(data_path, n_scenarios=100):
         print(f"   Found mode: {mode}")
     except Exception as e:
         print(f"   Could not read mode from args.log: {e}")
-        print("   Using default mode: unsecure")
-        mode = "secure"
+        print("   Using default mode: opf")
+        mode = "opf"
 
     # Check if all required files exist
     file_paths = {}
@@ -79,7 +80,7 @@ def validate_data_directory(data_path, n_scenarios=100):
         return False
 
 
-def main():
+def main() -> None:
     """Command-line interface for generating and validating power flow data."""
     parser = argparse.ArgumentParser(
         description="Generate or validate power flow data for grid analysis",
@@ -97,6 +98,9 @@ Examples:
 
   # Validate all scenarios
   gridfm-datakit validate /path/to/data/ --n-scenarios 0
+
+  # Compute statistics from generated data
+  gridfm-datakit stats /path/to/data/
         """,
     )
 
@@ -121,13 +125,24 @@ Examples:
     validate_parser.add_argument(
         "data_path",
         type=str,
-        help="Path to directory containing generated CSV files (bus_data.csv, branch_data.csv, gen_data.csv, y_bus_data.csv)",
+        help="Path to directory containing generated CSV files (bus_data.parquet, branch_data.parquet, gen_data.parquet, y_bus_data.parquet)",
     )
     validate_parser.add_argument(
         "--n-scenarios",
         type=int,
         default=100,
         help="Number of scenarios to sample for validation (default: 100). Use 0 to validate all scenarios.",
+    )
+
+    # Stats command
+    stats_parser = subparsers.add_parser(
+        "stats",
+        help="Compute and display statistics from generated power flow data",
+    )
+    stats_parser.add_argument(
+        "data_path",
+        type=str,
+        help="Path to directory containing generated parquet files (bus_data.parquet, branch_data.parquet, gen_data.parquet)",
     )
 
     args = parser.parse_args()
@@ -155,6 +170,12 @@ Examples:
         else:
             print("\nData validation failed!")
             sys.exit(1)
+
+    elif args.command == "stats":
+        print(f"Computing statistics from {args.data_path}...")
+        plot_stats(args.data_path)
+        print("\nStatistics computation completed!")
+        sys.exit(0)
 
     else:
         parser.print_help()

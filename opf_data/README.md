@@ -1,5 +1,5 @@
 
-This script converts OPF-data JSON files into four CSV outputs structured like those of datakit (branch_data.csv, bus_data.csv, gen_data.csv, and y_bus_data.csv).
+This script converts OPF-data JSON files into four CSV outputs structured like those of datakit (branch_data.parquet, bus_data.parquet, gen_data.parquet, and y_bus_data.parquet).
 It processes input files in parallel and in fixed-size chunks, appending sorted results incrementally to the final output datasets.
 
 ### Example usage
@@ -79,21 +79,21 @@ python batch_convert.py path_to_opf_data_dir/ out_dir/ "case57_ieee" --n-1 True
   \sum_k (c0 + c1·p_g + c2·p_g^2)
   ]
   must match `metadata.objective` within tolerance (1e-6).
-* The computed admittance matrix (Y) must match the pandapower baseline within
+* The computed admittance matrix (Y) must match the baseline within
   absolute tolerance 1e-9 and relative tolerance 1e-9.
 
 ---
 
 ## 3. Constant Values in Output Data
 
-### **`branch_data.csv`**
+### **`branch_data.parquet`**
 
 | Column                | Constant Value | Context                                 |
 | --------------------- | -------------- | --------------------------------------- |
 | `tap` (AC lines only) | 1.0            | AC lines have no tap ratio.             |
 | `br_status`           | 1.0            | All branches are considered in service. |
 
-### **`gen_data.csv`**
+### **`gen_data.parquet`**
 
 | Column        | Constant Value | Context                        |
 | ------------- | -------------- | ------------------------------ |

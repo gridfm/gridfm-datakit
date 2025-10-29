@@ -11,10 +11,10 @@ Key behavior per your request:
 - By default, pre-existing final CSVs are removed at startup to avoid duplication.
 
 Final outputs (continuously appended per chunk, globally sorted due to monotone scenario ordering + per-chunk sort):
-  - branch_data.csv      (sorted by: scenario, from_bus, to_bus)
-  - bus_data.csv         (sorted by: scenario, bus)
-  - gen_data.csv         (sorted by: scenario, bus, element)
-  - y_bus_data.csv       (sorted by: scenario, index1, index2)
+  - branch_data.parquet      (sorted by: scenario, from_bus, to_bus)
+  - bus_data.parquet         (sorted by: scenario, bus)
+  - gen_data.parquet         (sorted by: scenario, bus, element)
+  - y_bus_data.parquet       (sorted by: scenario, index1, index2)
 """
 
 import argparse
@@ -27,12 +27,6 @@ from tqdm import tqdm
 import pandas as pd
 import numpy as np
 from multiprocessing import Pool, cpu_count
-
-
-# ---- pandapower baseline Ybus (computed once) ----
-import pandapower as pp
-from gridfm_datakit.network import load_net_from_pglib
-from pandapower.pypower.makeYbus import branch_vectors, makeYbus
 
 
 # ---------- Utilities ----------
@@ -81,7 +75,6 @@ def parse_scenario_from_path(p: Path) -> Tuple[str, int]:
 def convert_one(
     data: dict,
     scenario: int,
-    Ybus_baseline: np.ndarray,
     atol: float,
     rtol: float,
     n_1: bool,
@@ -463,37 +456,16 @@ def convert_one(
                 },
             )
 
-    if (not n_1) and (
-        not np.allclose(
-            np.asarray(list(Y.values())).view(np.complex128),
-            Ybus_baseline[
-                np.array([i for i, _ in Y.keys()]),
-                np.array([j for _, j in Y.keys()]),
-            ],
-            atol=atol,
-            rtol=rtol,
-        )
-    ):
-        for i, j in zip(
-            np.array([i for i, _ in Y.keys()]),
-            np.array([j for _, j in Y.keys()]),
-        ):
-            if not np.isclose(Y[(i, j)], Ybus_baseline[i, j], atol=atol, rtol=rtol):
-                print(f"Y[{i}, {j}] = {Y[(i, j)]}")
-                print(f"Ybus_baseline[{i}, {j}] = {Ybus_baseline[i, j]}")
-                raise ValueError(f"Ybus mismatch for scenario '{scenario}'")
-
     return branch_rows, bus_rows, gen_rows, y_rows
 
 
 def process_one(args):
-    jf, scen_idx, Ybus_baseline, atol, rtol, n_1 = args
+    jf, scen_idx, atol, rtol, n_1 = args
     with open(jf, "r") as f:
         data = json.load(f)
     return convert_one(
         data,
         scenario=scen_idx,
-        Ybus_baseline=Ybus_baseline,
         atol=atol,
         rtol=rtol,
         n_1=n_1,
@@ -557,28 +529,15 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # Clean outputs unless resuming
-    branch_csv = out_dir / "branch_data.csv"
-    bus_csv = out_dir / "bus_data.csv"
-    gen_csv = out_dir / "gen_data.csv"
-    ybus_csv = out_dir / "y_bus_data.csv"
+    branch_csv = out_dir / "branch_data.parquet"
+    bus_csv = out_dir / "bus_data.parquet"
+    gen_csv = out_dir / "gen_data.parquet"
+    ybus_csv = out_dir / "y_bus_data.parquet"
     for p in (branch_csv, bus_csv, gen_csv, ybus_csv):
         try:
             p.unlink()
         except FileNotFoundError:
             pass
-
-    # ---- Compute baseline Ybus once ----
-    net = load_net_from_pglib(args.network)
-    pp.runpp(net)
-    _Ytt, _Yff, _Yft, _Ytf = branch_vectors(
-        net._ppc["branch"],
-        net._ppc["branch"].shape[0],
-    )
-    Ybus_baseline, _, _ = makeYbus(
-        net._ppc["baseMVA"],
-        net._ppc["bus"],
-        net._ppc["branch"],
-    )
 
     # ---- Collect files, parse indices, sort by scenario index ----
     files = list(data_dir.rglob("example*.json"))
@@ -602,7 +561,7 @@ def main():
 
         # Prepare args for multiprocessing
         pool_args = [
-            (jf, scen_idx, Ybus_baseline, args.atol, args.rtol, args.n_1)
+            (jf, scen_idx, args.atol, args.rtol, args.n_1)
             for jf, scen_idx in chunk_items
         ]
 

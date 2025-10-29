@@ -22,7 +22,6 @@ dependencies = [
     "nbformat",
     "numba",
     "numpy",
-    "pandapower==2.14.11",
     "pandas",
     "pathlib",
     "plotly",

@@ -44,6 +44,31 @@ gridfm-datakit validate ./data_out/case24_ieee_rts/raw --n-scenarios 50
 gridfm-datakit validate ./data_out/case24_ieee_rts/raw --n-scenarios 0
 ```
 
+### Stats
+
+Compute and display statistics from generated power flow data:
+
+```bash
+gridfm-datakit stats path/to/data/directory
+```
+
+**Arguments:**
+- `data_path`: Path to directory containing generated parquet files (`bus_data.parquet`, `branch_data.parquet`, `gen_data.parquet`)
+
+**Example:**
+```bash
+gridfm-datakit stats ./data_out/case24_ieee_rts/raw
+```
+
+This command:
+1. Computes aggregated statistics across all scenarios:
+   - Number of active generators and branches per scenario
+   - Branch loading metrics (overloads, maximum loading, all branch loadings)
+   - Power balance errors (active and reactive, normalized by number of buses)
+2. Generates and saves `stats_plot.png` containing histogram distributions of these metrics
+
+The statistics help assess dataset quality, identify constraint violations (overloads), and verify power balance consistency. See the [stats module](../components/stats.md) documentation for details.
+
 ## Validation Checks
 
 The validation command performs the following checks:
@@ -55,12 +80,12 @@ The validation command performs the following checks:
 ### Branch Constraints
 - Deactivated lines have zero power flows and admittances
 - Computed vs stored power flow consistency
-- Branch loading limits (secure mode only)
+- Branch loading limits (OPF mode only)
 
 ### Generator Constraints
 - Deactivated generators have zero power output
 - Generator power limits validation
-- Reactive power limits (secure mode only)
+- Reactive power limits (OPF mode only)
 
 ### Power Balance
 - Bus generation consistency between bus_data and gen_data

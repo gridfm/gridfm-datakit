@@ -13,3 +13,5 @@ gridfm_datakit/grids/*.m
 notebooks/test_data
 tests/test_data
 build/
+baseline_perturbations/
+opf_baseline_perturbations/

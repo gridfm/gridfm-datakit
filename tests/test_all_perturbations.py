@@ -11,7 +11,7 @@ def run_generation(config_params):
     """Run generation with specific perturbation configuration."""
     try:
         # Load base config
-        with open("tests/config/default_unsecure.yaml") as f:
+        with open("tests/config/default_pf_mode.yaml") as f:
             config_dict = yaml.safe_load(f)
 
         args = NestedNamespace(**config_dict)
@@ -48,25 +48,42 @@ def test_all_perturbation_combinations():
     """Test all possible combinations of perturbation types."""
 
     # Define all possible perturbation types
+    load_generators = ["agg_load_profile", "powergraph"]
     topology_types = ["none", "n_minus_k", "random"]
     generation_types = ["none", "cost_permutation", "cost_perturbation"]
     admittance_types = ["none", "random_perturbation"]
 
+    base_load_generator = "agg_load_profile"
     base_topology_type = "random"
     base_generation_type = "cost_permutation"
     base_admittance_type = "random_perturbation"
+
     # Create all combinations
     test_configs = []
 
-    for mode in ["secure", "unsecure"]:
+    for mode in ["opf", "pf"]:
+        for load_generator in load_generators:
+            if load_generator != base_load_generator:
+                test_configs.append(
+                    {
+                        "test_name": f"load_{load_generator}_topo_{base_topology_type}_gen_{base_generation_type}_adm_{base_admittance_type}_mode_{mode}",
+                        "load_generator": load_generator,
+                        "topology_type": base_topology_type,
+                        "generation_type": base_generation_type,
+                        "admittance_type": base_admittance_type,
+                        "mode": mode,
+                    },
+                )
+
         for topo in topology_types:
             if topo != base_topology_type:
-                if topo == "n_minus_k" and mode == "secure":
+                if topo == "n_minus_k" and mode == "opf":
                     continue  # this one is too slow
                 # only change topology_type
                 test_configs.append(
                     {
-                        "test_name": f"topo_{topo}_gen_{base_generation_type}_adm_{base_admittance_type}_mode_{mode}",
+                        "test_name": f"load_{base_load_generator}_topo_{topo}_gen_{base_generation_type}_adm_{base_admittance_type}_mode_{mode}",
+                        "load_generator": base_load_generator,
                         "topology_type": topo,
                         "generation_type": base_generation_type,
                         "admittance_type": base_admittance_type,
@@ -79,7 +96,8 @@ def test_all_perturbation_combinations():
                 # only change generation_type
                 test_configs.append(
                     {
-                        "test_name": f"topo_{base_topology_type}_gen_{gen}_adm_{base_admittance_type}_mode_{mode}",
+                        "test_name": f"load_{base_load_generator}_topo_{base_topology_type}_gen_{gen}_adm_{base_admittance_type}_mode_{mode}",
+                        "load_generator": base_load_generator,
                         "topology_type": base_topology_type,
                         "generation_type": gen,
                         "admittance_type": base_admittance_type,
@@ -92,7 +110,8 @@ def test_all_perturbation_combinations():
                 # only change admittance_type
                 test_configs.append(
                     {
-                        "test_name": f"topo_{base_topology_type}_gen_{base_generation_type}_adm_{adm}_mode_{mode}",
+                        "test_name": f"load_{base_load_generator}_topo_{base_topology_type}_gen_{base_generation_type}_adm_{adm}_mode_{mode}",
+                        "load_generator": base_load_generator,
                         "topology_type": base_topology_type,
                         "generation_type": base_generation_type,
                         "admittance_type": adm,
@@ -103,7 +122,8 @@ def test_all_perturbation_combinations():
         # add base configuration
         test_configs.append(
             {
-                "test_name": f"topo_{base_topology_type}_gen_{base_generation_type}_adm_{base_admittance_type}_mode_{mode}",
+                "test_name": f"load_{base_load_generator}_topo_{base_topology_type}_gen_{base_generation_type}_adm_{base_admittance_type}_mode_{mode}",
+                "load_generator": base_load_generator,
                 "topology_type": base_topology_type,
                 "generation_type": base_generation_type,
                 "admittance_type": base_admittance_type,

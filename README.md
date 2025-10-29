@@ -68,12 +68,12 @@ gridfm_datakit path/to/config.yaml
 
 Refer to the sections [Network](network.md), [Load Scenarios](load_scenarios.md), and [Topology perturbations](topology_perturbations.md) for a description of the configuration parameters.
 
-Sample configuration files are provided in `scripts/config`, e.g. `default.yaml`:
+Sample configuration files are provided in `scripts/config`, e.g. `case24_ieee_rts.yaml`:
 
 ```yaml
 network:
   name: "case24_ieee_rts" # Name of the power grid network (without extension)
-  source: "pglib" # Data source for the grid; options: pglib, pandapower, file
+  source: "pglib" # Data source for the grid; options: pglib, file
   network_dir: "scripts/grids" # if using source "file", this is the directory containing the network file (relative to the project root)
 
 
@@ -95,7 +95,7 @@ topology_perturbation:
   # WARNING: the following parameters are only used if type is not "none"
   k: 1 # Maximum number of components to drop in each perturbation
   n_topology_variants: 5 # Number of unique perturbed topologies per scenario
-  elements: ["line", "trafo", "gen", "sgen"] # elements to perturb options: line, trafo, gen, sgen
+  elements: [branch, gen] # elements to perturb. options: branch, gen
 
 generation_perturbation:
   type: "cost_permutation" # Type of generation perturbation; options: cost_permutation, cost_perturbation, none
@@ -106,9 +106,8 @@ settings:
   num_processes: 10 # Number of parallel processes to use
   data_dir: "./data_out" # Directory to save generated data relative to the project root
   large_chunk_size: 50 # Number of load scenarios processed before saving
-  no_stats: false # If true, disables statistical calculations
   overwrite: true # If true, overwrites existing files, if false, appends to files
-  mode: "unsecure" # Mode of the script; options: secure, unsecure. Unsecure mode generates unsecure scenarios, i.e. scenarios where the the generator setpoints are obtained for the base topology, before the topology is perturbed.
+  mode: "pf" # Mode of the script; options: pf, opf. pf: power flow data where one or more operating limits – the inequality constraints defined in OPF, e.g., voltage magnitude or branch limits – may be violated. opf:  datapoints for training OPF solvers, with cost-optimal dispatches that satisfy all operating limits (OPF-feasible)
 ```
 
 <br>
@@ -124,10 +123,10 @@ The data generation process writes the following artifacts under:
 - **scenarios_{generator}.csv**: Load scenarios (per-element time series) produced by the selected load generator.
 - **scenarios_{generator}.html**: Plot of the generated load scenarios.
 - **scenarios_{generator}.log**: Generator-specific notes (e.g., bounds for the global scaling factor when using `agg_load_profile`).
-- **bus_data.csv**: Bus-level features for each processed scenario (columns `BUS_COLUMNS` and, if `settings.dcpf=True`, also `DC_BUS_COLUMNS`).
-- **gen_data.csv**: Generator/ext_grid/sgen features per scenario (columns `GEN_COLUMNS`).
-- **branch_data.csv**: Branch features per scenario (columns `BRANCH_COLUMNS`).
-- **y_bus_data.csv**: Nonzero Y-bus entries per scenario with columns `[scenario, index1, index2, G, B]`.
+- **bus_data.parquet**: Bus-level features for each processed scenario (columns `BUS_COLUMNS` and, if `settings.dcpf=True`, also `DC_BUS_COLUMNS`).
+- **gen_data.parquet**: Generator features per scenario (columns `GEN_COLUMNS`).
+- **branch_data.parquet**: Branch features per scenario (columns `BRANCH_COLUMNS`).
+- **y_bus_data.parquet**: Nonzero Y-bus entries per scenario with columns `[scenario, index1, index2, G, B]`.
 - **stats.csv**: (if `settings.no_stats=False`) Aggregated statistics collected during generation.
 - **stats_plot.html**: (if `settings.no_stats=False`) HTML dashboard of the aggregated statistics.
-- **feature_plots/**: Created if `bus_data.csv` exists; contains violin plots per feature named `distribution_{feature_name}_all_buses.png`.
+- **feature_plots/**: Created if `bus_data.parquet` exists; contains violin plots per feature named `distribution_{feature_name}.png`.

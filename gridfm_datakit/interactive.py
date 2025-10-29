@@ -6,12 +6,13 @@ import yaml
 from pathlib import Path
 from importlib import resources
 from ipyfilechooser import FileChooser
+from typing import List, Dict, Any
 
 # Run the generation function directly
 from gridfm_datakit.generate import generate_power_flow_data_distributed
 
 
-def get_available_load_profiles():
+def get_available_load_profiles() -> List[str]:
     """Get list of available aggregated load profiles."""
     try:
         # Get all .csv files from the load_profiles directory
@@ -42,7 +43,7 @@ def get_available_load_profiles():
         ]
 
 
-def create_config():
+def create_config() -> Dict[str, Any]:
     """Create configuration dictionary from widget values."""
     if network_source.value == "file":
         if not network_file_chooser.selected:
@@ -52,9 +53,6 @@ def create_config():
         network_dir = str(file_path.parent)
     elif network_source.value == "pglib":
         name = pglib_grid_dropdown.value
-        network_dir = "none"
-    else:  # pandapower
-        name = pandapower_grid_dropdown.value
         network_dir = "none"
 
     config = {
@@ -92,7 +90,6 @@ def create_config():
             "num_processes": num_processes.value,
             "data_dir": str(data_dir.value),
             "large_chunk_size": large_chunk_size.value,
-            "no_stats": no_stats.value,
             "overwrite": overwrite.value,
             "mode": str(mode.value),
             "dcpf": dcpf.value,
@@ -101,7 +98,7 @@ def create_config():
     return config
 
 
-def interactive_interface():
+def interactive_interface() -> None:
     """Main function to create and display the interactive interface."""
     # Get available load profiles
     available_profiles = get_available_load_profiles()
@@ -118,16 +115,11 @@ def interactive_interface():
     )
 
     # Network Configuration
-    global \
-        network_source, \
-        pglib_grid_dropdown, \
-        pandapower_grid_dropdown, \
-        network_file_chooser
+    global network_source, pglib_grid_dropdown, network_file_chooser
 
     network_source = widgets.Dropdown(
         options=[
             ("pglib - Power Grid Library (Recommended)", "pglib"),
-            ("pandapower - Built-in pandapower networks (beta)", "pandapower"),
             ("file - Custom network files (MATPOWER .m)", "file"),
         ],
         value="pglib",
@@ -137,76 +129,76 @@ def interactive_interface():
     )
 
     # --- NEW: pglib grid dropdown ---
+    # Full list of PGLib OPF cases (names without the 'pglib_opf_' prefix)
     pglib_grids = [
+        "case3_lmbd",
+        "case5_pjm",
+        "case14_ieee",
         "case24_ieee_rts",
-        "case30_ieee",
         "case30_as",
+        "case30_ieee",
         "case39_epri",
         "case57_ieee",
         "case60_c",
         "case73_ieee_rts",
         "case89_pegase",
         "case118_ieee",
+        "case162_ieee_dtc",
+        "case179_goc",
         "case197_snem",
-        "case240_pserc",
+        "case200_activ",
+        "case300_ieee",
+        "case500_goc",
         "case793_goc",
+        "case1803_snem",
+        "case1888_rte",
+        "case1951_rte",
+        "case2000_goc",
         "case2312_goc",
+        "case2383wp_k",
+        "case240_pserc",
+        "case2736sp_k",
+        "case2737sop_k",
+        "case2742_goc",
+        "case2746wop_k",
+        "case2746wp_k",
+        "case2848_rte",
+        "case2853_sdet",
+        "case2868_rte",
         "case2869_pegase",
+        "case3012wp_k",
+        "case3022_goc",
+        "case3120sp_k",
+        "case3375wp_k",
         "case3970_goc",
         "case4020_goc",
         "case4601_goc",
+        "case4619_goc",
+        "case4661_sdet",
         "case4837_goc",
         "case4917_goc",
         "case5658_epigrids",
+        "case6468_rte",
+        "case6470_rte",
+        "case6495_rte",
+        "case6515_rte",
         "case7336_epigrids",
+        "case9241_pegase",
         "case9591_goc",
         "case10192_epigrids",
+        "case10480_goc",
+        "case13659_pegase",
         "case19402_goc",
+        "case20758_epigrids",
+        "case24464_goc",
+        "case10000_goc",
+        "case30000_goc",
+        "case78484_epigrids",
     ]
     pglib_grid_dropdown = widgets.Dropdown(
         options=pglib_grids,
         value="case24_ieee_rts",
         description="PGLib Grid:",
-        style={"description_width": "150px"},
-        layout=widgets.Layout(width="550px"),
-    )
-
-    # --- NEW: pandapower grid dropdown ---
-    pandapower_grids = [
-        "GBreducednetwork",
-        "case118",
-        "case11_iwamoto",
-        "case1354pegase",
-        "case14",
-        "case145",
-        "case1888rte",
-        "case24_ieee_rts",
-        "case2848rte",
-        "case2869pegase",
-        "case30",
-        "case300",
-        "case3120sp",
-        "case33bw",
-        "case39",
-        "case4gs",
-        "case5",
-        "case57",
-        "case5_demo_gridcal",
-        "case6470rte",
-        "case6495rte",
-        "case6515rte",
-        "case6ww",
-        "case89pegase",
-        "case9",
-        "case9241pegase",
-        "case_ieee30",
-        "case_illinois200",
-        "iceland",
-    ]
-    pandapower_grid_dropdown = widgets.Dropdown(
-        options=pandapower_grids,
-        value="case14",
-        description="Pandapower Grid:",
         style={"description_width": "150px"},
         layout=widgets.Layout(width="550px"),
     )
@@ -222,15 +214,9 @@ def interactive_interface():
     def update_network_visibility(*args):
         if network_source.value == "pglib":
             pglib_grid_dropdown.layout.display = "block"
-            pandapower_grid_dropdown.layout.display = "none"
-            network_file_chooser.layout.display = "none"
-        elif network_source.value == "pandapower":
-            pglib_grid_dropdown.layout.display = "none"
-            pandapower_grid_dropdown.layout.display = "block"
             network_file_chooser.layout.display = "none"
         else:  # file
             pglib_grid_dropdown.layout.display = "none"
-            pandapower_grid_dropdown.layout.display = "none"
             network_file_chooser.layout.display = "block"
 
     network_source.observe(update_network_visibility, names="value")
@@ -442,7 +428,7 @@ def interactive_interface():
 
     # Execution Settings
 
-    global num_processes, data_dir, large_chunk_size, no_stats, overwrite, mode, dcpf
+    global num_processes, data_dir, large_chunk_size, overwrite, mode, dcpf
     num_processes = widgets.IntSlider(
         value=10,
         min=1,
@@ -475,13 +461,6 @@ def interactive_interface():
 
     # Optional Settings
 
-    no_stats = widgets.Checkbox(
-        value=False,
-        description="Disable statistical calculations (faster)",
-        style={"description_width": "100px"},
-        layout=widgets.Layout(width="500px"),
-    )
-
     overwrite = widgets.Checkbox(
         value=True,
         description="Overwrite existing files (vs. append)",
@@ -493,15 +472,15 @@ def interactive_interface():
     mode = widgets.Dropdown(
         options=[
             (
-                "unsecure - Generate unsecure scenarios (setpoints before topology perturbation)",
-                "unsecure",
+                "PF mode - Generate Power flow data where one or more operating limits – the inequality constraints defined in OPF, e.g., voltage magnitude or branch limits – may be violated.",
+                "pf",
             ),
             (
-                "secure - Generate secure scenarios (setpoints after topology perturbation)",
-                "secure",
+                "OPF Mode: Generate Optimal Power Flow data, with cost-optimal dispatches that satisfy all operating limits (OPF-feasible)",
+                "opf",
             ),
         ],
-        value="unsecure",
+        value="pf",
         description="Processing Mode:",
         style={"description_width": "150px"},
         layout=widgets.Layout(width="650px"),
@@ -510,7 +489,7 @@ def interactive_interface():
     # DC Power Flow option
     dcpf = widgets.Checkbox(
         value=False,
-        description="Include DC Power Flow results (Vm_dc, Va_dc columns)",
+        description="Include DC Power Flow results (Va_dc columns)",
         style={"description_width": "100px"},
         layout=widgets.Layout(width="500px"),
     )
@@ -556,7 +535,6 @@ def interactive_interface():
             ),
             network_source,
             pglib_grid_dropdown,
-            pandapower_grid_dropdown,
             network_file_chooser,
         ],
         layout=widgets.Layout(
@@ -717,7 +695,6 @@ def interactive_interface():
             data_dir,
             large_chunk_size,
             mode,
-            no_stats,
             overwrite,
             dcpf,
         ],

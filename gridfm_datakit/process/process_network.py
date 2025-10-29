@@ -1,134 +1,118 @@
+"""
+Power system network processing and scenario generation.
+
+This module provides functionality for processing power system networks,
+running power flow calculations, and generating perturbed scenarios
+for data generation purposes.
+"""
+
 import numpy as np
-import pandas as pd
-from gridfm_datakit.utils.config import (
-    PQ,
-    PV,
-    REF,
+from gridfm_datakit.utils.column_names import (
     GEN_COLUMNS,
     BUS_COLUMNS,
     DC_BUS_COLUMNS,
+    BRANCH_COLUMNS,
 )
-from pandapower.auxiliary import pandapowerNet
-from typing import Tuple, List, Union
-from pandapower import makeYbus_pypower
-import pandapower as pp
+from typing import Tuple, List, Union, Dict, Any, Optional
+from gridfm_datakit.network import makeYbus, branch_vectors
 import copy
-from gridfm_datakit.process.solvers import run_opf, run_pf
-from pandapower.pypower.idx_bus import GS, BS
-from pandapower.pypower.idx_brch import (
+from gridfm_datakit.process.solvers import run_opf, run_pf, run_dcpf
+from gridfm_datakit.utils.idx_bus import (
+    GS,
+    BS,
+    BUS_TYPE,
+    BASE_KV,
+    VMIN,
+    VMAX,
+    PQ,
+    PV,
+    REF,
+)
+from gridfm_datakit.utils.idx_brch import SHIFT
+from gridfm_datakit.utils.idx_gen import GEN_BUS, PMIN, PMAX, QMIN, QMAX
+from gridfm_datakit.utils.idx_cost import NCOST, COST
+from gridfm_datakit.utils.idx_brch import (
     F_BUS,
     T_BUS,
     RATE_A,
     BR_STATUS,
-    PF,
-    QF,
-    PT,
-    QT,
     TAP,
     ANGMIN,
     ANGMAX,
 )
-from pandapower.pypower.makeYbus import branch_vectors
 from queue import Queue
-from gridfm_datakit.utils.stats import Stats
 from gridfm_datakit.perturbations.topology_perturbation import TopologyGenerator
 from gridfm_datakit.perturbations.generator_perturbation import GenerationGenerator
 from gridfm_datakit.perturbations.admittance_perturbation import AdmittanceGenerator
 import traceback
+from gridfm_datakit.network import Network
+from gridfm_datakit.utils.idx_bus import BUS_I, PD, QD
 
 
-def network_preprocessing(net: pandapowerNet) -> None:
-    """Adds names to bus dataframe and bus types to load, bus, gen, sgen dataframes.
+def init_julia() -> Any:
+    """Initialize Julia interface with PowerModels.jl.
 
-    This function performs several preprocessing steps:
+    Sets up Julia environment with required packages and defines
+    power flow and optimal power flow functions.
 
-    1. Assigns names to all network components
-    2. Determines bus types (PQ, PV, REF)
-    3. Assigns bus types to connected components
-    4. Performs validation checks on the network structure
-
-    Args:
-        net: The power network to preprocess.
+    Returns:
+        Julia interface object for running power flow calculations.
 
     Raises:
-        AssertionError: If network structure violates expected constraints:
-            - More than one load per bus
-            - REF bus not matching ext_grid connection
-            - PQ bus definition mismatch
+        RuntimeError: If Julia initialization fails.
     """
-    # Clean-Up things in Data-Frame // give numbered item names
-    for i, row in net.bus.iterrows():
-        net.bus.at[i, "name"] = "Bus " + str(i)
-    for i, row in net.load.iterrows():
-        net.load.at[i, "name"] = "Load " + str(i)
-    for i, row in net.sgen.iterrows():
-        net.sgen.at[i, "name"] = "Sgen " + str(i)
-    for i, row in net.gen.iterrows():
-        net.gen.at[i, "name"] = "Gen " + str(i)
-    for i, row in net.shunt.iterrows():
-        net.shunt.at[i, "name"] = "Shunt " + str(i)
-    for i, row in net.ext_grid.iterrows():
-        net.ext_grid.at[i, "name"] = "Ext_Grid " + str(i)
-    for i, row in net.line.iterrows():
-        net.line.at[i, "name"] = "Line " + str(i)
-    for i, row in net.trafo.iterrows():
-        net.trafo.at[i, "name"] = "Trafo " + str(i)
+    # TODO: check if juliacall already initialized
+    from juliacall import Main as jl
 
-    num_buses = len(net.bus)
-    bus_types = np.zeros(num_buses, dtype=int)
-
-    # assert one slack bus
-    assert len(net.ext_grid) == 1
-    indices_slack = np.unique(np.array(net.ext_grid["bus"]))
-
-    indices_PV = np.union1d(
-        np.unique(np.array(net.sgen["bus"])),
-        np.unique(np.array(net.gen["bus"])),
-    )
-    indices_PV = np.setdiff1d(
-        indices_PV,
-        indices_slack,
-    )  # Exclude slack indices from PV indices
-
-    indices_PQ = np.setdiff1d(
-        np.arange(num_buses),
-        np.union1d(indices_PV, indices_slack),
-    )
-
-    bus_types[indices_PQ] = PQ  # Set PV bus types to 1
-    bus_types[indices_PV] = PV  # Set PV bus types to 2
-    bus_types[indices_slack] = REF  # Set Slack bus types to 3
-
-    net.bus["type"] = bus_types
-
-    # assign type of the bus connected to each load and generator
-    net.load["type"] = net.bus.type[net.load.bus].to_list()
-    net.gen["type"] = net.bus.type[net.gen.bus].to_list()
-    net.sgen["type"] = net.bus.type[net.sgen.bus].to_list()
-
-    # there is no more than one load per bus:
-    assert net.load.bus.unique().shape[0] == net.load.bus.shape[0]
-
-    # REF bus is bus with ext grid:
-    assert (
-        np.where(net.bus["type"] == REF)[0]  # REF bus indicated by case file
-        == net.ext_grid.bus.values
-    ).all()  # Buses connected to an ext grid
-
-    # PQ buses are buses with no gen nor ext_grid, only load or nothing connected to them
-    assert (
-        (net.bus["type"] == PQ)  # PQ buses indicated by case file
-        == ~np.isin(
-            range(net.bus.shape[0]),
-            np.concatenate(
-                [net.ext_grid.bus.values, net.gen.bus.values, net.sgen.bus.values],
-            ),
-        )
-    ).all()  # Buses which are NOT connected to a gen nor an ext grid
+    try:
+        jl.seval("""
+        using PowerModels
+        using Ipopt
+        using Memento
+        Memento.config!("not_set")
 
 
-def pf_preprocessing(net: pandapowerNet) -> pandapowerNet:
-    """Sets variables to the results of OPF.
+        function run_opf(case_file)
+            result = solve_ac_opf(case_file, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0, "tol" => 1e-6))
+            result["solution"]["pf"] = false
+            return result
+        end
+
+        function run_pf(case_file)
+            # Solve AC power flow
+            network = PowerModels.parse_file(case_file)
+            result = compute_ac_pf(network)
+
+            # Return immediately if the solver did not converge
+            if result["termination_status"] == false
+                return result
+            end
+
+            # Update network data
+            update_data!(network, result["solution"])
+
+            # Compute branch flows
+            flows = calc_branch_flow_ac(network)
+
+            result["solution"]["branch"] = flows["branch"]
+            result["solution"]["pf"] = true
+            return result
+        end
+
+
+        function run_dcpf(case_file)
+            result = compute_dc_pf(case_file)
+            result["solution"]["pf"] = true
+            return result
+        end
+        """)
+    except Exception as e:
+        raise RuntimeError(f"Error initializing Julia: {e}")
+    return jl
+
+
+def pf_preprocessing(net: Network, res: Dict[str, Any]) -> Network:
+    """Set variables to the results of OPF.
 
     Updates the following network components with OPF results:
 
@@ -137,22 +121,38 @@ def pf_preprocessing(net: pandapowerNet) -> pandapowerNet:
 
     Args:
         net: The power network to preprocess.
+        res: OPF result dictionary containing solution data.
 
     Returns:
-        The updated power network with OPF results.
+        Updated network with OPF results applied.
     """
-    net.sgen[["p_mw"]] = net.res_sgen[
-        ["p_mw"]
-    ]  # sgens are not voltage controlled, so we set P only
-    net.gen[["p_mw", "vm_pu"]] = net.res_gen[["p_mw", "vm_pu"]]
+    pg = [
+        res["solution"]["gen"][str(i + 1)]["pg"] * net.baseMVA
+        for i in net.idx_gens_in_service
+    ]
+    vm = [
+        res["solution"]["bus"][str(net.reverse_bus_index_mapping[i])]["vm"]
+        for i in range(net.buses.shape[0])
+    ]
+
+    initial_pg = net.Pg_gen.copy()
+    net.Pg_gen = pg
+    net.Vm = vm
+    new_pg = net.Pg_gen
+    assert not np.allclose(initial_pg, new_pg), "Pg has not changed"
+
     return net
 
 
-def pf_post_processing(net: pandapowerNet, dcpf: bool = False) -> dict:
-    """Post-processes solved network results into numpy arrays for CSV export.
+def pf_post_processing(
+    net: Network,
+    res: Dict[str, Any],
+    dcpf: bool = False,
+) -> Dict[str, np.ndarray]:
+    """Post-process solved network results into numpy arrays for CSV export.
 
     This function extracts power flow results and builds four arrays matching
-    the column schemas defined in `gridfm_datakit.utils.config`:
+    the column schemas defined in `gridfm_datakit.utils.column_names`:
 
     - Bus data with BUS_COLUMNS (+ DC_BUS_COLUMNS if dcpf=True)
     - Generator data with GEN_COLUMNS
@@ -161,162 +161,175 @@ def pf_post_processing(net: pandapowerNet, dcpf: bool = False) -> dict:
 
     Args:
         net: The power network to process (must have solved power flow results).
+        res: Power flow result dictionary containing solution data.
         dcpf: If True, include DC power flow voltage magnitude/angle (Vm_dc, Va_dc).
 
     Returns:
-        dict: {
-            "bus": np.ndarray with bus-level features,
-            "gen": np.ndarray with generator features,
-            "branch": np.ndarray with branch features and admittances,
-            "Y_bus": np.ndarray with nonzero Y-bus entries
-        }
+        Dictionary containing:
+        - "bus": np.ndarray with bus-level features
+        - "gen": np.ndarray with generator features
+        - "branch": np.ndarray with branch features and admittances
+        - "Y_bus": np.ndarray with nonzero Y-bus entries
     """
 
-    n_buses = net.bus.shape[0]
-    n_cols = len(BUS_COLUMNS + DC_BUS_COLUMNS if dcpf else BUS_COLUMNS)
+    # --- Bus data ---
+    n_buses = net.buses.shape[0]
+    n_cols = len(BUS_COLUMNS) + len(DC_BUS_COLUMNS) if dcpf else len(BUS_COLUMNS)
     X_bus = np.zeros((n_buses, n_cols))
 
     # --- Loads ---
-    all_loads = net.res_load.groupby("bus")[["p_mw", "q_mvar"]].sum()
+    X_bus[:, 0] = net.buses[:, BUS_I]  # bus
+    X_bus[:, 1] = net.buses[:, PD]
+    X_bus[:, 2] = net.buses[:, QD]
 
-    # --- Generators (gen + sgen + ext_grid) ---
-    all_gens = (
-        pd.concat([net.res_gen, net.res_sgen, net.res_ext_grid], axis=0)
-        .groupby("bus")[["p_mw", "q_mvar"]]
-        .sum()
+    # --- Generator injections
+    assert len(res["solution"]["gen"]) == len(net.idx_gens_in_service), (
+        "Number of generators in solution should match number of generators in network"
     )
+    pg_gen = np.array(
+        [
+            res["solution"]["gen"][str(i + 1)]["pg"] * net.baseMVA
+            for i in net.idx_gens_in_service
+        ],
+    )
+    qg_gen = np.array(
+        [
+            res["solution"]["gen"][str(i + 1)]["qg"] * net.baseMVA
+            for i in net.idx_gens_in_service
+        ],
+    )
+    gen_bus = net.gens[net.idx_gens_in_service, GEN_BUS].astype(int)
+    Pg_bus = np.bincount(gen_bus, weights=pg_gen, minlength=n_buses)
+    Qg_bus = np.bincount(gen_bus, weights=qg_gen, minlength=n_buses)
 
-    # --- Assert bus indices are 0..n_buses-1 ---
-    assert (net.bus.index.values == np.arange(n_buses)).all()
+    assert np.all(Pg_bus[net.buses[:, BUS_TYPE] == PQ] == 0)
+    assert np.all(Qg_bus[net.buses[:, BUS_TYPE] == PQ] == 0)
 
-    # Fill basic bus info
-    X_bus[:, 0] = net.bus.index.values  # bus
-    X_bus[all_loads.index, 1:3] = all_loads.values  # Pd, Qd
-
-    # Generator injections (PV + REF buses)
-    pv_mask = net.bus.type == PV
-    ref_mask = net.bus.type == REF
-    X_bus[pv_mask, 3:5] = all_gens.reindex(net.bus.index).values[pv_mask]
-    X_bus[ref_mask, 3:5] = all_gens.reindex(net.bus.index).values[ref_mask]
+    X_bus[:, 3] = Pg_bus
+    X_bus[:, 4] = Qg_bus
 
     # Voltage
-    X_bus[:, 5] = net.res_bus.vm_pu.values
-    X_bus[:, 6] = net.res_bus.va_degree.values
+    assert set([int(k) for k in res["solution"]["bus"].keys()]) == set(
+        net.reverse_bus_index_mapping.values(),
+    ), "Buses in solution should match buses in network"
+
+    X_bus[:, 5] = [
+        res["solution"]["bus"][str(net.reverse_bus_index_mapping[i])]["vm"]
+        for i in range(n_buses)
+    ]
+    X_bus[:, 6] = np.rad2deg(
+        [
+            res["solution"]["bus"][str(net.reverse_bus_index_mapping[i])]["va"]
+            for i in range(n_buses)
+        ],
+    )
 
     # one-hot encoding of bus type
-    X_bus[np.arange(n_buses), 7 + net.bus.type - 1] = (
+    assert np.all(np.isin(net.buses[:, BUS_TYPE], [PQ, PV, REF])), (
+        "Bus type should be PQ, PV, or REF, no disconnected buses (4)"
+    )
+    X_bus[np.arange(n_buses), 7 + net.buses[:, BUS_TYPE].astype(int) - 1] = (
         1  # because type is 1, 2, 3, not 0, 1, 2
     )
 
-    # vn_kv, min_vm_pu, max_vm_pu
-    X_bus[:, 10] = net.bus.vn_kv.values
-    X_bus[:, 11] = net.bus.min_vm_pu.values
-    X_bus[:, 12] = net.bus.max_vm_pu.values
+    # base_kv, min_vm_pu, max_vm_pu
+    X_bus[:, 10] = net.buses[:, BASE_KV]
+    X_bus[:, 11] = net.buses[:, VMIN]
+    X_bus[:, 12] = net.buses[:, VMAX]
 
-    X_bus[:, 13] = net._ppc["bus"][:, GS] / net.sn_mva
-    X_bus[:, 14] = net._ppc["bus"][:, BS] / net.sn_mva
+    X_bus[:, 13] = net.buses[:, GS] / net.baseMVA
+    X_bus[:, 14] = net.buses[:, BS] / net.baseMVA
 
     if dcpf:
-        X_bus[:, 15] = net.bus["Vm_dc"].values
-        X_bus[:, 16] = net.bus["Va_dc"].values
+        X_bus[:, 15] = np.rad2deg(net.res_dc_va_rad)
 
     # --- Generator data ---
-    poly = net.poly_cost[
-        ["element", "et", "cp0_eur", "cp1_eur_per_mw", "cp2_eur_per_mw2"]
-    ]
-    dataframes = {
-        "gen": (net.gen, net.res_gen),
-        "sgen": (net.sgen, net.res_sgen),
-        "ext_grid": (net.ext_grid, net.res_ext_grid),
-    }
+    assert np.all(net.gencosts[:, NCOST] == 3), "NCOST should be 3"
+    n_gens = net.gens.shape[0]
+    n_cols = len(GEN_COLUMNS)
+    X_gen = np.zeros((n_gens, n_cols))
 
-    gen_dfs = []
-    for et, (static_df, res_df) in dataframes.items():
-        columns = [
-            "bus",
-            "min_p_mw",
-            "max_p_mw",
-            "min_q_mvar",
-            "max_q_mvar",
-            "in_service",
-        ]
-        columns = [col for col in columns if col in static_df.columns]
-        df = poly.loc[
-            poly.et == et
-        ].merge(
-            static_df[columns],
-            left_on="element",
-            right_index=True,
-            how="right",  # Otherwise we don't add generators that don't have cost information
-        )
-        df = df.merge(
-            res_df[["p_mw", "q_mvar"]],
-            left_on="element",
-            right_index=True,
-            how="left",
-        )
-        df["is_gen"] = int(et == "gen")
-        df["is_sgen"] = int(et == "sgen")
-        df["is_ext_grid"] = int(et == "ext_grid")
-        gen_dfs.append(df)
+    X_gen[:, 0] = list(range(n_gens))
+    X_gen[:, 1] = net.gens[:, GEN_BUS]
+    X_gen[net.idx_gens_in_service, 2] = pg_gen  # 0 if not in service
+    X_gen[net.idx_gens_in_service, 3] = qg_gen  # 0 if not in service
+    X_gen[:, 4] = net.gens[:, PMIN]
+    X_gen[:, 5] = net.gens[:, PMAX]
+    X_gen[:, 6] = net.gens[:, QMIN]
+    X_gen[:, 7] = net.gens[:, QMAX]
+    X_gen[:, 8] = net.gencosts[:, COST]
+    X_gen[:, 9] = net.gencosts[:, COST + 1]
+    X_gen[:, 10] = net.gencosts[:, COST + 2]
+    X_gen[net.idx_gens_in_service, 11] = 1
 
-    all_gen_data = pd.concat(gen_dfs, axis=0, ignore_index=True)
-    all_gen_data = all_gen_data.sort_values(
-        by=["bus", "element"],
-        kind="mergesort",
-    ).reset_index(drop=True)
-
-    X_gen = all_gen_data[GEN_COLUMNS].to_numpy()
+    # slack gen (can be any generator connected to the ref node)
+    slack_gen_idx = np.where(net.gens[:, GEN_BUS] == net.ref_bus_idx)[0]
+    X_gen[slack_gen_idx, 12] = 1
 
     # --- Edge (branch) info ---
-    ppc = net._ppc
-    to_bus = np.real(ppc["branch"][:, T_BUS])
-    from_bus = np.real(ppc["branch"][:, F_BUS])
-    pf = np.real(ppc["branch"][:, PF])
-    qf = np.real(ppc["branch"][:, QF])
-    pt = np.real(ppc["branch"][:, PT])
-    qt = np.real(ppc["branch"][:, QT])
-    Ytt, Yff, Yft, Ytf = branch_vectors(ppc["branch"], ppc["branch"].shape[0])
-    Ytt_r = np.real(Ytt)
-    Ytt_i = np.imag(Ytt)
-    Yff_r = np.real(Yff)
-    Yff_i = np.imag(Yff)
-    Yft_r = np.real(Yft)
-    Yft_i = np.imag(Yft)
-    Ytf_r = np.real(Ytf)
-    Ytf_i = np.imag(Ytf)
-    tap = np.real(ppc["branch"][:, TAP])
-    ang_min = np.real(ppc["branch"][:, ANGMIN])
-    ang_max = np.real(ppc["branch"][:, ANGMAX])
-    rate_a = np.real(ppc["branch"][:, RATE_A])
-    br_status = np.real(ppc["branch"][:, BR_STATUS])
-    branch_params = np.column_stack(
-        (
-            from_bus,
-            to_bus,
-            pf,
-            qf,
-            pt,
-            qt,
-            Yff_r,
-            Yff_i,
-            Yft_r,
-            Yft_i,
-            Ytf_r,
-            Ytf_i,
-            Ytt_r,
-            Ytt_i,
-            tap,
-            ang_min,
-            ang_max,
-            rate_a,
-            br_status,
-        ),
+    n_branches = net.branches.shape[0]
+    X_branch = np.zeros((n_branches, len(BRANCH_COLUMNS)))
+    X_branch[:, 0] = list(range(n_branches))
+    X_branch[:, 1] = np.real(net.branches[:, F_BUS])
+    X_branch[:, 2] = np.real(net.branches[:, T_BUS])
+
+    # pf, qf, pt, qt
+    if res["solution"]["pf"]:
+        # when solving pf, the flow of all branches is computed, so the number of branches in solution should match the number of branches in network
+        assert len(res["solution"]["branch"]) == n_branches, (
+            "Number of branches in solution should match number of branches in network"
+        )
+    else:
+        # when solving opf, the flow of only the in-service branches is computed, so the number of branches in solution should match the number of in-service branches in network
+        assert len(res["solution"]["branch"]) == len(net.idx_branches_in_service), (
+            "Number of branches in solution should match number of branches in network"
+        )
+
+    X_branch[net.idx_branches_in_service, 3] = np.array(
+        [
+            res["solution"]["branch"][str(i + 1)]["pf"] * net.baseMVA
+            for i in net.idx_branches_in_service
+        ],
+    )
+    X_branch[net.idx_branches_in_service, 4] = np.array(
+        [
+            res["solution"]["branch"][str(i + 1)]["qf"] * net.baseMVA
+            for i in net.idx_branches_in_service
+        ],
+    )
+    X_branch[net.idx_branches_in_service, 5] = np.array(
+        [
+            res["solution"]["branch"][str(i + 1)]["pt"] * net.baseMVA
+            for i in net.idx_branches_in_service
+        ],
+    )
+    X_branch[net.idx_branches_in_service, 6] = np.array(
+        [
+            res["solution"]["branch"][str(i + 1)]["qt"] * net.baseMVA
+            for i in net.idx_branches_in_service
+        ],
     )
 
-    # Y_bus
+    # admittances
+    Ytt, Yff, Yft, Ytf = branch_vectors(net.branches, net.branches.shape[0])
+    X_branch[:, 7] = np.real(Yff)
+    X_branch[:, 8] = np.imag(Yff)
+    X_branch[:, 9] = np.real(Yft)
+    X_branch[:, 10] = np.imag(Yft)
+    X_branch[:, 11] = np.real(Ytf)
+    X_branch[:, 12] = np.imag(Ytf)
+    X_branch[:, 13] = np.real(Ytt)
+    X_branch[:, 14] = np.imag(Ytt)
 
-    Y_bus, Yf, Yt = makeYbus_pypower(ppc["baseMVA"], ppc["bus"], ppc["branch"])
+    X_branch[:, 15] = net.branches[:, TAP]
+    X_branch[:, 16] = net.branches[:, SHIFT]
+    X_branch[:, 17] = net.branches[:, ANGMIN]
+    X_branch[:, 18] = net.branches[:, ANGMAX]
+    X_branch[:, 19] = net.branches[:, RATE_A]
+    X_branch[:, 20] = net.branches[:, BR_STATUS]
+
+    # --- Y-bus ---
+    Y_bus, Yf, Yt = makeYbus(net.baseMVA, net.buses, net.branches)
 
     i, j = np.nonzero(Y_bus)
     # note that Y_bus[i,j] can be != 0 even if a branch from i to j is not in service because there might be other branches connected to the same buses
@@ -329,25 +342,23 @@ def pf_post_processing(net: pandapowerNet, dcpf: bool = False) -> dict:
     edge_attr = np.stack((G, B)).T
     Y_bus = np.column_stack((edge_index, edge_attr))
 
-    return {"bus": X_bus, "gen": X_gen, "branch": branch_params, "Y_bus": Y_bus}
+    return {"bus": X_bus, "gen": X_gen, "branch": X_branch, "Y_bus": Y_bus}
 
 
-def process_scenario_unsecure(
-    net: pandapowerNet,
+def process_scenario_pf_mode(
+    net: Network,
     scenarios: np.ndarray,
     scenario_index: int,
     topology_generator: TopologyGenerator,
     generation_generator: GenerationGenerator,
     admittance_generator: AdmittanceGenerator,
-    no_stats: bool,
     local_processed_data: List[np.ndarray],
-    local_stats: Union[Stats, None],
     error_log_file: str,
     dcpf: bool,
-) -> Tuple[List[np.ndarray], Union[Stats, None]]:
-    """Generates one or more unsecure operating points for the given load scenario.
+) -> List[np.ndarray]:
+    """Processes a load scenario in PF mode
 
-    In unsecure mode, OPF is run first to get generator setpoints, then topology
+    In PF mode, OPF is run first to get generator setpoints, then topology
     perturbations are applied. This can lead to constraint violations (overloads,
     voltage violations) since the setpoints are not re-optimized for the new topology.
 
@@ -358,22 +369,19 @@ def process_scenario_unsecure(
         topology_generator: Generator for topology perturbations (line/transformer outages).
         generation_generator: Generator for generation cost perturbations.
         admittance_generator: Generator for line admittance perturbations.
-        no_stats: Whether to skip statistics collection.
         local_processed_data: List to accumulate processed data tuples.
-        local_stats: Statistics object for collecting network performance metrics.
         error_log_file: Path to error log file for recording failures.
         dcpf: Whether to include DC power flow results in output.
 
     Returns:
-        Tuple containing:
-            - Updated list of processed data (bus, gen, branch, Y_bus arrays)
-            - Updated statistics object (or None if no_stats=True)
+        Updated list of processed data (bus, gen, branch, Y_bus arrays)
     """
+    jl = init_julia()
     net = copy.deepcopy(net)
 
     # apply the load scenario to the network
-    net.load.p_mw = scenarios[:, scenario_index, 0]
-    net.load.q_mvar = scenarios[:, scenario_index, 1]
+    net.Pd = scenarios[:, scenario_index, 0]
+    net.Qd = scenarios[:, scenario_index, 1]
 
     # Apply generation perturbations before OPF.
     perturbations = generation_generator.generate((x for x in [net]))
@@ -385,47 +393,54 @@ def process_scenario_unsecure(
 
     # first run OPF to get the gen set points
     try:
-        run_opf(net)
+        res = run_opf(net, jl)
     except Exception as e:
         with open(error_log_file, "a") as f:
             f.write(
                 f"Caught an exception at scenario {scenario_index} in run_opf function: {e}\n",
             )
-        return (
-            local_processed_data,
-            local_stats,
-        )
+        return local_processed_data
 
     net_pf = copy.deepcopy(net)
-    net_pf = pf_preprocessing(net_pf)
+    net_pf = pf_preprocessing(net_pf, res)
 
     # Generate perturbed topologies
     perturbations = topology_generator.generate(net_pf)
 
-    # to get unsecure points, we apply the topology perturbation after OPF.
+    # to get PF points that can violate some OPF inequality constraints (to train PF solvers that can handle points outside of normal operating limits), we apply the topology perturbation after OPF.
     # The setpoints are then no longer adapted to the new topology, and might lead to e.g. abranch overload or a voltage magnitude violation once we drop an element.
     for perturbation in perturbations:
         try:
-            pp.rundcpp(perturbation)
-            perturbation.bus["Vm_dc"] = perturbation.res_bus.vm_pu
-            perturbation.bus["Va_dc"] = perturbation.res_bus.va_degree
-            run_pf(perturbation)
+            res = run_dcpf(perturbation, jl)
+            perturbation.res_dc_va_rad = [
+                res["solution"]["bus"][str(perturbation.reverse_bus_index_mapping[i])][
+                    "va"
+                ]
+                for i in range(perturbation.buses.shape[0])
+            ]
         except Exception as e:
             with open(error_log_file, "a") as f:
                 f.write(
-                    f"Caught an exception at scenario {scenario_index} when solving dcpf or in run_pf function: {e}\n",
+                    f"Caught an exception at scenario {scenario_index} when solving dcpf function: {e}\n",
+                )
+            perturbation.res_dc_va_rad = np.array(
+                [np.nan for i in range(perturbation.buses.shape[0])],
+            )
+        try:
+            res = run_pf(perturbation, jl)
+        except Exception as e:
+            with open(error_log_file, "a") as f:
+                f.write(
+                    f"Caught an exception at scenario {scenario_index} when solving in run_pf function: {e}\n",
                 )
             continue
 
         # Append processed power flow data
-        pf_data = pf_post_processing(perturbation, dcpf=dcpf)
+        pf_data = pf_post_processing(perturbation, res, dcpf)
         local_processed_data.append(
             (pf_data["bus"], pf_data["gen"], pf_data["branch"], pf_data["Y_bus"]),
         )
-        if not no_stats:
-            local_stats.update(perturbation)
-
-    return local_processed_data, local_stats
+    return local_processed_data
 
 
 def process_scenario_chunk(
@@ -433,19 +448,17 @@ def process_scenario_chunk(
     start_idx: int,
     end_idx: int,
     scenarios: np.ndarray,
-    net: pandapowerNet,
+    net: Network,
     progress_queue: Queue,
     topology_generator: TopologyGenerator,
     generation_generator: GenerationGenerator,
     admittance_generator: AdmittanceGenerator,
-    no_stats: bool,
     error_log_path: str,
     dcpf: bool,
 ) -> Tuple[
     Union[None, Exception],
     Union[None, str],
-    List[np.ndarray],
-    Union[Stats, None],
+    Optional[List[np.ndarray]],
 ]:
     """Process a chunk of scenarios for distributed processing.
 
@@ -453,7 +466,7 @@ def process_scenario_chunk(
     accumulating results before returning them to the main process.
 
     Args:
-        mode: Processing mode ("secure" or "unsecure").
+        mode: Processing mode ("opf" or "pf").
         start_idx: Starting scenario index (inclusive).
         end_idx: Ending scenario index (exclusive).
         scenarios: Array of load scenarios with shape (n_loads, n_scenarios, 2).
@@ -462,7 +475,6 @@ def process_scenario_chunk(
         topology_generator: Generator for topology perturbations.
         generation_generator: Generator for generation cost perturbations.
         admittance_generator: Generator for line admittance perturbations.
-        no_stats: Whether to skip statistics collection.
         error_log_path: Path to error log file for recording failures.
         dcpf: Whether to include DC power flow results in output.
 
@@ -471,43 +483,31 @@ def process_scenario_chunk(
             - Exception object (None if successful)
             - Traceback string (None if successful)
             - List of processed data tuples (bus, gen, branch, Y_bus arrays)
-            - Statistics object (or None if no_stats=True)
     """
     try:
-        local_stats = Stats() if not no_stats else None
         local_processed_data = []
         for scenario_index in range(start_idx, end_idx):
-            if mode == "secure":
-                (
-                    local_processed_data,
-                    local_stats,
-                ) = process_scenario_secure(
+            if mode == "opf":
+                local_processed_data = process_scenario_opf_mode(
                     net,
                     scenarios,
                     scenario_index,
                     topology_generator,
                     generation_generator,
                     admittance_generator,
-                    no_stats,
                     local_processed_data,
-                    local_stats,
                     error_log_path,
                     dcpf,
                 )
-            elif mode == "unsecure":
-                (
-                    local_processed_data,
-                    local_stats,
-                ) = process_scenario_unsecure(
+            elif mode == "pf":
+                local_processed_data = process_scenario_pf_mode(
                     net,
                     scenarios,
                     scenario_index,
                     topology_generator,
                     generation_generator,
                     admittance_generator,
-                    no_stats,
                     local_processed_data,
-                    local_stats,
                     error_log_path,
                     dcpf,
                 )
@@ -518,7 +518,6 @@ def process_scenario_chunk(
             None,
             None,
             local_processed_data,
-            local_stats,
         )
     except Exception as e:
         with open(error_log_path, "a") as f:
@@ -527,25 +526,23 @@ def process_scenario_chunk(
             f.write("\n")
         for _ in range(end_idx - start_idx):
             progress_queue.put(1)
-        return e, traceback.format_exc(), None, None, None
+        return e, traceback.format_exc(), None
 
 
-def process_scenario_secure(
-    net: pandapowerNet,
+def process_scenario_opf_mode(
+    net: Network,
     scenarios: np.ndarray,
     scenario_index: int,
     topology_generator: TopologyGenerator,
     generation_generator: GenerationGenerator,
     admittance_generator: AdmittanceGenerator,
-    no_stats: bool,
     local_processed_data: List[np.ndarray],
-    local_stats: Union[Stats, None],
     error_log_file: str,
     dcpf: bool,
-) -> Tuple[List[np.ndarray], Union[Stats, None]]:
-    """Processes a load scenario in secure mode.
+) -> List[np.ndarray]:
+    """Processes a load scenario in OPF mode
 
-    In secure mode, perturbations are applied first, then OPF is run to get
+    In OPF mode, perturbations are applied first, then OPF is run to get
     generator setpoints that account for the perturbed topology. This ensures
     all constraints are satisfied in the final operating point.
 
@@ -556,20 +553,18 @@ def process_scenario_secure(
         topology_generator: Generator for topology perturbations (line/transformer outages).
         generation_generator: Generator for generation cost perturbations.
         admittance_generator: Generator for line admittance perturbations.
-        no_stats: Whether to skip statistics collection.
         local_processed_data: List to accumulate processed data tuples.
-        local_stats: Statistics object for collecting network performance metrics.
         error_log_file: Path to error log file for recording failures.
         dcpf: Whether to include DC power flow results in output.
 
     Returns:
-        Tuple containing:
-            - Updated list of processed data (bus, gen, branch, Y_bus arrays)
-            - Updated statistics object (or None if no_stats=True)
+        Updated list of processed data (bus, gen, branch, Y_bus arrays)
     """
+    jl = init_julia()
+
     # apply the load scenario to the network
-    net.load.p_mw = scenarios[:, scenario_index, 0]
-    net.load.q_mvar = scenarios[:, scenario_index, 1]
+    net.Pd = scenarios[:, scenario_index, 0]
+    net.Qd = scenarios[:, scenario_index, 1]
 
     # Generate perturbed topologies
     perturbations = topology_generator.generate(net)
@@ -580,40 +575,37 @@ def process_scenario_secure(
     # Apply admittance perturbations
     perturbations = admittance_generator.generate(perturbations)
 
-    for perturbation in perturbations:
+    for perturbation in (
+        perturbations
+    ):  # (that returns copies of the network with the topology perturbation applied)
         try:
-            # run DCPF to get the bus voltages
-            pp.rundcopp(perturbation)
-            perturbation.bus["Vm_dc"] = perturbation.res_bus.vm_pu
-            perturbation.bus["Va_dc"] = perturbation.res_bus.va_degree
+            # run DCPF to get the bus voltages (just for benchmarking purposes)
+            res = run_dcpf(perturbation, jl)
+            perturbation.res_dc_va_rad = [
+                res["solution"]["bus"][str(i + 1)]["va"]
+                for i in range(perturbation.buses.shape[0])
+            ]
         except Exception as e:
-            perturbation.bus["Vm_dc"] = np.nan
-            perturbation.bus["Va_dc"] = np.nan
+            perturbation.res_dc_va_rad = np.array(
+                [np.nan for i in range(perturbation.buses.shape[0])],
+            )
             with open(error_log_file, "a") as f:
                 f.write(
                     f"Caught an exception at scenario {scenario_index} in rundcopp function: {e}\n",
                 )
         try:
             # run OPF to get the gen set points. Here the set points account for the topology perturbation.
-            run_opf(perturbation)
+            res = run_opf(perturbation, jl)
         except Exception as e:
             with open(error_log_file, "a") as f:
                 f.write(
                     f"Caught an exception at scenario {scenario_index} in run_opf function: {e}\n",
                 )
             continue
-        assert (
-            perturbation.res_gen.vm_pu[perturbation.res_gen.type == 2]
-            - perturbation.res_gen.vm_pu[perturbation.res_gen.type == 2]
-            < 1e-3
-        ).all(), "Generator voltage at PV buses is not the same after PF"
 
         # Append processed power flow data
-        pf_data = pf_post_processing(perturbation, dcpf=dcpf)
+        pf_data = pf_post_processing(perturbation, res, dcpf)
         local_processed_data.append(
             (pf_data["bus"], pf_data["gen"], pf_data["branch"], pf_data["Y_bus"]),
         )
-        if not no_stats:
-            local_stats.update(perturbation)
-
-    return local_processed_data, local_stats
+    return local_processed_data

@@ -2,12 +2,93 @@ import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
 from importlib import resources
-import pandapower as pp
 from abc import ABC, abstractmethod
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from copy import deepcopy
-from pandapower.auxiliary import pandapowerNet
+from multiprocessing import Pool
+from gridfm_datakit.network import Network
+from typing import Tuple, Any
+
+
+def _find_largest_scaling_factor_worker(
+    args: Tuple[Network, float, float, float, bool],
+) -> float:
+    (net, max_scaling, step_size, start, change_reactive_power) = args
+
+    net = deepcopy(net)
+    # Get reference values from Network class (PD and QD columns)
+    p_ref = net.Pd.copy()  # Active power demand
+    q_ref = net.Qd.copy()  # Reactive power demand
+    u = start
+    converged = True
+
+    print("Finding upper limit u .", end="", flush=True)
+
+    while (u <= max_scaling) and converged:
+        # Update load values in the Network using properties
+        net.Pd = p_ref * u
+        if change_reactive_power:
+            net.Qd = q_ref * u
+        else:
+            net.Qd = q_ref  # Keep original QD
+
+        from juliacall import Main as jl
+
+        # Create a temporary file for the MATPOWER case
+        import tempfile
+        import os
+
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            suffix=".m",
+            delete=False,
+        ) as temp_file:
+            temp_filename = temp_file.name
+
+        try:
+            # Initialize Julia with required packages
+            net.to_mpc(temp_filename)
+
+            try:
+                jl.seval("""
+                using PowerModels
+                using Ipopt
+
+                function run_opf(case_file)
+                    result = solve_ac_opf(case_file, Ipopt.Optimizer)
+                    return result
+                end
+                """)
+
+            except Exception as e:
+                print(f"Error: {e}")
+
+            try:
+                result = jl.solve_ac_opf(temp_filename, jl.Ipopt.Optimizer)
+                u += step_size
+                print(".", end="", flush=True)
+            except Exception as e:
+                raise RuntimeError(f"Julia OPF failed: {e}")
+
+            if str(result["termination_status"]) != "LOCALLY_SOLVED":
+                if u == start:
+                    raise RuntimeError(
+                        f"OPF did not converge for starting u={u:.3f}",
+                    )
+                print(
+                    f"\nOPF did not converge for u={u:.3f}. Using u={u - step_size:.3f} for upper limit",
+                    flush=True,
+                )
+                u -= step_size
+                converged = False
+
+        finally:
+            # Clean up temporary file
+            if os.path.exists(temp_filename):
+                os.unlink(temp_filename)
+
+    return u
 
 
 def load_scenarios_to_df(scenarios: np.ndarray) -> pd.DataFrame:
@@ -101,7 +182,7 @@ class LoadScenarioGeneratorBase(ABC):
     @abstractmethod
     def __call__(
         self,
-        net: pandapowerNet,
+        net: Network,
         n_scenarios: int,
         scenario_log: str,
     ) -> np.ndarray:
@@ -136,12 +217,12 @@ class LoadScenarioGeneratorBase(ABC):
 
     @staticmethod
     def find_largest_scaling_factor(
-        net: pandapowerNet,
+        net: Network,
         max_scaling: float,
         step_size: float,
         start: float,
         change_reactive_power: bool,
-    ) -> float:
+    ) -> Tuple[Pool, Any]:
         """Finds the largest load scaling factor that maintains OPF convergence.
 
         Args:
@@ -157,41 +238,12 @@ class LoadScenarioGeneratorBase(ABC):
         Raises:
             RuntimeError: If OPF does not converge for the starting value.
         """
-        net = deepcopy(
-            net,
-        )  # Without this, we change the base load of the network, whioch impacts the entire data gen
-        p_ref = net.load["p_mw"]
-        q_ref = net.load["q_mvar"]
-        u = start
-
-        # find upper limit
-        converged = True
-        print("Finding upper limit u .", end="", flush=True)
-
-        while (u <= max_scaling) and (converged is True):
-            net.load["p_mw"] = p_ref * u  # we scale the active power
-            if change_reactive_power:  # if we want to change the reactive power, we scale it by the same factor as the active power
-                net.load["q_mvar"] = q_ref * u
-            else:
-                net.load["q_mvar"] = q_ref
-
-            try:
-                pp.runopp(net, numba=True)
-                u += step_size  # we increment the scaling factor by the step size
-                print(".", end="", flush=True)
-            except pp.OPFNotConverged as err:
-                if u == start:
-                    raise RuntimeError(
-                        f"OPF did not converge for the starting value of u={u:.3f}, {err}",
-                    )
-                print(
-                    f"\nOPF did not converge for u={u:.3f}. Using u={u - step_size:.3f} for upper limit",
-                    flush=True,
-                )
-                u -= step_size
-                converged = False
-
-        return u
+        pool = Pool(processes=1)
+        result = pool.apply_async(
+            _find_largest_scaling_factor_worker,
+            ((net, max_scaling, step_size, start, change_reactive_power),),
+        )
+        return pool, result
 
     @staticmethod
     def min_max_scale(series: np.ndarray, new_min: float, new_max: float) -> np.ndarray:
@@ -306,7 +358,7 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
 
     def __call__(
         self,
-        net: pandapowerNet,
+        net: Network,
         n_scenarios: int,
         scenarios_log: str,
     ) -> np.ndarray:
@@ -331,13 +383,21 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
                 "The start scaling factor must be larger than the global range.",
             )
 
-        u = self.find_largest_scaling_factor(
+        pool, async_result = self.find_largest_scaling_factor(
             net,
             max_scaling=self.max_scaling_factor,
             step_size=self.step_size,
             start=self.start_scaling_factor,
             change_reactive_power=self.change_reactive_power,
         )
+
+        try:
+            # wait for the worker to finish and fetch numeric result
+            u = async_result.get(timeout=None)
+        finally:
+            pool.close()
+            pool.join()
+
         lower = (
             u - self.global_range * u
         )  # The lower bound used to be set as e.g. u - 40%, while now it is set as u - 40% of u
@@ -355,9 +415,8 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
         print("min, max of ref_curve: {}, {}".format(ref_curve.min(), ref_curve.max()))
         print("l, u: {}, {}".format(lower, u))
 
-        p_mw_array = net.load.p_mw.to_numpy()  # we now store the active power at the load elements level, we don't aggregate it at the bus level (which was probably not changing anything since there is usually max one load per bus)
-
-        q_mvar_array = net.load.q_mvar.to_numpy()
+        p_mw_array = net.Pd.copy()  # note that we do use buses that have 0 load, but since we only perturb the load by multiplying it by a factor, it will still be 0
+        q_mvar_array = net.Qd.copy()
 
         # if the number of requested scenarios is smaller than the number of timesteps in the load profile, we cut the load profile
         if n_scenarios <= ref_curve.shape[0]:
@@ -452,7 +511,7 @@ class Powergraph(LoadScenarioGeneratorBase):
 
     def __call__(
         self,
-        net: pandapowerNet,
+        net: Network,
         n_scenarios: int,
         scenario_log: str,
     ) -> np.ndarray:
@@ -474,9 +533,8 @@ class Powergraph(LoadScenarioGeneratorBase):
         ref_curve = agg_load / agg_load.max()
         print("u={}, l={}".format(ref_curve.max(), ref_curve.min()))
 
-        p_mw_array = net.load.p_mw.to_numpy()  # we now store the active power at the load elements level, we don't aggregate it at the bus level (which was probably not changing anything since there is usually max one load per bus)
-
-        q_mvar_array = net.load.q_mvar.to_numpy()
+        p_mw_array = net.Pd.copy()
+        q_mvar_array = net.Qd.copy()
 
         # if the number of requested scenarios is smaller than the number of timesteps in the load profile, we cut the load profile
         if n_scenarios <= ref_curve.shape[0]:
@@ -505,3 +563,64 @@ class Powergraph(LoadScenarioGeneratorBase):
         load_profiles = np.stack((load_profile_pmw, load_profile_qmvar), axis=-1)
 
         return load_profiles
+
+
+if __name__ == "__main__":
+    """
+    Demonstration of LoadScenariosFromAggProfile with specified parameters
+    """
+    from gridfm_datakit.network import load_net_from_pglib
+
+    print("=== LoadScenariosFromAggProfile Demo ===")
+
+    # Load a network
+    print("Loading network...")
+    network = load_net_from_pglib("case24_ieee_rts")
+    print(
+        f"Loaded network with {network.buses.shape[0]} buses, {network.gens.shape[0]} generators, {network.branches.shape[0]} branches",
+    )
+
+    # Count loads in the network
+    load_count = np.sum(
+        (network.buses[:, 2] > 0) | (network.buses[:, 3] > 0),
+    )  # PD or QD > 0
+    print(f"Network has {load_count} buses with loads")
+
+    # Create load scenario generator with specified parameters
+    print("\nCreating LoadScenariosFromAggProfile with specified parameters:")
+    print("  - agg_load_name: 'default'")
+    print("  - sigma: 0.2")
+    print("  - change_reactive_power: True")
+    print("  - global_range: 0.4")
+    print("  - max_scaling_factor: 2.0")
+    print("  - step_size: 0.025")
+    print("  - start_scaling_factor: 0.8")
+
+    load_generator = LoadScenariosFromAggProfile(
+        agg_load_name="default",
+        sigma=0.2,
+        change_reactive_power=True,
+        global_range=0.4,
+        max_scaling_factor=2.0,
+        step_size=0.025,
+        start_scaling_factor=0.6,
+    )
+
+    print("\nLoad scenario generator created successfully!")
+    print("Parameters stored:")
+    print(f"  - agg_load_name: {load_generator.agg_load_name}")
+    print(f"  - sigma: {load_generator.sigma}")
+    print(f"  - change_reactive_power: {load_generator.change_reactive_power}")
+    print(f"  - global_range: {load_generator.global_range}")
+    print(f"  - max_scaling_factor: {load_generator.max_scaling_factor}")
+    print(f"  - step_size: {load_generator.step_size}")
+    print(f"  - start_scaling_factor: {load_generator.start_scaling_factor}")
+
+    print("\nAttempting to generate load scenarios...")
+
+    scenarios = load_generator(
+        network,
+        n_scenarios=5,
+        scenarios_log="test_scenarios.log",
+    )
+    print(f"Successfully generated scenarios with shape: {scenarios.shape}")

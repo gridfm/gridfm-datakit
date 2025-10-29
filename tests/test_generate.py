@@ -1,12 +1,15 @@
 """
-Test cases for genertaing data from gridfm_datakit.generate module
+Test cases for generating data from gridfm_datakit.generate module
 """
 
 import pytest
 import os
-from pandapower.auxiliary import pandapowerNet
+
 import shutil
+import tempfile
 import yaml
+import pandas as pd
+from gridfm_datakit.network import Network
 from gridfm_datakit.utils.param_handler import NestedNamespace
 from gridfm_datakit.generate import (
     _setup_environment,
@@ -16,21 +19,24 @@ from gridfm_datakit.generate import (
 )
 
 
-@pytest.fixture(params=["secure", "unsecure"])
+@pytest.fixture(params=["opf", "pf"])
 def conf(request):
     """
-    Loads configuration files for both secure and unsecure modes.
+    Loads configuration files for both opf and pf modes.
     This fixture reads the configuration files and returns both for parametrized testing.
     """
     config_paths = {
-        "secure": "tests/config/default_secure.yaml",
-        "unsecure": "tests/config/default_unsecure.yaml",
+        "opf": "tests/config/default_opf_mode.yaml",
+        "pf": "tests/config/default_pf_mode.yaml",
     }
 
     path = config_paths[request.param]
     with open(path, "r") as f:
         base_config = yaml.safe_load(f)
         args = NestedNamespace(**base_config)
+    # Isolate outputs per xdist worker
+    worker = os.environ.get("PYTEST_XDIST_WORKER", "local")
+    args.settings.data_dir = f"./tests/test_data_{request.param}_mode_{worker}"
     return args
 
 
@@ -74,11 +80,8 @@ def test_prepare_network_and_scenarios(conf):
     args, base_path, file_paths = _setup_environment(conf)
     net, scenarios = _prepare_network_and_scenarios(args, file_paths)
 
-    assert isinstance(net, pandapowerNet), "Network should be a pandapowerNet object"
+    assert isinstance(net, Network), "Network should be a Network object"
     assert len(scenarios) > 0, "There should be at least one scenario"
-    # Check if the network has been loaded correctly
-    assert "bus" in net.keys(), "Network should contain bus data"
-    assert "line" in net.keys(), "Network should contain line data"
 
 
 def test_fail_prepare_network_and_scenarios():
@@ -96,7 +99,7 @@ def test_fail_prepare_network_and_scenarios_config():
     """
     Tests if preparing network and scenarios fails with an invalid grid source in the configuration file
     """
-    config = "tests/config/default_unsecure.yaml"
+    config = "tests/config/default_pf_mode.yaml"
     args, base_path, file_paths = _setup_environment(config)
     args.network.source = "invalid_source"  # Set invalid source
     with pytest.raises(ValueError, match="Invalid grid source!"):
@@ -112,7 +115,12 @@ def test_save_generated_data():
     """
     # Use config without perturbations to make sure we don't run into errors with perturbations
     config_path = "tests/config/default_without_perturbation.yaml"
-    file_paths = generate_power_flow_data_distributed(config_path)
+    with open(config_path, "r") as f:
+        cfg = yaml.safe_load(f)
+    args = NestedNamespace(**cfg)
+    worker = os.environ.get("PYTEST_XDIST_WORKER", "local")
+    args.settings.data_dir = f"./tests/test_data_without_perturbation_{worker}"
+    file_paths = generate_power_flow_data_distributed(args)
     print(file_paths)
 
     # Verify that output files were created
@@ -161,7 +169,7 @@ def test_fail_generate_pf_data():
 
 
 # Clean up generated files after tests
-@pytest.fixture(scope="module", autouse=True)
+@pytest.fixture(scope="session", autouse=True)
 def cleanup_generated_files():
     """
     Cleans up generated files after tests.
@@ -170,10 +178,11 @@ def cleanup_generated_files():
     yield  # This allows tests to run first
 
     # Only clean up directories that were actually created by these tests
+    worker = os.environ.get("PYTEST_XDIST_WORKER", "local")
     cleanup_paths = [
-        "./tests/test_data_without_perturbation",  # Created by test_save_generated_data() using default_without_perturbation.yaml
-        "./tests/test_data_unsecure",  # Created by test_generate_pf_data() using default_unsecure.yaml
-        "./tests/test_data_secure",  # Created by test_generate_pf_data() using default_secure.yaml
+        f"./tests/test_data_without_perturbation_{worker}",
+        f"./tests/test_data_pf_mode_{worker}",
+        f"./tests/test_data_opf_mode_{worker}",
     ]
 
     for path in cleanup_paths:
@@ -183,3 +192,94 @@ def cleanup_generated_files():
                 print(f"Cleaned up: {path}")
         except Exception as e:
             print(f"Warning: Could not clean up {path}: {e}")
+
+
+def test_setup_environment_overwrite_behavior():
+    """Ensure _setup_environment respects the overwrite flag by deleting or preserving existing output.
+
+    Steps:
+    - Create a temp data_dir and initial base_path
+    - Create a marker file inside base_path
+    - Call _setup_environment with overwrite=False: marker should persist
+    - Call _setup_environment with overwrite=True: marker should be removed
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config = {
+            "settings": {
+                "data_dir": tmpdir,
+                "overwrite": False,
+                "dcpf": False,
+            },
+            "network": {"name": "case24_ieee_rts"},
+            # minimal required sections for downstream functions
+            "load": {"generator": "agg_load_profile", "scenarios": 1},
+            "topology_perturbation": {"type": "none"},
+            "generation_perturbation": {"type": "none"},
+            "admittance_perturbation": {"type": "none"},
+        }
+
+        # First setup creates directories
+        args, base_path, file_paths = _setup_environment(config)
+        marker = os.path.join(base_path, "marker.txt")
+        os.makedirs(base_path, exist_ok=True)
+        with open(marker, "w") as f:
+            f.write("keep or remove")
+
+        # overwrite=False should keep existing contents
+        config["settings"]["overwrite"] = False
+        _args2, base_path2, _ = _setup_environment(config)
+        assert base_path2 == base_path
+        assert os.path.exists(marker), "Marker should persist when overwrite is False"
+
+        # overwrite=True should remove and recreate directory
+        config["settings"]["overwrite"] = True
+        _args3, base_path3, _ = _setup_environment(config)
+        assert base_path3 == base_path
+        assert not os.path.exists(marker), (
+            "Marker should be removed when overwrite is True"
+        )
+
+
+def test_parquet_append_vs_overwrite():
+    """Verify that saves append rows when overwrite is False, and reset when overwrite is True.
+
+    - Run generation with scenarios=1 -> record row counts
+    - Run again with overwrite=False and scenarios=2 -> counts should increase
+    - Run again with overwrite=True and scenarios=1 -> counts should reset to baseline
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Base config
+        with open("tests/config/default_without_perturbation.yaml", "r") as f:
+            cfg = yaml.safe_load(f)
+        args = NestedNamespace(**cfg)
+        args.settings.data_dir = tmpdir
+
+        # First run: scenarios=1
+        args.settings.overwrite = True
+        args.load.scenarios = 1
+        args.load.generator = "powergraph"
+        file_paths = generate_power_flow_data_distributed(args, plot=False)
+
+        df_bus_1 = pd.read_parquet(file_paths["bus_data"], engine="fastparquet")
+
+        n_bus_1 = len(df_bus_1)
+
+        # Second run: scenarios=2, overwrite=False -> should append
+        args.settings.overwrite = False
+        args.load.scenarios = 2
+        file_paths = generate_power_flow_data_distributed(args, plot=False)
+
+        df_bus_2 = pd.read_parquet(file_paths["bus_data"], engine="fastparquet")
+
+        assert len(df_bus_2) > n_bus_1, "Bus rows should increase when overwrite=False"
+
+        # Third run: scenarios=1, overwrite=True -> should reset (<= baseline + small variance)
+        args.settings.overwrite = True
+        args.load.scenarios = 1
+        file_paths = generate_power_flow_data_distributed(args, plot=False)
+
+        df_bus_3 = pd.read_parquet(file_paths["bus_data"], engine="fastparquet")
+
+        assert len(df_bus_3) <= len(df_bus_2) - n_bus_1, (
+            "Bus rows should reset when overwrite=True"
+        )

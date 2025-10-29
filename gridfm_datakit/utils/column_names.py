@@ -1,15 +1,7 @@
-# Global variables
-
-# bus types index used in matlab case files
-PQ = 1
-PV = 2
-REF = 3
-
 # Output CSV column definitions used by save/generate pipeline
 GEN_COLUMNS = [
+    "idx",
     "bus",
-    "et",
-    "element",
     "p_mw",
     "q_mvar",
     "min_p_mw",
@@ -19,11 +11,10 @@ GEN_COLUMNS = [
     "cp0_eur",
     "cp1_eur_per_mw",
     "cp2_eur_per_mw2",
-    "is_gen",
-    "is_sgen",
-    "is_ext_grid",
     "in_service",
+    "is_slack_gen",
 ]
+
 
 BUS_COLUMNS = [
     "bus",
@@ -43,9 +34,10 @@ BUS_COLUMNS = [
     "BS",
 ]
 
-DC_BUS_COLUMNS = ["Vm_dc", "Va_dc"]
+DC_BUS_COLUMNS = ["Va_dc"]
 
 BRANCH_COLUMNS = [
+    "idx",
     "from_bus",
     "to_bus",
     "pf",
@@ -61,6 +53,7 @@ BRANCH_COLUMNS = [
     "Ytt_r",
     "Ytt_i",
     "tap",
+    "shift",
     "ang_min",
     "ang_max",
     "rate_a",

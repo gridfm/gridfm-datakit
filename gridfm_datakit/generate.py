@@ -6,14 +6,11 @@ from gridfm_datakit.save import (
     save_node_edge_data,
 )
 from gridfm_datakit.process.process_network import (
-    network_preprocessing,
-    process_scenario_secure,
-    process_scenario_unsecure,
+    process_scenario_opf_mode,
+    process_scenario_pf_mode,
     process_scenario_chunk,
 )
 from gridfm_datakit.utils.stats import (
-    plot_stats,
-    Stats,
     plot_feature_distributions,
 )
 from gridfm_datakit.utils.param_handler import (
@@ -24,7 +21,6 @@ from gridfm_datakit.utils.param_handler import (
     initialize_admittance_generator,
 )
 from gridfm_datakit.network import (
-    load_net_from_pp,
     load_net_from_file,
     load_net_from_pglib,
 )
@@ -32,7 +28,6 @@ from gridfm_datakit.perturbations.load_perturbation import (
     load_scenarios_to_df,
     plot_load_scenarios_combined,
 )
-from pandapower.auxiliary import pandapowerNet
 import gc
 from datetime import datetime
 from tqdm import tqdm
@@ -40,12 +35,13 @@ from multiprocessing import Pool, Manager
 import shutil
 from gridfm_datakit.utils.utils import write_ram_usage_distributed, Tee
 import yaml
-from typing import List, Tuple, Any, Dict, Optional, Union
+from typing import List, Tuple, Any, Dict, Union
 import sys
+from gridfm_datakit.network import Network
 
 
 def _setup_environment(
-    config: Union[str, Dict, NestedNamespace],
+    config: Union[str, Dict[str, Any], NestedNamespace],
 ) -> Tuple[NestedNamespace, str, Dict[str, str]]:
     """Setup the environment for data generation.
 
@@ -80,10 +76,10 @@ def _setup_environment(
         "tqdm_log": os.path.join(base_path, "tqdm.log"),
         "error_log": os.path.join(base_path, "error.log"),
         "args_log": os.path.join(base_path, "args.log"),
-        "bus_data": os.path.join(base_path, "bus_data.csv"),
-        "branch_data": os.path.join(base_path, "branch_data.csv"),
-        "gen_data": os.path.join(base_path, "gen_data.csv"),
-        "y_bus_data": os.path.join(base_path, "y_bus_data.csv"),
+        "bus_data": os.path.join(base_path, "bus_data.parquet"),
+        "branch_data": os.path.join(base_path, "branch_data.parquet"),
+        "gen_data": os.path.join(base_path, "gen_data.parquet"),
+        "y_bus_data": os.path.join(base_path, "y_bus_data.parquet"),
         "scenarios": os.path.join(base_path, f"scenarios_{args.load.generator}.csv"),
         "scenarios_plot": os.path.join(
             base_path,
@@ -115,7 +111,7 @@ def _setup_environment(
 def _prepare_network_and_scenarios(
     args: NestedNamespace,
     file_paths: Dict[str, str],
-) -> Tuple[pandapowerNet, Any]:
+) -> Tuple[Network, np.ndarray]:
     """Prepare the network and generate load scenarios.
 
     Args:
@@ -125,10 +121,7 @@ def _prepare_network_and_scenarios(
     Returns:
         Tuple of (network, scenarios)
     """
-    # Load network
-    if args.network.source == "pandapower":
-        net = load_net_from_pp(args.network.name)
-    elif args.network.source == "pglib":
+    if args.network.source == "pglib":
         net = load_net_from_pglib(args.network.name)
     elif args.network.source == "file":
         net = load_net_from_file(
@@ -136,9 +129,6 @@ def _prepare_network_and_scenarios(
         )
     else:
         raise ValueError("Invalid grid source!")
-
-    network_preprocessing(net)
-    assert (net.sgen["scaling"] == 1).all(), "Scaling factor >1 not supported yet!"
 
     # Generate load scenarios
     load_scenario_generator = get_load_scenario_generator(args.load)
@@ -155,9 +145,8 @@ def _prepare_network_and_scenarios(
 
 
 def _save_generated_data(
-    net: pandapowerNet,
+    net: Network,
     processed_data: List,
-    global_stats: Optional[Stats],
     file_paths: Dict[str, str],
     base_path: str,
     args: NestedNamespace,
@@ -165,7 +154,7 @@ def _save_generated_data(
     """Save the generated data to files.
 
     Args:
-        net: Pandapower network
+        net: Network object
         processed_data: List of CSV data
         global_stats: Optional statistics object
         file_paths: Dictionary of file paths
@@ -182,13 +171,10 @@ def _save_generated_data(
             processed_data,
             dcpf=args.settings.dcpf,
         )
-        if not args.settings.no_stats and global_stats:
-            global_stats.save(base_path)
-            plot_stats(base_path)
 
 
 def generate_power_flow_data(
-    config: Union[str, Dict, NestedNamespace],
+    config: Union[str, Dict[str, Any], NestedNamespace],
 ) -> Dict[str, str]:
     """Generate power flow data based on the provided configuration using sequential processing.
 
@@ -221,14 +207,14 @@ def generate_power_flow_data(
         - tqdm.log: Progress tracking
         - error.log: Error messages
         - args.log: Configuration parameters (YAML dump)
-        - bus_data.csv: Bus-level features for each scenario
-        - branch_data.csv: Branch-level features for each scenario
-        - gen_data.csv: Generator features for each scenario
-        - y_bus_data.csv: Nonzero Y-bus entries for each scenario
+        - bus_data.parquet: Bus-level features for each scenario
+        - branch_data.parquet: Branch-level features for each scenario
+        - gen_data.parquet: Generator features for each scenario
+        - y_bus_data.parquet: Nonzero Y-bus entries for each scenario
         - scenarios_{generator}.csv: Load scenarios (per-element time series)
         - scenarios_{generator}.html: Load scenario plots
         - scenarios_{generator}.log: Load scenario generation notes
-        - feature_plots/: Feature distribution violin plots (if bus_data.csv exists)
+        - feature_plots/: Feature distribution violin plots (if bus_data.parquet exists)
     """
     # Setup environment
     args, base_path, file_paths = _setup_environment(config)
@@ -252,7 +238,6 @@ def generate_power_flow_data(
     )
 
     processed_data = []
-    global_stats = Stats() if not args.settings.no_stats else None
 
     # Process scenarios sequentially
     with open(file_paths["tqdm_log"], "a") as f:
@@ -264,31 +249,27 @@ def generate_power_flow_data(
         ) as pbar:
             for scenario_index in range(args.load.scenarios):
                 # Process the scenario
-                if args.settings.mode == "secure":
-                    processed_data, global_stats = process_scenario_secure(
+                if args.settings.mode == "opf":
+                    processed_data = process_scenario_opf_mode(
                         net,
                         scenarios,
                         scenario_index,
                         topology_generator,
                         generation_generator,
                         admittance_generator,
-                        args.settings.no_stats,
                         processed_data,
-                        global_stats,
                         file_paths["error_log"],
                         args.settings.dcpf,
                     )
-                elif args.settings.mode == "unsecure":
-                    processed_data, global_stats = process_scenario_unsecure(
+                elif args.settings.mode == "pf":
+                    processed_data = process_scenario_pf_mode(
                         net,
                         scenarios,
                         scenario_index,
                         topology_generator,
                         generation_generator,
                         admittance_generator,
-                        args.settings.no_stats,
                         processed_data,
-                        global_stats,
                         file_paths["error_log"],
                         args.settings.dcpf,
                     )
@@ -301,7 +282,6 @@ def generate_power_flow_data(
     _save_generated_data(
         net,
         processed_data,
-        global_stats,
         file_paths,
         base_path,
         args,
@@ -311,7 +291,7 @@ def generate_power_flow_data(
         plot_feature_distributions(
             file_paths["bus_data"],
             file_paths["feature_plots"],
-            net.sn_mva,
+            net.baseMVA,
             args.settings.dcpf,
         )
     else:
@@ -321,7 +301,7 @@ def generate_power_flow_data(
 
 
 def generate_power_flow_data_distributed(
-    config: Union[str, Dict, NestedNamespace],
+    config: Union[str, Dict[str, Any], NestedNamespace],
     plot: bool = True,
 ) -> Dict[str, str]:
     """Generate power flow data based on the provided configuration using distributed processing.
@@ -342,22 +322,20 @@ def generate_power_flow_data_distributed(
         - tqdm.log: Progress tracking
         - error.log: Error messages
         - args.log: Configuration parameters (YAML dump)
-        - bus_data.csv: Bus-level features for each scenario
-        - branch_data.csv: Branch-level features for each scenario
-        - gen_data.csv: Generator features for each scenario
-        - y_bus_data.csv: Nonzero Y-bus entries for each scenario
+        - bus_data.parquet: Bus-level features for each scenario
+        - branch_data.parquet: Branch-level features for each scenario
+        - gen_data.parquet: Generator features for each scenario
+        - y_bus_data.parquet: Nonzero Y-bus entries for each scenario
         - scenarios_{generator}.csv: Load scenarios (per-element time series)
         - scenarios_{generator}.html: Load scenario plots
         - scenarios_{generator}.log: Load scenario generation notes
-        - stats.csv: Aggregated statistics (if no_stats=False)
-        - stats_plot.html: Statistics dashboard (if no_stats=False)
-        - feature_plots/: Feature distribution violin plots (if bus_data.csv exists)
+        - feature_plots/: Feature distribution violin plots (if bus_data.parquet exists)
     """
     # Setup environment
     args, base_path, file_paths = _setup_environment(config)
 
     # check if mode is valid
-    if args.settings.mode not in ["secure", "unsecure"]:
+    if args.settings.mode not in ["opf", "pf"]:
         raise ValueError("Invalid mode!")
 
     # Prepare network and scenarios
@@ -414,7 +392,6 @@ def generate_power_flow_data_distributed(
                         topology_generator,
                         generation_generator,
                         admittance_generator,
-                        args.settings.no_stats,
                         file_paths["error_log"],
                         args.settings.dcpf,
                     )
@@ -436,22 +413,18 @@ def generate_power_flow_data_distributed(
 
                     # Gather results
                     processed_data = []
-                    global_stats = Stats() if not args.settings.no_stats else None
 
                     for result in results:
                         (
                             e,
                             traceback,
                             local_processed_data,
-                            local_stats,
                         ) = result.get()
                         if isinstance(e, Exception):
                             print(f"Error in process_scenario_chunk: {e}")
                             print(traceback)
                             sys.exit(1)
                         processed_data.extend(local_processed_data)
-                        if not args.settings.no_stats and local_stats:
-                            global_stats.merge(local_stats)
 
                     pool.close()
                     pool.join()
@@ -460,13 +433,12 @@ def generate_power_flow_data_distributed(
                 _save_generated_data(
                     net,
                     processed_data,
-                    global_stats,
                     file_paths,
                     base_path,
                     args,
                 )
 
-                del processed_data, global_stats
+                del processed_data
                 gc.collect()
 
     # Plot features
@@ -476,7 +448,7 @@ def generate_power_flow_data_distributed(
             plot_feature_distributions(
                 file_paths["bus_data"],
                 file_paths["feature_plots"],
-                net.sn_mva,
+                net.baseMVA,
                 args.settings.dcpf,
             )
         else:

@@ -41,7 +41,10 @@ def test_data_validation(config_path):
 
     args = NestedNamespace(**config_dict)
     args.load.scenarios = 5
-    args.settings.data_dir = f"./tests/test_data_validation/{config_name}"
+    # Isolate outputs per xdist worker to avoid cross-worker cleanup and clashes
+    worker = os.environ.get("PYTEST_XDIST_WORKER", "local")
+    base_dir = f"./tests/test_data_validation_{worker}"
+    args.settings.data_dir = f"{base_dir}/{config_name}"
 
     # Generate and validate data
     file_paths = generate_power_flow_data_distributed(args, plot=False)
@@ -49,15 +52,17 @@ def test_data_validation(config_path):
     validate_generated_data(file_paths, mode, n_scenarios=10)
 
 
-@pytest.fixture(scope="module", autouse=True)
+@pytest.fixture(scope="session", autouse=True)
 def cleanup():
     """Clean up test data after tests complete."""
     yield
 
-    # clean tests/test_data_validation
-    if os.path.exists("./tests/test_data_validation"):
-        shutil.rmtree("./tests/test_data_validation")
-        print("Cleaned up: ./tests/test_data_validation")
+    # clean this worker's output directory only
+    worker = os.environ.get("PYTEST_XDIST_WORKER", "local")
+    base_dir = f"./tests/test_data_validation_{worker}"
+    if os.path.exists(base_dir):
+        shutil.rmtree(base_dir, ignore_errors=True)
+        print(f"Cleaned up: {base_dir}")
 
 
 if __name__ == "__main__":

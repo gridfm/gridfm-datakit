@@ -1,7 +1,8 @@
 import numpy as np
-import pandapower as pp
 from abc import ABC, abstractmethod
 from typing import Generator, List, Union
+from gridfm_datakit.network import Network
+from gridfm_datakit.utils.idx_cost import NCOST, COST
 
 
 class GenerationGenerator(ABC):
@@ -15,8 +16,8 @@ class GenerationGenerator(ABC):
     @abstractmethod
     def generate(
         self,
-        example_generator: Generator[pp.pandapowerNet, None, None],
-    ) -> Union[Generator[pp.pandapowerNet, None, None], List[pp.pandapowerNet]]:
+        example_generator: Generator[Network, None, None],
+    ) -> Union[Generator[Network, None, None], List[Network]]:
         """Generate generation perturbations.
 
         Args:
@@ -38,8 +39,8 @@ class NoGenPerturbationGenerator(GenerationGenerator):
 
     def generate(
         self,
-        example_generator: Generator[pp.pandapowerNet, None, None],
-    ) -> Generator[pp.pandapowerNet, None, None]:
+        example_generator: Generator[Network, None, None],
+    ) -> Generator[Network, None, None]:
         """Yield the original examples without any perturbations.
 
         Args:
@@ -62,7 +63,7 @@ class PermuteGenCostGenerator(GenerationGenerator):
     generators of power grid networks.
     """
 
-    def __init__(self, base_net: pp.pandapowerNet) -> None:
+    def __init__(self, base_net: Network) -> None:
         """
         Initialize the gen-cost permuation generator.
 
@@ -70,13 +71,15 @@ class PermuteGenCostGenerator(GenerationGenerator):
             base_net: The base power network.
         """
         self.base_net = base_net
-        self.num_gens = len(base_net.poly_cost)
-        self.permute_cols = self.base_net.poly_cost.columns[2:]
+        self.num_gens = base_net.gens.shape[0]  # acount for deactivated generators
+        assert np.all(base_net.gencosts[:, NCOST] == base_net.gencosts[:, NCOST][0]), (
+            "All generators must have the same number of cost coefficients"
+        )
 
     def generate(
         self,
-        example_generator: Generator[pp.pandapowerNet, None, None],
-    ) -> Generator[pp.pandapowerNet, None, None]:
+        example_generator: Generator[Network, None, None],
+    ) -> Generator[Network, None, None]:
         """Generate a network with permuted generator cost coefficients.
 
         Args:
@@ -90,11 +93,8 @@ class PermuteGenCostGenerator(GenerationGenerator):
         """
         for scenario in example_generator:
             new_idx = np.random.permutation(self.num_gens)
-            scenario.poly_cost[self.permute_cols] = (
-                scenario.poly_cost[self.permute_cols]
-                .iloc[new_idx]
-                .reset_index(drop=True)
-            )
+            # Permute the rows (generators) of the cost coefficients (and NCOST, although we assume it is the same for all generators)
+            scenario.gencosts[:, NCOST:] = scenario.gencosts[:, NCOST:][new_idx]
             yield scenario
 
 
@@ -107,7 +107,7 @@ class PerturbGenCostGenerator(GenerationGenerator):
     from a uniform distribution.
     """
 
-    def __init__(self, base_net: pp.pandapowerNet, sigma: float) -> None:
+    def __init__(self, base_net: Network, sigma: float) -> None:
         """
         Initialize the gen-cost perturbation generator.
 
@@ -115,16 +115,20 @@ class PerturbGenCostGenerator(GenerationGenerator):
             base_net: The base power network.
         """
         self.base_net = base_net
-        self.num_gens = len(base_net.poly_cost)
-        self.perturb_cols = self.base_net.poly_cost.columns[2:]
+        self.num_gens = base_net.gens.shape[0]  # acount for deactivated generators
+        # assert all generators have the same number of cost coefficients
+        assert np.all(base_net.gencosts[:, NCOST] == base_net.gencosts[:, NCOST][0]), (
+            "All generators must have the same number of cost coefficients"
+        )
+        n_costs = int(base_net.gencosts[:, NCOST][0])
         self.lower = np.max([0.0, 1.0 - sigma])
         self.upper = 1.0 + sigma
-        self.sample_size = [self.num_gens, len(self.perturb_cols)]
+        self.sample_size = [self.num_gens, n_costs]
 
     def generate(
         self,
-        example_generator: Generator[pp.pandapowerNet, None, None],
-    ) -> Generator[pp.pandapowerNet, None, None]:
+        example_generator: Generator[Network, None, None],
+    ) -> Generator[Network, None, None]:
         """Generate a network with perturbed generator cost coefficients.
 
         Args:
@@ -146,7 +150,5 @@ class PerturbGenCostGenerator(GenerationGenerator):
                 high=self.upper,
                 size=self.sample_size,
             )
-            example.poly_cost[self.perturb_cols] = (
-                example.poly_cost[self.perturb_cols] * scale_fact
-            )
+            example.gencosts[:, COST:] = example.gencosts[:, COST:] * scale_fact
             yield example
