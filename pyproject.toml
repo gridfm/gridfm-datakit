@@ -30,6 +30,11 @@ dependencies = [
     "urllib3<2.0.0",
     "ipywidgets",
     "ipyfilechooser",
+    "scipy",
+    "juliacall",
+    "networkx",
+    "tqdm",
+    "fastparquet"
 ]
 
 authors = [
@@ -54,6 +59,7 @@ classifiers = [
 [project.scripts]
 gridfm_datakit = "gridfm_datakit.cli:main"
 
+
 [project.optional-dependencies]
 dev = [
   "mkdocs",
@@ -67,4 +73,6 @@ dev = [
 test = [
   "pytest",
   "pytest-cov",
+  "pyinstrument",
+  "pytest-xdist"
 ]

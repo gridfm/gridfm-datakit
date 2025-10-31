@@ -17,7 +17,7 @@ YAML dump of the configuration used for this run.
 
 ### Load Scenario Files
 
-#### `scenarios_{generator}.csv`
+#### `scenarios_{generator}.parquet`
 Load scenarios (per-element time series) produced by the selected load generator.
 
 #### `scenarios_{generator}.html`
@@ -48,7 +48,7 @@ Bus-level features for each processed scenario. Columns (BUS_COLUMNS):
 - **GS**: Shunt conductance at the bus (p.u. demanded at V = 1.0 p.u.)
 - **BS**: Shunt susceptance at the bus (p.u. injected at V = 1.0 p.u.)
 
-If `settings.dcpf=True`, also includes DC power flow columns (DC_BUS_COLUMNS):
+If `settings.mode=="pf"` and `settings.dcpf=True`, also includes DC power flow columns (DC_BUS_COLUMNS):
 - **Va_dc**: DC voltage angle (degrees)
 
 #### `gen_data.parquet`

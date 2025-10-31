@@ -41,10 +41,12 @@ def test_data_validation(config_path):
 
     args = NestedNamespace(**config_dict)
     args.load.scenarios = 5
+    args.topology_perturbation.n_topology_variants = 5
     # Isolate outputs per xdist worker to avoid cross-worker cleanup and clashes
     worker = os.environ.get("PYTEST_XDIST_WORKER", "local")
     base_dir = f"./tests/test_data_validation_{worker}"
     args.settings.data_dir = f"{base_dir}/{config_name}"
+
 
     # Generate and validate data
     file_paths = generate_power_flow_data_distributed(args, plot=False)

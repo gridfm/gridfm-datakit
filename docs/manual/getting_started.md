@@ -67,6 +67,8 @@ settings:
   overwrite: true # If true, overwrites existing files, if false, appends to files
   mode: "pf" # Mode of the script; options: pf, opf. pf: power flow data where one or more operating limits – the inequality constraints defined in OPF, e.g., voltage magnitude or branch limits – may be violated. opf:  datapoints for training OPF solvers, with cost-optimal dispatches that satisfy all operating limits (OPF-feasible)
   dcpf: false # If true, also stores the results of dc power flow (in addition to the results AC power flow)
+  pf_fast: true # Whether to use fast PF solver by default (compute_ac_pf from powermodels.jl); if false, uses Ipopt-based PF. Some networks e.g. case10000_goc do not work with pf_fast: true
+  enable_solver_logs: false # If true, write OPF/PF solver logs to {data_dir}/solver_log; PF fast ignores logging
 
 ```
 
@@ -85,6 +87,7 @@ The `mode` parameter controls how the power flow scenarios are generated and val
 - **Constraints**: Since the topology perturbations are performed after solving OPF, the inequality constraints of OPF (e.g. branch loading, voltage magnitude at PQ buses, generator bounds on reactive power, etc) might be violated.
 - **Use Case**: Training data for power flow, contingency analysis, etc
 - **Performance**: Faster as it avoids re-solving OPF for each perturbed scenario
+- **PF Solver Choice**: Controlled by `settings.pf_fast`. If `true`, uses the fast `compute_ac_pf` path. If `false`, uses the Ipopt-based AC PF for higher fidelity at the cost of speed.
 
 ## Data Validation
 
@@ -134,7 +137,7 @@ The data generation process writes the following artifacts under:
 - **tqdm.log**: Progress bar log.
 - **error.log**: Error messages captured during generation.
 - **args.log**: YAML dump of the configuration used for this run.
-- **scenarios_{generator}.csv**: Load scenarios (per-element time series) produced by the selected load generator.
+- **scenarios_{generator}.parquet**: Load scenarios (per-element time series) produced by the selected load generator.
 - **scenarios_{generator}.html**: Plot of the generated load scenarios.
 - **scenarios_{generator}.log**: Generator-specific notes (e.g., bounds for the global scaling factor when using `agg_load_profile`).
 - **bus_data.parquet**: Bus-level features for each processed scenario (columns `BUS_COLUMNS` and, if `settings.dcpf=True`, also `DC_BUS_COLUMNS`).

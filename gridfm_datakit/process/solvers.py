@@ -12,6 +12,7 @@ import tempfile
 import os
 from typing import Any, Dict
 from gridfm_datakit.network import Network
+from typing import Union
 
 
 def run_opf(net: Network, jl: Any) -> Dict[str, Any]:
@@ -35,7 +36,6 @@ def run_opf(net: Network, jl: Any) -> Dict[str, Any]:
         # Save network to temporary file
         net.to_mpc(temp_filename)
 
-        # Run OPF using the temporary file
         result = jl.run_opf(temp_filename)
 
         if str(result["termination_status"]) != "LOCALLY_SOLVED":
@@ -52,7 +52,7 @@ def run_opf(net: Network, jl: Any) -> Dict[str, Any]:
     # TODO: try warm start
 
 
-def run_pf(net: Network, jl: Any) -> Dict[str, Any]:
+def run_pf(net: Network, jl: Any, fast: Union[bool, None] = None) -> Dict[str, Any]:
     """Run Power Flow (PF) calculation using Julia interface.
 
     This function runs the power flow calculation using the Julia interface
@@ -68,6 +68,9 @@ def run_pf(net: Network, jl: Any) -> Dict[str, Any]:
     Raises:
         RuntimeError: If power flow fails to converge or encounters an error.
     """
+    if fast is None:
+        fast = True if net.buses.shape[0] < 10000 else False
+
     # Create a temporary file for the MATPOWER case
     with tempfile.NamedTemporaryFile(mode="w", suffix=".m", delete=False) as temp_file:
         temp_filename = temp_file.name
@@ -76,10 +79,13 @@ def run_pf(net: Network, jl: Any) -> Dict[str, Any]:
         # Save network to temporary file
         net.to_mpc(temp_filename)
 
-        # Run PF using the temporary file
-        result = jl.run_pf(temp_filename)
-
-        if str(result["termination_status"]) != "True":
+        # Run PF
+        result = jl.run_pf_fast(temp_filename) if fast else jl.run_pf(temp_filename)
+        if (
+            fast
+            and str(result["termination_status"]) != "True"
+            or (not fast and str(result["termination_status"]) != "LOCALLY_SOLVED")
+        ):
             raise RuntimeError(f"PF did not converge: {result['termination_status']}")
 
         return result
@@ -116,7 +122,7 @@ def run_dcpf(net: Network, jl: Any) -> Dict[str, Any]:
         # Save network to temporary file
         net.to_mpc(temp_filename)
 
-        # Run DC PF using the temporary file
+        # Run DCPF
         result = jl.run_dcpf(temp_filename)
 
         if str(result["termination_status"]) != "True":
@@ -138,6 +144,7 @@ def compare_pf_results(
     net: Network,
     jl: Any,
     case_name: str,
+    fast: bool,
     solver_type: str = "pf",
 ) -> bool:
     """Compare results from run_pf/run_opf (temp file) vs direct solve on original case file.
@@ -171,7 +178,7 @@ def compare_pf_results(
     print(f"Running {solver_name} on temporary file for {case_name}...")
     try:
         if solver_type == "pf":
-            temp_result = run_pf(net, jl)
+            temp_result = run_pf(net, jl, fast)
         else:  # opf
             temp_result = run_opf(net, jl)
         temp_converged = True
@@ -186,15 +193,23 @@ def compare_pf_results(
         raise FileNotFoundError(f"Original case file not found: {original_file_path}")
 
     print(f"Running {solver_name} directly on original file: {original_file_path}")
-    if solver_type == "pf":
-        original_result = jl.run_pf(original_file_path)
-    else:  # opf
-        original_result = jl.run_opf(original_file_path)
-    original_converged = (
-        str(original_result["termination_status"]) == "True"
-        if solver_type == "pf"
-        else str(original_result["termination_status"]) == "LOCALLY_SOLVED"
-    )
+    try:
+        if solver_type == "pf" and fast:
+            original_result = jl.run_pf_fast(original_file_path)
+            original_converged = str(original_result["termination_status"]) == "True"
+        elif solver_type == "pf" and not fast:
+            original_result = jl.run_pf(original_file_path)
+            original_converged = (
+                str(original_result["termination_status"]) == "LOCALLY_SOLVED"
+            )
+        elif solver_type == "opf":
+            original_result = jl.run_opf(original_file_path)
+            original_converged = (
+                str(original_result["termination_status"]) == "LOCALLY_SOLVED"
+            )
+    except Exception as e:
+        print(f"Error running {solver_name} directly on original file: {e}")
+        original_converged = False
 
     # Step 3: Compare results
     print(f"Comparing {solver_name} results for {case_name}...")

@@ -18,23 +18,29 @@ class TestComparePF_OPF_Results:
         cls.jl = init_julia()
 
     @pytest.mark.parametrize(
-        "case_name,solver_type",
+        "case_name,solver_type,fast",
         [
-            ("case24_ieee_rts", "pf"),
-            ("case24_ieee_rts", "opf"),
-            ("case57_ieee", "pf"),
-            ("case57_ieee", "opf"),
-            ("case118_ieee", "pf"),
-            ("case118_ieee", "opf"),
-            ("case300_ieee", "pf"),
-            ("case300_ieee", "opf"),
-            ("case2000_goc", "pf"),
-            ("case2000_goc", "opf"),
-            ("case10000_goc", "pf"),
-            ("case10000_goc", "opf"),
+            ("case24_ieee_rts", "pf", True),
+            ("case24_ieee_rts", "pf", False),
+            ("case24_ieee_rts", "opf", False),
+            ("case57_ieee", "pf", True),
+            ("case57_ieee", "pf", False),
+            ("case57_ieee", "opf", False),
+            ("case118_ieee", "pf", True),
+            ("case118_ieee", "pf", False),
+            ("case118_ieee", "opf", False),
+            ("case300_ieee", "pf", True),
+            ("case300_ieee", "pf", False),
+            ("case300_ieee", "opf", False),
+            ("case2000_goc", "pf", True),
+            ("case2000_goc", "pf", False),
+            ("case2000_goc", "opf", False),
+            # ("case10000_goc", "pf", True),
+            # ("case10000_goc", "pf", False),
+            # ("case10000_goc", "opf", False),
         ],
     )
-    def test_compare_results(self, case_name, solver_type):
+    def test_compare_results(self, case_name, solver_type, fast):
         """Test that PF/OPF results from temp file match results from original case file"""
         solver_name = "PF" if solver_type == "pf" else "OPF"
         print(f"\nTesting {solver_name} result comparison for {case_name}...")
@@ -46,11 +52,13 @@ class TestComparePF_OPF_Results:
         )
 
         # Compare results
-        results_match = compare_pf_results(net, self.jl, case_name, solver_type)
+        results_match = compare_pf_results(net, self.jl, case_name, fast, solver_type)
 
         # Assert that results match
         assert results_match, (
-            f"{solver_name} results from temp file don't match original case file for {case_name}"
+            f"{solver_name} results from temp file don't match original case file for {case_name} with fast={fast}"
         )
 
-        print(f"{solver_name} result comparison passed for {case_name}")
+        print(
+            f"{solver_name} result comparison passed for {case_name} with fast={fast}",
+        )

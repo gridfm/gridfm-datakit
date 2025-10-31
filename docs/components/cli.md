@@ -69,6 +69,24 @@ This command:
 
 The statistics help assess dataset quality, identify constraint violations (overloads), and verify power balance consistency. See the [stats module](../components/stats.md) documentation for details.
 
+### Feature Plots
+
+Plot distributions for all bus features across buses and save PNGs:
+
+```bash
+gridfm_datakit plots path/to/data/directory [--output-dir DIR] [--sn-mva 100]
+```
+
+**Arguments:**
+- `data_path`: Path containing `bus_data.parquet`
+- `--output-dir DIR` (optional): Where to save plots (default: `data_path/feature_plots`)
+- `--sn-mva` (optional): Base MVA to normalize Pd/Qd/Pg/Qg (default: 100)
+
+**Examples:**
+```bash
+# Generate feature plots into the default directory (data_path/feature_plots)
+gridfm_datakit plots ./data_out/case24_ieee_rts/raw
+
 ## Validation Checks
 
 The validation command performs the following checks:

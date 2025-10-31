@@ -13,6 +13,7 @@ from gridfm_datakit.utils.column_names import (
     DC_BUS_COLUMNS,
     BRANCH_COLUMNS,
 )
+import os
 from typing import Tuple, List, Union, Dict, Any, Optional
 from gridfm_datakit.network import makeYbus, branch_vectors
 import copy
@@ -47,13 +48,18 @@ from gridfm_datakit.perturbations.admittance_perturbation import AdmittanceGener
 import traceback
 from gridfm_datakit.network import Network
 from gridfm_datakit.utils.idx_bus import BUS_I, PD, QD
+import multiprocessing
 
 
-def init_julia() -> Any:
+def init_julia(solver_log_dir: str = None) -> Any:
     """Initialize Julia interface with PowerModels.jl.
 
-    Sets up Julia environment with required packages and defines
-    power flow and optimal power flow functions.
+    Sets up Julia environment and defines AC OPF/PF/DCPF entrypoints.
+
+    Args:
+        solver_log_dir: If provided, enable OPF/PF logging to files under this
+            directory using per-process names (opf_<proc>.log, pf_<proc>.log).
+            If None, logging is disabled.
 
     Returns:
         Julia interface object for running power flow calculations.
@@ -61,53 +67,150 @@ def init_julia() -> Any:
     Raises:
         RuntimeError: If Julia initialization fails.
     """
-    # TODO: check if juliacall already initialized
     from juliacall import Main as jl
 
+    # Decide log paths and Ipopt print levels
+    proc = multiprocessing.current_process().name
+
+    opf_solver_log_file = (
+        ""
+        if solver_log_dir is None
+        else os.path.join(solver_log_dir, "opf_" + str(proc) + ".log")
+    )
+    pf_solver_log_file = (
+        ""
+        if solver_log_dir is None
+        else os.path.join(solver_log_dir, "pf_" + str(proc) + ".log")
+    )
+
+    print_level = 0 if solver_log_dir is None else 5
+
     try:
+        # Base imports and logging config in Julia
         jl.seval("""
         using PowerModels
         using Ipopt
         using Memento
         Memento.config!("not_set")
+        """)
 
-
-        function run_opf(case_file)
-            result = solve_ac_opf(case_file, optimizer_with_attributes(Ipopt.Optimizer, "print_level" => 0, "tol" => 1e-6))
+        # ----- AC-OPF core -----
+        jl.seval(
+            """
+        function _run_opf_core(case_file)
+            result = solve_ac_opf(
+                case_file,
+                optimizer_with_attributes(
+                    Ipopt.Optimizer,
+                    "tol" => 1e-6,
+                    "print_level" => {},
+                ),
+            )
             result["solution"]["pf"] = false
             return result
         end
+        """.format(print_level),
+        )
 
-        function run_pf(case_file)
-            # Solve AC power flow
+        # run_opf: either alias to core (no logging) or wrap with redirection (logging)
+        if opf_solver_log_file == "":
+            jl.seval("""
+            const run_opf = _run_opf_core
+            """)
+        else:
+            jl.seval(
+                """
+            function run_opf(case_file)
+                open("{}", "a") do io
+                    redirect_stdout(io) do
+                        redirect_stderr(io) do
+                            return _run_opf_core(case_file)
+                        end
+                    end
+                end
+            end
+            """.format(opf_solver_log_file),
+            )
+
+        # ----- Fast PF (direct computation) -----
+        jl.seval("""
+        function run_pf_fast(case_file)
             network = PowerModels.parse_file(case_file)
             result = compute_ac_pf(network)
 
-            # Return immediately if the solver did not converge
             if result["termination_status"] == false
                 return result
             end
 
-            # Update network data
             update_data!(network, result["solution"])
-
-            # Compute branch flows
             flows = calc_branch_flow_ac(network)
 
             result["solution"]["branch"] = flows["branch"]
             result["solution"]["pf"] = true
             return result
         end
+        """)
 
+        # ----- AC-PF core -----
+        jl.seval(
+            """
+        function _run_pf_core(case_file)
+            network = PowerModels.parse_file(case_file)
+            result = solve_ac_pf(
+                network,
+                optimizer_with_attributes(
+                    Ipopt.Optimizer,
+                    "tol" => 1e-6,
+                    "print_level" => {},
+                ),
+            )
 
+            if string(result["termination_status"]) != "LOCALLY_SOLVED"
+                return result
+            end
+
+            update_data!(network, result["solution"])
+            flows = calc_branch_flow_ac(network)
+
+            result["solution"]["branch"] = flows["branch"]
+            result["solution"]["pf"] = true
+            return result
+        end
+        """.format(print_level),
+        )
+
+        # run_pf: either alias to core (no logging) or wrap with redirection (logging)
+        if pf_solver_log_file == "":
+            jl.seval("""
+            const run_pf = _run_pf_core
+            """)
+        else:
+            jl.seval(
+                """
+            function run_pf(case_file)
+                open("{}", "a") do io
+                    redirect_stdout(io) do
+                        redirect_stderr(io) do
+                            return _run_pf_core(case_file)
+                        end
+                    end
+                end
+            end
+            """.format(pf_solver_log_file),
+            )
+
+        # ----- DCPF -----
+        jl.seval("""
         function run_dcpf(case_file)
             result = compute_dc_pf(case_file)
             result["solution"]["pf"] = true
             return result
         end
         """)
+
     except Exception as e:
-        raise RuntimeError(f"Error initializing Julia: {e}")
+        raise RuntimeError("Error initializing Julia: {}".format(e))
+
     return jl
 
 
@@ -135,11 +238,8 @@ def pf_preprocessing(net: Network, res: Dict[str, Any]) -> Network:
         for i in range(net.buses.shape[0])
     ]
 
-    initial_pg = net.Pg_gen.copy()
     net.Pg_gen = pg
     net.Vm = vm
-    new_pg = net.Pg_gen
-    assert not np.allclose(initial_pg, new_pg), "Pg has not changed"
 
     return net
 
@@ -355,6 +455,8 @@ def process_scenario_pf_mode(
     local_processed_data: List[np.ndarray],
     error_log_file: str,
     dcpf: bool,
+    pf_fast: bool,
+    solver_log_dir: str,
 ) -> List[np.ndarray]:
     """Processes a load scenario in PF mode
 
@@ -376,7 +478,7 @@ def process_scenario_pf_mode(
     Returns:
         Updated list of processed data (bus, gen, branch, Y_bus arrays)
     """
-    jl = init_julia()
+    jl = init_julia(solver_log_dir)
     net = copy.deepcopy(net)
 
     # apply the load scenario to the network
@@ -427,7 +529,7 @@ def process_scenario_pf_mode(
                 [np.nan for i in range(perturbation.buses.shape[0])],
             )
         try:
-            res = run_pf(perturbation, jl)
+            res = run_pf(perturbation, jl, fast=pf_fast)
         except Exception as e:
             with open(error_log_file, "a") as f:
                 f.write(
@@ -455,6 +557,8 @@ def process_scenario_chunk(
     admittance_generator: AdmittanceGenerator,
     error_log_path: str,
     dcpf: bool,
+    pf_fast: bool,
+    solver_log_dir: str,
 ) -> Tuple[
     Union[None, Exception],
     Union[None, str],
@@ -498,6 +602,7 @@ def process_scenario_chunk(
                     local_processed_data,
                     error_log_path,
                     dcpf,
+                    solver_log_dir,
                 )
             elif mode == "pf":
                 local_processed_data = process_scenario_pf_mode(
@@ -510,6 +615,8 @@ def process_scenario_chunk(
                     local_processed_data,
                     error_log_path,
                     dcpf,
+                    pf_fast,
+                    solver_log_dir,
                 )
 
             progress_queue.put(1)  # update queue
@@ -539,6 +646,7 @@ def process_scenario_opf_mode(
     local_processed_data: List[np.ndarray],
     error_log_file: str,
     dcpf: bool,
+    solver_log_dir: str,
 ) -> List[np.ndarray]:
     """Processes a load scenario in OPF mode
 
@@ -560,7 +668,7 @@ def process_scenario_opf_mode(
     Returns:
         Updated list of processed data (bus, gen, branch, Y_bus arrays)
     """
-    jl = init_julia()
+    jl = init_julia(solver_log_dir)
 
     # apply the load scenario to the network
     net.Pd = scenarios[:, scenario_index, 0]
@@ -578,21 +686,6 @@ def process_scenario_opf_mode(
     for perturbation in (
         perturbations
     ):  # (that returns copies of the network with the topology perturbation applied)
-        try:
-            # run DCPF to get the bus voltages (just for benchmarking purposes)
-            res = run_dcpf(perturbation, jl)
-            perturbation.res_dc_va_rad = [
-                res["solution"]["bus"][str(i + 1)]["va"]
-                for i in range(perturbation.buses.shape[0])
-            ]
-        except Exception as e:
-            perturbation.res_dc_va_rad = np.array(
-                [np.nan for i in range(perturbation.buses.shape[0])],
-            )
-            with open(error_log_file, "a") as f:
-                f.write(
-                    f"Caught an exception at scenario {scenario_index} in rundcopp function: {e}\n",
-                )
         try:
             # run OPF to get the gen set points. Here the set points account for the topology perturbation.
             res = run_opf(perturbation, jl)

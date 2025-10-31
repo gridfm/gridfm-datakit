@@ -9,7 +9,21 @@ from gridfm_datakit.generate import (
     generate_power_flow_data_distributed,
 )
 from gridfm_datakit.validation import validate_generated_data
-from gridfm_datakit.utils.stats import plot_stats
+from gridfm_datakit.utils.stats import plot_stats, plot_feature_distributions
+
+
+def pm_setup() -> None:
+    """Set up Julia packages required for PowerModels.jl."""
+    from juliacall import Main as jl
+
+    jl.seval(
+        """
+        using Pkg
+        Pkg.add("Ipopt")
+        Pkg.add("PowerModels")
+        Pkg.add("Memento")
+        """,
+    )
 
 
 def validate_data_directory(data_path: str, n_scenarios: int = 100) -> bool:
@@ -101,6 +115,12 @@ Examples:
 
   # Compute statistics from generated data
   gridfm-datakit stats /path/to/data/
+
+  # Plot bus feature distributions
+  gridfm-datakit plots /path/to/data/
+
+  # Set up Julia packages for PowerModels
+  gridfm-datakit setup_pm
         """,
     )
 
@@ -145,6 +165,35 @@ Examples:
         help="Path to directory containing generated parquet files (bus_data.parquet, branch_data.parquet, gen_data.parquet)",
     )
 
+    # Plots command
+    plots_parser = subparsers.add_parser(
+        "plots",
+        help="Plot distributions for all bus features across buses",
+    )
+    plots_parser.add_argument(
+        "data_path",
+        type=str,
+        help="Path to directory containing bus_data.parquet",
+    )
+    plots_parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Directory to write feature plots (default: data_path/feature_plots)",
+    )
+    plots_parser.add_argument(
+        "--sn-mva",
+        type=float,
+        default=100.0,
+        help="Base MVA used to normalize Pd/Qd/Pg/Qg (default: 100)",
+    )
+
+    # Setup PM command
+    subparsers.add_parser(
+        "setup_pm",
+        help="Set up Julia packages required for PowerModels.jl (Ipopt, PowerModels, Memento)",
+    )
+
     args = parser.parse_args()
 
     if args.command == "generate":
@@ -176,6 +225,37 @@ Examples:
         plot_stats(args.data_path)
         print("\nStatistics computation completed!")
         sys.exit(0)
+
+    elif args.command == "plots":
+        data_dir = Path(args.data_path)
+        bus_file = data_dir / "bus_data.parquet"
+        if not bus_file.exists():
+            print(f"ERROR: {bus_file} not found")
+            sys.exit(1)
+
+        output_dir = args.output_dir or str(data_dir / "feature_plots")
+        print(
+            f"Plotting bus feature distributions from {bus_file} -> {output_dir}",
+        )
+        plot_feature_distributions(
+            node_file=str(bus_file),
+            output_dir=output_dir,
+            sn_mva=args.sn_mva,
+        )
+        print("\nFeature plots generated!")
+        sys.exit(0)
+
+    elif args.command == "setup_pm":
+        print("Setting up Julia packages for PowerModels.jl...")
+        print("This may take a few minutes...")
+        try:
+            pm_setup()
+            print("\nJulia packages installed successfully!")
+            print("Installed packages: Ipopt, PowerModels, Memento")
+            sys.exit(0)
+        except Exception as e:
+            print(f"\nERROR: Failed to set up Julia packages: {e}")
+            sys.exit(1)
 
     else:
         parser.print_help()

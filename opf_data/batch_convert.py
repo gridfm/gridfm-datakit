@@ -77,7 +77,6 @@ def convert_one(
     scenario: int,
     atol: float,
     rtol: float,
-    n_1: bool,
 ) -> Tuple[List[dict], List[dict], List[dict], List[dict]]:
     require(
         "grid" in data and "solution" in data,
@@ -265,6 +264,7 @@ def convert_one(
         branch_rows.append(
             {
                 "scenario": scenario,
+                "idx": k,
                 "from_bus": f,
                 "to_bus": t,
                 "pf": pf * baseMVA,
@@ -280,6 +280,7 @@ def convert_one(
                 "Ytt_r": Ytt.real,
                 "Ytt_i": Ytt.imag,
                 "tap": tap,
+                "shift": 0.0,
                 "ang_min": np.rad2deg(angmin),
                 "ang_max": np.rad2deg(angmax),
                 "rate_a": rate_a * baseMVA,
@@ -295,6 +296,8 @@ def convert_one(
         add_to_Y(t, t, Ytt)
         add_to_Y(f, t, Yft)
         add_to_Y(t, f, Ytf)
+
+    n_lines = len(branch_rows)
 
     # Transformers
     for k in range(ntf):
@@ -336,6 +339,7 @@ def convert_one(
         branch_rows.append(
             {
                 "scenario": scenario,
+                "idx": n_lines + k,
                 "from_bus": f,
                 "to_bus": t,
                 "pf": pf * baseMVA,
@@ -351,6 +355,7 @@ def convert_one(
                 "Ytt_r": Ytt.real,
                 "Ytt_i": Ytt.imag,
                 "tap": tap_mag,
+                "shift": shift,
                 "ang_min": np.rad2deg(angmin),
                 "ang_max": np.rad2deg(angmax),
                 "rate_a": rate_a * baseMVA,
@@ -405,23 +410,24 @@ def convert_one(
             },
         )
 
+    slack_buses = np.where(np.array(btype) == 3)[0]
+    # assert only one slack bus
+    assert len(slack_buses) == 1, "There should be exactly one slack bus"
+    slack_bus = slack_buses[0]
+
     # ---- Generator rows and cost check ----
     cost = 0.0
     gen_rows: List[dict] = []
     for g in range(ng):
         (mbase, pg0, pmin, pmax, qg0, qmin, qmax, vg, c2, c1, c0) = gens[g][:11]
-        assert mbase == baseMVA, (
-            f"Generator mbase mismatch. mbase: {mbase}, baseMVA: {baseMVA}"
-        )
         bus_of_g = gen_link["receivers"][g]
         p_mw, q_mvar = gen_sol[g]
         cost += c0 + c1 * p_mw + c2 * (p_mw) ** 2
         gen_rows.append(
             {
                 "scenario": scenario,
+                "idx": g,
                 "bus": bus_of_g,
-                "et": "gen",
-                "element": g,
                 "p_mw": p_mw * baseMVA,
                 "q_mvar": q_mvar * baseMVA,
                 "min_p_mw": pmin * baseMVA,
@@ -431,10 +437,8 @@ def convert_one(
                 "cp0_eur": c0,
                 "cp1_eur_per_mw": c1 * baseMVA,
                 "cp2_eur_per_mw2": c2 * baseMVA**2,
-                "is_gen": 1,
-                "is_sgen": 0,
-                "is_ext_grid": 0,
                 "in_service": 1,
+                "is_slack_gen": 1 if bus_of_g == slack_bus else 0,
             },
         )
 
@@ -460,7 +464,7 @@ def convert_one(
 
 
 def process_one(args):
-    jf, scen_idx, atol, rtol, n_1 = args
+    jf, scen_idx, atol, rtol = args
     with open(jf, "r") as f:
         data = json.load(f)
     return convert_one(
@@ -468,7 +472,6 @@ def process_one(args):
         scenario=scen_idx,
         atol=atol,
         rtol=rtol,
-        n_1=n_1,
     )
 
 
@@ -477,8 +480,12 @@ def process_one(args):
 
 def append_df(out_path: Path, df: pd.DataFrame):
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    header = not out_path.exists()
-    df.to_csv(out_path, mode="a", header=header, index=False)
+    df.to_parquet(
+        out_path,
+        append=True if out_path.exists() else False,
+        index=False,
+        engine="fastparquet",
+    )
 
 
 # ---------- Main driver (chunked + append) ----------
@@ -493,17 +500,11 @@ def main():
         help="Directory containing example*.json files (searched recursively).",
     )
     parser.add_argument("out_dir", help="Directory for aggregated CSV outputs.")
-    parser.add_argument("network", help="Network name (without pglib prefix).")
-    parser.add_argument(
-        "--n-1",
-        type=bool,
-        required=True,
-        help="True if using N-1, False if using FullTop",
-    )
+
     parser.add_argument(
         "--chunk-size",
         type=int,
-        default=20000,
+        default=2000,
         help="Files per processing chunk (default: 100).",
     )
     parser.add_argument(
@@ -561,8 +562,7 @@ def main():
 
         # Prepare args for multiprocessing
         pool_args = [
-            (jf, scen_idx, args.atol, args.rtol, args.n_1)
-            for jf, scen_idx in chunk_items
+            (jf, scen_idx, args.atol, args.rtol) for jf, scen_idx in chunk_items
         ]
 
         # ---- Multiprocessing pool ----
@@ -594,7 +594,7 @@ def main():
 
         # Sort within the chunk to maintain global ordering upon append
         branch_df = pd.DataFrame(all_branch).sort_values(
-            by=["scenario", "from_bus", "to_bus"],
+            by=["scenario", "idx"],
             kind="mergesort",
         )
         bus_df = pd.DataFrame(all_bus).sort_values(
@@ -602,7 +602,7 @@ def main():
             kind="mergesort",
         )
         gen_df = pd.DataFrame(all_gen).sort_values(
-            by=["scenario", "bus", "element"],
+            by=["scenario", "bus", "idx"],
             kind="mergesort",
         )
         ybus_df = pd.DataFrame(all_ybus).sort_values(

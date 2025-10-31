@@ -95,15 +95,14 @@ def test_fail_prepare_network_and_scenarios():
         net, scenarios = _prepare_network_and_scenarios(args, file_paths)
 
 
-def test_fail_prepare_network_and_scenarios_config():
+def test_fail_prepare_network_and_scenarios_config(conf):
     """
     Tests if preparing network and scenarios fails with an invalid grid source in the configuration file
     """
-    config = "tests/config/default_pf_mode.yaml"
-    args, base_path, file_paths = _setup_environment(config)
-    args.network.source = "invalid_source"  # Set invalid source
+    args, base_path, file_paths = _setup_environment(conf)
+    conf.network.source = "invalid_source"  # Set invalid source
     with pytest.raises(ValueError, match="Invalid grid source!"):
-        net, scenarios = _prepare_network_and_scenarios(args, file_paths)
+        net, scenarios = _prepare_network_and_scenarios(conf, file_paths)
 
 
 # Test save network function
@@ -209,6 +208,9 @@ def test_setup_environment_overwrite_behavior():
                 "data_dir": tmpdir,
                 "overwrite": False,
                 "dcpf": False,
+                "enable_solver_logs": False,
+                "pf_fast": False,
+                "mode": "opf",
             },
             "network": {"name": "case24_ieee_rts"},
             # minimal required sections for downstream functions
@@ -283,3 +285,29 @@ def test_parquet_append_vs_overwrite():
         assert len(df_bus_3) <= len(df_bus_2) - n_bus_1, (
             "Bus rows should reset when overwrite=True"
         )
+
+
+def test_dcpf_presence_in_pf_mode_absent_in_opf_mode():
+    """Ensure DCPF data is generated in PF mode but not in OPF mode, even if dcpf=true."""
+    worker = os.environ.get("PYTEST_XDIST_WORKER", "local")
+
+    # PF mode with dcpf=true
+    with open("tests/config/default_pf_mode.yaml", "r") as f:
+        cfg_pf = yaml.safe_load(f)
+    cfg_pf["settings"]["data_dir"] = f"./tests/test_data_pf_mode_{worker}"
+    pf_paths = generate_power_flow_data_distributed(cfg_pf, plot=False)
+    df_pf = pd.read_parquet(pf_paths["bus_data"], engine="fastparquet")
+    assert "Va_dc" in df_pf.columns, "Va_dc should exist in PF mode when dcpf=true"
+    # check at least one row has Va_dc not nan
+    assert df_pf["Va_dc"].notna().any(), "At least one row should have Va_dc not nan"
+
+    # OPF mode with dcpf=true
+    with open("tests/config/default_opf_mode.yaml", "r") as f:
+        cfg_opf = yaml.safe_load(f)
+    cfg_opf["settings"]["data_dir"] = f"./tests/test_data_opf_mode_{worker}"
+    cfg_opf["settings"]["dcpf"] = True
+    opf_paths = generate_power_flow_data_distributed(cfg_opf, plot=False)
+    df_opf = pd.read_parquet(opf_paths["bus_data"], engine="fastparquet")
+    assert "Va_dc" not in df_opf.columns, (
+        "Va_dc should not exist in OPF mode even if dcpf=true"
+    )

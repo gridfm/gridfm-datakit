@@ -5,6 +5,7 @@ import os
 from gridfm_datakit.save import (
     save_node_edge_data,
 )
+import warnings
 from gridfm_datakit.process.process_network import (
     process_scenario_opf_mode,
     process_scenario_pf_mode,
@@ -65,22 +66,39 @@ def _setup_environment(
     else:
         args = config
 
+    # set dcpf to false if mode is "opf"
+    if args.settings.mode == "opf":
+        warnings.warn("dcpf is set to False for opf mode!")
+        args.settings.dcpf = False
+
     # Setup output directory
     base_path = os.path.join(args.settings.data_dir, args.network.name, "raw")
     if os.path.exists(base_path) and args.settings.overwrite:
         shutil.rmtree(base_path)
     os.makedirs(base_path, exist_ok=True)
 
+    # Setup solver logs directory under data_dir/solver_log
+    solver_log_dir = (
+        os.path.join(base_path, "solver_log")
+        if args.settings.enable_solver_logs
+        else None
+    )
+    os.makedirs(solver_log_dir, exist_ok=True) if solver_log_dir is not None else None
+
     # Setup file paths
     file_paths = {
         "tqdm_log": os.path.join(base_path, "tqdm.log"),
         "error_log": os.path.join(base_path, "error.log"),
         "args_log": os.path.join(base_path, "args.log"),
+        "solver_log_dir": solver_log_dir,
         "bus_data": os.path.join(base_path, "bus_data.parquet"),
         "branch_data": os.path.join(base_path, "branch_data.parquet"),
         "gen_data": os.path.join(base_path, "gen_data.parquet"),
         "y_bus_data": os.path.join(base_path, "y_bus_data.parquet"),
-        "scenarios": os.path.join(base_path, f"scenarios_{args.load.generator}.csv"),
+        "scenarios": os.path.join(
+            base_path,
+            f"scenarios_{args.load.generator}.parquet",
+        ),
         "scenarios_plot": os.path.join(
             base_path,
             f"scenarios_{args.load.generator}.html",
@@ -138,8 +156,11 @@ def _prepare_network_and_scenarios(
         file_paths["scenarios_log"],
     )
     scenarios_df = load_scenarios_to_df(scenarios)
-    scenarios_df.to_csv(file_paths["scenarios"], index=False)
-    plot_load_scenarios_combined(scenarios_df, file_paths["scenarios_plot"])
+    scenarios_df.to_parquet(file_paths["scenarios"], index=False, engine="fastparquet")
+    if net.buses.shape[0] <= 100:
+        plot_load_scenarios_combined(scenarios_df, file_paths["scenarios_plot"])
+    else:
+        print("Skipping plot of scenarios for large networks (number of buses > 100)")
 
     return net, scenarios
 
@@ -195,7 +216,7 @@ def generate_power_flow_data(
             'branch_data': branch-level features CSV (BRANCH_COLUMNS),
             'gen_data': generator features CSV (GEN_COLUMNS),
             'y_bus_data': Y-bus nonzero entries CSV,
-            'scenarios': load scenarios CSV,
+            'scenarios': load scenarios Parquet,
             'scenarios_plot': load scenarios plot HTML,
             'scenarios_log': load scenario generation log,
             'feature_plots': feature distribution plots directory
@@ -211,7 +232,7 @@ def generate_power_flow_data(
         - branch_data.parquet: Branch-level features for each scenario
         - gen_data.parquet: Generator features for each scenario
         - y_bus_data.parquet: Nonzero Y-bus entries for each scenario
-        - scenarios_{generator}.csv: Load scenarios (per-element time series)
+        - scenarios_{generator}.parquet: Load scenarios (per-element time series)
         - scenarios_{generator}.html: Load scenario plots
         - scenarios_{generator}.log: Load scenario generation notes
         - feature_plots/: Feature distribution violin plots (if bus_data.parquet exists)
@@ -260,6 +281,7 @@ def generate_power_flow_data(
                         processed_data,
                         file_paths["error_log"],
                         args.settings.dcpf,
+                        file_paths["solver_log_dir"],
                     )
                 elif args.settings.mode == "pf":
                     processed_data = process_scenario_pf_mode(
@@ -272,6 +294,8 @@ def generate_power_flow_data(
                         processed_data,
                         file_paths["error_log"],
                         args.settings.dcpf,
+                        args.settings.pf_fast,
+                        file_paths["solver_log_dir"],
                     )
                 else:
                     raise ValueError("Invalid mode!")
@@ -292,7 +316,6 @@ def generate_power_flow_data(
             file_paths["bus_data"],
             file_paths["feature_plots"],
             net.baseMVA,
-            args.settings.dcpf,
         )
     else:
         print("No node data file generated. Skipping feature plotting.")
@@ -326,7 +349,7 @@ def generate_power_flow_data_distributed(
         - branch_data.parquet: Branch-level features for each scenario
         - gen_data.parquet: Generator features for each scenario
         - y_bus_data.parquet: Nonzero Y-bus entries for each scenario
-        - scenarios_{generator}.csv: Load scenarios (per-element time series)
+        - scenarios_{generator}.parquet: Load scenarios (per-element time series)
         - scenarios_{generator}.html: Load scenario plots
         - scenarios_{generator}.log: Load scenario generation notes
         - feature_plots/: Feature distribution violin plots (if bus_data.parquet exists)
@@ -394,6 +417,8 @@ def generate_power_flow_data_distributed(
                         admittance_generator,
                         file_paths["error_log"],
                         args.settings.dcpf,
+                        args.settings.pf_fast,
+                        file_paths["solver_log_dir"],
                     )
                     for chunk in scenario_chunks
                 ]
@@ -423,7 +448,7 @@ def generate_power_flow_data_distributed(
                         if isinstance(e, Exception):
                             print(f"Error in process_scenario_chunk: {e}")
                             print(traceback)
-                            sys.exit(1)
+                            sys.exit(e)
                         processed_data.extend(local_processed_data)
 
                     pool.close()
@@ -449,7 +474,6 @@ def generate_power_flow_data_distributed(
                 file_paths["bus_data"],
                 file_paths["feature_plots"],
                 net.baseMVA,
-                args.settings.dcpf,
             )
         else:
             print("No node data file generated. Skipping feature plotting.")

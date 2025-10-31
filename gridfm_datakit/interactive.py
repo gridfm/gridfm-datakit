@@ -93,6 +93,8 @@ def create_config() -> Dict[str, Any]:
             "overwrite": overwrite.value,
             "mode": str(mode.value),
             "dcpf": dcpf.value,
+            "pf_fast": pf_fast.value,
+            "enable_solver_logs": enable_solver_logs.value,
         },
     }
     return config
@@ -428,7 +430,15 @@ def interactive_interface() -> None:
 
     # Execution Settings
 
-    global num_processes, data_dir, large_chunk_size, overwrite, mode, dcpf
+    global \
+        num_processes, \
+        data_dir, \
+        large_chunk_size, \
+        overwrite, \
+        mode, \
+        dcpf, \
+        pf_fast, \
+        enable_solver_logs
     num_processes = widgets.IntSlider(
         value=10,
         min=1,
@@ -490,6 +500,22 @@ def interactive_interface() -> None:
     dcpf = widgets.Checkbox(
         value=False,
         description="Include DC Power Flow results (Va_dc columns)",
+        style={"description_width": "100px"},
+        layout=widgets.Layout(width="500px"),
+    )
+
+    # PF fast option
+    pf_fast = widgets.Checkbox(
+        value=True,
+        description="Use fast PF when solving PF (does not work with all networks)",
+        style={"description_width": "100px"},
+        layout=widgets.Layout(width="500px"),
+    )
+
+    # Enable solver logs option
+    enable_solver_logs = widgets.Checkbox(
+        value=False,
+        description="Enable OPF/PF solver logs (only for debugging)",
         style={"description_width": "100px"},
         layout=widgets.Layout(width="500px"),
     )
@@ -697,6 +723,8 @@ def interactive_interface() -> None:
             mode,
             overwrite,
             dcpf,
+            pf_fast,
+            enable_solver_logs,
         ],
         layout=widgets.Layout(
             border="2px solid #EFEBE9",

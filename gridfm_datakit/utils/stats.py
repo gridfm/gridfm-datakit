@@ -83,7 +83,7 @@ def compute_stats_from_data(data_dir: str) -> Dict[str, np.ndarray]:
     active_br = active_br.assign(_loading=loading)
 
     n_overloads_s = (
-        (active_br["_loading"] > 1.0)
+        (active_br["_loading"] > 1.01)
         .groupby(active_br["scenario"], sort=False)
         .sum()
         .reindex(scenarios, fill_value=0)
@@ -233,7 +233,6 @@ def plot_feature_distributions(
     node_file: str,
     output_dir: str,
     sn_mva: float,
-    dcpf: bool,
     buses: List[int] = None,
 ) -> None:
     """Create and save violin plots showing the distribution of each feature across all buses.
@@ -280,7 +279,7 @@ def plot_feature_distributions(
     bus_groups = node_data.groupby("bus")
     sorted_buses = sorted(bus_groups.groups.keys())
 
-    if dcpf:
+    if "Va_dc" in node_data.columns:
         feature_cols = BUS_COLUMNS + DC_BUS_COLUMNS
     else:
         feature_cols = BUS_COLUMNS

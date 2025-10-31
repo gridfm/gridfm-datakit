@@ -15,3 +15,5 @@ tests/test_data
 build/
 baseline_perturbations/
 opf_baseline_perturbations/
+extract_results.ipynb
+opf_data/data

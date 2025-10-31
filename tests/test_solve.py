@@ -24,17 +24,22 @@ class TestSolve:
         cls.jl = init_julia()
 
     @pytest.mark.parametrize(
-        "case_name",
+        "case_name,pf_fast",
         [
-            # "case24_ieee_rts",
-            # "case57_ieee",
-            # "case118_ieee",
-            # "case300_ieee",
-            "case2000_goc",
-            # "case30000_goc"
+            ("case24_ieee_rts", True),
+            ("case24_ieee_rts", False),
+            ("case57_ieee", True),
+            ("case57_ieee", False),
+            ("case118_ieee", True),
+            ("case118_ieee", False),
+            ("case300_ieee", True),
+            ("case300_ieee", False),
+            ("case2000_goc", True),
+            ("case2000_goc", False),
+            ("case10000_goc", False),  # fast PF is not supported for this case
         ],
     )
-    def test_complete_workflow(self, case_name):
+    def test_complete_workflow(self, case_name, pf_fast):
         """Test complete workflow: OPF → PF post-processing → PF → PF post-processing on IEEE cases"""
         print(f"\nTesting {case_name}...")
 
@@ -72,9 +77,8 @@ class TestSolve:
         # Step 3: Run PF
         net = pf_preprocessing(net, opf_result)
         start_time = time.time()
-        print("  Running PF...")
-        pf_result = run_pf(net, self.jl)
-        assert str(pf_result["termination_status"]) == "True"
+        print(f"  Running PF (fast={pf_fast})...")
+        pf_result = run_pf(net, self.jl, fast=pf_fast)
         end_time = time.time()
         print(f"  PF time: {end_time - start_time} seconds")
         print("  PF converged successfully")

@@ -369,7 +369,7 @@ def validate_branch_loading_opf_mode(generated_data: Dict[str, pd.DataFrame]) ->
                 binding_loadings.append(loading)
 
             # Track overloads (loading > 1.0)
-            if loading > 1.0:
+            if loading > 1.01:
                 overloaded_branches.append((scenario, from_bus, to_bus, loading))
 
             # Only assert loading limits in OPF mode

@@ -18,30 +18,35 @@ This library is brought to you by the GridFM team to generate power flow data to
 ---
 
 
-
-## Comparison with other PF datasets/ libraries
-
-| Feature                                                    | GraphNeuralSolver [\[1\]](https://doi.org/10.1016/j.epsr.2020.106547) | OPFData [\[2\]](https://arxiv.org/abs/2406.07234) | OPFLearn [\[3\]](https://arxiv.org/abs/2111.01228) | PowerFlowNet [\[4\]](https://arxiv.org/abs/2311.03415) | TypedGNN [\[5\]](https://doi.org/10.1016/j.engappai.2022.105567) | PF△ [\[6\]](https://www.climatechange.ai/papers/iclr2025/67) | **PGLearn** [\[7\]](https://openreview.net/pdf?id=cecIf0CKnH) | **gridfm-datakit** [\[8\]](https://www.cell.com/joule/fulltext/S2542-4351(24)00470-7) |
-| ---------------------------------------------------------- | ----------------- | ------- | -------- | ------------- | -------- | --- | ----------------------------- | ---------- |
-| Generator Profile                                          | ✅                | ❌      | ❌       | ✅            | ✅       | ✅  | ❌                            | ✅         |
-| N-1                                                        | ❌                | ✅      | ❌       | ❌            | ✅       | ✅  | ✅                            | ✅         |
-| > 1000 Buses                                               | ❌                | ✅      | ✅       | ❌            | ❌       | ✅  | ✅                            | ✅         |
-| N-k, k > 1                                                 | ❌                | ❌      | ❌       | ❌            | ❌       | ❌  | ❌                            | ✅         |
-| Load Scenarios from Real World Data                        | ❌                | ❌      | ❌       | ❌            | ❌       | ❌  | ❌                            | ✅         |
-| Net Param Perturbation                                     | ✅                | ❌      | ❌       | ✅            | ✅       | ❌  | ❌                            | ✅         |
-| Multi-processing and scalable to very large (1M+) datasets | ❌                | ❌      | ❌       | ❌            | ❌       | ❌  | ✅                            | ✅         |
-
-
 # Installation
 
 1. ⭐ Star the [repository](https://github.com/gridfm/gridfm-datakit) on GitHub to support the project!
 
-2. Run:
+2. Install gridfm-datakit
 
     ```bash
     python -m pip install --upgrade pip  # Upgrade pip
     pip install gridfm-datakit
     ```
+
+3. Install Julia with Powermodels and Ipopt
+
+    ```bash
+    gridfm_datakit setup_pm
+    ```
+
+### For Developers
+
+To install the latest development version from GitHub, follow these steps instead of step 2.
+
+```bash
+git clone https://github.com/gridfm/gridfm-datakit.git
+cd "gridfm-datakit"
+python3 -m venv venv
+source venv/bin/activate
+python -m pip install --upgrade pip  # Upgrade pip to ensure compatibility with pyproject.toml
+pip3 install -e '.[test,dev]'
+```
 
 # Getting Started
 
@@ -120,7 +125,7 @@ The data generation process writes the following artifacts under:
 - **tqdm.log**: Progress bar log.
 - **error.log**: Error messages captured during generation.
 - **args.log**: YAML dump of the configuration used for this run.
-- **scenarios_{generator}.csv**: Load scenarios (per-element time series) produced by the selected load generator.
+- **scenarios_{generator}.parquet**: Load scenarios (per-element time series) produced by the selected load generator.
 - **scenarios_{generator}.html**: Plot of the generated load scenarios.
 - **scenarios_{generator}.log**: Generator-specific notes (e.g., bounds for the global scaling factor when using `agg_load_profile`).
 - **bus_data.parquet**: Bus-level features for each processed scenario (columns `BUS_COLUMNS` and, if `settings.dcpf=True`, also `DC_BUS_COLUMNS`).
