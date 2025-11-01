@@ -47,7 +47,6 @@ def test_data_validation(config_path):
     base_dir = f"./tests/test_data_validation_{worker}"
     args.settings.data_dir = f"{base_dir}/{config_name}"
 
-
     # Generate and validate data
     file_paths = generate_power_flow_data_distributed(args, plot=False)
     mode = args.settings.mode

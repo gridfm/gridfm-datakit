@@ -59,3 +59,11 @@ BRANCH_COLUMNS = [
     "rate_a",
     "br_status",
 ]
+
+
+YBUS_COLUMNS = [
+    "index1",
+    "index2",
+    "G",
+    "B",
+]

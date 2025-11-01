@@ -7,7 +7,13 @@ to provide comprehensive validation of generated power flow data.
 
 import pandas as pd
 import numpy as np
-from typing import Dict
+from typing import Dict, Iterable
+from gridfm_datakit.utils.column_names import (
+    BUS_COLUMNS,
+    BRANCH_COLUMNS,
+    GEN_COLUMNS,
+    YBUS_COLUMNS,
+)
 
 
 def validate_generated_data(
@@ -48,6 +54,17 @@ def validate_generated_data(
     except Exception as e:
         raise AssertionError(f"Scenario indexing consistency validation failed: {e}")
 
+    # Run Data Integrity Tests
+    try:
+        validate_bus_indexing_consistency(generated_data)
+    except Exception as e:
+        raise AssertionError(f"Bus indexing consistency validation failed: {e}")
+
+    try:
+        validate_data_completeness(generated_data)
+    except Exception as e:
+        raise AssertionError(f"Data completeness validation failed: {e}")
+
     # Sample scenarios if n_scenarios is provided to avoid too long validation times
     if n_scenarios > 0:
         max_scenarios = len(generated_data["bus_data"]["scenario"].unique())
@@ -71,17 +88,6 @@ def validate_generated_data(
         print(
             f"Sampled {len(sampled_scenarios)} scenarios for validation out of {max_scenarios}",
         )
-
-    # Run Data Integrity Tests
-    try:
-        validate_bus_indexing_consistency(generated_data)
-    except Exception as e:
-        raise AssertionError(f"Bus indexing consistency validation failed: {e}")
-
-    try:
-        validate_data_completeness(generated_data)
-    except Exception as e:
-        raise AssertionError(f"Data completeness validation failed: {e}")
 
     # Run Y-Bus Consistency Tests
     try:
@@ -713,8 +719,21 @@ def validate_bus_indexing_consistency(generated_data: Dict[str, pd.DataFrame]) -
     print("    Bus indexing consistency: OK")
 
 
+def _require_columns(df: pd.DataFrame, name: str, required: Iterable[str]) -> None:
+    missing = set(required) - set(df.columns)
+    assert not missing, f"{name}: missing required columns {sorted(missing)}"
+
+
+def _check_no_nan(df: pd.DataFrame, name: str, required: Iterable[str]) -> None:
+    if df[required].isna().any().any():
+        for col in required:
+            assert not df[col].isna().any(), (
+                f"{name}: column '{col}' contains NaN values"
+            )
+
+
 def validate_data_completeness(generated_data: Dict[str, pd.DataFrame]) -> None:
-    """Test that all required columns are present and no critical data is missing."""
+    """Test that all required columns are present and contain no NaN values."""
     bus_data = generated_data["bus_data"]
     branch_data = generated_data["branch_data"]
     gen_data = generated_data["gen_data"]
@@ -725,27 +744,33 @@ def validate_data_completeness(generated_data: Dict[str, pd.DataFrame]) -> None:
         f"    Data completeness: validating {total_entries} total entries across 4 data files",
     )
 
-    assert "scenario" in bus_data.columns, "Bus data should have scenario column"
-    assert "scenario" in branch_data.columns, "Branch data should have scenario column"
-    assert "scenario" in gen_data.columns, "Generator data should have scenario column"
-    assert "scenario" in y_bus_data.columns, "Y-bus data should have scenario column"
+    # 1) Ensure 'scenario' column exists everywhere
+    for name, df in [
+        ("Bus data", bus_data),
+        ("Branch data", branch_data),
+        ("Generator data", gen_data),
+        ("Y-bus data", y_bus_data),
+    ]:
+        assert "scenario" in df.columns, f"{name} should have scenario column"
 
-    assert not bus_data["bus"].isna().any(), "Bus indices should not be missing"
-    assert not bus_data["Vm"].isna().any(), "Voltage magnitudes should not be missing"
-    assert not branch_data["from_bus"].isna().any(), (
-        "Branch from_bus should not be missing"
-    )
-    assert not branch_data["to_bus"].isna().any(), "Branch to_bus should not be missing"
-    assert not gen_data["bus"].isna().any(), (
-        "Generator bus indices should not be missing"
-    )
+    # 2) Check required columns exist and contain no NaN values
+    _require_columns(bus_data, "Bus data", BUS_COLUMNS)
+    _require_columns(branch_data, "Branch data", BRANCH_COLUMNS)
+    _require_columns(gen_data, "Generator data", GEN_COLUMNS)
+    _require_columns(y_bus_data, "Y-bus data", YBUS_COLUMNS)
 
+    _check_no_nan(bus_data, "Bus data", BUS_COLUMNS)
+    _check_no_nan(branch_data, "Branch data", BRANCH_COLUMNS)
+    _check_no_nan(gen_data, "Generator data", GEN_COLUMNS)
+    _check_no_nan(y_bus_data, "Y-bus data", YBUS_COLUMNS)
+
+    # 3) Non-emptiness
     assert len(bus_data) > 0, "Bus data should not be empty"
     assert len(branch_data) > 0, "Branch data should not be empty"
     assert len(gen_data) > 0, "Generator data should not be empty"
     assert len(y_bus_data) > 0, "Y-bus data should not be empty"
 
-    print("    Data completeness: OK")
+    print("    Data completeness: OK (all required columns present and NaN-free)")
 
 
 if __name__ == "__main__":

@@ -6,14 +6,14 @@ Batch converter for grid/solution JSONs under a data_dir, processed in chunks.
 
 Key behavior per your request:
 - Processes input files in fixed-size chunks (default: 100).
-- After each chunk, sorts rows within the chunk and APPENDS them to the final CSVs.
+- After each chunk, sorts rows within the chunk and APPENDS them to the final parquets.
 - No end-of-run concatenation step.
-- By default, pre-existing final CSVs are removed at startup to avoid duplication.
+- By default, pre-existing final parquets are removed at startup to avoid duplication.
 
 Final outputs (continuously appended per chunk, globally sorted due to monotone scenario ordering + per-chunk sort):
-  - branch_data.parquet      (sorted by: scenario, from_bus, to_bus)
+  - branch_data.parquet      (sorted by: scenario, idx)
   - bus_data.parquet         (sorted by: scenario, bus)
-  - gen_data.parquet         (sorted by: scenario, bus, element)
+  - gen_data.parquet         (sorted by: scenario, bus, idx)
   - y_bus_data.parquet       (sorted by: scenario, index1, index2)
 """
 
@@ -493,13 +493,13 @@ def append_df(out_path: Path, df: pd.DataFrame):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Batch-convert JSON grid/solution files to aggregated CSVs with Ybus validation (chunked, append-per-chunk).",
+        description="Batch-convert JSON grid/solution files to aggregated parquets with Ybus validation (chunked, append-per-chunk).",
     )
     parser.add_argument(
         "data_dir",
         help="Directory containing example*.json files (searched recursively).",
     )
-    parser.add_argument("out_dir", help="Directory for aggregated CSV outputs.")
+    parser.add_argument("out_dir", help="Directory for aggregated parquet outputs.")
 
     parser.add_argument(
         "--chunk-size",
@@ -530,11 +530,11 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # Clean outputs unless resuming
-    branch_csv = out_dir / "branch_data.parquet"
-    bus_csv = out_dir / "bus_data.parquet"
-    gen_csv = out_dir / "gen_data.parquet"
-    ybus_csv = out_dir / "y_bus_data.parquet"
-    for p in (branch_csv, bus_csv, gen_csv, ybus_csv):
+    branch_parquet = out_dir / "branch_data.parquet"
+    bus_parquet = out_dir / "bus_data.parquet"
+    gen_parquet = out_dir / "gen_data.parquet"
+    ybus_parquet = out_dir / "y_bus_data.parquet"
+    for p in (branch_parquet, bus_parquet, gen_parquet, ybus_parquet):
         try:
             p.unlink()
         except FileNotFoundError:
@@ -580,41 +580,39 @@ def main():
             )
 
         # results is a list of tuples: (b_rows, u_rows, g_rows, y_rows)
+        print("Aggregating chunk results...")
         all_branch = []
         all_bus = []
         all_gen = []
         all_ybus = []
 
-        for r in results:
+        for r in tqdm(results, desc="Aggregating", leave=False):
             b_rows, u_rows, g_rows, y_rows = r
             all_branch.extend(b_rows)
             all_bus.extend(u_rows)
             all_gen.extend(g_rows)
             all_ybus.extend(y_rows)
 
-        # Sort within the chunk to maintain global ordering upon append
-        branch_df = pd.DataFrame(all_branch).sort_values(
-            by=["scenario", "idx"],
-            kind="mergesort",
-        )
-        bus_df = pd.DataFrame(all_bus).sort_values(
-            by=["scenario", "bus"],
-            kind="mergesort",
-        )
-        gen_df = pd.DataFrame(all_gen).sort_values(
-            by=["scenario", "bus", "idx"],
-            kind="mergesort",
-        )
-        ybus_df = pd.DataFrame(all_ybus).sort_values(
-            by=["scenario", "index1", "index2"],
-            kind="mergesort",
-        )
+        print("Sorting chunk dataframes...")
 
-        # Append to final CSVs
-        append_df(branch_csv, branch_df)
-        append_df(bus_csv, bus_df)
-        append_df(gen_csv, gen_df)
-        append_df(ybus_csv, ybus_df)
+        def fast_df(rows: List[dict]) -> pd.DataFrame:
+            if not rows:
+                return pd.DataFrame()
+            keys = rows[0].keys()
+            return pd.DataFrame.from_records(rows, columns=keys)
+
+        branch_df = fast_df(all_branch)
+        bus_df = fast_df(all_bus)
+        gen_df = fast_df(all_gen)
+        ybus_df = fast_df(all_ybus)
+        
+        
+        # Append to final parquets
+        print("Appending chunk dataframes to final parquets...")
+        append_df(branch_parquet, branch_df)
+        append_df(bus_parquet, bus_df)
+        append_df(gen_parquet, gen_df)
+        append_df(ybus_parquet, ybus_df)
 
 
 if __name__ == "__main__":
