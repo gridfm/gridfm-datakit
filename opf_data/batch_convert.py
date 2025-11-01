@@ -605,8 +605,7 @@ def main():
         bus_df = fast_df(all_bus)
         gen_df = fast_df(all_gen)
         ybus_df = fast_df(all_ybus)
-        
-        
+
         # Append to final parquets
         print("Appending chunk dataframes to final parquets...")
         append_df(branch_parquet, branch_df)
