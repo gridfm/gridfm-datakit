@@ -91,7 +91,7 @@ class TestComparePF_OPF_Results_AllPGLib:
     @classmethod
     def setup_class(cls):
         """Initialize Julia once for all test parameters."""
-        cls.jl = init_julia()
+        cls.jl = init_julia(max_iter=150)
 
     @pytest.mark.parametrize(
         "case_name,solver_type",

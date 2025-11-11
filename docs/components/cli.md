@@ -17,7 +17,7 @@ gridfm-datakit generate path/to/config.yaml
 
 **Example:**
 ```bash
-gridfm-datakit generate scripts/config/case24_ieee_rts.yaml
+gridfm-datakit generate scripts/config/default.yaml
 ```
 
 ### Validate Data
@@ -69,30 +69,32 @@ This command:
 
 The statistics help assess dataset quality, identify constraint violations (overloads), and verify power balance consistency. See the [stats module](../components/stats.md) documentation for details.
 
-### Feature Plots
+### Plots
 
-Plot distributions for all bus features across buses and save PNGs:
+Generate violin plots for all bus features and save them to disk:
 
 ```bash
-gridfm_datakit plots path/to/data/directory [--output-dir DIR] [--sn-mva 100]
+gridfm-datakit plots path/to/data/directory [--output-dir DIR] [--sn-mva 100]
 ```
 
 **Arguments:**
 - `data_path`: Path containing `bus_data.parquet`
-- `--output-dir DIR` (optional): Where to save plots (default: `data_path/feature_plots`)
-- `--sn-mva` (optional): Base MVA to normalize Pd/Qd/Pg/Qg (default: 100)
+- `--output-dir DIR` (optional): Directory where plots are saved (default: `data_path/feature_plots`)
+- `--sn-mva` (optional): Base MVA used to normalize Pd/Qd/Pg/Qg (default: 100)
 
-**Examples:**
+**Example:**
 ```bash
-# Generate feature plots into the default directory (data_path/feature_plots)
-gridfm_datakit plots ./data_out/case24_ieee_rts/raw
+gridfm-datakit plots ./data_out/case24_ieee_rts/raw --sn-mva 100
+```
+
+This command reads `bus_data.parquet`, normalizes power columns by `sn_mva`, and writes violin plots named `distribution_{feature_name}.png` to the output directory for quick visualization of feature distributions.
 
 ## Validation Checks
 
 The validation command performs the following checks:
 
 ### Y-Bus Consistency
-- Consistancy of bus admittance matrix with branch admittance data
+- Consistency of bus admittance matrix with branch admittance data
 - Y-bus matrix structure validation
 
 ### Branch Constraints

@@ -24,7 +24,7 @@ gridfm-datakit generate path/to/config.yaml
 
 Refer to the sections [Network](network.md), [Load Scenarios](load_scenarios.md), and [Topology perturbations](topology_perturbations.md) for a description of the configuration parameters.
 
-Sample configuration files are provided in `scripts/config`, e.g. `case24_ieee_rts.yaml`:
+Sample configuration files are provided in `scripts/config`, e.g. `default.yaml`:
 
 ```yaml
 network:
@@ -66,8 +66,9 @@ settings:
   large_chunk_size: 1000 # Number of load scenarios processed before saving
   overwrite: true # If true, overwrites existing files, if false, appends to files
   mode: "pf" # Mode of the script; options: pf, opf. pf: power flow data where one or more operating limits – the inequality constraints defined in OPF, e.g., voltage magnitude or branch limits – may be violated. opf:  datapoints for training OPF solvers, with cost-optimal dispatches that satisfy all operating limits (OPF-feasible)
-  dcpf: false # If true, also stores the results of dc power flow (in addition to the results AC power flow)
+  include_dc_res: true # If true, also stores the results of dc power flow and dc optimal power flow
   pf_fast: true # Whether to use fast PF solver by default (compute_ac_pf from powermodels.jl); if false, uses Ipopt-based PF. Some networks e.g. case10000_goc do not work with pf_fast: true
+  dcpf_fast: true # Whether to use fast DC PF solver (compute_dc_pf from powermodels.jl); if false, uses optimizer-based DC PF
   enable_solver_logs: false # If true, write OPF/PF solver logs to {data_dir}/solver_log; PF fast ignores logging
 
 ```
@@ -83,7 +84,7 @@ The `mode` parameter controls how the power flow scenarios are generated and val
 - **Performance**: Slower due to OPF solving for each scenario
 
 ### Power Flow Mode (`mode: "pf"`)
-- **Generation**: Solves OPF for base topology, then applies topology perturbations and solves Power Flow (whithout changing the generator setpoints)
+- **Generation**: Solves OPF for base topology, then applies topology perturbations and solves Power Flow (without changing the generator setpoints)
 - **Constraints**: Since the topology perturbations are performed after solving OPF, the inequality constraints of OPF (e.g. branch loading, voltage magnitude at PQ buses, generator bounds on reactive power, etc) might be violated.
 - **Use Case**: Training data for power flow, contingency analysis, etc
 - **Performance**: Faster as it avoids re-solving OPF for each perturbed scenario
@@ -127,6 +128,14 @@ This generates `stats_plot.png` showing distributions of:
 
 The plots help assess dataset quality and identify scenarios with constraint violations or balance errors.
 
+To visualize individual feature distributions across buses, run:
+
+```bash
+gridfm-datakit plots ./data_out/case24_ieee_rts/raw --sn-mva 100
+```
+
+This command saves violin plots for each feature to `feature_plots/` (or a custom directory specified with `--output-dir`).
+
 <br>
 
 # Output Files
@@ -140,10 +149,9 @@ The data generation process writes the following artifacts under:
 - **scenarios_{generator}.parquet**: Load scenarios (per-element time series) produced by the selected load generator.
 - **scenarios_{generator}.html**: Plot of the generated load scenarios.
 - **scenarios_{generator}.log**: Generator-specific notes (e.g., bounds for the global scaling factor when using `agg_load_profile`).
-- **bus_data.parquet**: Bus-level features for each processed scenario (columns `BUS_COLUMNS` and, if `settings.dcpf=True`, also `DC_BUS_COLUMNS`).
+- **bus_data.parquet**: Bus-level features for each processed scenario (columns `BUS_COLUMNS` and, if `settings.include_dc_res=True`, also `DC_BUS_COLUMNS`).
 - **gen_data.parquet**: Generator features per scenario (columns `GEN_COLUMNS`).
 - **branch_data.parquet**: Branch features per scenario (columns `BRANCH_COLUMNS`).
 - **y_bus_data.parquet**: Nonzero Y-bus entries per scenario with columns `[scenario, index1, index2, G, B]`.
-- **stats.csv**: (if `settings.no_stats=False`) Aggregated statistics collected during generation.
+- **stats.parquet**: (if `settings.no_stats=False`) Aggregated statistics collected during generation.
 - **stats_plot.html**: (if `settings.no_stats=False`) HTML dashboard of the aggregated statistics.
-- **feature_plots/**: Created if `bus_data.parquet` exists; contains violin plots per feature named `distribution_{feature_name}.png`.

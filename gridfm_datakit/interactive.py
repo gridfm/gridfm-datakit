@@ -92,9 +92,11 @@ def create_config() -> Dict[str, Any]:
             "large_chunk_size": large_chunk_size.value,
             "overwrite": overwrite.value,
             "mode": str(mode.value),
-            "dcpf": dcpf.value,
+            "include_dc_res": include_dc_res.value,
             "pf_fast": pf_fast.value,
+            "dcpf_fast": dcpf_fast.value,
             "enable_solver_logs": enable_solver_logs.value,
+            "max_iter": max_iter.value,
         },
     }
     return config
@@ -250,9 +252,9 @@ def interactive_interface() -> None:
     )
 
     num_scenarios = widgets.IntSlider(
-        value=200,
+        value=10000,
         min=10,
-        max=30000,
+        max=10000,
         step=10,
         description="Load Scenarios:",
         style={"description_width": "150px"},
@@ -294,8 +296,8 @@ def interactive_interface() -> None:
 
     max_scaling_factor = widgets.FloatSlider(
         value=4.0,
-        min=1.0,
-        max=10.0,
+        min=0.7,
+        max=4.0,
         step=0.1,
         description="Max Scaling:",
         style={"description_width": "150px"},
@@ -304,9 +306,9 @@ def interactive_interface() -> None:
     )
 
     step_size = widgets.FloatSlider(
-        value=0.025,
-        min=0.01,
-        max=0.1,
+        value=0.1,
+        min=0.05,
+        max=0.2,
         step=0.005,
         description="Step Size:",
         style={"description_width": "150px"},
@@ -315,7 +317,7 @@ def interactive_interface() -> None:
     )
 
     start_scaling_factor = widgets.FloatSlider(
-        value=0.8,
+        value=1.0,
         min=0.1,
         max=2.0,
         step=0.1,
@@ -329,7 +331,7 @@ def interactive_interface() -> None:
 
     global k, n_topology_variants, perturbation_type, elements
     k = widgets.IntSlider(
-        value=2,
+        value=1,
         min=1,
         max=10,
         step=1,
@@ -340,9 +342,9 @@ def interactive_interface() -> None:
     )
 
     n_topology_variants = widgets.IntSlider(
-        value=5,
+        value=20,
         min=1,
-        max=20,
+        max=50,
         step=1,
         description="Top. Variants per load scenario:",
         style={"description_width": "200px"},
@@ -364,12 +366,10 @@ def interactive_interface() -> None:
 
     elements = widgets.SelectMultiple(
         options=[
-            ("line", "line"),
-            ("trafo", "trafo"),
+            ("branch", "branch"),
             ("gen", "gen"),
-            ("sgen", "sgen"),
         ],
-        value=["line", "trafo", "gen", "sgen"],
+        value=["branch", "gen"],
         description="Elements to Drop:",
         style={"description_width": "150px"},
         layout=widgets.Layout(width="550px", height="120px"),
@@ -436,13 +436,15 @@ def interactive_interface() -> None:
         large_chunk_size, \
         overwrite, \
         mode, \
-        dcpf, \
+        include_dc_res, \
         pf_fast, \
-        enable_solver_logs
+        dcpf_fast, \
+        enable_solver_logs, \
+        max_iter
     num_processes = widgets.IntSlider(
-        value=10,
+        value=16,
         min=1,
-        max=16,
+        max=32,
         step=1,
         description="Parallel Processes:",
         style={"description_width": "150px"},
@@ -451,7 +453,7 @@ def interactive_interface() -> None:
     )
 
     data_dir = widgets.Text(
-        value="data/",
+        value="./data_out",
         description="Output Directory:",
         placeholder="e.g., data/, /path/to/output",
         style={"description_width": "150px"},
@@ -459,9 +461,9 @@ def interactive_interface() -> None:
     )
 
     large_chunk_size = widgets.IntSlider(
-        value=200,
+        value=1000,
         min=10,
-        max=500,
+        max=10000,
         step=10,
         description="Chunk Size:",
         style={"description_width": "150px"},
@@ -497,9 +499,9 @@ def interactive_interface() -> None:
     )
 
     # DC Power Flow option
-    dcpf = widgets.Checkbox(
-        value=False,
-        description="Include DC Power Flow results (Va_dc columns)",
+    include_dc_res = widgets.Checkbox(
+        value=True,
+        description="Include DC PF/ OPF results",
         style={"description_width": "100px"},
         layout=widgets.Layout(width="500px"),
     )
@@ -512,12 +514,31 @@ def interactive_interface() -> None:
         layout=widgets.Layout(width="500px"),
     )
 
-    # Enable solver logs option
-    enable_solver_logs = widgets.Checkbox(
-        value=False,
-        description="Enable OPF/PF solver logs (only for debugging)",
+    dcpf_fast = widgets.Checkbox(
+        value=True,
+        description="Use fast DCPF when solving DC PF (compute_dc_pf)",
         style={"description_width": "100px"},
         layout=widgets.Layout(width="500px"),
+    )
+
+    # Enable solver logs option
+    enable_solver_logs = widgets.Checkbox(
+        value=True,
+        description="Enable OPF/PF solver logs",
+        style={"description_width": "100px"},
+        layout=widgets.Layout(width="500px"),
+    )
+
+    # Max iterations for Ipopt-based solvers
+    max_iter = widgets.IntSlider(
+        value=200,
+        min=50,
+        max=1000,
+        step=50,
+        description="Max Iterations (Ipopt):",
+        style={"description_width": "150px"},
+        layout=widgets.Layout(width="550px"),
+        readout_format="d",
     )
 
     # Load Configuration - Advanced Box
@@ -722,9 +743,11 @@ def interactive_interface() -> None:
             large_chunk_size,
             mode,
             overwrite,
-            dcpf,
+            include_dc_res,
             pf_fast,
+            dcpf_fast,
             enable_solver_logs,
+            max_iter,
         ],
         layout=widgets.Layout(
             border="2px solid #EFEBE9",

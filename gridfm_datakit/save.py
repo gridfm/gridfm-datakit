@@ -9,12 +9,16 @@ import os
 import pandas as pd
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 from gridfm_datakit.utils.column_names import (
     BUS_COLUMNS,
     DC_BUS_COLUMNS,
     GEN_COLUMNS,
+    DC_GEN_COLUMNS,
     BRANCH_COLUMNS,
+    DC_BRANCH_COLUMNS,
+    RUNTIME_COLUMNS,
+    DC_RUNTIME_COLUMNS,
 )
 from gridfm_datakit.network import Network
 
@@ -29,12 +33,12 @@ def _process_and_save(args: Tuple[str, List[np.ndarray], str, int, int, bool]) -
             - path: Output file path
             - last_scenario: Last scenario index processed
             - n_buses: Number of buses in the network
-            - dcpf: Whether DC power flow data is included
+            - include_dc_res: Whether DC power flow data is included
     """
-    data_type, processed_data, path, last_scenario, n_buses, dcpf = args
+    data_type, processed_data, path, last_scenario, n_buses, include_dc_res = args
 
     if data_type == "bus":
-        bus_columns = BUS_COLUMNS + DC_BUS_COLUMNS if dcpf else BUS_COLUMNS
+        bus_columns = BUS_COLUMNS + DC_BUS_COLUMNS if include_dc_res else BUS_COLUMNS
         bus_data = np.concatenate([item[0] for item in processed_data], axis=0)
         df = pd.DataFrame(bus_data, columns=bus_columns)
         df["bus"] = df["bus"].astype("int64")
@@ -46,7 +50,7 @@ def _process_and_save(args: Tuple[str, List[np.ndarray], str, int, int, bool]) -
 
     elif data_type == "gen":
         gen_data = np.concatenate([item[1] for item in processed_data], axis=0)
-        df = pd.DataFrame(gen_data, columns=GEN_COLUMNS)
+        df = pd.DataFrame(gen_data, columns=GEN_COLUMNS + DC_GEN_COLUMNS if include_dc_res else GEN_COLUMNS)
         df["bus"] = df["bus"].astype("int64")
         scenario_indices = np.concatenate(
             [
@@ -58,7 +62,7 @@ def _process_and_save(args: Tuple[str, List[np.ndarray], str, int, int, bool]) -
 
     elif data_type == "branch":
         branch_data = np.concatenate([item[2] for item in processed_data], axis=0)
-        df = pd.DataFrame(branch_data, columns=BRANCH_COLUMNS)
+        df = pd.DataFrame(branch_data, columns=BRANCH_COLUMNS + DC_BRANCH_COLUMNS if include_dc_res else BRANCH_COLUMNS)
         df[["from_bus", "to_bus"]] = df[["from_bus", "to_bus"]].astype("int64")
         scenario_indices = np.concatenate(
             [
@@ -79,7 +83,18 @@ def _process_and_save(args: Tuple[str, List[np.ndarray], str, int, int, bool]) -
             ],
         )
         df.insert(0, "scenario", scenario_indices)
-
+        
+        
+    elif data_type == "runtime":
+        runtime_data = np.concatenate([item[4] for item in processed_data])
+        df = pd.DataFrame(runtime_data, columns=RUNTIME_COLUMNS + DC_RUNTIME_COLUMNS if include_dc_res else RUNTIME_COLUMNS)
+        scenario_indices = np.concatenate(
+            [
+                np.full(item[4].shape[0], last_scenario + 1 + i, dtype="int64")
+                for i, item in enumerate(processed_data)
+            ],
+        )
+        df.insert(0, "scenario", scenario_indices)
     else:
         raise ValueError(f"Unknown data type: {data_type}")
 
@@ -97,8 +112,9 @@ def save_node_edge_data(
     branch_path: str,
     gen_path: str,
     y_bus_path: str,
-    processed_data: List[Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]],
-    dcpf: bool = False,
+    runtime_path: str,
+    processed_data: List[Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]],
+    include_dc_res: bool = False,
 ) -> None:
     """Save processed power system data to parquet files using parallel processing.
 
@@ -112,7 +128,7 @@ def save_node_edge_data(
         gen_path: Path for saving generator data parquet file.
         y_bus_path: Path for saving Y-bus data parquet file.
         processed_data: List of tuples containing processed data arrays for each scenario.
-        dcpf: Whether DC power flow data is included in the output.
+        include_dc_res: Whether DC power flow data is included in the output.
     """
     n_buses = net.buses.shape[0]
 
@@ -129,10 +145,11 @@ def save_node_edge_data(
 
     # Define arguments per data type
     tasks = [
-        ("bus", processed_data, node_path, last_scenario, n_buses, dcpf),
-        ("gen", processed_data, gen_path, last_scenario, n_buses, dcpf),
-        ("branch", processed_data, branch_path, last_scenario, n_buses, dcpf),
-        ("y_bus", processed_data, y_bus_path, last_scenario, n_buses, dcpf),
+        ("bus", processed_data, node_path, last_scenario, n_buses, include_dc_res),
+        ("gen", processed_data, gen_path, last_scenario, n_buses, include_dc_res),
+        ("branch", processed_data, branch_path, last_scenario, n_buses, include_dc_res),
+        ("y_bus", processed_data, y_bus_path, last_scenario, n_buses, include_dc_res),
+        ("runtime", processed_data, runtime_path, last_scenario, n_buses, include_dc_res),
     ]
 
     with ThreadPoolExecutor(max_workers=4) as pool:

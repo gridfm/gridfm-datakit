@@ -2,7 +2,7 @@
 Power flow and optimal power flow solvers using Julia interface.
 
 This module provides functions for running power flow (PF), optimal power flow (OPF),
-and DC power flow (DCPF) calculations using Julia's PowerModels.jl package.
+DC power flow (DCPF), and DC optimal power flow (DC OPF) calculations using Julia's PowerModels.jl package.
 It also includes functionality for comparing results between temporary files
 and original case files.
 """
@@ -61,6 +61,7 @@ def run_pf(net: Network, jl: Any, fast: Union[bool, None] = None) -> Dict[str, A
     Args:
         net: A network object containing the power system model.
         jl: Julia interface object for running power flow.
+        fast: If True, use the direct (non-optimizer) computation. If None, defaults to False (uses optimizer-based solver).
 
     Returns:
         Power flow result containing termination status and solution data.
@@ -68,8 +69,8 @@ def run_pf(net: Network, jl: Any, fast: Union[bool, None] = None) -> Dict[str, A
     Raises:
         RuntimeError: If power flow fails to converge or encounters an error.
     """
-    if fast is None:
-        fast = True if net.buses.shape[0] < 10000 else False
+
+
 
     # Create a temporary file for the MATPOWER case
     with tempfile.NamedTemporaryFile(mode="w", suffix=".m", delete=False) as temp_file:
@@ -86,7 +87,7 @@ def run_pf(net: Network, jl: Any, fast: Union[bool, None] = None) -> Dict[str, A
             and str(result["termination_status"]) != "True"
             or (not fast and str(result["termination_status"]) != "LOCALLY_SOLVED")
         ):
-            raise RuntimeError(f"PF did not converge: {result['termination_status']}")
+            raise RuntimeError(f"PF did not converge: {result['termination_status']}, fast={fast}")
 
         return result
 
@@ -98,7 +99,7 @@ def run_pf(net: Network, jl: Any, fast: Union[bool, None] = None) -> Dict[str, A
             os.unlink(temp_filename)
 
 
-def run_dcpf(net: Network, jl: Any) -> Dict[str, Any]:
+def run_dcpf(net: Network, jl: Any, fast: Union[bool, None] = None) -> Dict[str, Any]:
     """Run DC Power Flow (DCPF) calculation using Julia interface.
 
     This function runs the DC power flow calculation using the Julia interface
@@ -107,6 +108,7 @@ def run_dcpf(net: Network, jl: Any) -> Dict[str, Any]:
     Args:
         net: A network object containing the power system model.
         jl: Julia interface object for running DC power flow.
+        fast: If True, use the direct (non-optimizer) computation. If None, defaults to False (uses optimizer-based solver).
 
     Returns:
         DC power flow result containing termination status and solution data.
@@ -114,6 +116,7 @@ def run_dcpf(net: Network, jl: Any) -> Dict[str, Any]:
     Raises:
         RuntimeError: If DC power flow fails to converge or encounters an error.
     """
+
     # Create a temporary file for the MATPOWER case
     with tempfile.NamedTemporaryFile(mode="w", suffix=".m", delete=False) as temp_file:
         temp_filename = temp_file.name
@@ -122,12 +125,16 @@ def run_dcpf(net: Network, jl: Any) -> Dict[str, Any]:
         # Save network to temporary file
         net.to_mpc(temp_filename)
 
-        # Run DCPF
-        result = jl.run_dcpf(temp_filename)
+        # Run DCPF (fast or standard)
+        result = jl.run_dcpf_fast(temp_filename) if fast else jl.run_dcpf(temp_filename)
 
-        if str(result["termination_status"]) != "True":
+        if (
+            fast
+            and str(result["termination_status"]) != "True"
+            or (not fast and str(result["termination_status"]) != "LOCALLY_SOLVED")
+        ):
             raise RuntimeError(
-                f"DC PF did not converge: {result['termination_status']}",
+                f"DC PF did not converge: {result['termination_status']}, fast={fast}",
             )
 
         return result
@@ -139,6 +146,47 @@ def run_dcpf(net: Network, jl: Any) -> Dict[str, Any]:
         if os.path.exists(temp_filename):
             os.unlink(temp_filename)
 
+
+def run_dcopf(net: Network, jl: Any) -> Dict[str, Any]:
+    """Run DC Optimal Power Flow (DC OPF) calculation using Julia interface.
+
+    This function runs the DC optimal power flow calculation using the Julia interface
+    and returns the result with termination status.
+
+    Args:
+        net: A network object containing the power system model.
+        jl: Julia interface object for running DC OPF.
+
+    Returns:
+        DC OPF result containing termination status and solution data.
+
+    Raises:
+        RuntimeError: If DC OPF fails to converge or encounters an error.
+    """
+    # Create a temporary file for the MATPOWER case
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".m", delete=False) as temp_file:
+        temp_filename = temp_file.name
+
+    try:
+        # Save network to temporary file
+        net.to_mpc(temp_filename)
+
+        # Run DC OPF
+        result = jl.run_dcopf(temp_filename)
+
+        if str(result["termination_status"]) != "LOCALLY_SOLVED":
+            raise RuntimeError(
+                f"DC OPF did not converge: {result['termination_status']}",
+            )
+
+        return result
+
+    except Exception as e:
+        raise RuntimeError(f"Error running DC OPF: {e}")
+    finally:
+        # Clean up temporary file
+        if os.path.exists(temp_filename):
+            os.unlink(temp_filename)
 
 def compare_pf_results(
     net: Network,

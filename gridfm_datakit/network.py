@@ -81,7 +81,6 @@ class Network:
         bus_index_mapping: Mapping from original to continuous bus indices.
         reverse_bus_index_mapping: Mapping from continuous to original bus indices.
         ref_bus_idx: Index of the reference bus.
-        res_dc_va_rad: DC power flow voltage angle results.
     """
 
     def __init__(self, mpc: Dict[str, Any]) -> None:
@@ -129,8 +128,7 @@ class Network:
             [self.bus_index_mapping[int(idx)] for idx in self.branches[:, T_BUS]],
         )
 
-        # initialize dc power flow voltage angle results
-        self.res_dc_va_rad = np.array([])
+
 
         # assert all generator buses are in bus IDs
         assert np.all(np.isin(self.gens[:, GEN_BUS], self.buses[:, BUS_I])), (

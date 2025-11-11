@@ -4,7 +4,7 @@ from gridfm_datakit.utils.param_handler import NestedNamespace
 
 
 if __name__ == "__main__":
-    yaml_path = "scripts/config/case24_ieee_rts.yaml"
+    yaml_path = "scripts/config/default.yaml"
 
     with open(yaml_path) as f:
         config_dict = yaml.safe_load(f)

@@ -26,8 +26,8 @@ def conf(request):
     This fixture reads the configuration files and returns both for parametrized testing.
     """
     config_paths = {
-        "opf": "tests/config/default_opf_mode.yaml",
-        "pf": "tests/config/default_pf_mode.yaml",
+        "opf": "tests/config/default_opf_mode_test.yaml",
+        "pf": "tests/config/default_pf_mode_test.yaml",
     }
 
     path = config_paths[request.param]
@@ -113,7 +113,7 @@ def test_save_generated_data():
     Uses config without perturbations to be sure scenarios converge
     """
     # Use config without perturbations to make sure we don't run into errors with perturbations
-    config_path = "tests/config/default_without_perturbation.yaml"
+    config_path = "tests/config/default_without_perturbation_test.yaml"
     with open(config_path, "r") as f:
         cfg = yaml.safe_load(f)
     args = NestedNamespace(**cfg)
@@ -207,7 +207,7 @@ def test_setup_environment_overwrite_behavior():
             "settings": {
                 "data_dir": tmpdir,
                 "overwrite": False,
-                "dcpf": False,
+                "include_dc_res": False,
                 "enable_solver_logs": False,
                 "pf_fast": False,
                 "mode": "opf",
@@ -251,7 +251,7 @@ def test_parquet_append_vs_overwrite():
     """
     with tempfile.TemporaryDirectory() as tmpdir:
         # Base config
-        with open("tests/config/default_without_perturbation.yaml", "r") as f:
+        with open("tests/config/default_without_perturbation_test.yaml", "r") as f:
             cfg = yaml.safe_load(f)
         args = NestedNamespace(**cfg)
         args.settings.data_dir = tmpdir
@@ -260,7 +260,7 @@ def test_parquet_append_vs_overwrite():
         args.settings.overwrite = True
         args.load.scenarios = 1
         args.load.generator = "powergraph"
-        file_paths = generate_power_flow_data_distributed(args, plot=False)
+        file_paths = generate_power_flow_data_distributed(args)
 
         df_bus_1 = pd.read_parquet(file_paths["bus_data"], engine="fastparquet")
 
@@ -269,7 +269,7 @@ def test_parquet_append_vs_overwrite():
         # Second run: scenarios=2, overwrite=False -> should append
         args.settings.overwrite = False
         args.load.scenarios = 2
-        file_paths = generate_power_flow_data_distributed(args, plot=False)
+        file_paths = generate_power_flow_data_distributed(args)
 
         df_bus_2 = pd.read_parquet(file_paths["bus_data"], engine="fastparquet")
 
@@ -278,7 +278,7 @@ def test_parquet_append_vs_overwrite():
         # Third run: scenarios=1, overwrite=True -> should reset (<= baseline + small variance)
         args.settings.overwrite = True
         args.load.scenarios = 1
-        file_paths = generate_power_flow_data_distributed(args, plot=False)
+        file_paths = generate_power_flow_data_distributed(args)
 
         df_bus_3 = pd.read_parquet(file_paths["bus_data"], engine="fastparquet")
 
@@ -287,27 +287,6 @@ def test_parquet_append_vs_overwrite():
         )
 
 
-def test_dcpf_presence_in_pf_mode_absent_in_opf_mode():
-    """Ensure DCPF data is generated in PF mode but not in OPF mode, even if dcpf=true."""
-    worker = os.environ.get("PYTEST_XDIST_WORKER", "local")
 
-    # PF mode with dcpf=true
-    with open("tests/config/default_pf_mode.yaml", "r") as f:
-        cfg_pf = yaml.safe_load(f)
-    cfg_pf["settings"]["data_dir"] = f"./tests/test_data_pf_mode_{worker}"
-    pf_paths = generate_power_flow_data_distributed(cfg_pf, plot=False)
-    df_pf = pd.read_parquet(pf_paths["bus_data"], engine="fastparquet")
-    assert "Va_dc" in df_pf.columns, "Va_dc should exist in PF mode when dcpf=true"
-    # check at least one row has Va_dc not nan
-    assert df_pf["Va_dc"].notna().any(), "At least one row should have Va_dc not nan"
-
-    # OPF mode with dcpf=true
-    with open("tests/config/default_opf_mode.yaml", "r") as f:
-        cfg_opf = yaml.safe_load(f)
-    cfg_opf["settings"]["data_dir"] = f"./tests/test_data_opf_mode_{worker}"
-    cfg_opf["settings"]["dcpf"] = True
-    opf_paths = generate_power_flow_data_distributed(cfg_opf, plot=False)
-    df_opf = pd.read_parquet(opf_paths["bus_data"], engine="fastparquet")
-    assert "Va_dc" not in df_opf.columns, (
-        "Va_dc should not exist in OPF mode even if dcpf=true"
-    )
+if __name__ == "__main__":
+    test_parquet_append_vs_overwrite()

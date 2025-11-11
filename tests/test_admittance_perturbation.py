@@ -108,3 +108,23 @@ class TestAdmittancePerturbation:
         assert different_perturbations > 0, (
             "Perturbation should change the admittance values"
         )
+
+    def test_admittance_sigma_zero_no_change(self):
+        """PerturbAdmittanceGenerator with sigma=0 should not change R/X."""
+        net = load_net_from_pglib("case24_ieee_rts")
+        r0 = net.branches[:, BR_R].copy()
+        x0 = net.branches[:, BR_X].copy()
+        gen = PerturbAdmittanceGenerator(base_net=net, sigma=0.0)
+
+        def gen_net():
+            yield net
+
+        [net_out] = list(gen.generate(gen_net()))
+        np.testing.assert_array_equal(net_out.branches[:, BR_R], r0)
+        np.testing.assert_array_equal(net_out.branches[:, BR_X], x0)
+
+if __name__ == "__main__":
+    test = TestAdmittancePerturbation()
+    test.test_no_admittance_perturbation_preserves_values()
+    test.test_admittance_perturbation_changes_values()
+    test.test_admittance_sigma_zero_no_change()

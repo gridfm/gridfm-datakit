@@ -11,7 +11,7 @@ def run_generation(config_params):
     """Run generation with specific perturbation configuration."""
     try:
         # Load base config
-        with open("tests/config/default_pf_mode.yaml") as f:
+        with open("tests/config/default_pf_mode_test.yaml") as f:
             config_dict = yaml.safe_load(f)
 
         args = NestedNamespace(**config_dict)
@@ -31,7 +31,7 @@ def run_generation(config_params):
         )
 
         # Generate data
-        file_paths = generate_power_flow_data_distributed(args, plot=False)
+        file_paths = generate_power_flow_data_distributed(args)
         validate_generated_data(file_paths, args.settings.mode, n_scenarios=10)
 
         # Clean up

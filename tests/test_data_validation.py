@@ -14,42 +14,51 @@ from pathlib import Path
 from gridfm_datakit.generate import generate_power_flow_data_distributed
 from gridfm_datakit.validation import validate_generated_data
 from gridfm_datakit.utils.param_handler import NestedNamespace
+import copy
 
 
-def get_config_files():
-    """Get all YAML config files, excluding slow ones."""
-    config_files = glob.glob("scripts/config/*.yaml") + glob.glob("tests/config/*.yaml")
 
-    # Exclude slow configs
-    excluded = [
-        "scripts/config/Texas2k_case1_2016summerpeak.yaml",  # too slow
-        "scripts/config/case1354_pegase.yaml",  # too slow
-        "scripts/config/case179_goc.yaml",  # bad convergence
-    ]
+def get_configs():
+    default_config_path = 'scripts/config/default.yaml'
 
-    return [f for f in config_files if f not in excluded]
-
-
-@pytest.mark.parametrize("config_path", get_config_files())
-def test_data_validation(config_path):
-    """Test each config file by generating data and running validation."""
-    config_name = Path(config_path).stem
-
-    # Load and modify config for testing
-    with open(config_path, "r") as f:
+    with open(default_config_path, "r") as f:
         config_dict = yaml.safe_load(f)
-
     args = NestedNamespace(**config_dict)
+
+    configs = []
+    for name in ['case24_ieee_rts', 'case118_ieee', 'case197_snem', 'case240_pserc', 'case300_ieee']:
+        new_args = copy.deepcopy(args)
+        new_args.network.name = name
+        configs.append((name, new_args))
+    return configs
+
+# ---- Use readable IDs here ----
+configs = get_configs()
+param_combinations = [
+    (cfg, mode)
+    for _, cfg in configs
+    for mode in ["opf", "pf"]
+]
+param_ids = [
+    f"{name}-{mode}"
+    for name, _ in configs
+    for mode in ["opf", "pf"]
+]
+
+@pytest.mark.parametrize("args,mode", param_combinations, ids=param_ids)
+def test_data_validation(args, mode):
+    """Test each config file by generating data and running validation in both PF and OPF modes."""
+
     args.load.scenarios = 5
+    args.settings.mode = mode
     args.topology_perturbation.n_topology_variants = 5
     # Isolate outputs per xdist worker to avoid cross-worker cleanup and clashes
     worker = os.environ.get("PYTEST_XDIST_WORKER", "local")
     base_dir = f"./tests/test_data_validation_{worker}"
-    args.settings.data_dir = f"{base_dir}/{config_name}"
+    args.settings.data_dir = f"{base_dir}/{args.network.name}_{mode}"
 
     # Generate and validate data
-    file_paths = generate_power_flow_data_distributed(args, plot=False)
-    mode = args.settings.mode
+    file_paths = generate_power_flow_data_distributed(args)
     validate_generated_data(file_paths, mode, n_scenarios=10)
 
 
@@ -67,4 +76,6 @@ def cleanup():
 
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+    # pytest.main([__file__, "-v"])
+    test_data_validation("scripts/config/default.yaml")
+    

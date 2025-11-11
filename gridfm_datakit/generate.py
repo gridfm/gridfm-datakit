@@ -11,9 +11,6 @@ from gridfm_datakit.process.process_network import (
     process_scenario_pf_mode,
     process_scenario_chunk,
 )
-from gridfm_datakit.utils.stats import (
-    plot_feature_distributions,
-)
 from gridfm_datakit.utils.param_handler import (
     NestedNamespace,
     get_load_scenario_generator,
@@ -39,6 +36,7 @@ import yaml
 from typing import List, Tuple, Any, Dict, Union
 import sys
 from gridfm_datakit.network import Network
+from gridfm_datakit.process.process_network import init_julia
 
 
 def _setup_environment(
@@ -65,11 +63,7 @@ def _setup_environment(
         args = NestedNamespace(**config)
     else:
         args = config
-
-    # set dcpf to false if mode is "opf"
-    if args.settings.mode == "opf":
-        warnings.warn("dcpf is set to False for opf mode!")
-        args.settings.dcpf = False
+        
 
     # Setup output directory
     base_path = os.path.join(args.settings.data_dir, args.network.name, "raw")
@@ -95,6 +89,7 @@ def _setup_environment(
         "branch_data": os.path.join(base_path, "branch_data.parquet"),
         "gen_data": os.path.join(base_path, "gen_data.parquet"),
         "y_bus_data": os.path.join(base_path, "y_bus_data.parquet"),
+        "runtime_data": os.path.join(base_path, "runtime_data.parquet"),
         "scenarios": os.path.join(
             base_path,
             f"scenarios_{args.load.generator}.parquet",
@@ -107,7 +102,6 @@ def _setup_environment(
             base_path,
             f"scenarios_{args.load.generator}.log",
         ),
-        "feature_plots": os.path.join(base_path, "feature_plots"),
     }
 
     # Initialize logs
@@ -154,6 +148,7 @@ def _prepare_network_and_scenarios(
         net,
         args.load.scenarios,
         file_paths["scenarios_log"],
+        max_iter=args.settings.max_iter,
     )
     scenarios_df = load_scenarios_to_df(scenarios)
     scenarios_df.to_parquet(file_paths["scenarios"], index=False, engine="fastparquet")
@@ -176,8 +171,7 @@ def _save_generated_data(
 
     Args:
         net: Network object
-        processed_data: List of CSV data
-        global_stats: Optional statistics object
+        processed_data: List of processed data arrays
         file_paths: Dictionary of file paths
         base_path: Base output directory
         args: Configuration object
@@ -189,8 +183,9 @@ def _save_generated_data(
             file_paths["branch_data"],
             file_paths["gen_data"],
             file_paths["y_bus_data"],
+            file_paths["runtime_data"],
             processed_data,
-            dcpf=args.settings.dcpf,
+            include_dc_res=args.settings.include_dc_res,
         )
 
 
@@ -218,8 +213,7 @@ def generate_power_flow_data(
             'y_bus_data': Y-bus nonzero entries CSV,
             'scenarios': load scenarios Parquet,
             'scenarios_plot': load scenarios plot HTML,
-            'scenarios_log': load scenario generation log,
-            'feature_plots': feature distribution plots directory
+            'scenarios_log': load scenario generation log
         }
 
     Note:
@@ -235,8 +229,9 @@ def generate_power_flow_data(
         - scenarios_{generator}.parquet: Load scenarios (per-element time series)
         - scenarios_{generator}.html: Load scenario plots
         - scenarios_{generator}.log: Load scenario generation notes
-        - feature_plots/: Feature distribution violin plots (if bus_data.parquet exists)
     """
+    
+    
     # Setup environment
     args, base_path, file_paths = _setup_environment(config)
 
@@ -258,8 +253,11 @@ def generate_power_flow_data(
         net,
     )
 
-    processed_data = []
 
+    jl = init_julia(args.settings.max_iter, file_paths["solver_log_dir"])
+
+    processed_data = []
+    
     # Process scenarios sequentially
     with open(file_paths["tqdm_log"], "a") as f:
         with tqdm(
@@ -280,8 +278,11 @@ def generate_power_flow_data(
                         admittance_generator,
                         processed_data,
                         file_paths["error_log"],
-                        args.settings.dcpf,
-                        file_paths["solver_log_dir"],
+                        args.settings.include_dc_res,
+                        jl,
+                        
+                        
+                        
                     )
                 elif args.settings.mode == "pf":
                     processed_data = process_scenario_pf_mode(
@@ -293,9 +294,10 @@ def generate_power_flow_data(
                         admittance_generator,
                         processed_data,
                         file_paths["error_log"],
-                        args.settings.dcpf,
+                        args.settings.include_dc_res,
                         args.settings.pf_fast,
-                        file_paths["solver_log_dir"],
+                        args.settings.dcpf_fast,
+                        jl,
                     )
                 else:
                     raise ValueError("Invalid mode!")
@@ -310,22 +312,12 @@ def generate_power_flow_data(
         base_path,
         args,
     )
-    # Plot features
-    if os.path.exists(file_paths["bus_data"]):
-        plot_feature_distributions(
-            file_paths["bus_data"],
-            file_paths["feature_plots"],
-            net.baseMVA,
-        )
-    else:
-        print("No node data file generated. Skipping feature plotting.")
 
     return file_paths
 
 
 def generate_power_flow_data_distributed(
     config: Union[str, Dict[str, Any], NestedNamespace],
-    plot: bool = True,
 ) -> Dict[str, str]:
     """Generate power flow data based on the provided configuration using distributed processing.
 
@@ -352,7 +344,6 @@ def generate_power_flow_data_distributed(
         - scenarios_{generator}.parquet: Load scenarios (per-element time series)
         - scenarios_{generator}.html: Load scenario plots
         - scenarios_{generator}.log: Load scenario generation notes
-        - feature_plots/: Feature distribution violin plots (if bus_data.parquet exists)
     """
     # Setup environment
     args, base_path, file_paths = _setup_environment(config)
@@ -416,9 +407,11 @@ def generate_power_flow_data_distributed(
                         generation_generator,
                         admittance_generator,
                         file_paths["error_log"],
-                        args.settings.dcpf,
+                        args.settings.include_dc_res,
                         args.settings.pf_fast,
+                        args.settings.dcpf_fast,
                         file_paths["solver_log_dir"],
+                        args.settings.max_iter,
                     )
                     for chunk in scenario_chunks
                 ]
@@ -465,17 +458,5 @@ def generate_power_flow_data_distributed(
 
                 del processed_data
                 gc.collect()
-
-    # Plot features
-    # check if bus_data csv file exists
-    if plot:
-        if os.path.exists(file_paths["bus_data"]):
-            plot_feature_distributions(
-                file_paths["bus_data"],
-                file_paths["feature_plots"],
-                net.baseMVA,
-            )
-        else:
-            print("No node data file generated. Skipping feature plotting.")
 
     return file_paths

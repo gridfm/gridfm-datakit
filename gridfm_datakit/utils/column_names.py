@@ -15,6 +15,9 @@ GEN_COLUMNS = [
     "is_slack_gen",
 ]
 
+DC_GEN_COLUMNS = [
+    "p_mw_dc",
+]
 
 BUS_COLUMNS = [
     "bus",
@@ -34,7 +37,7 @@ BUS_COLUMNS = [
     "BS",
 ]
 
-DC_BUS_COLUMNS = ["Va_dc"]
+DC_BUS_COLUMNS = ["Va_dc", "Pg_dc"]
 
 BRANCH_COLUMNS = [
     "idx",
@@ -44,6 +47,9 @@ BRANCH_COLUMNS = [
     "qf",
     "pt",
     "qt",
+    "r",
+    "x",
+    "b",
     "Yff_r",
     "Yff_i",
     "Yft_r",
@@ -60,6 +66,10 @@ BRANCH_COLUMNS = [
     "br_status",
 ]
 
+DC_BRANCH_COLUMNS = [
+    "pf_dc",
+    "pt_dc",
+]
 
 YBUS_COLUMNS = [
     "index1",
@@ -67,3 +77,13 @@ YBUS_COLUMNS = [
     "G",
     "B",
 ]
+
+RUNTIME_COLUMNS = [
+    "ac",
+]
+
+DC_RUNTIME_COLUMNS = [
+    "dc",
+]
+
+

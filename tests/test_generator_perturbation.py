@@ -284,3 +284,19 @@ class TestGeneratorPerturbation:
                 assert np.all(valid_scaling_factors <= expected_upper), (
                     f"Scaling factors should be <= {expected_upper}"
                 )
+
+
+def test_generator_cost_sigma_zero_no_change():
+    """PerturbGenCostGenerator with sigma=0 should not change gencosts."""
+    net = load_net_from_pglib("case24_ieee_rts")
+    costs0 = net.gencosts.copy()
+    gen = PerturbGenCostGenerator(base_net=net, sigma=0.0)
+
+    def gen_net():
+        import copy
+        yield copy.deepcopy(net)
+
+    [net_out] = list(gen.generate(gen_net()))
+    assert np.allclose(net_out.gencosts, costs0, rtol=0.0, atol=0.0), (
+        "gencosts should be unchanged when sigma=0"
+    )

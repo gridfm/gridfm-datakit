@@ -45,11 +45,12 @@ Bus-level features for each processed scenario. Columns (BUS_COLUMNS):
 - **vn_kv**: Nominal voltage level at the bus (kV)
 - **min_vm_pu**: Minimum voltage magnitude limit (p.u.)
 - **max_vm_pu**: Maximum voltage magnitude limit (p.u.)
-- **GS**: Shunt conductance at the bus (p.u. demanded at V = 1.0 p.u.)
-- **BS**: Shunt susceptance at the bus (p.u. injected at V = 1.0 p.u.)
+- **GS**: Shunt conductance at the bus (p.u. at V = 1.0 p.u.)
+- **BS**: Shunt susceptance at the bus (p.u. at V = 1.0 p.u.)
 
-If `settings.mode=="pf"` and `settings.dcpf=True`, also includes DC power flow columns (DC_BUS_COLUMNS):
+If `settings.include_dc_res=True`, also includes DC power flow columns (DC_BUS_COLUMNS):
 - **Va_dc**: DC voltage angle (degrees)
+- **Pg_dc**: DC active power generation at the bus (MW)
 
 #### `gen_data.parquet`
 Generator features per scenario. Columns (GEN_COLUMNS):
@@ -69,6 +70,9 @@ Generator features per scenario. Columns (GEN_COLUMNS):
 - **in_service**: 1 if generator is in service, else 0
 - **is_slack_gen**: 1 if generator is at the reference bus, else 0
 
+If `settings.include_dc_res=True`, also includes DC generator column (DC_GEN_COLUMNS):
+- **p_mw_dc**: Active power from DC solution (MW)
+
 #### `branch_data.parquet`
 Branch features per scenario. Columns (BRANCH_COLUMNS):
 
@@ -80,6 +84,9 @@ Branch features per scenario. Columns (BRANCH_COLUMNS):
 - **qf**: Reactive power flow from source to destination (MVAr)
 - **pt**: Active power flow from destination to source (MW)
 - **qt**: Reactive power flow from destination to source (MVAr)
+- **r**: Series resistance (p.u.)
+- **x**: Series reactance (p.u.)
+- **b**: Total line charging susceptance (p.u.)
 - **Yff_r**: Real part of the self-admittance at the source bus (p.u.)
 - **Yff_i**: Imaginary part of the self-admittance at the source bus (p.u.)
 - **Yft_r**: Real part of the mutual admittance from source to destination bus (p.u.)
@@ -95,6 +102,10 @@ Branch features per scenario. Columns (BRANCH_COLUMNS):
 - **rate_a**: Rate limit of the branch (MVA)
 - **br_status**: Branch status (1 if in service, 0 if out of service)
 
+If `settings.include_dc_res=True`, also includes DC branch columns (DC_BRANCH_COLUMNS):
+- **pf_dc**: DC active power flow from source to destination (MW)
+- **pt_dc**: DC active power flow from destination to source (MW)
+
 #### `y_bus_data.parquet`
 Nonzero Y-bus entries per scenario with columns:
 
@@ -106,7 +117,7 @@ Nonzero Y-bus entries per scenario with columns:
 
 ### Statistics Files
 
-#### `stats.csv`
+#### `stats.parquet`
 Aggregated statistics collected during generation (if `settings.no_stats=False`), including metrics such as:
 
 - Number of generators
@@ -120,5 +131,8 @@ HTML dashboard of the aggregated statistics (if `settings.no_stats=False`).
 
 ### Feature Visualization
 
-#### `feature_plots/`
-Directory created if `bus_data.parquet` exists; contains violin plots per feature named `distribution_{feature_name}.png`.
+Feature distribution plots can be generated using the CLI command:
+```bash
+gridfm-datakit plots path/to/data/directory
+```
+This creates a `feature_plots/` directory with violin plots per feature named `distribution_{feature_name}.png`.

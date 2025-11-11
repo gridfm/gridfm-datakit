@@ -15,7 +15,7 @@ class TestComparePF_OPF_Results:
     @classmethod
     def setup_class(cls):
         """Initialize Julia interface once for all tests"""
-        cls.jl = init_julia()
+        cls.jl = init_julia(max_iter=150)
 
     @pytest.mark.parametrize(
         "case_name,solver_type,fast",

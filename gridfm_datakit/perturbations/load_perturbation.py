@@ -8,13 +8,14 @@ from plotly.subplots import make_subplots
 from copy import deepcopy
 from multiprocessing import Pool
 from gridfm_datakit.network import Network
+from gridfm_datakit.process.process_network import init_julia
 from typing import Tuple, Any
 
 
 def _find_largest_scaling_factor_worker(
-    args: Tuple[Network, float, float, float, bool],
+    args: Tuple[Network, float, float, float, bool, int],
 ) -> float:
-    (net, max_scaling, step_size, start, change_reactive_power) = args
+    (net, max_scaling, step_size, start, change_reactive_power, max_iter) = args
 
     net = deepcopy(net)
     # Get reference values from Network class (PD and QD columns)
@@ -25,6 +26,11 @@ def _find_largest_scaling_factor_worker(
 
     print("Finding upper limit u .", end="", flush=True)
 
+    # Initialize Julia interface once before the loop
+    import tempfile
+    import os
+    jl = init_julia(max_iter=max_iter, solver_log_dir=None, print_level=5)
+
     while (u <= max_scaling) and converged:
         # Update load values in the Network using properties
         net.Pd = p_ref * u
@@ -33,12 +39,7 @@ def _find_largest_scaling_factor_worker(
         else:
             net.Qd = q_ref  # Keep original QD
 
-        from juliacall import Main as jl
-
         # Create a temporary file for the MATPOWER case
-        import tempfile
-        import os
-
         with tempfile.NamedTemporaryFile(
             mode="w",
             suffix=".m",
@@ -47,29 +48,13 @@ def _find_largest_scaling_factor_worker(
             temp_filename = temp_file.name
 
         try:
-            # Initialize Julia with required packages
+            # Write network to MATPOWER case file
             net.to_mpc(temp_filename)
 
-            try:
-                jl.seval("""
-                using PowerModels
-                using Ipopt
-
-                function run_opf(case_file)
-                    result = solve_ac_opf(case_file, Ipopt.Optimizer)
-                    return result
-                end
-                """)
-
-            except Exception as e:
-                print(f"Error: {e}")
-
-            try:
-                result = jl.solve_ac_opf(temp_filename, jl.Ipopt.Optimizer)
-                u += step_size
-                print(".", end="", flush=True)
-            except Exception as e:
-                raise RuntimeError(f"Julia OPF failed: {e}")
+            # Run OPF using the initialized Julia interface
+            result = jl.run_opf(temp_filename)
+            u += step_size
+            print(".", end="", flush=True)
 
             if str(result["termination_status"]) != "LOCALLY_SOLVED":
                 if u == start:
@@ -185,6 +170,7 @@ class LoadScenarioGeneratorBase(ABC):
         net: Network,
         n_scenarios: int,
         scenario_log: str,
+        max_iter: int,
     ) -> np.ndarray:
         """Generates load scenarios for a power network.
 
@@ -192,6 +178,7 @@ class LoadScenarioGeneratorBase(ABC):
             net: The power network.
             n_scenarios: Number of scenarios to generate.
             scenario_log: Path to log file for scenario generation details.
+            max_iter: Maximum iterations for the OPF solver.
 
         Returns:
             numpy.ndarray: Array of shape (n_loads, n_scenarios, 2) containing p_mw and q_mvar values.
@@ -222,6 +209,7 @@ class LoadScenarioGeneratorBase(ABC):
         step_size: float,
         start: float,
         change_reactive_power: bool,
+        max_iter: int,
     ) -> Tuple[Pool, Any]:
         """Finds the largest load scaling factor that maintains OPF convergence.
 
@@ -231,6 +219,7 @@ class LoadScenarioGeneratorBase(ABC):
             step_size: Increment for scaling factor search.
             start: Starting scaling factor.
             change_reactive_power: Whether to scale reactive power.
+            max_iter: Maximum iterations for the OPF solver.
 
         Returns:
             float: Largest scaling factor that maintains OPF convergence.
@@ -241,7 +230,7 @@ class LoadScenarioGeneratorBase(ABC):
         pool = Pool(processes=1)
         result = pool.apply_async(
             _find_largest_scaling_factor_worker,
-            ((net, max_scaling, step_size, start, change_reactive_power),),
+            ((net, max_scaling, step_size, start, change_reactive_power, max_iter),),
         )
         return pool, result
 
@@ -361,6 +350,7 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
         net: Network,
         n_scenarios: int,
         scenarios_log: str,
+        max_iter: int,
     ) -> np.ndarray:
         """Generates load profiles based on aggregated load data.
 
@@ -368,6 +358,7 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
             net: The power network.
             n_scenarios: Number of scenarios to generate.
             scenarios_log: Path to log file for scenario generation details.
+            max_iter: Maximum iterations for the OPF solver.
 
         Returns:
             numpy.ndarray: Array of shape (n_loads, n_scenarios, 2) containing p_mw and q_mvar values.
@@ -389,6 +380,7 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
             step_size=self.step_size,
             start=self.start_scaling_factor,
             change_reactive_power=self.change_reactive_power,
+            max_iter=max_iter,
         )
 
         try:
@@ -514,6 +506,7 @@ class Powergraph(LoadScenarioGeneratorBase):
         net: Network,
         n_scenarios: int,
         scenario_log: str,
+        max_iter: int,
     ) -> np.ndarray:
         """Generates load profiles based on aggregated load data.
 
@@ -521,6 +514,7 @@ class Powergraph(LoadScenarioGeneratorBase):
             net: The power network.
             n_scenarios: Number of scenarios to generate.
             scenario_log: Path to log file for scenario generation details.
+            max_iter: Maximum iterations for the OPF solver (unused for Powergraph).
 
         Returns:
             numpy.ndarray: Array of shape (n_loads, n_scenarios, 2) containing p_mw and q_mvar values.

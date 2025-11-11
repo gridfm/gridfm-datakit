@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Command-line interface for generating and validating power flow data."""
+"""Command-line interface for generating, validating, and visualizing power flow data."""
 
 import argparse
 import sys
@@ -44,6 +44,7 @@ def validate_data_directory(data_path: str, n_scenarios: int = 100) -> bool:
         "branch_data": "branch_data.parquet",
         "gen_data": "gen_data.parquet",
         "y_bus_data": "y_bus_data.parquet",
+        "runtime_data": "runtime_data.parquet",
     }
 
     try:
@@ -95,7 +96,7 @@ def validate_data_directory(data_path: str, n_scenarios: int = 100) -> bool:
 
 
 def main() -> None:
-    """Command-line interface for generating and validating power flow data."""
+    """Command-line interface for generating, validating, and visualizing power flow data."""
     parser = argparse.ArgumentParser(
         description="Generate or validate power flow data for grid analysis",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -115,9 +116,6 @@ Examples:
 
   # Compute statistics from generated data
   gridfm-datakit stats /path/to/data/
-
-  # Plot bus feature distributions
-  gridfm-datakit plots /path/to/data/
 
   # Set up Julia packages for PowerModels
   gridfm-datakit setup_pm

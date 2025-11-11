@@ -195,7 +195,7 @@ class TestVerifyNetwork:
     @classmethod
     def setup_class(cls):
         # Initialize Julia so PowerModels functions are available via juliacall Main
-        init_julia()
+        init_julia(max_iter=150)
 
     def test_deactivated_branches(self):
         verify_deactivated_branches()
