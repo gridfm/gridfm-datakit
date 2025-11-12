@@ -79,28 +79,28 @@ mpc.branch = [
 % INFO    : Line Capacity Model:         stat
 % INFO    : Setting Flat Start
 % INFO    : Line Capacity PAB:           15.0 (deg.)
-% INFO    : 
+% INFO    :
 % INFO    : === Generator Bounds Update Notes ===
-% INFO    : 
+% INFO    :
 % INFO    : === Base KV Replacement Notes ===
-% INFO    : 
+% INFO    :
 % INFO    : === Transformer Setting Replacement Notes ===
-% INFO    : 
+% INFO    :
 % INFO    : === Line Capacity Stat Model Notes ===
 % INFO    : Updated Thermal Rating: on line 1-4 : Rate A, Rate B, Rate C , 9900.0, 0.0, 0.0 -> 426
 % INFO    : Updated Thermal Rating: on line 1-5 : Rate A, Rate B, Rate C , 9900.0, 0.0, 0.0 -> 426
 % INFO    : Updated Thermal Rating: on line 2-3 : Rate A, Rate B, Rate C , 9900.0, 0.0, 0.0 -> 426
 % INFO    : Updated Thermal Rating: on line 3-4 : Rate A, Rate B, Rate C , 9900.0, 0.0, 0.0 -> 426
-% INFO    : 
+% INFO    :
 % INFO    : === Line Capacity Monotonicity Notes ===
-% INFO    : 
+% INFO    :
 % INFO    : === Voltage Setpoint Replacement Notes ===
 % INFO    : Bus 1	: V=1.0, theta=0.0 -> V=1.0, theta=0.0
 % INFO    : Bus 2	: V=1.0, theta=0.0 -> V=1.0, theta=0.0
 % INFO    : Bus 3	: V=1.0, theta=0.0 -> V=1.0, theta=0.0
 % INFO    : Bus 4	: V=1.0, theta=0.0 -> V=1.0, theta=0.0
 % INFO    : Bus 5	: V=1.0, theta=0.0 -> V=1.0, theta=0.0
-% INFO    : 
+% INFO    :
 % INFO    : === Generator Setpoint Replacement Notes ===
 % INFO    : Gen at bus 1	: Pg=40.0, Qg=0.0 -> Pg=20.0, Qg=0.0
 % INFO    : Gen at bus 1	: Vg=1.0 -> Vg=1.0
@@ -112,5 +112,5 @@ mpc.branch = [
 % INFO    : Gen at bus 4	: Vg=1.0 -> Vg=1.0
 % INFO    : Gen at bus 5	: Pg=466.51, Qg=0.0 -> Pg=300.0, Qg=0.0
 % INFO    : Gen at bus 5	: Vg=1.0 -> Vg=1.0
-% INFO    : 
+% INFO    :
 % INFO    : === Writing Matpower Case File Notes ===

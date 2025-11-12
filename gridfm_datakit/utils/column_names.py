@@ -85,5 +85,3 @@ RUNTIME_COLUMNS = [
 DC_RUNTIME_COLUMNS = [
     "dc",
 ]
-
-

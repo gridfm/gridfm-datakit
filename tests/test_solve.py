@@ -15,7 +15,6 @@ from gridfm_datakit.process.process_network import (
     pf_preprocessing,
     pf_post_processing,
 )
-from gridfm_datakit.utils.idx_bus import REF
 from gridfm_datakit.utils.idx_gen import GEN_BUS
 from gridfm_datakit.utils.column_names import (
     BUS_COLUMNS,
@@ -128,7 +127,7 @@ class TestSolve:
     )
     def test_dc_opf_and_dc_pf_comprehensive(self, case_name):
         """Comprehensive test for DC OPF and DC PF functionality
-        
+
         Tests:
         1. DC OPF - checks Vm=1.0, Va=0 at slack, qt/qf are NaN
         2. AC OPF + DC PF - checks Vm=1.0, Va=0 at slack, pg unchanged except slack
@@ -145,14 +144,18 @@ class TestSolve:
 
         # ====== PART 1: Test DC OPF ======
         print("\n  ====== PART 1: Testing DC OPF ======")
-        
+
         # Run DC OPF
         print("  Running DC OPF...")
         dcopf_result = run_dcopf(net, self.jl)
-        assert str(dcopf_result["termination_status"]) == "LOCALLY_SOLVED", "DC OPF should converge"
+        assert str(dcopf_result["termination_status"]) == "LOCALLY_SOLVED", (
+            "DC OPF should converge"
+        )
         print("DC OPF converged successfully")
         opf_result = run_opf(net, self.jl)
-        assert str(opf_result["termination_status"]) == "LOCALLY_SOLVED", "OPF should converge"
+        assert str(opf_result["termination_status"]) == "LOCALLY_SOLVED", (
+            "OPF should converge"
+        )
         print("OPF converged successfully")
 
         # Check Vm is 1.0 at all buses
@@ -160,7 +163,9 @@ class TestSolve:
             dcopf_result["solution"]["bus"][str(net.reverse_bus_index_mapping[i])]["vm"]
             for i in range(n_buses)
         ]
-        assert np.isclose(vm, 1.0).all(), "Vm should be 1.0 at all buses when solving with DCPF"
+        assert np.isclose(vm, 1.0).all(), (
+            "Vm should be 1.0 at all buses when solving with DCPF"
+        )
         print("All buses have Vm = 1.0")
 
         # Check Va is 0 at slack bus
@@ -176,33 +181,48 @@ class TestSolve:
         print("  Checking qt and qf are NaN for all branches...")
         for i in net.idx_branches_in_service:
             branch_key = str(i + 1)
-            assert np.isnan(dcopf_result["solution"]["branch"][branch_key]["qf"]), f"Branch {i+1} qf should be NaN"
-            assert np.isnan(dcopf_result["solution"]["branch"][branch_key]["qt"]), f"Branch {i+1} qt should be NaN"
-        print("qt and qf are NaN for all branches (DC OPF doesn't compute reactive power)")
+            assert np.isnan(dcopf_result["solution"]["branch"][branch_key]["qf"]), (
+                f"Branch {i + 1} qf should be NaN"
+            )
+            assert np.isnan(dcopf_result["solution"]["branch"][branch_key]["qt"]), (
+                f"Branch {i + 1} qt should be NaN"
+            )
+        print(
+            "qt and qf are NaN for all branches (DC OPF doesn't compute reactive power)",
+        )
 
         # Post-process DC OPF results and ensure no NaNs in outputs
         print("  Post-processing DC OPF results and checking for NaNs...")
-        dcopf_pf_data = pf_post_processing(net, opf_result, dcopf_result, include_dc_res=True)
+        dcopf_pf_data = pf_post_processing(
+            net,
+            opf_result,
+            dcopf_result,
+            include_dc_res=True,
+        )
         for key in ["bus", "gen", "branch", "Y_bus"]:
             arr = dcopf_pf_data[key]
-            assert not np.isnan(arr).any(), f"NaN detected in {key} data after DC OPF post-processing"
+            assert not np.isnan(arr).any(), (
+                f"NaN detected in {key} data after DC OPF post-processing"
+            )
         print("No NaNs in DC OPF post-processed outputs")
-
-
 
         # ====== PART 2: Test AC OPF + DC PF ======
         print("\n  ====== PART 2: Testing AC OPF + DC PF ======")
-        
+
         # Run AC OPF
         print("  Running AC OPF...")
         opf_result = run_opf(net, self.jl)
-        assert str(opf_result["termination_status"]) == "LOCALLY_SOLVED", "AC OPF should converge"
+        assert str(opf_result["termination_status"]) == "LOCALLY_SOLVED", (
+            "AC OPF should converge"
+        )
         print("AC OPF converged successfully")
 
         # Get generator Pg from AC OPF (before PF)
         pg_before_pf = {}
         for i in net.idx_gens_in_service:
-            pg_before_pf[i] = opf_result["solution"]["gen"][str(i + 1)]["pg"] * net.baseMVA
+            pg_before_pf[i] = (
+                opf_result["solution"]["gen"][str(i + 1)]["pg"] * net.baseMVA
+            )
 
         # PF preprocessing
         print("  Running PF preprocessing...")
@@ -212,7 +232,9 @@ class TestSolve:
         # Run DC PF
         print("  Running DC PF...")
         dcpf_result = run_dcpf(net_pf, self.jl, fast=False)
-        assert str(dcpf_result["termination_status"]) == "LOCALLY_SOLVED", "DC PF should converge"
+        assert str(dcpf_result["termination_status"]) == "LOCALLY_SOLVED", (
+            "DC PF should converge"
+        )
         print("DC PF converged successfully")
 
         # Check Vm is 1.0 at all buses
@@ -220,7 +242,9 @@ class TestSolve:
             dcopf_result["solution"]["bus"][str(net.reverse_bus_index_mapping[i])]["vm"]
             for i in range(n_buses)
         ]
-        assert np.isclose(vm, 1.0).all(), "Vm should be 1.0 at all buses when solving with DCPF"
+        assert np.isclose(vm, 1.0).all(), (
+            "Vm should be 1.0 at all buses when solving with DCPF"
+        )
         print("All buses have Vm = 1.0")
 
         # Check Va is 0 at slack bus
@@ -236,39 +260,54 @@ class TestSolve:
         print("  Checking qt and qf are NaN for all branches...")
         for i in net.idx_branches_in_service:
             branch_key = str(i + 1)
-            assert np.isnan(dcopf_result["solution"]["branch"][branch_key]["qf"]), f"Branch {i+1} qf should be NaN"
-            assert np.isnan(dcopf_result["solution"]["branch"][branch_key]["qt"]), f"Branch {i+1} qt should be NaN"
-        print("qt and qf are NaN for all branches (DC OPF doesn't compute reactive power)")
+            assert np.isnan(dcopf_result["solution"]["branch"][branch_key]["qf"]), (
+                f"Branch {i + 1} qf should be NaN"
+            )
+            assert np.isnan(dcopf_result["solution"]["branch"][branch_key]["qt"]), (
+                f"Branch {i + 1} qt should be NaN"
+            )
+        print(
+            "qt and qf are NaN for all branches (DC OPF doesn't compute reactive power)",
+        )
 
         # Check pg has not changed at all gens except slack gen
         print("  Checking Pg unchanged except at slack gen...")
-        slack_gen_indices = np.where(net_pf.gens[:, GEN_BUS] == net_pf.ref_bus_idx)[0]  # GEN_BUS == ref_bus_idx
-        
+        slack_gen_indices = np.where(net_pf.gens[:, GEN_BUS] == net_pf.ref_bus_idx)[
+            0
+        ]  # GEN_BUS == ref_bus_idx
+
         for i in net_pf.idx_gens_in_service:
             gen_key = str(i + 1)
             pg_dc = dcpf_result["solution"]["gen"][gen_key]["pg"] * net_pf.baseMVA
             pg_before = pg_before_pf[i]
             if i not in slack_gen_indices:
-                
                 assert np.isclose(pg_dc, pg_before, atol=1e-3), (
-                    f"Gen {i+1} (non-slack): Pg should be unchanged. "
+                    f"Gen {i + 1} (non-slack): Pg should be unchanged. "
                     f"Before PF: {pg_before} MW, After DC PF: {pg_dc} MW"
                 )
             else:
-                print(f"    Gen {i+1} is slack gen - Pg allowed to change (DC PF: {pg_dc} MW, before PF: {pg_before} MW)")
+                print(
+                    f"    Gen {i + 1} is slack gen - Pg allowed to change (DC PF: {pg_dc} MW, before PF: {pg_before} MW)",
+                )
         print("Pg unchanged at all gens except slack gen")
 
         # Post-process DC PF results and ensure no NaNs in outputs
         print("  Post-processing DC PF results and checking for NaNs...")
-        dcpf_pf_data = pf_post_processing(net_pf, opf_result, dcpf_result, include_dc_res=True)
+        dcpf_pf_data = pf_post_processing(
+            net_pf,
+            opf_result,
+            dcpf_result,
+            include_dc_res=True,
+        )
         for key in ["bus", "gen", "branch", "Y_bus"]:
             arr = dcpf_pf_data[key]
-            assert not np.isnan(arr).any(), f"NaN detected in {key} data after DC PF post-processing"
+            assert not np.isnan(arr).any(), (
+                f"NaN detected in {key} data after DC PF post-processing"
+            )
         print("No NaNs in DC PF post-processed outputs")
-        
-        
+
         # ====== PART 3: Test DC PF fast ======
-                # Run DC PF
+        # Run DC PF
         print("  Running DC PF...")
         dcpf_result = run_dcpf(net_pf, self.jl, fast=True)
         assert str(dcpf_result["termination_status"]) == "True", "DC PF should converge"
@@ -279,7 +318,9 @@ class TestSolve:
             dcopf_result["solution"]["bus"][str(net.reverse_bus_index_mapping[i])]["vm"]
             for i in range(n_buses)
         ]
-        assert np.isclose(vm, 1.0).all(), "Vm should be 1.0 at all buses when solving with DCPF"
+        assert np.isclose(vm, 1.0).all(), (
+            "Vm should be 1.0 at all buses when solving with DCPF"
+        )
         print("All buses have Vm = 1.0")
 
         # Check Va is 0 at slack bus
@@ -295,42 +336,53 @@ class TestSolve:
         print("  Checking qt and qf are NaN for all branches...")
         for i in net.idx_branches_in_service:
             branch_key = str(i + 1)
-            assert np.isnan(dcopf_result["solution"]["branch"][branch_key]["qf"]), f"Branch {i+1} qf should be NaN"
-            assert np.isnan(dcopf_result["solution"]["branch"][branch_key]["qt"]), f"Branch {i+1} qt should be NaN"
-        print("qt and qf are NaN for all branches (DC OPF doesn't compute reactive power)")
-
+            assert np.isnan(dcopf_result["solution"]["branch"][branch_key]["qf"]), (
+                f"Branch {i + 1} qf should be NaN"
+            )
+            assert np.isnan(dcopf_result["solution"]["branch"][branch_key]["qt"]), (
+                f"Branch {i + 1} qt should be NaN"
+            )
+        print(
+            "qt and qf are NaN for all branches (DC OPF doesn't compute reactive power)",
+        )
 
         # Post-process DC PF results and ensure no NaNs in outputs
         print("  Post-processing DC PF results and checking for NaNs...")
-        dcpf_pf_data = pf_post_processing(net_pf, opf_result, dcpf_result, include_dc_res=True)
+        dcpf_pf_data = pf_post_processing(
+            net_pf,
+            opf_result,
+            dcpf_result,
+            include_dc_res=True,
+        )
         for key in ["bus", "gen", "branch", "Y_bus"]:
             arr = dcpf_pf_data[key]
-            assert not np.isnan(arr).any(), f"NaN detected in {key} data after DC PF post-processing"
+            assert not np.isnan(arr).any(), (
+                f"NaN detected in {key} data after DC PF post-processing"
+            )
         print("No NaNs in DC PF post-processed outputs")
-        
+
         # Check pg has not changed at all gens except slack gen
         print("  Checking Pg unchanged except at slack gen...")
-        slack_gen_indices = np.where(net_pf.gens[:, GEN_BUS] == net_pf.ref_bus_idx)[0]  # GEN_BUS == ref_bus_idx
-        
+        slack_gen_indices = np.where(net_pf.gens[:, GEN_BUS] == net_pf.ref_bus_idx)[
+            0
+        ]  # GEN_BUS == ref_bus_idx
+
         for i in net_pf.idx_gens_in_service:
-            pg_dc = dcpf_pf_data["gen"][i, len(GEN_COLUMNS) + DC_GEN_COLUMNS.index("p_mw_dc")]
+            pg_dc = dcpf_pf_data["gen"][
+                i,
+                len(GEN_COLUMNS) + DC_GEN_COLUMNS.index("p_mw_dc"),
+            ]
             pg_before = pg_before_pf[i]
             if i not in slack_gen_indices:
                 assert np.isclose(pg_dc, pg_before, atol=1e-3), (
-                    f"Gen {i+1} (non-slack): Pg should be unchanged. "
+                    f"Gen {i + 1} (non-slack): Pg should be unchanged. "
                     f"Before PF: {pg_before} MW, After DC PF: {pg_dc} MW"
                 )
             else:
-                print(f"    Gen {i+1} is slack gen - Pg allowed to change (DC PF: {pg_dc} MW, before PF: {pg_before} MW)")
+                print(
+                    f"    Gen {i + 1} is slack gen - Pg allowed to change (DC PF: {pg_dc} MW, before PF: {pg_before} MW)",
+                )
         print("Pg unchanged at all gens except slack gen")
-
-
-        
-        
-        
-
-
-
 
     @pytest.mark.parametrize(
         "case_name",
@@ -365,7 +417,12 @@ class TestSolve:
             assert "ITERATION_LIMIT" in str(e)
 
         # Post-process with include_dc_res=True and verify DC columns are NaN
-        pf_data_opf_mode = pf_post_processing(net, opf_result, dcopf_result, include_dc_res=True)
+        pf_data_opf_mode = pf_post_processing(
+            net,
+            opf_result,
+            dcopf_result,
+            include_dc_res=True,
+        )
 
         # Bus DC column (Va_dc) should be all NaN
         va_dc_idx = len(BUS_COLUMNS) + DC_BUS_COLUMNS.index("Va_dc")
@@ -384,7 +441,7 @@ class TestSolve:
         pt_dc_col = pf_data_opf_mode["branch"][:, pt_dc_idx]
         assert np.isnan(pf_dc_col[net.idx_branches_in_service]).all()
         assert np.isnan(pt_dc_col[net.idx_branches_in_service]).all()
-        
+
         # runtime
         dc_idx = len(RUNTIME_COLUMNS) + DC_RUNTIME_COLUMNS.index("dc")
         runtime_col_opf = pf_data_opf_mode["runtime"][:, dc_idx]
@@ -394,7 +451,9 @@ class TestSolve:
         # Also test PF mode: run AC PF (converges), DC PF (non-converged), then check DC NaNs
         net_pf = pf_preprocessing(net, opf_result)
         pf_result = run_pf(net_pf, jl_dc0, fast=True)
-        assert (pf_result["termination_status"] == True) or (str(pf_result["termination_status"]) == "LOCALLY_SOLVED")
+        assert (pf_result["termination_status"]) or (
+            str(pf_result["termination_status"]) == "LOCALLY_SOLVED"
+        )
 
         # DC OPF should not converge (dc_max_iter=0)
         dcpf_result = None
@@ -407,7 +466,12 @@ class TestSolve:
             # check ITERATION_LIMIT in termination_status
             assert "ITERATION_LIMIT" in str(e)
 
-        pf_data_pf_mode = pf_post_processing(net_pf, pf_result, dcpf_result, include_dc_res=True)
+        pf_data_pf_mode = pf_post_processing(
+            net_pf,
+            pf_result,
+            dcpf_result,
+            include_dc_res=True,
+        )
 
         va_dc_idx = len(BUS_COLUMNS) + DC_BUS_COLUMNS.index("Va_dc")
         va_dc_col_pf = pf_data_pf_mode["bus"][:, va_dc_idx]
@@ -423,18 +487,18 @@ class TestSolve:
         pt_dc_col_pf = pf_data_pf_mode["branch"][:, pt_dc_idx]
         assert np.isnan(pf_dc_col_pf[net_pf.idx_branches_in_service]).all()
         assert np.isnan(pt_dc_col_pf[net_pf.idx_branches_in_service]).all()
-        
+
         # runtime
         dc_idx = len(RUNTIME_COLUMNS) + DC_RUNTIME_COLUMNS.index("dc")
         runtime_col_pf = pf_data_pf_mode["runtime"][:, dc_idx]
         assert np.isnan(runtime_col_pf).all()
-        
+
         print("DC columns are NaN when DC PF and DC OPF do not converge")
         print(f"{case_name} completed successfully")
 
     def test_dcpf_fast_matches_slow(self):
         """Fast DC PF should match slow DC PF after post-processing."""
-        case_name = "case24_ieee_rts" # that test fails for case300 (and possibly other cases). compute_dc_pf and solve_dc_pf from powermodels 
+        case_name = "case24_ieee_rts"  # that test fails for case300 (and possibly other cases). compute_dc_pf and solve_dc_pf from powermodels
         # do not actually give the same solution
         print(f"\nTesting DC PF fast vs slow for {case_name}...")
 
@@ -457,14 +521,26 @@ class TestSolve:
 
         # Post-process and compare outputs
         print("  Post-processing and comparing outputs...")
-        pf_data_slow = pf_post_processing(net_pf, opf_result, dcpf_slow, include_dc_res=True)
-        pf_data_fast = pf_post_processing(net_pf, opf_result, dcpf_fast, include_dc_res=True)
+        pf_data_slow = pf_post_processing(
+            net_pf,
+            opf_result,
+            dcpf_slow,
+            include_dc_res=True,
+        )
+        pf_data_fast = pf_post_processing(
+            net_pf,
+            opf_result,
+            dcpf_fast,
+            include_dc_res=True,
+        )
 
         for key in ["bus", "gen", "branch", "Y_bus"]:
             arr_slow = pf_data_slow[key]
             arr_fast = pf_data_fast[key]
             assert arr_slow.shape == arr_fast.shape, f"Shape mismatch for key '{key}'"
-            assert np.allclose(arr_slow, arr_fast, equal_nan=True), f"Mismatch for key '{key}'"
+            assert np.allclose(arr_slow, arr_fast, equal_nan=True), (
+                f"Mismatch for key '{key}'"
+            )
 
         print("Fast and slow DC PF results match after post-processing")
 
@@ -479,7 +555,7 @@ class TestSolve:
     def test_dc_columns_nan_when_res_dc_none(self, case_name):
         """Test that when res_dc=None and include_dc_res=True, all DC columns are NaN,
         and that NaN values can be properly read from parquet after saving.
-        
+
         This simulates the case where DC power flow did not converge (res_dc=None)
         but include_dc_res=True, so DC columns should be present but all NaN.
         """
@@ -503,7 +579,7 @@ class TestSolve:
 
         # Check that all DC columns are NaN in memory
         print("  Checking DC columns are NaN in memory...")
-        
+
         # Bus DC columns: Va_dc, Pg_dc
         va_dc_idx = len(BUS_COLUMNS) + DC_BUS_COLUMNS.index("Va_dc")
         pg_dc_idx = len(BUS_COLUMNS) + DC_BUS_COLUMNS.index("Pg_dc")
@@ -516,7 +592,9 @@ class TestSolve:
         # Gen DC columns: p_mw_dc
         p_mw_dc_idx = len(GEN_COLUMNS) + DC_GEN_COLUMNS.index("p_mw_dc")
         p_mw_dc_col = pf_data["gen"][:, p_mw_dc_idx]
-        assert np.isnan(p_mw_dc_col[net.idx_gens_in_service]).all(), "p_mw_dc should be all NaN for in-service gens when res_dc=None"
+        assert np.isnan(p_mw_dc_col[net.idx_gens_in_service]).all(), (
+            "p_mw_dc should be all NaN for in-service gens when res_dc=None"
+        )
         print("    Gen DC columns are all NaN for in-service generators")
 
         # Branch DC columns: pf_dc, pt_dc
@@ -524,14 +602,20 @@ class TestSolve:
         pt_dc_idx = len(BRANCH_COLUMNS) + DC_BRANCH_COLUMNS.index("pt_dc")
         pf_dc_col = pf_data["branch"][:, pf_dc_idx]
         pt_dc_col = pf_data["branch"][:, pt_dc_idx]
-        assert np.isnan(pf_dc_col[net.idx_branches_in_service]).all(), "pf_dc should be all NaN for in-service branches when res_dc=None"
-        assert np.isnan(pt_dc_col[net.idx_branches_in_service]).all(), "pt_dc should be all NaN for in-service branches when res_dc=None"
+        assert np.isnan(pf_dc_col[net.idx_branches_in_service]).all(), (
+            "pf_dc should be all NaN for in-service branches when res_dc=None"
+        )
+        assert np.isnan(pt_dc_col[net.idx_branches_in_service]).all(), (
+            "pt_dc should be all NaN for in-service branches when res_dc=None"
+        )
         print("    Branch DC columns are all NaN for in-service branches")
 
         # Runtime DC columns: dc
         dc_idx = len(RUNTIME_COLUMNS) + DC_RUNTIME_COLUMNS.index("dc")
         runtime_dc_col = pf_data["runtime"][:, dc_idx]
-        assert np.isnan(runtime_dc_col).all(), "dc runtime should be all NaN when res_dc=None"
+        assert np.isnan(runtime_dc_col).all(), (
+            "dc runtime should be all NaN when res_dc=None"
+        )
         print("    Runtime DC column is all NaN")
 
         # Now save to parquet and read back to verify NaN persistence
@@ -552,7 +636,9 @@ class TestSolve:
             gen_df.insert(0, "scenario", 0)
 
             branch_df = pd.DataFrame(pf_data["branch"], columns=branch_columns)
-            branch_df[["from_bus", "to_bus"]] = branch_df[["from_bus", "to_bus"]].astype("int64")
+            branch_df[["from_bus", "to_bus"]] = branch_df[
+                ["from_bus", "to_bus"]
+            ].astype("int64")
             branch_df.insert(0, "scenario", 0)
 
             runtime_df = pd.DataFrame(pf_data["runtime"], columns=runtime_columns)
@@ -577,30 +663,48 @@ class TestSolve:
 
             # Verify NaN values are preserved after round-trip
             print("  Verifying NaN values are preserved after parquet round-trip...")
-            
+
             # Bus DC columns
-            assert bus_df_read["Va_dc"].isna().all(), "Va_dc should remain all NaN after parquet round-trip"
-            assert bus_df_read["Pg_dc"].isna().all(), "Pg_dc should remain all NaN after parquet round-trip"
+            assert bus_df_read["Va_dc"].isna().all(), (
+                "Va_dc should remain all NaN after parquet round-trip"
+            )
+            assert bus_df_read["Pg_dc"].isna().all(), (
+                "Pg_dc should remain all NaN after parquet round-trip"
+            )
             print("    Bus DC columns remain all NaN after parquet round-trip")
 
             # Gen DC columns (check in-service gens)
             in_service_mask = gen_df_read["in_service"] == 1
-            assert gen_df_read.loc[in_service_mask, "p_mw_dc"].isna().all(), "p_mw_dc should remain all NaN for in-service gens after parquet round-trip"
-            print("    Gen DC columns remain all NaN for in-service generators after parquet round-trip")
+            assert gen_df_read.loc[in_service_mask, "p_mw_dc"].isna().all(), (
+                "p_mw_dc should remain all NaN for in-service gens after parquet round-trip"
+            )
+            print(
+                "    Gen DC columns remain all NaN for in-service generators after parquet round-trip",
+            )
 
             # Branch DC columns (check in-service branches)
             in_service_mask = branch_df_read["br_status"] == 1
-            assert branch_df_read.loc[in_service_mask, "pf_dc"].isna().all(), "pf_dc should remain all NaN for in-service branches after parquet round-trip"
-            assert branch_df_read.loc[in_service_mask, "pt_dc"].isna().all(), "pt_dc should remain all NaN for in-service branches after parquet round-trip"
-            print("    Branch DC columns remain all NaN for in-service branches after parquet round-trip")
+            assert branch_df_read.loc[in_service_mask, "pf_dc"].isna().all(), (
+                "pf_dc should remain all NaN for in-service branches after parquet round-trip"
+            )
+            assert branch_df_read.loc[in_service_mask, "pt_dc"].isna().all(), (
+                "pt_dc should remain all NaN for in-service branches after parquet round-trip"
+            )
+            print(
+                "    Branch DC columns remain all NaN for in-service branches after parquet round-trip",
+            )
 
             # Runtime DC columns
-            assert runtime_df_read["dc"].isna().all(), "dc runtime should remain all NaN after parquet round-trip"
+            assert runtime_df_read["dc"].isna().all(), (
+                "dc runtime should remain all NaN after parquet round-trip"
+            )
             print("    Runtime DC column remains all NaN after parquet round-trip")
 
-        print(f"  {case_name} completed successfully: NaN values persist through parquet save/load")
+        print(
+            f"  {case_name} completed successfully: NaN values persist through parquet save/load",
+        )
 
-   
+
 if __name__ == "__main__":
     test = TestSolve()
     # set up julia interface

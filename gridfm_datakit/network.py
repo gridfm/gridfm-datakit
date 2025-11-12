@@ -128,8 +128,6 @@ class Network:
             [self.bus_index_mapping[int(idx)] for idx in self.branches[:, T_BUS]],
         )
 
-
-
         # assert all generator buses are in bus IDs
         assert np.all(np.isin(self.gens[:, GEN_BUS], self.buses[:, BUS_I])), (
             "All generator buses should be in bus IDs"

@@ -287,6 +287,5 @@ def test_parquet_append_vs_overwrite():
         )
 
 
-
 if __name__ == "__main__":
     test_parquet_append_vs_overwrite()

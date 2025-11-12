@@ -25,12 +25,13 @@ gridfm-datakit generate scripts/config/default.yaml
 Validate previously generated power flow data. Runs comprehensive validation checks for data integrity and physical consistency:
 
 ```bash
-gridfm-datakit validate path/to/data/directory [--n-scenarios N]
+gridfm-datakit validate path/to/data/directory [--n-scenarios N] [--sn-mva 100]
 ```
 
 **Arguments:**
 - `data_path`: Path to directory containing generated CSV files
 - `--n-scenarios N`: Number of scenarios to sample for validation (default: 100). Use 0 to validate all scenarios.
+- `--sn-mva`: Base MVA used to scale power quantities (default: 100).
 
 **Examples:**
 ```bash
@@ -49,11 +50,12 @@ gridfm-datakit validate ./data_out/case24_ieee_rts/raw --n-scenarios 0
 Compute and display statistics from generated power flow data:
 
 ```bash
-gridfm-datakit stats path/to/data/directory
+gridfm-datakit stats path/to/data/directory [--sn-mva 100]
 ```
 
 **Arguments:**
 - `data_path`: Path to directory containing generated parquet files (`bus_data.parquet`, `branch_data.parquet`, `gen_data.parquet`)
+- `--sn-mva`: Base MVA used to scale power quantities (default: 100).
 
 **Example:**
 ```bash

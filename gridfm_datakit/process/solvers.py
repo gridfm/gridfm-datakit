@@ -70,8 +70,6 @@ def run_pf(net: Network, jl: Any, fast: Union[bool, None] = None) -> Dict[str, A
         RuntimeError: If power flow fails to converge or encounters an error.
     """
 
-
-
     # Create a temporary file for the MATPOWER case
     with tempfile.NamedTemporaryFile(mode="w", suffix=".m", delete=False) as temp_file:
         temp_filename = temp_file.name
@@ -87,7 +85,9 @@ def run_pf(net: Network, jl: Any, fast: Union[bool, None] = None) -> Dict[str, A
             and str(result["termination_status"]) != "True"
             or (not fast and str(result["termination_status"]) != "LOCALLY_SOLVED")
         ):
-            raise RuntimeError(f"PF did not converge: {result['termination_status']}, fast={fast}")
+            raise RuntimeError(
+                f"PF did not converge: {result['termination_status']}, fast={fast}",
+            )
 
         return result
 
@@ -187,6 +187,7 @@ def run_dcopf(net: Network, jl: Any) -> Dict[str, Any]:
         # Clean up temporary file
         if os.path.exists(temp_filename):
             os.unlink(temp_filename)
+
 
 def compare_pf_results(
     net: Network,

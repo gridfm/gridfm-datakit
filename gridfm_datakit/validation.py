@@ -28,6 +28,7 @@ from gridfm_datakit.utils.power_balance import (
 def validate_generated_data(
     file_paths: Dict[str, str],
     mode: str,
+    sn_mva: float,
     n_scenarios: int = 0,
 ) -> bool:
     """Run all validation tests on the generated data.
@@ -36,6 +37,7 @@ def validate_generated_data(
         file_paths: Dictionary containing paths to data files (bus_data, branch_data, gen_data, y_bus_data).
         mode: Operating mode ("opf" or "pf").
         n_scenarios: Number of scenarios to sample for validation (0 for all scenarios).
+        sn_mva: Base MVA used to scale power quantities
 
     Returns:
         True if all validations pass.
@@ -115,7 +117,7 @@ def validate_generated_data(
         )
 
     try:
-        validate_computed_vs_stored_power_flows(generated_data)
+        validate_computed_vs_stored_power_flows(generated_data, sn_mva)
     except Exception as e:
         raise AssertionError(f"Computed vs stored power flows validation failed: {e}")
 
@@ -189,7 +191,7 @@ def validate_generated_data(
             raise AssertionError(f"Slack Pg consistency validation failed: {e}")
 
     try:
-        validate_power_balance_equations(generated_data)
+        validate_power_balance_equations(generated_data, sn_mva)
     except Exception as e:
         raise AssertionError(f"Power balance equations validation failed: {e}")
 
@@ -231,25 +233,33 @@ def validate_ybus_diagonal_consistency(generated_data: Dict[str, pd.DataFrame]) 
     expected = (
         bus_keyed.merge(yff_sum, on=["scenario", "bus"], how="left")
         .merge(ytt_sum, on=["scenario", "bus"], how="left")
-        .fillna({"yff_sum_g": 0.0, "yff_sum_b": 0.0, "ytt_sum_g": 0.0, "ytt_sum_b": 0.0})
+        .fillna(
+            {"yff_sum_g": 0.0, "yff_sum_b": 0.0, "ytt_sum_g": 0.0, "ytt_sum_b": 0.0},
+        )
     )
 
     # Compute expected G and B
-    expected["expected_g"] = expected["GS"] + expected["yff_sum_g"] + expected["ytt_sum_g"]
-    expected["expected_b"] = expected["BS"] + expected["yff_sum_b"] + expected["ytt_sum_b"]
+    expected["expected_g"] = (
+        expected["GS"] + expected["yff_sum_g"] + expected["ytt_sum_g"]
+    )
+    expected["expected_b"] = (
+        expected["BS"] + expected["yff_sum_b"] + expected["ytt_sum_b"]
+    )
 
     # Get actual G and B from y_bus_data (diagonal entries only)
-    ybus_diagonal = y_bus_data[
-        (y_bus_data["index1"] == y_bus_data["index2"])
-    ][["scenario", "index1", "G", "B"]].rename(columns={"index1": "bus"})
+    ybus_diagonal = y_bus_data[(y_bus_data["index1"] == y_bus_data["index2"])][
+        ["scenario", "index1", "G", "B"]
+    ].rename(columns={"index1": "bus"})
     ybus_diagonal["scenario"] = ybus_diagonal["scenario"].astype(int)
     ybus_diagonal["bus"] = ybus_diagonal["bus"].astype(int)
 
     # Merge expected with actual
     comparison = expected.merge(
-        ybus_diagonal, on=["scenario", "bus"], how="left", suffixes=("", "_actual")
+        ybus_diagonal,
+        on=["scenario", "bus"],
+        how="left",
+        suffixes=("", "_actual"),
     )
-
 
     # Vectorized comparison
     g_diff = np.abs(comparison["expected_g"] - comparison["G"])
@@ -258,16 +268,11 @@ def validate_ybus_diagonal_consistency(generated_data: Dict[str, pd.DataFrame]) 
     tolerance = 1e-6
     g_mismatches = comparison[g_diff >= tolerance]
     b_mismatches = comparison[b_diff >= tolerance]
-    
 
     if len(g_mismatches) > 0:
-        raise AssertionError(
-            f"G mismatches: {g_mismatches}"
-        )
+        raise AssertionError(f"G mismatches: {g_mismatches}")
     if len(b_mismatches) > 0:
-        raise AssertionError(
-            f"B mismatches: {b_mismatches}"
-        )
+        raise AssertionError(f"B mismatches: {b_mismatches}")
 
 
 def validate_deactivated_lines_zero_admittance(
@@ -323,15 +328,20 @@ def validate_deactivated_lines_zero_admittance(
 
 def validate_computed_vs_stored_power_flows(
     generated_data: Dict[str, pd.DataFrame],
+    sn_mva: float,
 ) -> None:
     """Test that computed power flows match stored power flows."""
-    
-    
+
     print(
-        f"    Validate computed vs stored power flows: validating {len(generated_data['branch_data'])} branches across {len(generated_data['branch_data']['scenario'].unique())} scenarios",    
+        f"    Validate computed vs stored power flows: validating {len(generated_data['branch_data'])} branches across {len(generated_data['branch_data']['scenario'].unique())} scenarios",
     )
-    
-    pf, qf, pt, qt = compute_branch_powers_vectorized(generated_data["branch_data"], generated_data["bus_data"], dc=False)
+
+    pf, qf, pt, qt = compute_branch_powers_vectorized(
+        generated_data["branch_data"],
+        generated_data["bus_data"],
+        dc=False,
+        sn_mva=sn_mva,
+    )
     computed_flows = pd.DataFrame(
         {
             "pf": pf,
@@ -344,14 +354,15 @@ def validate_computed_vs_stored_power_flows(
         },
         index=generated_data["branch_data"].index,
     )
-    
-    
-    flows_data = generated_data["branch_data"][["pf", "qf", "pt", "qt", "scenario", "from_bus", "to_bus"]]
+
+    flows_data = generated_data["branch_data"][
+        ["pf", "qf", "pt", "qt", "scenario", "from_bus", "to_bus"]
+    ]
     mismatch = ~np.isclose(computed_flows, flows_data, atol=1e-4, rtol=1e-4)
-    #TODO investigate why atol has to be so large
+    # TODO investigate why atol has to be so large
     if mismatch.any():
         raise AssertionError(
-            f"Computed power flows do not match stored power flows, stored: \n{flows_data[mismatch]}, computed: \n{computed_flows[mismatch]}"
+            f"Computed power flows do not match stored power flows, stored: \n{flows_data[mismatch]}, computed: \n{computed_flows[mismatch]}",
         )
 
     print("    Computed vs stored power flows: OK")
@@ -466,14 +477,13 @@ def validate_deactivated_generators_zero_output(
         assert (deactivated_gens["q_mvar"] == 0).all(), (
             "Deactivated generators should have zero q_mvar"
         )
-        
+
         if "p_mw_dc" in deactivated_gens.columns:
             # zero or nan (if no solution was found)
-            assert ((deactivated_gens["p_mw_dc"] == 0) | (deactivated_gens["p_mw_dc"].isna())).all(), (
-                "Deactivated generators should have zero p_mw_dc or be NaN"
-            )
-        
-    
+            assert (
+                (deactivated_gens["p_mw_dc"] == 0)
+                | (deactivated_gens["p_mw_dc"].isna())
+            ).all(), "Deactivated generators should have zero p_mw_dc or be NaN"
 
     print("    Deactivated generators zero output: OK")
 
@@ -655,9 +665,9 @@ def validate_bus_generation_consistency(
     bus_keyed["bus"] = bus_keyed["bus"].astype(int)
 
     # Merge bus data with generator sums
-    comparison = bus_keyed.merge(
-        gen_sum, on=["scenario", "bus"], how="left"
-    ).fillna({"pg_gen_sum": 0.0, "qg_gen_sum": 0.0})
+    comparison = bus_keyed.merge(gen_sum, on=["scenario", "bus"], how="left").fillna(
+        {"pg_gen_sum": 0.0, "qg_gen_sum": 0.0},
+    )
 
     # Vectorized comparison
     tolerance = 1e-6
@@ -708,9 +718,9 @@ def validate_bus_generation_consistency_dc(
     bus_keyed["bus"] = bus_keyed["bus"].astype(int)
 
     # Merge bus data with generator sums
-    comparison = bus_keyed.merge(
-        gen_sum_dc, on=["scenario", "bus"], how="left"
-    ).fillna({"pg_dc_gen_sum": 0.0})
+    comparison = bus_keyed.merge(gen_sum_dc, on=["scenario", "bus"], how="left").fillna(
+        {"pg_dc_gen_sum": 0.0},
+    )
 
     # Filter out NaN Pg_dc rows (e.g., OPF mode without DC)
     comparison = comparison[comparison["Pg_dc"].notna()]
@@ -733,7 +743,7 @@ def validate_bus_generation_consistency_dc(
 
 def validate_dc_columns_consistency(generated_data: Dict[str, pd.DataFrame]) -> None:
     """Test that if any DC column has NaN for a scenario, all DC columns are NaN for that scenario (vectorized).
-    
+
     This ensures that when DC power flow doesn't converge, all DC data is consistently NaN,
     not just some columns.
     """
@@ -741,8 +751,7 @@ def validate_dc_columns_consistency(generated_data: Dict[str, pd.DataFrame]) -> 
     branch_data = generated_data["branch_data"]
     gen_data = generated_data["gen_data"]
     runtime_data = generated_data["runtime_data"]
-    
-   
+
     # check if there is dc data:
     if "Va_dc" not in bus_data.columns:
         print("    DC columns consistency: skipped (no Va_dc column)")
@@ -751,23 +760,44 @@ def validate_dc_columns_consistency(generated_data: Dict[str, pd.DataFrame]) -> 
     # compute scenarios that have nan for each DC column
     scenarios_with_nan = {}
     for col in DC_BUS_COLUMNS:
-        scenarios_with_nan[col] = set(bus_data[bus_data[col].isna()]["scenario"].unique())
+        scenarios_with_nan[col] = set(
+            bus_data[bus_data[col].isna()]["scenario"].unique(),
+        )
     for col in DC_BRANCH_COLUMNS:
-        scenarios_with_nan[col] = set(branch_data[branch_data[col].isna()]["scenario"].unique())
+        scenarios_with_nan[col] = set(
+            branch_data[branch_data[col].isna()]["scenario"].unique(),
+        )
     for col in DC_GEN_COLUMNS:
-        scenarios_with_nan[col] = set(gen_data[gen_data[col].isna()]["scenario"].unique())
+        scenarios_with_nan[col] = set(
+            gen_data[gen_data[col].isna()]["scenario"].unique(),
+        )
     for col in DC_RUNTIME_COLUMNS:
-        scenarios_with_nan[col] = set(runtime_data[runtime_data[col].isna()]["scenario"].unique())
-            
+        scenarios_with_nan[col] = set(
+            runtime_data[runtime_data[col].isna()]["scenario"].unique(),
+        )
+
     # check all values of scenarios_with_nan are the same
     key_0 = list(scenarios_with_nan.keys())[0]
     for col in scenarios_with_nan:
         if scenarios_with_nan[col] != scenarios_with_nan[key_0]:
             # find the difference
-            difference = scenarios_with_nan[col].difference(scenarios_with_nan[key_0]).union(scenarios_with_nan[key_0].difference(scenarios_with_nan[col]))
-            raise AssertionError(f"DC columns consistency: scenarios with nan for {col} are not the same, difference: {sorted([int(i) for i in difference])}")
-   
-    print("number of scenarios with nan: ", len(scenarios_with_nan[key_0].union(scenarios_with_nan[key_0].difference(scenarios_with_nan[col]))))
+            difference = (
+                scenarios_with_nan[col]
+                .difference(scenarios_with_nan[key_0])
+                .union(scenarios_with_nan[key_0].difference(scenarios_with_nan[col]))
+            )
+            raise AssertionError(
+                f"DC columns consistency: scenarios with nan for {col} are not the same, difference: {sorted([int(i) for i in difference])}",
+            )
+
+    print(
+        "number of scenarios with nan: ",
+        len(
+            scenarios_with_nan[key_0].union(
+                scenarios_with_nan[key_0].difference(scenarios_with_nan[col]),
+            ),
+        ),
+    )
     print("    DC columns consistency: OK")
 
 
@@ -819,7 +849,10 @@ def validate_non_slack_pg_consistency(generated_data: Dict[str, pd.DataFrame]) -
     print("    Non-slack Pg consistency: OK")
 
 
-def validate_power_balance_equations(generated_data: Dict[str, pd.DataFrame]) -> None:
+def validate_power_balance_equations(
+    generated_data: Dict[str, pd.DataFrame],
+    sn_mva: float,
+) -> None:
     """Test power balance equations (Kirchhoff's Current Law)."""
     bus_data = generated_data["bus_data"]
     branch_data = generated_data["branch_data"]
@@ -828,17 +861,20 @@ def validate_power_balance_equations(generated_data: Dict[str, pd.DataFrame]) ->
     print(
         f"    Power balance equations (Kirchhoff's Law): validating {len(bus_data)} bus entries across {len(scenarios)} scenarios",
     )
-    
-    
-    
-    power_balance_ac = compute_bus_balance(bus_data, branch_data, branch_data[["pf", "qf", "pt", "qt"]], False)
+
+    power_balance_ac = compute_bus_balance(
+        bus_data,
+        branch_data,
+        branch_data[["pf", "qf", "pt", "qt"]],
+        False,
+        sn_mva=sn_mva,
+    )
     not_close_zero = ~np.isclose(0.0, power_balance_ac["P_mis_ac"], atol=1e-4)
-    #TODO investigate why atol has to be so large
+    # TODO investigate why atol has to be so large
     if not_close_zero.any():
         raise AssertionError(
-            f"Power balance equations (Kirchhoff's Law) do not hold, mismatches: {power_balance_ac[not_close_zero]}"
-        )       
-
+            f"Power balance equations (Kirchhoff's Law) do not hold, mismatches: {power_balance_ac[not_close_zero]}",
+        )
 
     print("    Power balance equations (Kirchhoff's Law): OK")
 
@@ -931,14 +967,24 @@ def validate_data_completeness(generated_data: Dict[str, pd.DataFrame]) -> None:
         assert "scenario" in df.columns, f"{name} should have scenario column"
 
     dc = True if "Va_dc" in bus_data.columns else False
-    
+
     # 2) Check required columns exist and contain no NaN values
-    _require_columns(bus_data, "Bus data", BUS_COLUMNS + DC_BUS_COLUMNS if dc else BUS_COLUMNS)
-    _require_columns(branch_data, "Branch data", BRANCH_COLUMNS + DC_BRANCH_COLUMNS if dc else BRANCH_COLUMNS)
-    _require_columns(gen_data, "Generator data", GEN_COLUMNS + DC_GEN_COLUMNS if dc else GEN_COLUMNS)
+    _require_columns(
+        bus_data,
+        "Bus data",
+        BUS_COLUMNS + DC_BUS_COLUMNS if dc else BUS_COLUMNS,
+    )
+    _require_columns(
+        branch_data,
+        "Branch data",
+        BRANCH_COLUMNS + DC_BRANCH_COLUMNS if dc else BRANCH_COLUMNS,
+    )
+    _require_columns(
+        gen_data,
+        "Generator data",
+        GEN_COLUMNS + DC_GEN_COLUMNS if dc else GEN_COLUMNS,
+    )
     _require_columns(y_bus_data, "Y-bus data", YBUS_COLUMNS)
-    
-    
 
     _check_no_nan(bus_data, "Bus data", BUS_COLUMNS)
     _check_no_nan(branch_data, "Branch data", BRANCH_COLUMNS)
@@ -964,5 +1010,5 @@ if __name__ == "__main__":
         "y_bus_data": "data_out/case24_ieee_rts/raw/y_bus_data.parquet",
         "runtime_data": "data_out/case24_ieee_rts/raw/runtime_data.parquet",
     }
-    validate_generated_data(file_paths, "pf", n_scenarios=10)
+    validate_generated_data(file_paths, "pf", 100.0, n_scenarios=10)
     print("Validation completed successfully!")

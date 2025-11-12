@@ -26,7 +26,11 @@ def pm_setup() -> None:
     )
 
 
-def validate_data_directory(data_path: str, n_scenarios: int = 100) -> bool:
+def validate_data_directory(
+    data_path: str,
+    sn_mva: float,
+    n_scenarios: int,
+) -> bool:
     """
     Validate generated power flow data in a directory.
 
@@ -83,7 +87,12 @@ def validate_data_directory(data_path: str, n_scenarios: int = 100) -> bool:
     try:
         # Run validation
         print(f"Running validation tests (mode: {mode})...")
-        validate_generated_data(file_paths, mode, n_scenarios=n_scenarios)
+        validate_generated_data(
+            file_paths,
+            mode,
+            sn_mva=sn_mva,
+            n_scenarios=n_scenarios,
+        )
         print("All validation tests passed!")
         return True
 
@@ -151,6 +160,12 @@ Examples:
         default=100,
         help="Number of scenarios to sample for validation (default: 100). Use 0 to validate all scenarios.",
     )
+    validate_parser.add_argument(
+        "--sn-mva",
+        type=float,
+        default=100.0,
+        help="Base MVA used to scale power quantities (default: 100).",
+    )
 
     # Stats command
     stats_parser = subparsers.add_parser(
@@ -161,6 +176,12 @@ Examples:
         "data_path",
         type=str,
         help="Path to directory containing generated parquet files (bus_data.parquet, branch_data.parquet, gen_data.parquet)",
+    )
+    stats_parser.add_argument(
+        "--sn-mva",
+        type=float,
+        default=100.0,
+        help="Base MVA used to scale power quantities (default: 100).",
     )
 
     # Plots command
@@ -209,7 +230,11 @@ Examples:
             print(f"Sampling {args.n_scenarios} scenarios for validation...")
         else:
             print("Validating all scenarios...")
-        success = validate_data_directory(args.data_path, n_scenarios=args.n_scenarios)
+        success = validate_data_directory(
+            args.data_path,
+            sn_mva=args.sn_mva,
+            n_scenarios=args.n_scenarios,
+        )
 
         if success:
             print("\nData validation completed successfully!")
@@ -220,7 +245,7 @@ Examples:
 
     elif args.command == "stats":
         print(f"Computing statistics from {args.data_path}...")
-        plot_stats(args.data_path)
+        plot_stats(args.data_path, sn_mva=args.sn_mva)
         print("\nStatistics computation completed!")
         sys.exit(0)
 

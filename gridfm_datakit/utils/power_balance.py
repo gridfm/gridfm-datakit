@@ -6,7 +6,10 @@ from typing import Tuple
 
 
 def compute_branch_powers_vectorized(
-    branch_df: pd.DataFrame, bus_df: pd.DataFrame, dc: bool
+    branch_df: pd.DataFrame,
+    bus_df: pd.DataFrame,
+    dc: bool,
+    sn_mva: float,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Compute branch power flows for all branches in a vectorized fashion.
 
@@ -14,6 +17,7 @@ def compute_branch_powers_vectorized(
         branch_df: DataFrame with branch data including Yff, Yft, Ytf, Ytt admittances
         bus_df: DataFrame with bus data including Vm and Va (or Va_dc for DC mode)
         dc: If True, use DC power flow (Va_dc, Vm=1.0), else use AC (Va, Vm)
+        sn_mva: System base power in MVA used to scale complex power results
 
     Returns:
         Tuple of (pf, qf, pt, qt) power flow arrays in MW/MVAR
@@ -23,7 +27,8 @@ def compute_branch_powers_vectorized(
     to_bus = branch_df["to_bus"].to_numpy(dtype=int)
 
     idx_from = pd.MultiIndex.from_arrays(
-        [scenarios, from_bus], names=["scenario", "bus"]
+        [scenarios, from_bus],
+        names=["scenario", "bus"],
     )
     idx_to = pd.MultiIndex.from_arrays([scenarios, to_bus], names=["scenario", "bus"])
 
@@ -34,34 +39,30 @@ def compute_branch_powers_vectorized(
     Vf = bus_df_indexed["V"].loc[idx_from].to_numpy(dtype=np.complex128)
     Vt = bus_df_indexed["V"].loc[idx_to].to_numpy(dtype=np.complex128)
 
-    Yff = (
-        branch_df["Yff_r"].to_numpy(dtype=np.float64)
-        + 1j * branch_df["Yff_i"].to_numpy(dtype=np.float64)
-    )
-    Yft = (
-        branch_df["Yft_r"].to_numpy(dtype=np.float64)
-        + 1j * branch_df["Yft_i"].to_numpy(dtype=np.float64)
-    )
-    Ytf = (
-        branch_df["Ytf_r"].to_numpy(dtype=np.float64)
-        + 1j * branch_df["Ytf_i"].to_numpy(dtype=np.float64)
-    )
-    Ytt = (
-        branch_df["Ytt_r"].to_numpy(dtype=np.float64)
-        + 1j * branch_df["Ytt_i"].to_numpy(dtype=np.float64)
-    )
+    Yff = branch_df["Yff_r"].to_numpy(dtype=np.float64) + 1j * branch_df[
+        "Yff_i"
+    ].to_numpy(dtype=np.float64)
+    Yft = branch_df["Yft_r"].to_numpy(dtype=np.float64) + 1j * branch_df[
+        "Yft_i"
+    ].to_numpy(dtype=np.float64)
+    Ytf = branch_df["Ytf_r"].to_numpy(dtype=np.float64) + 1j * branch_df[
+        "Ytf_i"
+    ].to_numpy(dtype=np.float64)
+    Ytt = branch_df["Ytt_r"].to_numpy(dtype=np.float64) + 1j * branch_df[
+        "Ytt_i"
+    ].to_numpy(dtype=np.float64)
 
     If = Yff * Vf + Yft * Vt
     It = Ytt * Vt + Ytf * Vf
 
-    Sf = Vf * np.conj(If) * 100.0
-    St = Vt * np.conj(It) * 100.0
-    
+    Sf = Vf * np.conj(If) * sn_mva
+    St = Vt * np.conj(It) * sn_mva
+
     pf = np.real(Sf)
     qf = np.imag(Sf)
     pt = np.real(St)
     qt = np.imag(St)
-    
+
     return pf, qf, pt, qt
 
 
@@ -70,6 +71,7 @@ def compute_bus_balance(
     branch_df: pd.DataFrame,
     flows: pd.DataFrame,
     dc: bool,
+    sn_mva: float,
 ) -> pd.DataFrame:
     """
     Compute power balance at each bus for AC or DC mode.
@@ -85,10 +87,11 @@ def compute_bus_balance(
         branch_df: DataFrame with branch data (scenario, from_bus, to_bus)
         flows: DataFrame with flow data. For AC: columns (pf, qf, pt, qt). For DC: columns (pf_dc, pt_dc)
         dc: If True, compute DC balance, else AC balance
+        sn_mva: System base power in MVA used to scale power terms
 
     Returns:
         DataFrame with columns [scenario, bus, P_mis_ac, Q_mis_ac] for AC or [scenario, bus, P_mis_dc] for DC
-    """        
+    """
     # ===== Step 1: Aggregate branch flows per bus =====
     # For each bus, sum flows where it is the "from" bus (pf, qf) and where it is the "to" bus (pt, qt)
     # For AC: include both active (pf, pt) and reactive (qf, qt) flows
@@ -98,17 +101,21 @@ def compute_bus_balance(
 
     if not dc:
         from_bus = pd.concat(
-            [branch_df[["scenario", "from_bus"]], flows[["pf", "qf"]]], axis=1
+            [branch_df[["scenario", "from_bus"]], flows[["pf", "qf"]]],
+            axis=1,
         ).rename(columns={"from_bus": "bus"})
         to_bus = pd.concat(
-            [branch_df[["scenario", "to_bus"]], flows[["pt", "qt"]]], axis=1
+            [branch_df[["scenario", "to_bus"]], flows[["pt", "qt"]]],
+            axis=1,
         ).rename(columns={"to_bus": "bus"})
     else:
         from_bus = pd.concat(
-            [branch_df[["scenario", "from_bus"]], flows[["pf_dc"]]], axis=1
+            [branch_df[["scenario", "from_bus"]], flows[["pf_dc"]]],
+            axis=1,
         ).rename(columns={"from_bus": "bus", "pf_dc": "pf"})
         to_bus = pd.concat(
-            [branch_df[["scenario", "to_bus"]], flows[["pt_dc"]]], axis=1
+            [branch_df[["scenario", "to_bus"]], flows[["pt_dc"]]],
+            axis=1,
         ).rename(columns={"to_bus": "bus", "pt_dc": "pt"})
 
     # set int dtype for scenario and bus
@@ -136,11 +143,9 @@ def compute_bus_balance(
     # Shunt power = G*|V|^2 (active) and -B*|V|^2 (reactive)
     # For DC: |V| = 1.0, for AC: |V| = Vm from solution
     absV2 = 1.0 if dc else bus_df["Vm"].to_numpy(dtype=np.float64) ** 2
-    P_sh = bus_df.get("GS", 0.0).to_numpy(dtype=np.float64) * absV2 * 100.0
+    P_sh = bus_df["GS"].to_numpy(dtype=np.float64) * absV2 * sn_mva
     Q_sh = (
-        -(bus_df.get("BS", 0.0).to_numpy(dtype=np.float64) * absV2 * 100.0)
-        if not dc
-        else None
+        -(bus_df["BS"].to_numpy(dtype=np.float64) * absV2 * sn_mva) if not dc else None
     )
 
     # ===== Step 3: Compute net injections =====
@@ -175,4 +180,3 @@ def compute_bus_balance(
         scenarios_with_nan = set(bus_df[bus_df["Va_dc"].isna()]["scenario"].unique())
         bal.loc[bal["scenario"].isin(scenarios_with_nan), "P_mis_dc"] = np.nan
         return bal[["scenario", "bus", "P_mis_dc"]]
-

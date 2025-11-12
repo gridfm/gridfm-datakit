@@ -5,7 +5,6 @@ import os
 from gridfm_datakit.save import (
     save_node_edge_data,
 )
-import warnings
 from gridfm_datakit.process.process_network import (
     process_scenario_opf_mode,
     process_scenario_pf_mode,
@@ -63,7 +62,6 @@ def _setup_environment(
         args = NestedNamespace(**config)
     else:
         args = config
-        
 
     # Setup output directory
     base_path = os.path.join(args.settings.data_dir, args.network.name, "raw")
@@ -230,8 +228,7 @@ def generate_power_flow_data(
         - scenarios_{generator}.html: Load scenario plots
         - scenarios_{generator}.log: Load scenario generation notes
     """
-    
-    
+
     # Setup environment
     args, base_path, file_paths = _setup_environment(config)
 
@@ -253,11 +250,10 @@ def generate_power_flow_data(
         net,
     )
 
-
     jl = init_julia(args.settings.max_iter, file_paths["solver_log_dir"])
 
     processed_data = []
-    
+
     # Process scenarios sequentially
     with open(file_paths["tqdm_log"], "a") as f:
         with tqdm(
@@ -280,9 +276,6 @@ def generate_power_flow_data(
                         file_paths["error_log"],
                         args.settings.include_dc_res,
                         jl,
-                        
-                        
-                        
                     )
                 elif args.settings.mode == "pf":
                     processed_data = process_scenario_pf_mode(

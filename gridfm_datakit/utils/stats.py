@@ -12,7 +12,10 @@ from gridfm_datakit.utils.power_balance import (
 )
 
 
-def compute_stats_from_data(data_dir: str) -> Dict[str, np.ndarray]:
+def compute_stats_from_data(
+    data_dir: str,
+    sn_mva: float,
+) -> Dict[str, np.ndarray]:
     """Compute statistics from parquet data files (vectorized).
 
     Computes aggregated statistics from generated power flow data. Processes all scenarios
@@ -20,6 +23,7 @@ def compute_stats_from_data(data_dir: str) -> Dict[str, np.ndarray]:
 
     Args:
         data_dir: Directory containing bus_data.parquet, branch_data.parquet, gen_data.parquet, runtime_data.parquet
+        sn_mva: Base MVA used to scale power quantities
 
     Returns:
         Dictionary with the following keys and corresponding numpy arrays:
@@ -60,7 +64,7 @@ def compute_stats_from_data(data_dir: str) -> Dict[str, np.ndarray]:
         os.path.join(data_dir, "runtime_data.parquet"),
         engine="fastparquet",
     )
-    
+
     dc = True if "p_mw_dc" in gen_data.columns else False
     # The canonical scenario ordering (to match the original function's behavior)
     scenarios = bus_data["scenario"].unique()
@@ -112,35 +116,48 @@ def compute_stats_from_data(data_dir: str) -> Dict[str, np.ndarray]:
 
     # Global vector of per-branch loadings (matches prior behavior of extending a list)
     branch_loadings_vec = active_br["_loading"].to_numpy(copy=False)
-    
-    
+
     # --- 3) Power balance errors ---
-    balance_ac = compute_bus_balance(bus_data, branch_data, branch_data[["pf", "qf", "pt", "qt"]], False)
+    balance_ac = compute_bus_balance(
+        bus_data,
+        branch_data,
+        branch_data[["pf", "qf", "pt", "qt"]],
+        False,
+        sn_mva=sn_mva,
+    )
     group_by_scenario = balance_ac.groupby("scenario")
     p_balance_ac_max = group_by_scenario["P_mis_ac"].max().reindex(scenarios)
     p_balance_ac_mean = group_by_scenario["P_mis_ac"].mean().reindex(scenarios)
     q_balance_ac_max = group_by_scenario["Q_mis_ac"].max().reindex(scenarios)
     q_balance_ac_mean = group_by_scenario["Q_mis_ac"].mean().reindex(scenarios)
     if dc:
-        pf_dc, _, pt_dc, _ = compute_branch_powers_vectorized(branch_data, bus_data, True)
-        balance_dc = compute_bus_balance(bus_data, branch_data, pd.DataFrame({"pf_dc": pf_dc, "pt_dc": pt_dc}, index=branch_data.index), True)
+        pf_dc, _, pt_dc, _ = compute_branch_powers_vectorized(
+            branch_data,
+            bus_data,
+            True,
+            sn_mva=sn_mva,
+        )
+        balance_dc = compute_bus_balance(
+            bus_data,
+            branch_data,
+            pd.DataFrame({"pf_dc": pf_dc, "pt_dc": pt_dc}, index=branch_data.index),
+            True,
+            sn_mva=sn_mva,
+        )
         group_by_scenario = balance_dc.groupby("scenario")
         p_balance_dc_max = group_by_scenario["P_mis_dc"].max().reindex(scenarios)
         p_balance_dc_mean = group_by_scenario["P_mis_dc"].mean().reindex(scenarios)
         # bus index of the bus with the largest DC P-mismatch per scenario
         idxmax = group_by_scenario["P_mis_dc"].idxmax().dropna()
-        idx_bus_max_p_balance_error_dc_per_scenario = (
-            balance_dc.loc[idxmax, "bus"].reindex(scenarios)
-        )
-        
+        idx_bus_max_p_balance_error_dc_per_scenario = balance_dc.loc[
+            idxmax,
+            "bus",
+        ].reindex(scenarios)
 
     # ---4) Runtime data ---
     runtime_data_ac = runtime_data["ac"].reindex(scenarios) * 1000.0
     if dc:
         runtime_data_dc = runtime_data["dc"].reindex(scenarios) * 1000.0
-        
-
-
 
     # --- Pack results (preserve original array shapes/order) ---
     result = {
@@ -155,20 +172,19 @@ def compute_stats_from_data(data_dir: str) -> Dict[str, np.ndarray]:
         "q_balance_error_ac_max": q_balance_ac_max.to_numpy(dtype=float),
         "q_balance_error_ac_mean": q_balance_ac_mean.to_numpy(dtype=float),
         "runtime_data_ac_ms": runtime_data_ac.to_numpy(dtype=float),
-
-        
     }
     if dc:
         result["p_balance_error_dc_max"] = p_balance_dc_max.to_numpy(dtype=float)
         result["p_balance_error_dc_mean"] = p_balance_dc_mean.to_numpy(dtype=float)
-        result["bus_idx_max_p_balance_error_dc_per_scenario"] = idx_bus_max_p_balance_error_dc_per_scenario.to_numpy(dtype=int)
+        result["bus_idx_max_p_balance_error_dc_per_scenario"] = (
+            idx_bus_max_p_balance_error_dc_per_scenario.to_numpy(dtype=int)
+        )
         result["runtime_data_dc_ms"] = runtime_data_dc.to_numpy(dtype=float)
-        
+
     return result
 
 
-
-def plot_stats(data_dir: str) -> None:
+def plot_stats(data_dir: str, sn_mva: float) -> None:
     """Generate and save statistics plots using matplotlib.
 
     Creates a multi-panel histogram plot showing distributions of key metrics across all scenarios.
@@ -177,6 +193,7 @@ def plot_stats(data_dir: str) -> None:
     Args:
         data_dir: Directory containing data files (bus_data.parquet, branch_data.parquet, gen_data.parquet, runtime_data.parquet)
                   and where the plot will be saved
+        sn_mva: Base MVA used to scale power quantities
 
     The generated plot contains histograms (with log scale on y-axis) for:
     - Number of generators per scenario
@@ -189,7 +206,7 @@ def plot_stats(data_dir: str) -> None:
     - Runtime (AC solver execution time in milliseconds)
     - (If DC data available) DC active power balance error, bus index with max DC PBE, and DC runtime
     """
-    stats = compute_stats_from_data(data_dir)
+    stats = compute_stats_from_data(data_dir, sn_mva=sn_mva)
     filename = os.path.join(data_dir, "stats_plot.png")
 
     # Save per-scenario statistics to a parquet file with one row per scenario
@@ -208,18 +225,18 @@ def plot_stats(data_dir: str) -> None:
     }
     mean_mean_p_balance_error_ac = np.nanmean(stats["p_balance_error_ac_mean"])
     mean_mean_q_balance_error_ac = np.nanmean(stats["q_balance_error_ac_mean"])
-    
+
     if "p_balance_error_dc_max" in stats:
         per_scenario["p_balance_error_dc_max"] = stats["p_balance_error_dc_max"]
         per_scenario["p_balance_error_dc_mean"] = stats["p_balance_error_dc_mean"]
-        per_scenario["bus_idx_max_p_balance_error_dc_per_scenario"] = stats["bus_idx_max_p_balance_error_dc_per_scenario"]
+        per_scenario["bus_idx_max_p_balance_error_dc_per_scenario"] = stats[
+            "bus_idx_max_p_balance_error_dc_per_scenario"
+        ]
         per_scenario["runtime_data_dc_ms"] = stats["runtime_data_dc_ms"]
         mean_mean_p_balance_error_dc = np.nanmean(stats["p_balance_error_dc_mean"])
 
-
     df_stats = pd.DataFrame(per_scenario)
     df_stats.to_parquet(os.path.join(data_dir, "stats.parquet"), index=False)
-
 
     # Titles and data pairs
     plots = [
@@ -229,28 +246,58 @@ def plot_stats(data_dir: str) -> None:
         ("Max Loading", stats["max_loading"]),
         ("Branch Loading", stats["branch_loadings"]),
         # ("Max Active PBE (AC, normalized)", stats["p_balance_error_ac_max"]),
-        (f"Mean Active PBE (AC, normalized). Mean={np.format_float_scientific(mean_mean_p_balance_error_ac, precision=2)}", stats["p_balance_error_ac_mean"]),
+        (
+            f"Mean Active PBE (AC, normalized). Mean={np.format_float_scientific(mean_mean_p_balance_error_ac, precision=2)}",
+            stats["p_balance_error_ac_mean"],
+        ),
         # ("Max Reactive PBE (AC, normalized)", stats["q_balance_error_ac_max"]),
-        (f"Mean Reactive PBE (AC, normalized). Mean={np.format_float_scientific(mean_mean_q_balance_error_ac, precision=2)}", stats["q_balance_error_ac_mean"]),
-        ("Runtime (AC, ms). Mean={:.2f}".format(stats["runtime_data_ac_ms"].mean()), stats["runtime_data_ac_ms"]),
+        (
+            f"Mean Reactive PBE (AC, normalized). Mean={np.format_float_scientific(mean_mean_q_balance_error_ac, precision=2)}",
+            stats["q_balance_error_ac_mean"],
+        ),
+        (
+            "Runtime (AC, ms). Mean={:.2f}".format(stats["runtime_data_ac_ms"].mean()),
+            stats["runtime_data_ac_ms"],
+        ),
     ]
 
     # Optionally add DC power balance if available
     if "p_balance_error_dc_max" in stats:
-        plots.append(("Max Active PBE (DC in AC model, normalized)", stats["p_balance_error_dc_max"]))
-        plots.append((f"Mean Active PBE (DC in AC model, normalized). Mean={mean_mean_p_balance_error_dc:.2f}", stats["p_balance_error_dc_mean"]))   
-        plots.append(("Bus Index with Max Active PBE (DC in AC model, normalized)", stats["bus_idx_max_p_balance_error_dc_per_scenario"]))
-        plots.append(("Runtime (DC, ms). Mean={:.2f}".format(np.nanmean(stats["runtime_data_dc_ms"])), stats["runtime_data_dc_ms"]))
-
+        plots.append(
+            (
+                "Max Active PBE (DC in AC model, normalized)",
+                stats["p_balance_error_dc_max"],
+            ),
+        )
+        plots.append(
+            (
+                f"Mean Active PBE (DC in AC model, normalized). Mean={mean_mean_p_balance_error_dc:.2f}",
+                stats["p_balance_error_dc_mean"],
+            ),
+        )
+        plots.append(
+            (
+                "Bus Index with Max Active PBE (DC in AC model, normalized)",
+                stats["bus_idx_max_p_balance_error_dc_per_scenario"],
+            ),
+        )
+        plots.append(
+            (
+                "Runtime (DC, ms). Mean={:.2f}".format(
+                    np.nanmean(stats["runtime_data_dc_ms"]),
+                ),
+                stats["runtime_data_dc_ms"],
+            ),
+        )
 
     # sort plots by title
     plots.sort(key=lambda x: x[0])
     # Define figure and subplots
     n_plots = len(plots)
     import math
-    fig, axes = plt.subplots(math.ceil(n_plots/2), 2 ,figsize=(12, 14))
-    axes = axes.ravel()
 
+    fig, axes = plt.subplots(math.ceil(n_plots / 2), 2, figsize=(12, 14))
+    axes = axes.ravel()
 
     # Plot histograms
     for ax, (title, data) in zip(axes, plots):
@@ -260,7 +307,14 @@ def plot_stats(data_dir: str) -> None:
             if "DC" in title:
                 valid = data[~np.isnan(data)]
                 nan_count = int(np.isnan(data).sum())
-                ax.hist(valid, bins=100, color="steelblue", edgecolor="black", alpha=0.7, label=f"valid={len(valid)}, nan={nan_count}")
+                ax.hist(
+                    valid,
+                    bins=100,
+                    color="steelblue",
+                    edgecolor="black",
+                    alpha=0.7,
+                    label=f"valid={len(valid)}, nan={nan_count}",
+                )
                 ax.legend()
             else:
                 ax.hist(data, bins=100, color="steelblue", edgecolor="black", alpha=0.7)

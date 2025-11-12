@@ -32,7 +32,7 @@ def run_generation(config_params):
 
         # Generate data
         file_paths = generate_power_flow_data_distributed(args)
-        validate_generated_data(file_paths, args.settings.mode, n_scenarios=10)
+        validate_generated_data(file_paths, args.settings.mode, 100.0, n_scenarios=10)
 
         # Clean up
         if os.path.exists(args.settings.data_dir):

@@ -294,6 +294,7 @@ def test_generator_cost_sigma_zero_no_change():
 
     def gen_net():
         import copy
+
         yield copy.deepcopy(net)
 
     [net_out] = list(gen.generate(gen_net()))

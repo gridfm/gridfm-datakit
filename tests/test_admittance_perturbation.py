@@ -123,6 +123,7 @@ class TestAdmittancePerturbation:
         np.testing.assert_array_equal(net_out.branches[:, BR_R], r0)
         np.testing.assert_array_equal(net_out.branches[:, BR_X], x0)
 
+
 if __name__ == "__main__":
     test = TestAdmittancePerturbation()
     test.test_no_admittance_perturbation_preserves_values()

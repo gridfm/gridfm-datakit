@@ -59,7 +59,12 @@ from gridfm_datakit.utils.idx_bus import BUS_I, PD, QD
 import multiprocessing
 
 
-def init_julia(max_iter: int, solver_log_dir: str = None, dc_max_iter: Optional[int] = None, print_level: Optional[int] = None) -> Any:
+def init_julia(
+    max_iter: int,
+    solver_log_dir: str = None,
+    dc_max_iter: Optional[int] = None,
+    print_level: Optional[int] = None,
+) -> Any:
     """Initialize Julia interface with PowerModels.jl.
 
     Sets up Julia environment and defines AC OPF/PF/DCPF entrypoints.
@@ -292,7 +297,7 @@ def init_julia(max_iter: int, solver_log_dir: str = None, dc_max_iter: Optional[
                 end
             end
             """.format(pf_solver_log_file),
-            ) 
+            )
 
         # ----- DC-PF core -----
         jl.seval(
@@ -344,10 +349,10 @@ def init_julia(max_iter: int, solver_log_dir: str = None, dc_max_iter: Optional[
             """.format(dcpf_solver_log_file),
             )
 
-        
-        
         # warm start all functions by running a dummy case
-        dummy_case_file  = str(resources.files("gridfm_datakit.process").joinpath(f"dummy.m"))
+        dummy_case_file = str(
+            resources.files("gridfm_datakit.process").joinpath("dummy.m"),
+        )
         if print_level > 0 and solver_log_dir is None:
             print("\n ======= warm starting Julia interface =======\n", flush=True)
         if opf_solver_log_file:
@@ -357,7 +362,9 @@ def init_julia(max_iter: int, solver_log_dir: str = None, dc_max_iter: Optional[
 
         if dcopf_solver_log_file:
             with open(dcopf_solver_log_file, "a") as f:
-                f.write(" ======= warm starting Julia interface dcopf function =======\n")
+                f.write(
+                    " ======= warm starting Julia interface dcopf function =======\n",
+                )
         jl.run_dcopf(dummy_case_file)
 
         # run_pf_fast has no log file
@@ -370,14 +377,19 @@ def init_julia(max_iter: int, solver_log_dir: str = None, dc_max_iter: Optional[
 
         if dcpf_solver_log_file:
             with open(dcpf_solver_log_file, "a") as f:
-                f.write(" ======= warm starting Julia interface dcpf function =======\n")
+                f.write(
+                    " ======= warm starting Julia interface dcpf function =======\n",
+                )
         jl.run_dcpf(dummy_case_file)
-        
+
         # run_dcpf_fast has no log file
         jl.run_dcpf_fast(dummy_case_file)
-        
+
         if print_level > 0 and solver_log_dir is None:
-            print("\n ======= warm starting Julia interface completed =======\n", flush=True)
+            print(
+                "\n ======= warm starting Julia interface completed =======\n",
+                flush=True,
+            )
 
     except Exception as e:
         raise RuntimeError("Error initializing Julia: {}".format(e))
@@ -415,7 +427,13 @@ def pf_preprocessing(net: Network, res: Dict[str, Any]) -> Network:
     return net
 
 
-def apply_slack_single_gen(net: Network, pg_gen: np.ndarray, Pg_bus: np.ndarray, pf_dcpf: np.ndarray, pt_dcpf: np.ndarray) -> np.ndarray:
+def apply_slack_single_gen(
+    net: Network,
+    pg_gen: np.ndarray,
+    Pg_bus: np.ndarray,
+    pf_dcpf: np.ndarray,
+    pt_dcpf: np.ndarray,
+) -> np.ndarray:
     """
     Put the entire slack-bus power imbalance on the first generator
     connected to the slack (reference) bus.
@@ -441,18 +459,18 @@ def apply_slack_single_gen(net: Network, pg_gen: np.ndarray, Pg_bus: np.ndarray,
 
     # branches with slack as from/to bus
     branches_from = net.branches[net.idx_branches_in_service, F_BUS] == net.ref_bus_idx
-    branches_to   = net.branches[net.idx_branches_in_service, T_BUS] == net.ref_bus_idx
+    branches_to = net.branches[net.idx_branches_in_service, T_BUS] == net.ref_bus_idx
 
     sum_flows_from = pf_dcpf[branches_from].sum()
-    sum_flows_to   = pt_dcpf[branches_to].sum()
+    sum_flows_to = pt_dcpf[branches_to].sum()
 
     # power balance at slack
     balance = pg_slack - pd_slack - (sum_flows_from + sum_flows_to)
 
     # find generators at slack bus
-    slack_gen = np.where(
-        net.gens[net.idx_gens_in_service, GEN_BUS] == net.ref_bus_idx
-    )[0]
+    slack_gen = np.where(net.gens[net.idx_gens_in_service, GEN_BUS] == net.ref_bus_idx)[
+        0
+    ]
 
     # copy current setpoints
     pg_gen_dc = pg_gen.copy()
@@ -492,13 +510,14 @@ def pf_post_processing(
         - "branch": np.ndarray with branch features and admittances
         - "Y_bus": np.ndarray with nonzero Y-bus entries
     """
-    
-    
-    
-    
+
     # --- Edge (branch) info ---
     n_branches = net.branches.shape[0]
-    n_cols = len(BRANCH_COLUMNS) + len(DC_BRANCH_COLUMNS) if include_dc_res else len(BRANCH_COLUMNS)
+    n_cols = (
+        len(BRANCH_COLUMNS) + len(DC_BRANCH_COLUMNS)
+        if include_dc_res
+        else len(BRANCH_COLUMNS)
+    )
     X_branch = np.zeros((n_branches, n_cols))
     X_branch[:, 0] = list(range(n_branches))
     X_branch[:, 1] = np.real(net.branches[:, F_BUS])
@@ -544,7 +563,7 @@ def pf_post_processing(
     X_branch[:, 7] = net.branches[:, BR_R]
     X_branch[:, 8] = net.branches[:, BR_X]
     X_branch[:, 9] = net.branches[:, BR_B]
-    
+
     # admittances
     Ytt, Yff, Yft, Ytf = branch_vectors(net.branches, net.branches.shape[0])
     X_branch[:, 10] = np.real(Yff)
@@ -565,22 +584,32 @@ def pf_post_processing(
     X_branch[:, 21] = net.branches[:, ANGMAX]
     X_branch[:, 22] = net.branches[:, RATE_A]
     X_branch[:, 23] = net.branches[:, BR_STATUS]
-    
+
     if include_dc_res:
         if res_dc is not None:
-            pf_dc = np.array([res_dc["solution"]["branch"][str(i + 1)]["pf"] * net.baseMVA for i in net.idx_branches_in_service])
-            pt_dc = np.array([res_dc["solution"]["branch"][str(i + 1)]["pt"] * net.baseMVA for i in net.idx_branches_in_service])
+            pf_dc = np.array(
+                [
+                    res_dc["solution"]["branch"][str(i + 1)]["pf"] * net.baseMVA
+                    for i in net.idx_branches_in_service
+                ],
+            )
+            pt_dc = np.array(
+                [
+                    res_dc["solution"]["branch"][str(i + 1)]["pt"] * net.baseMVA
+                    for i in net.idx_branches_in_service
+                ],
+            )
             X_branch[net.idx_branches_in_service, 24] = pf_dc
             X_branch[net.idx_branches_in_service, 25] = pt_dc
         else:
             X_branch[net.idx_branches_in_service, 24] = np.nan
             X_branch[net.idx_branches_in_service, 25] = np.nan
 
-
-
     # --- Bus data ---
     n_buses = net.buses.shape[0]
-    n_cols = len(BUS_COLUMNS) + len(DC_BUS_COLUMNS) if include_dc_res else len(BUS_COLUMNS)
+    n_cols = (
+        len(BUS_COLUMNS) + len(DC_BUS_COLUMNS) if include_dc_res else len(BUS_COLUMNS)
+    )
     X_bus = np.zeros((n_buses, n_cols))
 
     # --- Loads ---
@@ -607,9 +636,7 @@ def pf_post_processing(
     gen_bus = net.gens[net.idx_gens_in_service, GEN_BUS].astype(int)
     Pg_bus = np.bincount(gen_bus, weights=pg_gen, minlength=n_buses)
     Qg_bus = np.bincount(gen_bus, weights=qg_gen, minlength=n_buses)
-    
-    
-    
+
     assert np.all(Pg_bus[net.buses[:, BUS_TYPE] == PQ] == 0)
     assert np.all(Qg_bus[net.buses[:, BUS_TYPE] == PQ] == 0)
 
@@ -617,16 +644,17 @@ def pf_post_processing(
         if res_dc is not None:
             # check if "gen" key is in res_dc["solution"]
             if "gen" in res_dc["solution"]:
-                pg_gen_dc = np.array([
-                    res_dc["solution"]["gen"][str(i + 1)]["pg"] * net.baseMVA
-                    for i in net.idx_gens_in_service
-                ])
-            else: 
+                pg_gen_dc = np.array(
+                    [
+                        res_dc["solution"]["gen"][str(i + 1)]["pg"] * net.baseMVA
+                        for i in net.idx_gens_in_service
+                    ],
+                )
+            else:
                 pg_gen_dc = apply_slack_single_gen(net, pg_gen, Pg_bus, pf_dc, pt_dc)
             Pg_bus_dc = np.bincount(gen_bus, weights=pg_gen_dc, minlength=n_buses)
             assert np.all(Pg_bus_dc[net.buses[:, BUS_TYPE] == PQ] == 0)
 
-   
     X_bus[:, 3] = Pg_bus
     X_bus[:, 4] = Qg_bus
 
@@ -664,23 +692,26 @@ def pf_post_processing(
 
     if include_dc_res:
         if res_dc is not None:
-            va = np.rad2deg([
-                res_dc["solution"]["bus"][str(net.reverse_bus_index_mapping[i])]["va"]
-                for i in range(n_buses)
-            ])
+            va = np.rad2deg(
+                [
+                    res_dc["solution"]["bus"][str(net.reverse_bus_index_mapping[i])][
+                        "va"
+                    ]
+                    for i in range(n_buses)
+                ],
+            )
             X_bus[:, 15] = va
             X_bus[:, 16] = Pg_bus_dc
-        else: 
+        else:
             X_bus[:, 15] = np.nan
             X_bus[:, 16] = np.nan
-
-        
-
 
     # --- Generator data ---
     assert np.all(net.gencosts[:, NCOST] == 3), "NCOST should be 3"
     n_gens = net.gens.shape[0]
-    n_cols = len(GEN_COLUMNS) + len(DC_GEN_COLUMNS) if include_dc_res else len(GEN_COLUMNS)
+    n_cols = (
+        len(GEN_COLUMNS) + len(DC_GEN_COLUMNS) if include_dc_res else len(GEN_COLUMNS)
+    )
 
     X_gen = np.zeros((n_gens, n_cols))
 
@@ -700,14 +731,13 @@ def pf_post_processing(
     # slack gen (can be any generator connected to the ref node)
     slack_gen_idx = np.where(net.gens[:, GEN_BUS] == net.ref_bus_idx)[0]
     X_gen[slack_gen_idx, 12] = 1
-    
+
     if include_dc_res:
         if res_dc is not None:
-            X_gen[net.idx_gens_in_service,13] = pg_gen_dc
+            X_gen[net.idx_gens_in_service, 13] = pg_gen_dc
         else:
-            X_gen[net.idx_gens_in_service,13] = np.nan
-   
-   
+            X_gen[net.idx_gens_in_service, 13] = np.nan
+
     # --- Y-bus ---
     Y_bus, Yf, Yt = makeYbus(net.baseMVA, net.buses, net.branches)
 
@@ -721,9 +751,13 @@ def pf_post_processing(
     edge_index = np.column_stack((i, j))
     edge_attr = np.stack((G, B)).T
     Y_bus = np.column_stack((edge_index, edge_attr))
-    
+
     # ---- runtime data ----
-    n_cols = len(RUNTIME_COLUMNS) + len(DC_RUNTIME_COLUMNS) if include_dc_res else len(RUNTIME_COLUMNS)
+    n_cols = (
+        len(RUNTIME_COLUMNS) + len(DC_RUNTIME_COLUMNS)
+        if include_dc_res
+        else len(RUNTIME_COLUMNS)
+    )
     X_runtime = np.zeros((1, n_cols))
     X_runtime[0, 0] = res["solve_time"]
     if include_dc_res:
@@ -731,10 +765,13 @@ def pf_post_processing(
             X_runtime[0, 1] = res_dc["solve_time"]
         else:
             X_runtime[0, 1] = np.nan
-    return {"bus": X_bus, "gen": X_gen, "branch": X_branch, "Y_bus": Y_bus, "runtime": X_runtime}
-
-
-
+    return {
+        "bus": X_bus,
+        "gen": X_gen,
+        "branch": X_branch,
+        "Y_bus": Y_bus,
+        "runtime": X_runtime,
+    }
 
 
 def process_scenario_pf_mode(
@@ -817,7 +854,7 @@ def process_scenario_pf_mode(
                     f.write(
                         f"Caught an exception at scenario {scenario_index} when solving dcpf function: {e}\n",
                     )
-                    
+
         try:
             res = run_pf(perturbation, jl, fast=pf_fast)
         except Exception as e:
@@ -830,7 +867,13 @@ def process_scenario_pf_mode(
         # Append processed power flow data
         pf_data = pf_post_processing(perturbation, res, res_dcpf, include_dc_res)
         local_processed_data.append(
-            (pf_data["bus"], pf_data["gen"], pf_data["branch"], pf_data["Y_bus"], pf_data["runtime"]),
+            (
+                pf_data["bus"],
+                pf_data["gen"],
+                pf_data["branch"],
+                pf_data["Y_bus"],
+                pf_data["runtime"],
+            ),
         )
     return local_processed_data
 
@@ -850,7 +893,7 @@ def process_scenario_chunk(
     pf_fast: bool,
     dcpf_fast: bool,
     solver_log_dir: str,
-    max_iter:int ,
+    max_iter: int,
 ) -> Tuple[
     Union[None, Exception],
     Union[None, str],
@@ -880,7 +923,7 @@ def process_scenario_chunk(
             - Traceback string (None if successful)
             - List of processed data tuples (bus, gen, branch, Y_bus arrays)
     """
-    
+
     try:
         jl = init_julia(max_iter, solver_log_dir)
         local_processed_data = []
@@ -896,7 +939,7 @@ def process_scenario_chunk(
                     local_processed_data,
                     error_log_path,
                     include_dc_res,
-                    jl
+                    jl,
                 )
             elif mode == "pf":
                 local_processed_data = process_scenario_pf_mode(
@@ -911,7 +954,7 @@ def process_scenario_chunk(
                     include_dc_res,
                     pf_fast,
                     dcpf_fast,
-                    jl
+                    jl,
                 )
 
             progress_queue.put(1)  # update queue
@@ -1002,6 +1045,12 @@ def process_scenario_opf_mode(
         # Append processed power flow data
         pf_data = pf_post_processing(perturbation, res, res_dcopf, include_dc_res)
         local_processed_data.append(
-            (pf_data["bus"], pf_data["gen"], pf_data["branch"], pf_data["Y_bus"], pf_data["runtime"]),
+            (
+                pf_data["bus"],
+                pf_data["gen"],
+                pf_data["branch"],
+                pf_data["Y_bus"],
+                pf_data["runtime"],
+            ),
         )
     return local_processed_data

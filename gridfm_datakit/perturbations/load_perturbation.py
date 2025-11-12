@@ -29,6 +29,7 @@ def _find_largest_scaling_factor_worker(
     # Initialize Julia interface once before the loop
     import tempfile
     import os
+
     jl = init_julia(max_iter=max_iter, solver_log_dir=None, print_level=5)
 
     while (u <= max_scaling) and converged:

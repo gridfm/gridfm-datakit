@@ -99,7 +99,6 @@ class TestTopologyPerturbation:
             "All perturbed networks are identical, which is unlikely"
         )
 
-
     def test_n_minus_k_generator_connectivity(self):
         """Test that NMinusKGenerator respects connectivity constraints"""
         # Load the original network

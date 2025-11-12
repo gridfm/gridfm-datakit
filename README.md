@@ -75,7 +75,7 @@ gridfm-datakit generate path/to/config.yaml
 Validate generated power flow data for integrity and physical consistency:
 
 ```bash
-gridfm-datakit validate /path/to/data/ [--n-scenarios N]
+gridfm-datakit validate /path/to/data/ [--n-scenarios N] [--sn-mva 100]
 ```
 
 ### Compute Statistics
@@ -83,7 +83,7 @@ gridfm-datakit validate /path/to/data/ [--n-scenarios N]
 Generate statistics plots from generated data:
 
 ```bash
-gridfm-datakit stats /path/to/data/
+gridfm-datakit stats /path/to/data/ [--sn-mva 100]
 ```
 
 ### Plot Feature Distributions
@@ -93,7 +93,6 @@ Create violin plots for bus feature distributions:
 ```bash
 gridfm-datakit plots /path/to/data/ [--output-dir DIR] [--sn-mva 100]
 ```
-
 
 ## Configuration Overview
 

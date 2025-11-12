@@ -6,44 +6,41 @@ validation functions to ensure physical consistency across different networks an
 """
 
 import pytest
-import glob
 import yaml
 import shutil
 import os
-from pathlib import Path
 from gridfm_datakit.generate import generate_power_flow_data_distributed
 from gridfm_datakit.validation import validate_generated_data
 from gridfm_datakit.utils.param_handler import NestedNamespace
 import copy
 
 
-
 def get_configs():
-    default_config_path = 'scripts/config/default.yaml'
+    default_config_path = "scripts/config/default.yaml"
 
     with open(default_config_path, "r") as f:
         config_dict = yaml.safe_load(f)
     args = NestedNamespace(**config_dict)
 
     configs = []
-    for name in ['case24_ieee_rts', 'case118_ieee', 'case197_snem', 'case240_pserc', 'case300_ieee']:
+    for name in [
+        "case24_ieee_rts",
+        "case118_ieee",
+        "case197_snem",
+        "case240_pserc",
+        "case300_ieee",
+    ]:
         new_args = copy.deepcopy(args)
         new_args.network.name = name
         configs.append((name, new_args))
     return configs
 
+
 # ---- Use readable IDs here ----
 configs = get_configs()
-param_combinations = [
-    (cfg, mode)
-    for _, cfg in configs
-    for mode in ["opf", "pf"]
-]
-param_ids = [
-    f"{name}-{mode}"
-    for name, _ in configs
-    for mode in ["opf", "pf"]
-]
+param_combinations = [(cfg, mode) for _, cfg in configs for mode in ["opf", "pf"]]
+param_ids = [f"{name}-{mode}" for name, _ in configs for mode in ["opf", "pf"]]
+
 
 @pytest.mark.parametrize("args,mode", param_combinations, ids=param_ids)
 def test_data_validation(args, mode):
@@ -59,7 +56,7 @@ def test_data_validation(args, mode):
 
     # Generate and validate data
     file_paths = generate_power_flow_data_distributed(args)
-    validate_generated_data(file_paths, mode, n_scenarios=10)
+    validate_generated_data(file_paths, mode, 100.0, n_scenarios=10)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -78,4 +75,3 @@ def cleanup():
 if __name__ == "__main__":
     # pytest.main([__file__, "-v"])
     test_data_validation("scripts/config/default.yaml")
-    

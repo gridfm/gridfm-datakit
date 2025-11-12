@@ -18,7 +18,6 @@ def test_agg_load_no_variation_when_sigma_and_range_zero_change_q_true():
         max_scaling_factor=1.0,
         step_size=0.1,
         start_scaling_factor=1.0,
-        
     )
     scenarios = gen(net, n_scenarios=5, scenarios_log="/dev/null", max_iter=200)
     # shape: (n_loads, n_scenarios, 2)
@@ -49,5 +48,3 @@ def test_agg_load_no_variation_when_sigma_and_range_zero_change_q_false():
     # q must equal base across all scenarios
     for s in range(scenarios.shape[1]):
         assert np.allclose(scenarios[:, s, 1], q_base)
-
-
