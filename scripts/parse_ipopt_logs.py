@@ -102,6 +102,9 @@ def summarize_iterations(
             "avg": statistics.mean(xs),
             "p99": float(np.percentile(xs, 99)),
             "999": float(np.percentile(xs, 99.9)),
+            "9999": float(np.percentile(xs, 99.99)),
+            "99999": float(np.percentile(xs, 99.999)),
+            "1/100000": float(np.percentile(xs, 99.99999)),
         }
 
     return {
@@ -141,6 +144,12 @@ def main():
         print(f"  avg   : {None if s['avg'] is None else round(s['avg'], 3)}")
         print(f"  p99   : {None if s['p99'] is None else round(s['p99'], 3)}")
         print(f"  p99.9 : {None if s['999'] is None else round(s['999'], 3)}")
+        print(f"  p99.99: {None if s['9999'] is None else round(s['9999'], 3)}")
+        print(f"  p99.999: {None if s['99999'] is None else round(s['99999'], 3)}")
+        print(
+            f"  p1/100 000: {None if s['1/100000'] is None else round(s['1/100000'], 3)}",
+        )
+        print(f"  max   : {s['max']}")
         print()
 
     fmt_stats("Optimal solution", summary["optimal"])

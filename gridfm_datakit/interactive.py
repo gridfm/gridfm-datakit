@@ -153,14 +153,16 @@ def interactive_interface() -> None:
         "case200_activ",
         "case300_ieee",
         "case500_goc",
+        "case588_sdet",  # Added
         "case793_goc",
+        "case1354_pegase",  # Added
         "case1803_snem",
         "case1888_rte",
         "case1951_rte",
         "case2000_goc",
         "case2312_goc",
         "case2383wp_k",
-        "case240_pserc",
+        "case240_pserc",  # Note: Moved to its correct position by bus count (240 buses)
         "case2736sp_k",
         "case2737sop_k",
         "case2742_goc",
@@ -187,16 +189,17 @@ def interactive_interface() -> None:
         "case6495_rte",
         "case6515_rte",
         "case7336_epigrids",
+        "case8387_pegase",  # Added
         "case9241_pegase",
         "case9591_goc",
+        "case10000_goc",  # Note: Moved from bottom to its correct position (10,000 buses)
         "case10192_epigrids",
         "case10480_goc",
         "case13659_pegase",
         "case19402_goc",
         "case20758_epigrids",
         "case24464_goc",
-        "case10000_goc",
-        "case30000_goc",
+        "case30000_goc",  # Note: Moved from bottom to its correct position (30,000 buses)
         "case78484_epigrids",
     ]
     pglib_grid_dropdown = widgets.Dropdown(

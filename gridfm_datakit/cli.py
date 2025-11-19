@@ -5,6 +5,7 @@ import argparse
 import sys
 import yaml
 from pathlib import Path
+from multiprocessing import Pool
 from gridfm_datakit.generate import (
     generate_power_flow_data_distributed,
 )
@@ -12,8 +13,8 @@ from gridfm_datakit.validation import validate_generated_data
 from gridfm_datakit.utils.stats import plot_stats, plot_feature_distributions
 
 
-def pm_setup() -> None:
-    """Set up Julia packages required for PowerModels.jl."""
+def _pm_setup_worker() -> None:
+    """Worker function for setting up Julia packages required for PowerModels.jl."""
     from juliacall import Main as jl
 
     jl.seval(
@@ -24,6 +25,17 @@ def pm_setup() -> None:
         Pkg.add("Memento")
         """,
     )
+
+
+def pm_setup():
+    """Set up Julia packages required for PowerModels.jl using multiprocessing.
+
+    Returns:
+        Tuple[Pool, AsyncResult]: Pool and async result for parallel handling.
+    """
+    pool = Pool(processes=1)
+    result = pool.apply_async(_pm_setup_worker, ())
+    return pool, result
 
 
 def validate_data_directory(
@@ -272,7 +284,13 @@ Examples:
         print("Setting up Julia packages for PowerModels.jl...")
         print("This may take a few minutes...")
         try:
-            pm_setup()
+            pool, result = pm_setup()
+            try:
+                # wait for the worker to finish
+                result.get(timeout=None)
+            finally:
+                pool.close()
+                pool.join()
             print("\nJulia packages installed successfully!")
             print("Installed packages: Ipopt, PowerModels, Memento")
             sys.exit(0)
