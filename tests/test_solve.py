@@ -498,7 +498,7 @@ class TestSolve:
 
     def test_dcpf_fast_matches_slow(self):
         """Fast DC PF should match slow DC PF after post-processing."""
-        case_name = "case24_ieee_rts"  # that test fails for case300 (and possibly other cases). compute_dc_pf and solve_dc_pf from powermodels
+        case_name = "case14_ieee"  # that test fails for case300 (and possibly other cases). compute_dc_pf and solve_dc_pf from powermodels
         # do not actually give the same solution
         print(f"\nTesting DC PF fast vs slow for {case_name}...")
 

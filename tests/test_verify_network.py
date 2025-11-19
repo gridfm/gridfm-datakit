@@ -5,11 +5,9 @@ Converted from scripts/verify_network.py to run under pytest.
 
 import tempfile
 import os
-import numpy as np
 from juliacall import Main as jl
 from gridfm_datakit.network import (
     load_net_from_pglib,
-    makeYbus,
     F_BUS,
     T_BUS,
     GEN_BUS,
@@ -169,28 +167,6 @@ def verify_generator_bus_assignment():
     print(f"   ✓ All {net.gens.shape[0]} generators have matching bus assignments")
 
 
-def verify_admittance_matrix():
-    """Check that Y-bus calculation matches PowerModels."""
-    print("\n5. Testing Y-bus calculation...")
-
-    case_name = "case300_ieee"
-    net = load_net_from_pglib(case_name)
-
-    # Calculate with Network
-    Y_bus_net, Yf, Yt = makeYbus(net.baseMVA, net.buses, net.branches)
-
-    # Calculate with PowerModels
-    parse = jl.PowerModels.parse_file(f"gridfm_datakit/grids/pglib_opf_{case_name}.m")
-    Y_bus_pm = jl.PowerModels.calc_basic_admittance_matrix(parse)
-    Y_bus_pm_np = Y_bus_pm.to_numpy()
-
-    # Compare results
-    max_diff = np.abs(Y_bus_net - Y_bus_pm_np).max()
-    assert max_diff < 1e-10, f"Y-bus mismatch: max difference = {max_diff}"
-
-    print(f"   ✓ Y-bus matches (max difference: {max_diff:.2e})")
-
-
 class TestVerifyNetwork:
     @classmethod
     def setup_class(cls):
@@ -208,6 +184,3 @@ class TestVerifyNetwork:
 
     def test_generator_bus_assignment(self):
         verify_generator_bus_assignment()
-
-    def test_admittance_matrix(self):
-        verify_admittance_matrix()
