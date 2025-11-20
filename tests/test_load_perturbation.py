@@ -5,6 +5,7 @@ Tests for load perturbation no-op conditions for aggregated profile generator.
 import numpy as np
 from gridfm_datakit.network import load_net_from_pglib
 from gridfm_datakit.perturbations.load_perturbation import LoadScenariosFromAggProfile
+import os
 
 
 def test_agg_load_no_variation_when_sigma_and_range_zero_change_q_true():
@@ -19,7 +20,7 @@ def test_agg_load_no_variation_when_sigma_and_range_zero_change_q_true():
         step_size=0.1,
         start_scaling_factor=1.0,
     )
-    scenarios = gen(net, n_scenarios=5, scenarios_log="/dev/null", max_iter=200)
+    scenarios = gen(net, n_scenarios=5, scenarios_log=os.devnull, max_iter=200)
     # shape: (n_loads, n_scenarios, 2)
     # All scenarios across axis=1 should be equal to the first scenario
     p_first = scenarios[:, 0, 0]
@@ -41,7 +42,7 @@ def test_agg_load_no_variation_when_sigma_and_range_zero_change_q_false():
         step_size=0.1,
         start_scaling_factor=1.0,
     )
-    scenarios = gen(net, n_scenarios=4, scenarios_log="/dev/null", max_iter=200)
+    scenarios = gen(net, n_scenarios=4, scenarios_log=os.devnull, max_iter=200)
     # p columns identical across scenarios
     p_first = scenarios[:, 0, 0]
     assert np.allclose(scenarios[:, :, 0], p_first[:, None])
