@@ -78,6 +78,12 @@ def validate_generated_data(
     except Exception as e:
         raise AssertionError(f"Data completeness validation failed: {e}")
 
+        # DC columns consistency: if any DC column has NaN, all DC columns must be NaN
+    try:
+        validate_dc_columns_consistency(generated_data)
+    except Exception as e:
+        raise AssertionError(f"DC columns consistency validation failed: {e}")
+
     # Sample scenarios if n_scenarios is provided to avoid too long validation times
     if n_scenarios > 0:
         max_scenarios = len(generated_data["bus_data"]["scenario"].unique())
@@ -97,6 +103,9 @@ def validate_generated_data(
         ]
         generated_data["y_bus_data"] = generated_data["y_bus_data"][
             generated_data["y_bus_data"]["scenario"].isin(sampled_scenarios)
+        ]
+        generated_data["runtime_data"] = generated_data["runtime_data"][
+            generated_data["runtime_data"]["scenario"].isin(sampled_scenarios)
         ]
         print(
             f"Sampled {len(sampled_scenarios)} scenarios for validation out of {max_scenarios}",
@@ -176,12 +185,6 @@ def validate_generated_data(
         validate_bus_generation_consistency_dc(generated_data)
     except Exception as e:
         raise AssertionError(f"Bus generation DC consistency validation failed: {e}")
-
-    # DC columns consistency: if any DC column has NaN, all DC columns must be NaN
-    try:
-        validate_dc_columns_consistency(generated_data)
-    except Exception as e:
-        raise AssertionError(f"DC columns consistency validation failed: {e}")
 
     # Check Pg and Pg_dc match at slack nodes in PF mode
     if mode == "pf":
