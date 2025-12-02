@@ -28,7 +28,7 @@ This library is brought to you by the GridFM team to generate power flow data to
 
     ```bash
     python -m pip install --upgrade pip  # Upgrade pip
-    pip install gridfm-datakit
+    pip install gridfm-datakit==0.0.9a0
     ```
 
 4. Install Julia with Powermodels and Ipopt
