@@ -91,22 +91,31 @@ def init_julia(
     opf_solver_log_file = (
         ""
         if solver_log_dir is None
-        else os.path.join(solver_log_dir, "opf_" + str(proc) + ".log")
+        else os.path.join(solver_log_dir, "opf_" + str(proc) + ".log").replace(
+            "\\",
+            "/",
+        )
     )
     pf_solver_log_file = (
         ""
         if solver_log_dir is None
-        else os.path.join(solver_log_dir, "pf_" + str(proc) + ".log")
+        else os.path.join(solver_log_dir, "pf_" + str(proc) + ".log").replace("\\", "/")
     )
     dcpf_solver_log_file = (
         ""
         if solver_log_dir is None
-        else os.path.join(solver_log_dir, "dcpf_" + str(proc) + ".log")
+        else os.path.join(solver_log_dir, "dcpf_" + str(proc) + ".log").replace(
+            "\\",
+            "/",
+        )
     )
     dcopf_solver_log_file = (
         ""
         if solver_log_dir is None
-        else os.path.join(solver_log_dir, "dcopf_" + str(proc) + ".log")
+        else os.path.join(solver_log_dir, "dcopf_" + str(proc) + ".log").replace(
+            "\\",
+            "/",
+        )
     )
 
     if print_level is None:

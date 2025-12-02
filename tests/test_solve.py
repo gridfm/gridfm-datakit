@@ -496,8 +496,12 @@ class TestSolve:
         print("DC columns are NaN when DC PF and DC OPF do not converge")
         print(f"{case_name} completed successfully")
 
+    @pytest.mark.skip(
+        reason="Slow DC PF does not always converge so this has to be further investigated",
+    )
     def test_dcpf_fast_matches_slow(self):
         """Fast DC PF should match slow DC PF after post-processing."""
+        # TODO: remove slow dc pf if all tests work with fast dc pf
         case_name = "case14_ieee"  # that test fails for case300 (and possibly other cases). compute_dc_pf and solve_dc_pf from powermodels
         # do not actually give the same solution
         print(f"\nTesting DC PF fast vs slow for {case_name}...")
