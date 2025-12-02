@@ -22,14 +22,16 @@ This library is brought to you by the GridFM team to generate power flow data to
 
 1. ⭐ Star the repository on GitHub to support the project!
 
-2. Install gridfm-datakit
+2. Make sure you have Python 3.10, 3.11, or 3.12 installed. ⚠️ Windows users: Python 3.12 is not supported. Use Python 3.10.11 or 3.11.9.
+
+3. Install gridfm-datakit
 
     ```bash
     python -m pip install --upgrade pip  # Upgrade pip
     pip install gridfm-datakit
     ```
 
-3. Install Julia with Powermodels and Ipopt
+4. Install Julia with Powermodels and Ipopt
 
     ```bash
     gridfm_datakit setup_pm
@@ -37,7 +39,7 @@ This library is brought to you by the GridFM team to generate power flow data to
 
 ### For Developers
 
-To install the latest development version from GitHub, follow these steps instead of step 2.
+To install the latest development version from GitHub, follow these steps instead of step 3.
 
 ```bash
 git clone https://github.com/gridfm/gridfm-datakit.git

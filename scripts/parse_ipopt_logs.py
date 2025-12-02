@@ -9,7 +9,6 @@ Ultra-fast IPOPT log parser:
 
 from pathlib import Path
 import argparse
-import statistics
 from typing import List, Optional, Dict
 import numpy as np
 from tqdm import tqdm
@@ -19,6 +18,7 @@ from multiprocessing import Pool, cpu_count
 
 class RunRecord:
     __slots__ = ("iterations", "exit_msg")
+
     def __init__(self):
         self.iterations: Optional[int] = None
         self.exit_msg: Optional[str] = None
@@ -36,8 +36,6 @@ def _finalize_run(current: RunRecord, runs: List[RunRecord]):
     if current.iterations is not None or current.exit_msg is not None:
         runs.append(current)
 
-
-import mmap
 
 def parse_ipopt_runs_from_file(path: str) -> List[RunRecord]:
     runs = []
@@ -65,7 +63,7 @@ def parse_ipopt_runs_from_file(path: str) -> List[RunRecord]:
                 if "Number of Iterations" in line:
                     idx = line.rfind(":")
                     if idx != -1:
-                        num = line[idx + 1:].strip()
+                        num = line[idx + 1 :].strip()
                         if num.isdigit():
                             current.iterations = int(num)
                     continue
@@ -76,7 +74,6 @@ def parse_ipopt_runs_from_file(path: str) -> List[RunRecord]:
 
     _finalize(current, runs)
     return runs
-
 
 
 def parse_files(filepaths: List[str]) -> List[RunRecord]:
@@ -96,7 +93,6 @@ def parse_files(filepaths: List[str]) -> List[RunRecord]:
 def summarize_iterations(
     runs: List[RunRecord],
 ) -> Dict[str, Dict[str, Optional[float]]]:
-
     optimal_iters = [r.iterations for r in runs if r.is_complete() and r.is_optimal()]
     non_optimal_iters = [
         r.iterations for r in runs if r.is_complete() and not r.is_optimal()
@@ -126,7 +122,7 @@ def summarize_iterations(
 
 def main():
     ap = argparse.ArgumentParser(
-        description="Ultra-fast IPOPT iteration statistics parser."
+        description="Ultra-fast IPOPT iteration statistics parser.",
     )
     ap.add_argument(
         "--dir",
@@ -160,7 +156,7 @@ def main():
     if not log_files:
         print(f"No logs found for pattern solver_log/{pattern}")
         return
-    
+
     print(f"Found {len(log_files)} log files for pattern solver_log/{pattern}")
 
     runs = parse_files([str(p) for p in log_files])
@@ -175,7 +171,17 @@ def main():
 
     def fmt_stats(title, s):
         print(f"[{title}]")
-        for key in ["count", "min", "max", "avg", "p99", "999", "9999", "99999", "1/100000"]:
+        for key in [
+            "count",
+            "min",
+            "max",
+            "avg",
+            "p99",
+            "999",
+            "9999",
+            "99999",
+            "1/100000",
+        ]:
             val = s.get(key)
             if isinstance(val, float):
                 val = round(val, 3)
