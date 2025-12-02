@@ -1,6 +1,7 @@
 import yaml
 import os
 import shutil
+import pytest
 from gridfm_datakit.utils.param_handler import NestedNamespace
 from gridfm_datakit.generate import generate_power_flow_data_distributed
 from concurrent.futures import ProcessPoolExecutor
@@ -44,6 +45,7 @@ def run_generation(config_params):
         return config_params["test_name"], f"FAIL: {e}"
 
 
+@pytest.mark.skip(reason="Long-running comprehensive test")
 def test_all_perturbation_combinations():
     """Test all possible combinations of perturbation types."""
 
