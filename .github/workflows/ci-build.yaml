@@ -74,6 +74,6 @@ jobs:
       - name: Unit tests
         run: |
           source .venv/bin/activate
-          pytest --cov=. tests/
+          pytest --cov=. tests/ -s -v
 
 # testing
