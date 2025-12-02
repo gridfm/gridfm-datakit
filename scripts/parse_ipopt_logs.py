@@ -1,34 +1,24 @@
 #!/usr/bin/env python3
 """
-Parse IPOPT logs and report iteration statistics conditioned on termination status.
-
-Usage:
-    python parse_ipopt_logs.py file1.log file2.log ...
-
-What it does:
-- A single file may contain multiple IPOPT runs back-to-back.
-- For each run, it extracts:
-    * Number of Iterations....: <int>
-    * EXIT: <termination message>
-- A run is classified as "optimal" if the EXIT line contains
-  the substring "Optimal Solution Found." (case-sensitive match).
-  Any other EXIT message is classified as "non_optimal".
-- Reports count, min, max, average, and 99th percentile iterations for both classes.
-- Also reports bookkeeping about runs with incomplete data.
+Ultra-fast IPOPT log parser:
+- Streams files (no readlines)
+- No regex (string operations)
+- __slots__ RunRecord
+- Vectorized percentiles
 """
 
+from pathlib import Path
 import argparse
-import re
 import statistics
 from typing import List, Optional, Dict
 import numpy as np
-
-ITER_RE = re.compile(r"^\s*Number of Iterations\.{4,}:\s*(\d+)\s*$")
-EXIT_RE = re.compile(r"^\s*EXIT:\s*(.+?)\s*$")
-RUN_START_RE = re.compile(r"^\s*This is Ipopt version\b")  # optional delimiter
+from tqdm import tqdm
+import mmap
+from multiprocessing import Pool, cpu_count
 
 
 class RunRecord:
+    __slots__ = ("iterations", "exit_msg")
     def __init__(self):
         self.iterations: Optional[int] = None
         self.exit_msg: Optional[str] = None
@@ -42,82 +32,113 @@ class RunRecord:
         return "Optimal Solution Found." in self.exit_msg
 
 
-def _finalize_run(current: RunRecord, runs: List[RunRecord]) -> None:
-    """Append the current run if it has any content (iterations or exit)."""
+def _finalize_run(current: RunRecord, runs: List[RunRecord]):
     if current.iterations is not None or current.exit_msg is not None:
         runs.append(current)
 
 
-def parse_ipopt_runs_from_text(lines: List[str]) -> List[RunRecord]:
-    """Parse IPOPT runs from a sequence of log lines."""
-    runs: List[RunRecord] = []
+import mmap
+
+def parse_ipopt_runs_from_file(path: str) -> List[RunRecord]:
+    runs = []
     current = RunRecord()
 
-    for line in lines:
-        if RUN_START_RE.search(line):
-            _finalize_run(current, runs)
-            current = RunRecord()
-            continue
+    _finalize = _finalize_run
+    RunRec = RunRecord
 
-        m_iter = ITER_RE.match(line)
-        if m_iter:
-            current.iterations = int(m_iter.group(1))
-            continue
+    with open(path, "r", encoding="utf-8", errors="ignore") as f:
+        with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
+            readline = mm.readline
 
-        m_exit = EXIT_RE.match(line)
-        if m_exit:
-            current.exit_msg = m_exit.group(1).strip()
-            continue
+            while True:
+                bline = readline()
+                if not bline:
+                    break
 
-    _finalize_run(current, runs)
+                line = bline.decode("utf-8", "ignore")
+
+                if "This is Ipopt version" in line:
+                    _finalize(current, runs)
+                    current = RunRec()
+                    continue
+
+                if "Number of Iterations" in line:
+                    idx = line.rfind(":")
+                    if idx != -1:
+                        num = line[idx + 1:].strip()
+                        if num.isdigit():
+                            current.iterations = int(num)
+                    continue
+
+                if line.lstrip().startswith("EXIT:"):
+                    current.exit_msg = line.split("EXIT:", 1)[1].strip()
+                    continue
+
+    _finalize(current, runs)
     return runs
 
 
+
 def parse_files(filepaths: List[str]) -> List[RunRecord]:
-    all_runs: List[RunRecord] = []
-    for p in filepaths:
-        with open(p, "r", encoding="utf-8", errors="ignore") as f:
-            lines = f.readlines()
-        runs = parse_ipopt_runs_from_text(lines)
-        all_runs.extend(runs)
+    all_runs = []
+
+    with Pool(processes=cpu_count()) as pool:
+        for runs in tqdm(
+            pool.imap_unordered(parse_ipopt_runs_from_file, filepaths),
+            total=len(filepaths),
+            desc="Parsing log files (parallel)",
+        ):
+            all_runs.extend(runs)
+
     return all_runs
 
 
 def summarize_iterations(
     runs: List[RunRecord],
 ) -> Dict[str, Dict[str, Optional[float]]]:
-    """Return summary statistics for optimal and non-optimal classes."""
+
     optimal_iters = [r.iterations for r in runs if r.is_complete() and r.is_optimal()]
     non_optimal_iters = [
         r.iterations for r in runs if r.is_complete() and not r.is_optimal()
     ]
 
-    def stats(xs: List[int]) -> Dict[str, Optional[float]]:
+    def stats(xs: List[int]):
         if not xs:
             return {"count": 0, "min": None, "max": None, "avg": None, "p99": None}
+
+        arr = np.array(xs, dtype=float)
+        p = np.percentile(arr, [99, 99.9, 99.99, 99.999, 99.99999])
+
         return {
             "count": len(xs),
-            "min": min(xs),
-            "max": max(xs),
-            "avg": statistics.mean(xs),
-            "p99": float(np.percentile(xs, 99)),
-            "999": float(np.percentile(xs, 99.9)),
-            "9999": float(np.percentile(xs, 99.99)),
-            "99999": float(np.percentile(xs, 99.999)),
-            "1/100000": float(np.percentile(xs, 99.99999)),
+            "min": int(arr.min()),
+            "max": int(arr.max()),
+            "avg": float(arr.mean()),
+            "p99": float(p[0]),
+            "999": float(p[1]),
+            "9999": float(p[2]),
+            "99999": float(p[3]),
+            "1/100000": float(p[4]),
         }
 
-    return {
-        "optimal": stats(optimal_iters),
-        "non_optimal": stats(non_optimal_iters),
-    }
+    return {"optimal": stats(optimal_iters), "non_optimal": stats(non_optimal_iters)}
 
 
 def main():
     ap = argparse.ArgumentParser(
-        description="Extract IPOPT iteration statistics by termination status.",
+        description="Ultra-fast IPOPT iteration statistics parser."
     )
-    ap.add_argument("logs", nargs="+", help="One or more IPOPT log files.")
+    ap.add_argument(
+        "--dir",
+        required=True,
+        help="Base directory that contains solver_log/",
+    )
+    ap.add_argument(
+        "--type",
+        required=True,
+        choices=["opf", "dcopf", "pf", "dcpf"],
+        help="Type of logs to parse.",
+    )
     ap.add_argument(
         "--show-incomplete",
         action="store_true",
@@ -125,7 +146,24 @@ def main():
     )
     args = ap.parse_args()
 
-    runs = parse_files(args.logs)
+    patterns = {
+        "opf": "opf_*.log",
+        "dcopf": "dcopf_*.log",
+        "pf": "pf_*.log",
+        "dcpf": "dcpf_*.log",
+    }
+
+    pattern = patterns[args.type]
+    base = Path(args.dir).expanduser().resolve()
+    log_files = list((base / "solver_log").glob(pattern))
+
+    if not log_files:
+        print(f"No logs found for pattern solver_log/{pattern}")
+        return
+    
+    print(f"Found {len(log_files)} log files for pattern solver_log/{pattern}")
+
+    runs = parse_files([str(p) for p in log_files])
     complete = [r for r in runs if r.is_complete()]
     incomplete = [r for r in runs if not r.is_complete()]
     summary = summarize_iterations(runs)
@@ -133,23 +171,15 @@ def main():
     print("====== IPOPT Iteration Statistics ======")
     print(f"Total runs detected: {len(runs)}")
     print(f"Complete runs:       {len(complete)}")
-    print(f"Incomplete runs:     {len(incomplete)}")
-    print()
+    print(f"Incomplete runs:     {len(incomplete)}\n")
 
-    def fmt_stats(title: str, s: Dict[str, Optional[float]]) -> None:
+    def fmt_stats(title, s):
         print(f"[{title}]")
-        print(f"  count : {s['count']}")
-        print(f"  min   : {s['min']}")
-        print(f"  max   : {s['max']}")
-        print(f"  avg   : {None if s['avg'] is None else round(s['avg'], 3)}")
-        print(f"  p99   : {None if s['p99'] is None else round(s['p99'], 3)}")
-        print(f"  p99.9 : {None if s['999'] is None else round(s['999'], 3)}")
-        print(f"  p99.99: {None if s['9999'] is None else round(s['9999'], 3)}")
-        print(f"  p99.999: {None if s['99999'] is None else round(s['99999'], 3)}")
-        print(
-            f"  p1/100 000: {None if s['1/100000'] is None else round(s['1/100000'], 3)}",
-        )
-        print(f"  max   : {s['max']}")
+        for key in ["count", "min", "max", "avg", "p99", "999", "9999", "99999", "1/100000"]:
+            val = s.get(key)
+            if isinstance(val, float):
+                val = round(val, 3)
+            print(f"  {key:10}: {val}")
         print()
 
     fmt_stats("Optimal solution", summary["optimal"])
