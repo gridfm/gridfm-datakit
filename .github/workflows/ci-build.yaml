@@ -36,41 +36,41 @@ jobs:
       - name: Security Checks
         run: |
           bandit --severity-level high .
-  
+
   pytests:
     runs-on: ubuntu-latest
-  
+
     steps:
       - uses: actions/checkout@v4
-  
+
       - name: Install Julia (JuliaUp)
         uses: julia-actions/setup-julia@v1
         with:
           version: '1.12'
-  
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-  
+
       - name: Create virtualenv
         run: |
           python -m venv .venv
           source .venv/bin/activate
-  
+
       - name: Install Python dependencies
         run: |
           source .venv/bin/activate
           python -m pip install --upgrade pip wheel
           pip install -e ".[test]"
-  
+
       - name: Run Julia setup (PowerModels)
         env:
           JULIA_PKG_SERVER: ""
         run: |
           source .venv/bin/activate
           gridfm_datakit setup_pm
-  
+
       - name: Unit tests
         run: |
           source .venv/bin/activate
