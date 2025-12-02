@@ -3,7 +3,7 @@ import os
 import shutil
 import pytest
 from gridfm_datakit.utils.param_handler import NestedNamespace
-from gridfm_datakit.generate import generate_power_flow_data_distributed
+from gridfm_datakit.generate import generate_power_flow_data
 from concurrent.futures import ProcessPoolExecutor
 from gridfm_datakit.validation import validate_generated_data
 
@@ -32,7 +32,7 @@ def run_generation(config_params):
         )
 
         # Generate data
-        file_paths = generate_power_flow_data_distributed(args)
+        file_paths = generate_power_flow_data(args)
         validate_generated_data(file_paths, args.settings.mode, 100.0, n_scenarios=10)
 
         # Clean up
