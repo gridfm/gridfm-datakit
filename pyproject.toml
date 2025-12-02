@@ -34,8 +34,7 @@ dependencies = [
     "juliacall",
     "networkx",
     "tqdm",
-    "fastparquet"
-]
+    "pyarrow"]
 
 authors = [
   {name = "Alban Puech", email = "apuech@seas.harvard.edu"},

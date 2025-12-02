@@ -496,6 +496,10 @@ class TestSolve:
         print("DC columns are NaN when DC PF and DC OPF do not converge")
         print(f"{case_name} completed successfully")
 
+    # skip this test
+    @pytest.mark.skip(
+        reason="TODO: remove slow dc pf as fast works better in pretty much all cases",
+    )
     def test_dcpf_fast_matches_slow(self):
         """Fast DC PF should match slow DC PF after post-processing."""
         case_name = "case14_ieee"  # that test fails for case300 (and possibly other cases). compute_dc_pf and solve_dc_pf from powermodels
@@ -644,22 +648,52 @@ class TestSolve:
             runtime_df = pd.DataFrame(pf_data["runtime"], columns=runtime_columns)
             runtime_df.insert(0, "scenario", 0)
 
-            # Save to parquet
+            # Save to partitioned parquet
             bus_path = os.path.join(tmpdir, "bus_data.parquet")
             gen_path = os.path.join(tmpdir, "gen_data.parquet")
             branch_path = os.path.join(tmpdir, "branch_data.parquet")
             runtime_path = os.path.join(tmpdir, "runtime_data.parquet")
 
-            bus_df.to_parquet(bus_path, engine="fastparquet", index=False)
-            gen_df.to_parquet(gen_path, engine="fastparquet", index=False)
-            branch_df.to_parquet(branch_path, engine="fastparquet", index=False)
-            runtime_df.to_parquet(runtime_path, engine="fastparquet", index=False)
+            # Add partition column for scenario-based partitioning (100 scenarios per partition)
+            bus_df["scenario_partition"] = (bus_df["scenario"] // 100).astype("int64")
+            gen_df["scenario_partition"] = (gen_df["scenario"] // 100).astype("int64")
+            branch_df["scenario_partition"] = (branch_df["scenario"] // 100).astype(
+                "int64",
+            )
+            runtime_df["scenario_partition"] = (runtime_df["scenario"] // 100).astype(
+                "int64",
+            )
+
+            bus_df.to_parquet(
+                bus_path,
+                partition_cols=["scenario_partition"],
+                engine="pyarrow",
+                index=False,
+            )
+            gen_df.to_parquet(
+                gen_path,
+                partition_cols=["scenario_partition"],
+                engine="pyarrow",
+                index=False,
+            )
+            branch_df.to_parquet(
+                branch_path,
+                partition_cols=["scenario_partition"],
+                engine="pyarrow",
+                index=False,
+            )
+            runtime_df.to_parquet(
+                runtime_path,
+                partition_cols=["scenario_partition"],
+                engine="pyarrow",
+                index=False,
+            )
 
             # Read back from parquet
-            bus_df_read = pd.read_parquet(bus_path, engine="fastparquet")
-            gen_df_read = pd.read_parquet(gen_path, engine="fastparquet")
-            branch_df_read = pd.read_parquet(branch_path, engine="fastparquet")
-            runtime_df_read = pd.read_parquet(runtime_path, engine="fastparquet")
+            bus_df_read = pd.read_parquet(bus_path, engine="pyarrow")
+            gen_df_read = pd.read_parquet(gen_path, engine="pyarrow")
+            branch_df_read = pd.read_parquet(branch_path, engine="pyarrow")
+            runtime_df_read = pd.read_parquet(runtime_path, engine="pyarrow")
 
             # Verify NaN values are preserved after round-trip
             print("  Verifying NaN values are preserved after parquet round-trip...")

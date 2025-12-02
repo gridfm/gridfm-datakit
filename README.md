@@ -75,7 +75,7 @@ gridfm-datakit generate path/to/config.yaml
 Validate generated power flow data for integrity and physical consistency:
 
 ```bash
-gridfm-datakit validate /path/to/data/ [--n-scenarios N] [--sn-mva 100]
+gridfm-datakit validate /path/to/data/ [--n-partitions 100] [--sn-mva 100]
 ```
 
 ### Compute Statistics
@@ -83,7 +83,7 @@ gridfm-datakit validate /path/to/data/ [--n-scenarios N] [--sn-mva 100]
 Generate statistics plots from generated data:
 
 ```bash
-gridfm-datakit stats /path/to/data/ [--sn-mva 100]
+gridfm-datakit stats /path/to/data/ [--n-partitions 100] [--sn-mva 100]
 ```
 
 ### Plot Feature Distributions
@@ -91,7 +91,7 @@ gridfm-datakit stats /path/to/data/ [--sn-mva 100]
 Create violin plots for bus feature distributions:
 
 ```bash
-gridfm-datakit plots /path/to/data/ [--output-dir DIR] [--sn-mva 100]
+gridfm-datakit plots /path/to/data/ [--n-partitions 100] [--output-dir DIR] [--sn-mva 100]
 ```
 
 ## Configuration Overview
@@ -163,8 +163,9 @@ The data generation process writes the following artifacts under:
 - **scenarios_{generator}.parquet**: Load scenarios (per-element time series) produced by the selected load generator.
 - **scenarios_{generator}.html**: Plot of the generated load scenarios.
 - **scenarios_{generator}.log**: Generator-specific notes (e.g., bounds for the global scaling factor when using `agg_load_profile`).
-- **bus_data.parquet**: Bus-level features for each processed scenario (columns `BUS_COLUMNS` and, if `settings.include_dc_res=True`, also `DC_BUS_COLUMNS`).
-- **gen_data.parquet**: Generator features per scenario (columns `GEN_COLUMNS`).
-- **branch_data.parquet**: Branch features per scenario (columns `BRANCH_COLUMNS`).
-- **y_bus_data.parquet**: Nonzero Y-bus entries per scenario with columns `[scenario, index1, index2, G, B]`.
-- **runtime_data.parquet**: Runtime data for each scenario (AC and DC solver execution times).
+- **n_scenarios.txt**: Metadata file containing the total number of scenarios (used for efficient partition management).
+- **bus_data.parquet**: Bus-level features for each processed scenario, partitioned by `scenario_partition` (columns `BUS_COLUMNS` and, if `settings.include_dc_res=True`, also `DC_BUS_COLUMNS`).
+- **gen_data.parquet**: Generator features per scenario, partitioned by `scenario_partition` (columns `GEN_COLUMNS`).
+- **branch_data.parquet**: Branch features per scenario, partitioned by `scenario_partition` (columns `BRANCH_COLUMNS`).
+- **y_bus_data.parquet**: Nonzero Y-bus entries per scenario, partitioned by `scenario_partition` with columns `[scenario, index1, index2, G, B]`.
+- **runtime_data.parquet**: Runtime data for each scenario, partitioned by `scenario_partition` (AC and DC solver execution times).
