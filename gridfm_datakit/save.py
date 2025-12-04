@@ -19,6 +19,7 @@ from gridfm_datakit.utils.column_names import (
     DC_BRANCH_COLUMNS,
     RUNTIME_COLUMNS,
     DC_RUNTIME_COLUMNS,
+    YBUS_COLUMNS,
 )
 from gridfm_datakit.network import Network
 
@@ -82,7 +83,7 @@ def _process_and_save(args: Tuple[str, List[np.ndarray], str, int, int, bool]) -
 
     elif data_type == "y_bus":
         y_bus_data = np.concatenate([item[3] for item in processed_data])
-        df = pd.DataFrame(y_bus_data, columns=["index1", "index2", "G", "B"])
+        df = pd.DataFrame(y_bus_data, columns=YBUS_COLUMNS)
         df[["index1", "index2"]] = df[["index1", "index2"]].astype("int64")
         scenario_indices = np.concatenate(
             [

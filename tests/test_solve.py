@@ -80,7 +80,7 @@ class TestSolve:
         print(f"  OPF time: {end_time - start_time} seconds")
         # Step 2: PF post-processing on OPF results
         print("  PF post-processing OPF results...")
-        opf_pf_data = pf_post_processing(net, opf_result, None, include_dc_res=False)
+        opf_pf_data = pf_post_processing(0, net, opf_result, None, include_dc_res=False)
         assert "bus" in opf_pf_data
         assert "gen" in opf_pf_data
         assert "branch" in opf_pf_data
@@ -101,7 +101,7 @@ class TestSolve:
 
         # Step 4: PF post-processing on PF results
         print("  PF post-processing PF results...")
-        pf_pf_data = pf_post_processing(net, pf_result, None, include_dc_res=False)
+        pf_pf_data = pf_post_processing(0, net, pf_result, None, include_dc_res=False)
         assert "bus" in pf_pf_data
         assert "gen" in pf_pf_data
         assert "branch" in pf_pf_data
@@ -194,6 +194,7 @@ class TestSolve:
         # Post-process DC OPF results and ensure no NaNs in outputs
         print("  Post-processing DC OPF results and checking for NaNs...")
         dcopf_pf_data = pf_post_processing(
+            0,
             net,
             opf_result,
             dcopf_result,
@@ -294,6 +295,7 @@ class TestSolve:
         # Post-process DC PF results and ensure no NaNs in outputs
         print("  Post-processing DC PF results and checking for NaNs...")
         dcpf_pf_data = pf_post_processing(
+            0,
             net_pf,
             opf_result,
             dcpf_result,
@@ -349,6 +351,7 @@ class TestSolve:
         # Post-process DC PF results and ensure no NaNs in outputs
         print("  Post-processing DC PF results and checking for NaNs...")
         dcpf_pf_data = pf_post_processing(
+            0,
             net_pf,
             opf_result,
             dcpf_result,
@@ -418,6 +421,7 @@ class TestSolve:
 
         # Post-process with include_dc_res=True and verify DC columns are NaN
         pf_data_opf_mode = pf_post_processing(
+            0,
             net,
             opf_result,
             dcopf_result,
@@ -467,6 +471,7 @@ class TestSolve:
             assert "ITERATION_LIMIT" in str(e)
 
         pf_data_pf_mode = pf_post_processing(
+            0,
             net_pf,
             pf_result,
             dcpf_result,
@@ -526,12 +531,14 @@ class TestSolve:
         # Post-process and compare outputs
         print("  Post-processing and comparing outputs...")
         pf_data_slow = pf_post_processing(
+            0,
             net_pf,
             opf_result,
             dcpf_slow,
             include_dc_res=True,
         )
         pf_data_fast = pf_post_processing(
+            0,
             net_pf,
             opf_result,
             dcpf_fast,
@@ -579,7 +586,7 @@ class TestSolve:
 
         # Call pf_post_processing with res_dc=None and include_dc_res=True
         print("  Post-processing with res_dc=None and include_dc_res=True...")
-        pf_data = pf_post_processing(net, opf_result, None, include_dc_res=True)
+        pf_data = pf_post_processing(0, net, opf_result, None, include_dc_res=True)
 
         # Check that all DC columns are NaN in memory
         print("  Checking DC columns are NaN in memory...")
