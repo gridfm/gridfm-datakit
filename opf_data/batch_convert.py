@@ -480,11 +480,13 @@ def process_one(args):
 
 def append_df(out_path: Path, df: pd.DataFrame):
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    # Add partition column for scenario-based partitioning (100 scenarios per partition)
+    df["scenario_partition"] = (df["scenario"] // 10).astype("int64")
     df.to_parquet(
         out_path,
-        append=True if out_path.exists() else False,
+        partition_cols=["scenario_partition"],
+        engine="pyarrow",
         index=False,
-        engine="fastparquet",
     )
 
 

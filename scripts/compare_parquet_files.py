@@ -302,7 +302,7 @@ def main():
         epilog="""
 Examples:
   # Compare two directories
-  python compare_parquet_files.py /path/to/old/data /path/to/new/data
+  python scripts/compare_parquet_files.py /path/to/old/data /path/to/new/data
 
   # Compare with verbose output
   python compare_parquet_files.py /path/to/old/data /path/to/new/data -v

@@ -262,7 +262,7 @@ def test_parquet_append_vs_overwrite():
         args.load.generator = "powergraph"
         file_paths = generate_power_flow_data_distributed(args)
 
-        df_bus_1 = pd.read_parquet(file_paths["bus_data"], engine="fastparquet")
+        df_bus_1 = pd.read_parquet(file_paths["bus_data"], engine="pyarrow")
 
         n_bus_1 = len(df_bus_1)
 
@@ -271,7 +271,7 @@ def test_parquet_append_vs_overwrite():
         args.load.scenarios = 2
         file_paths = generate_power_flow_data_distributed(args)
 
-        df_bus_2 = pd.read_parquet(file_paths["bus_data"], engine="fastparquet")
+        df_bus_2 = pd.read_parquet(file_paths["bus_data"], engine="pyarrow")
 
         assert len(df_bus_2) > n_bus_1, "Bus rows should increase when overwrite=False"
 
@@ -280,7 +280,7 @@ def test_parquet_append_vs_overwrite():
         args.load.scenarios = 1
         file_paths = generate_power_flow_data_distributed(args)
 
-        df_bus_3 = pd.read_parquet(file_paths["bus_data"], engine="fastparquet")
+        df_bus_3 = pd.read_parquet(file_paths["bus_data"], engine="pyarrow")
 
         assert len(df_bus_3) <= len(df_bus_2) - n_bus_1, (
             "Bus rows should reset when overwrite=True"

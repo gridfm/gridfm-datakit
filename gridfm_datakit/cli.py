@@ -41,14 +41,14 @@ def pm_setup():
 def validate_data_directory(
     data_path: str,
     sn_mva: float,
-    n_scenarios: int,
+    n_partitions: int,
 ) -> bool:
     """
     Validate generated power flow data in a directory.
 
     Args:
         data_path (str): Path to directory containing generated files
-        n_scenarios (int): Number of scenarios to sample for validation (0 = all scenarios)
+        n_partitions (int): Number of partitions to sample for validation (0 = all partitions)
     Returns:
         bool: True if all validations pass, False otherwise
     """
@@ -103,7 +103,7 @@ def validate_data_directory(
             file_paths,
             mode,
             sn_mva=sn_mva,
-            n_scenarios=n_scenarios,
+            n_partitions=n_partitions,
         )
         print("All validation tests passed!")
         return True
@@ -126,17 +126,33 @@ Examples:
   # Generate data from config file
   gridfm-datakit generate config.yaml
 
-  # Validate existing data (sample 100 scenarios)
+  # Validate existing data (sample 100 partitions)
   gridfm-datakit validate /path/to/data/
 
-  # Validate with custom scenario sampling
-  gridfm-datakit validate /path/to/data/ --n-scenarios 50
+  # Validate with custom number of partitions
+  gridfm-datakit validate /path/to/data/ --n-partitions 50
 
   # Validate all scenarios
-  gridfm-datakit validate /path/to/data/ --n-scenarios 0
+  gridfm-datakit validate /path/to/data/ --n-partitions 0
 
-  # Compute statistics from generated data
+  # Compute statistics from generated data (using 100 partitions)
   gridfm-datakit stats /path/to/data/
+
+  # Compute statistics from generated data with custom number of partitions
+  gridfm-datakit stats /path/to/data/ --n-partitions
+
+  # Compute statistics from generated data using all scenarios
+  gridfm-datakit stats /path/to/data/ --n-partitions 0
+
+
+  # Plot feature distributions from generated data (using 100 partitions)
+  gridfm-datakit plots /path/to/data/ --n-partitions 100
+
+  # Plot feature distributions from generated data with custom number of partitions
+  gridfm-datakit plots /path/to/data/ --n-partitions 50
+
+  # Plot feature distributions from generated data using all scenarios
+  gridfm-datakit plots /path/to/data/ --n-partitions 0
 
   # Set up Julia packages for PowerModels
   gridfm-datakit setup_pm
@@ -167,10 +183,10 @@ Examples:
         help="Path to directory containing generated CSV files (bus_data.parquet, branch_data.parquet, gen_data.parquet, y_bus_data.parquet)",
     )
     validate_parser.add_argument(
-        "--n-scenarios",
+        "--n-partitions",
         type=int,
         default=100,
-        help="Number of scenarios to sample for validation (default: 100). Use 0 to validate all scenarios.",
+        help="Number of partitions to sample for validation (default: 100). Use 0 to validate all partitions.",
     )
     validate_parser.add_argument(
         "--sn-mva",
@@ -195,6 +211,12 @@ Examples:
         default=100.0,
         help="Base MVA used to scale power quantities (default: 100).",
     )
+    stats_parser.add_argument(
+        "--n-partitions",
+        type=int,
+        default=100,
+        help="Number of partitions to compute stats for (default: 100). Use 0 to compute stats for all partitions.",
+    )
 
     # Plots command
     plots_parser = subparsers.add_parser(
@@ -205,6 +227,12 @@ Examples:
         "data_path",
         type=str,
         help="Path to directory containing bus_data.parquet",
+    )
+    plots_parser.add_argument(
+        "--n-partitions",
+        type=int,
+        default=100,
+        help="Number of partitions to plot (default: 100). Use 0 to plot all partitions.",
     )
     plots_parser.add_argument(
         "--output-dir",
@@ -238,14 +266,14 @@ Examples:
 
     elif args.command == "validate":
         print(f"Validating data in {args.data_path}...")
-        if args.n_scenarios > 0:
-            print(f"Sampling {args.n_scenarios} scenarios for validation...")
+        if args.n_partitions > 0:
+            print(f"Sampling {args.n_partitions} partitions for validation...")
         else:
-            print("Validating all scenarios...")
+            print("Validating all partitions...")
         success = validate_data_directory(
             args.data_path,
             sn_mva=args.sn_mva,
-            n_scenarios=args.n_scenarios,
+            n_partitions=args.n_partitions,
         )
 
         if success:
@@ -257,7 +285,9 @@ Examples:
 
     elif args.command == "stats":
         print(f"Computing statistics from {args.data_path}...")
-        plot_stats(args.data_path, sn_mva=args.sn_mva)
+        if args.n_partitions > 0:
+            print(f"Computing stats for {args.n_partitions} partitions...")
+        plot_stats(args.data_path, sn_mva=args.sn_mva, n_partitions=args.n_partitions)
         print("\nStatistics computation completed!")
         sys.exit(0)
 
@@ -272,10 +302,13 @@ Examples:
         print(
             f"Plotting bus feature distributions from {bus_file} -> {output_dir}",
         )
+        if args.n_partitions > 0:
+            print(f"Plotting for {args.n_partitions} partitions...")
         plot_feature_distributions(
             node_file=str(bus_file),
             output_dir=output_dir,
             sn_mva=args.sn_mva,
+            n_partitions=args.n_partitions,
         )
         print("\nFeature plots generated!")
         sys.exit(0)
