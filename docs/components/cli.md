@@ -25,24 +25,24 @@ gridfm-datakit generate scripts/config/default.yaml
 Validate previously generated power flow data. Runs comprehensive validation checks for data integrity and physical consistency:
 
 ```bash
-gridfm-datakit validate path/to/data/directory [--n-scenarios N] [--sn-mva 100]
+gridfm-datakit validate path/to/data/directory [--n-partitions N] [--sn-mva 100]
 ```
 
 **Arguments:**
 - `data_path`: Path to directory containing generated CSV files
-- `--n-scenarios N`: Number of scenarios to sample for validation (default: 100). Use 0 to validate all scenarios.
+- `--n-partitions N`: Number of partitions to sample for validation (default: 100). Use 0 to validate all partitions.
 - `--sn-mva`: Base MVA used to scale power quantities (default: 100).
 
 **Examples:**
 ```bash
-# Validate with default sampling (100 scenarios)
+# Validate with default sampling (100 partitions)
 gridfm-datakit validate ./data_out/case24_ieee_rts/raw
 
-# Validate with custom scenario sampling
-gridfm-datakit validate ./data_out/case24_ieee_rts/raw --n-scenarios 50
+# Validate with custom partition sampling
+gridfm-datakit validate ./data_out/case24_ieee_rts/raw --n-partitions 50
 
-# Validate all scenarios (slower but complete)
-gridfm-datakit validate ./data_out/case24_ieee_rts/raw --n-scenarios 0
+# Validate all partitions (slower but complete)
+gridfm-datakit validate ./data_out/case24_ieee_rts/raw --n-partitions 0
 ```
 
 ### Stats
@@ -63,7 +63,7 @@ gridfm-datakit stats ./data_out/case24_ieee_rts/raw
 ```
 
 This command:
-1. Computes aggregated statistics across all scenarios:
+1. Computes aggregated statistics across sampled partitions:
    - Number of active generators and branches per scenario
    - Branch loading metrics (overloads, maximum loading, all branch loadings)
    - Power balance errors (active and reactive, normalized by number of buses)

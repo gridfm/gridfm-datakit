@@ -480,7 +480,7 @@ def process_one(args):
 
 def append_df(out_path: Path, df: pd.DataFrame):
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    # Add partition column for scenario-based partitioning (100 scenarios per partition)
+    # Add partition column for scenario-based partitioning (n_scenario_per_partition scenarios per partition)
     df["scenario_partition"] = (df["scenario"] // 10).astype("int64")
     df.to_parquet(
         out_path,

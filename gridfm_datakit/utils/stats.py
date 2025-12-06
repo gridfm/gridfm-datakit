@@ -11,6 +11,7 @@ from gridfm_datakit.utils.power_balance import (
     compute_bus_balance,
 )
 from gridfm_datakit.utils.utils import get_num_scenarios
+from gridfm_datakit.utils.utils import read_partitions, n_scenario_per_partition
 
 
 def compute_stats_from_data(
@@ -54,7 +55,9 @@ def compute_stats_from_data(
     # Get total number of scenarios efficiently
     total_scenarios = get_num_scenarios(data_dir)
 
-    total_partitions = (total_scenarios + 99) // 100
+    total_partitions = (
+        total_scenarios + n_scenario_per_partition - 1
+    ) // n_scenario_per_partition
 
     if n_partitions > 0:
         sampled_partitions = sorted(
@@ -76,26 +79,10 @@ def compute_stats_from_data(
     gen_file = os.path.join(data_dir, "gen_data.parquet")
     runtime_file = os.path.join(data_dir, "runtime_data.parquet")
 
-    bus_data = pd.read_parquet(
-        bus_file,
-        engine="pyarrow",
-        filters=[("scenario_partition", "in", sampled_partitions)],
-    )
-    branch_data = pd.read_parquet(
-        branch_file,
-        engine="pyarrow",
-        filters=[("scenario_partition", "in", sampled_partitions)],
-    )
-    gen_data = pd.read_parquet(
-        gen_file,
-        engine="pyarrow",
-        filters=[("scenario_partition", "in", sampled_partitions)],
-    )
-    runtime_data = pd.read_parquet(
-        runtime_file,
-        engine="pyarrow",
-        filters=[("scenario_partition", "in", sampled_partitions)],
-    )
+    bus_data = read_partitions(bus_file, sampled_partitions)
+    branch_data = read_partitions(branch_file, sampled_partitions)
+    gen_data = read_partitions(gen_file, sampled_partitions)
+    runtime_data = read_partitions(runtime_file, sampled_partitions)
 
     dc = True if "p_mw_dc" in gen_data.columns else False
     # The canonical scenario ordering (to match the original function's behavior)
@@ -273,8 +260,10 @@ def plot_stats(data_dir: str, sn_mva: float, n_partitions: int = 0) -> None:
         mean_mean_p_balance_error_dc = np.nanmean(stats["p_balance_error_dc_mean"])
 
     df_stats = pd.DataFrame(per_scenario)
-    # Add partition column for scenario-based partitioning (100 scenarios per partition)
-    df_stats["scenario_partition"] = (df_stats["scenario"] // 100).astype("int64")
+    # Add partition column for scenario-based partitioning (n_scenario_per_partition scenarios per partition)
+    df_stats["scenario_partition"] = (
+        df_stats["scenario"] // n_scenario_per_partition
+    ).astype("int64")
     df_stats.to_parquet(
         os.path.join(data_dir, "stats.parquet"),
         partition_cols=["scenario_partition"],
@@ -414,7 +403,9 @@ def plot_feature_distributions(
     # Get total number of scenarios and partitions
     data_dir = os.path.dirname(node_file)
     total_scenarios = get_num_scenarios(data_dir)
-    total_partitions = (total_scenarios + 99) // 100
+    total_partitions = (
+        total_scenarios + n_scenario_per_partition - 1
+    ) // n_scenario_per_partition
 
     if n_partitions > 0:
         sampled_partitions = sorted(
@@ -431,11 +422,7 @@ def plot_feature_distributions(
         sampled_partitions = list(range(total_partitions))
 
     # Read filtered data from partitioned parquet using partition filter
-    node_data = pd.read_parquet(
-        node_file,
-        engine="pyarrow",
-        filters=[("scenario_partition", "in", sampled_partitions)],
-    )
+    node_data = read_partitions(node_file, sampled_partitions)
     os.makedirs(output_dir, exist_ok=True)
 
     if not buses:
@@ -460,10 +447,6 @@ def plot_feature_distributions(
         feature_cols = BUS_COLUMNS + DC_BUS_COLUMNS
     else:
         feature_cols = BUS_COLUMNS
-
-    assert node_data.shape[1] == len(feature_cols) + 2, (
-        "Node data has the wrong number of columns"
-    )  # 2 because of scenario and scenario_partition columns
 
     for feature_name in feature_cols:
         fig, ax = plt.subplots(figsize=(15, 6))

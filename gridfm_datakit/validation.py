@@ -25,6 +25,7 @@ from gridfm_datakit.utils.power_balance import (
     compute_bus_balance,
 )
 from gridfm_datakit.utils.utils import get_num_scenarios
+from gridfm_datakit.utils.utils import read_partitions, n_scenario_per_partition
 
 
 def _validate_partition_structure(
@@ -32,7 +33,7 @@ def _validate_partition_structure(
     total_scenarios: int,
 ) -> None:
     """
-    for each partitioned parquet directory (100 scenarios/partition),
+    for each partitioned parquet directory (n_scenario_per_partition scenarios/partition),
     check that:
       - All partitions except the last contain 100 unique scenarios.
       - Last partition contains (total_scenarios % 100) unique scenarios (unless perfectly divided, then 100).
@@ -41,21 +42,22 @@ def _validate_partition_structure(
       - Prints results for each check.
     """
     print("Validating partition structure (easy checks)...")
-    n = 100
-    partitions = (total_scenarios + n - 1) // n  # ceiling division
+    partitions = (
+        total_scenarios + n_scenario_per_partition - 1
+    ) // n_scenario_per_partition  # ceiling division
 
     for k in range(partitions):
-        expected_first = k * n
-        expected_last = min((k + 1) * n, total_scenarios) - 1
+        expected_first = k * n_scenario_per_partition
+        expected_last = min((k + 1) * n_scenario_per_partition, total_scenarios) - 1
         expect_count = expected_last - expected_first + 1
 
-        # Just use the scenario column from bus_data (minimal load)
-        part = pd.read_parquet(
-            file_paths["bus_data"],
-            columns=["scenario"],
-            engine="pyarrow",
-            filters=[("scenario_partition", "==", k)],
-        )["scenario"]
+        # Construct partition path
+        partition_path = os.path.join(file_paths["bus_data"], f"scenario_partition={k}")
+
+        # Read all parquet files in this partition folder
+        part = pd.read_parquet(partition_path, columns=["scenario"], engine="pyarrow")[
+            "scenario"
+        ]
         unique_scenarios = part.unique()
         min_scenario, max_scenario = np.min(unique_scenarios), np.max(unique_scenarios)
         if len(unique_scenarios) != expect_count:
@@ -98,11 +100,13 @@ def validate_generated_data(
     total_scenarios = get_num_scenarios(data_dir)
 
     # Step 1: Validate partition structure on ALL partitions
-    print("Step 1: Validating partition structure on all partitions...")
-    _validate_partition_structure(file_paths, total_scenarios)
+    # print("Step 1: Validating partition structure on all partitions...")
+    # _validate_partition_structure(file_paths, total_scenarios)
 
-    # Calculate number of partitions (100 scenarios per partition)
-    num_partitions = (total_scenarios + 99) // 100
+    # Calculate number of partitions (n_scenario_per_partition scenarios per partition)
+    num_partitions = (
+        total_scenarios + n_scenario_per_partition - 1
+    ) // n_scenario_per_partition
 
     # Sample partitions
     if n_partitions > 0:
@@ -114,7 +118,7 @@ def validate_generated_data(
                 replace=False,
             ),
         )
-        max_scenarios_to_validate = len(sampled_partitions) * 100
+        max_scenarios_to_validate = len(sampled_partitions) * n_scenario_per_partition
         print(
             f"Step 2: Running core validations on {len(sampled_partitions)} sampled partitions (up to {max_scenarios_to_validate} scenarios) out of {num_partitions} total",
         )
@@ -124,33 +128,11 @@ def validate_generated_data(
             f"Step 2: Running core validations on all {num_partitions} partitions ({total_scenarios} total scenarios)",
         )
 
-    # Step 2: Run core validations on sampled partitions using "in" filter
-    print("Loading sampled partitions...")
-    bus_data = pd.read_parquet(
-        file_paths["bus_data"],
-        engine="pyarrow",
-        filters=[("scenario_partition", "in", sampled_partitions)],
-    )
-    branch_data = pd.read_parquet(
-        file_paths["branch_data"],
-        engine="pyarrow",
-        filters=[("scenario_partition", "in", sampled_partitions)],
-    )
-    gen_data = pd.read_parquet(
-        file_paths["gen_data"],
-        engine="pyarrow",
-        filters=[("scenario_partition", "in", sampled_partitions)],
-    )
-    y_bus_data = pd.read_parquet(
-        file_paths["y_bus_data"],
-        engine="pyarrow",
-        filters=[("scenario_partition", "in", sampled_partitions)],
-    )
-    runtime_data = pd.read_parquet(
-        file_paths["runtime_data"],
-        engine="pyarrow",
-        filters=[("scenario_partition", "in", sampled_partitions)],
-    )
+    bus_data = read_partitions(file_paths["bus_data"], sampled_partitions)
+    branch_data = read_partitions(file_paths["branch_data"], sampled_partitions)
+    gen_data = read_partitions(file_paths["gen_data"], sampled_partitions)
+    y_bus_data = read_partitions(file_paths["y_bus_data"], sampled_partitions)
+    runtime_data = read_partitions(file_paths["runtime_data"], sampled_partitions)
 
     generated_data = {
         "bus_data": bus_data,

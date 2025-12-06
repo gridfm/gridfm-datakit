@@ -95,14 +95,14 @@ The `mode` parameter controls how the power flow scenarios are generated and val
 The generated data can be validated using the CLI validation command:
 
 ```bash
-# Validate with default sampling (100 scenarios)
+# Validate with default sampling (100 partitions)
 gridfm-datakit validate ./data_out/case24_ieee_rts/raw
 
-# Validate with custom scenario sampling
-gridfm-datakit validate ./data_out/case24_ieee_rts/raw --n-scenarios 50
+# Validate with custom partition sampling
+gridfm-datakit validate ./data_out/case24_ieee_rts/raw --n-partitions 50
 
-# Validate all scenarios (slower but complete)
-gridfm-datakit validate ./data_out/case24_ieee_rts/raw --n-scenarios 0
+# Validate all partitions (slower but complete)
+gridfm-datakit validate ./data_out/case24_ieee_rts/raw --n-partitions 0
 ```
 
 This automatically detects the generation mode and runs appropriate validation checks:

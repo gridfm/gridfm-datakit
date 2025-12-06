@@ -22,6 +22,7 @@ from gridfm_datakit.utils.column_names import (
     YBUS_COLUMNS,
 )
 from gridfm_datakit.network import Network
+from gridfm_datakit.utils.utils import n_scenario_per_partition
 
 
 def _process_and_save(args: Tuple[str, List[np.ndarray], str, int, int, bool]) -> None:
@@ -111,8 +112,10 @@ def _process_and_save(args: Tuple[str, List[np.ndarray], str, int, int, bool]) -
     else:
         raise ValueError(f"Unknown data type: {data_type}")
 
-    # Add partition column for scenario-based partitioning (1000 scenarios per partition)
-    df["scenario_partition"] = (df["scenario"] // 100).astype("int64")
+    # Add partition column for scenario-based partitioning (n_scenario_per_partition scenarios per partition)
+    df["scenario_partition"] = (df["scenario"] // n_scenario_per_partition).astype(
+        "int64",
+    )
 
     df.to_parquet(
         path,

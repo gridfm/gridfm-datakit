@@ -28,6 +28,7 @@ from gridfm_datakit.utils.column_names import (
 )
 
 import time
+from gridfm_datakit.utils.utils import n_scenario_per_partition
 
 
 class TestSolve:
@@ -662,13 +663,21 @@ class TestSolve:
             branch_path = os.path.join(tmpdir, "branch_data.parquet")
             runtime_path = os.path.join(tmpdir, "runtime_data.parquet")
 
-            # Add partition column for scenario-based partitioning (100 scenarios per partition)
-            bus_df["scenario_partition"] = (bus_df["scenario"] // 100).astype("int64")
-            gen_df["scenario_partition"] = (gen_df["scenario"] // 100).astype("int64")
-            branch_df["scenario_partition"] = (branch_df["scenario"] // 100).astype(
+            # Add partition column for scenario-based partitioning (n_scenario_per_partition scenarios per partition)
+            bus_df["scenario_partition"] = (
+                bus_df["scenario"] // n_scenario_per_partition
+            ).astype("int64")
+            gen_df["scenario_partition"] = (
+                gen_df["scenario"] // n_scenario_per_partition
+            ).astype("int64")
+            branch_df["scenario_partition"] = (
+                branch_df["scenario"] // n_scenario_per_partition
+            ).astype(
                 "int64",
             )
-            runtime_df["scenario_partition"] = (runtime_df["scenario"] // 100).astype(
+            runtime_df["scenario_partition"] = (
+                runtime_df["scenario"] // n_scenario_per_partition
+            ).astype(
                 "int64",
             )
 
