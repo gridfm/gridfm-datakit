@@ -27,6 +27,7 @@ from tqdm import tqdm
 import pandas as pd
 import numpy as np
 from multiprocessing import Pool, cpu_count
+from gridfm_datakit.utils.utils import n_scenario_per_partition
 
 
 # ---------- Utilities ----------
@@ -355,7 +356,7 @@ def convert_one(
                 "Ytt_r": Ytt.real,
                 "Ytt_i": Ytt.imag,
                 "tap": tap_mag,
-                "shift": shift,
+                "shift": np.rad2deg(shift),
                 "ang_min": np.rad2deg(angmin),
                 "ang_max": np.rad2deg(angmax),
                 "rate_a": rate_a * baseMVA,
@@ -481,7 +482,9 @@ def process_one(args):
 def append_df(out_path: Path, df: pd.DataFrame):
     out_path.parent.mkdir(parents=True, exist_ok=True)
     # Add partition column for scenario-based partitioning (n_scenario_per_partition scenarios per partition)
-    df["scenario_partition"] = (df["scenario"] // 10).astype("int64")
+    df["scenario_partition"] = (df["scenario"] // n_scenario_per_partition).astype(
+        "int64",
+    )
     df.to_parquet(
         out_path,
         partition_cols=["scenario_partition"],
