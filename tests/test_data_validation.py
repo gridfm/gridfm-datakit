@@ -56,7 +56,7 @@ def test_data_validation(args, mode):
 
     # Generate and validate data
     file_paths = generate_power_flow_data_distributed(args)
-    validate_generated_data(file_paths, mode, 100.0, n_scenarios=10)
+    validate_generated_data(file_paths, mode, 100.0, n_partitions=10)
 
 
 @pytest.fixture(scope="session", autouse=True)

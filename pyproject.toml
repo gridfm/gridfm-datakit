@@ -35,7 +35,7 @@ dependencies = [
     "juliacall",
     "networkx",
     "tqdm",
-    "fastparquet",
+    "pyarrow",
     # Enforce Python <= 3.11 on Windows
     "gridfm-datakit-winblock ; sys_platform == 'win32' and python_version >= '3.12'"
 ]

@@ -1,5 +1,6 @@
 # Output CSV column definitions used by save/generate pipeline
 GEN_COLUMNS = [
+    "load_scenario_idx",
     "idx",
     "bus",
     "p_mw",
@@ -20,6 +21,7 @@ DC_GEN_COLUMNS = [
 ]
 
 BUS_COLUMNS = [
+    "load_scenario_idx",
     "bus",
     "Pd",
     "Qd",
@@ -40,6 +42,7 @@ BUS_COLUMNS = [
 DC_BUS_COLUMNS = ["Va_dc", "Pg_dc"]
 
 BRANCH_COLUMNS = [
+    "load_scenario_idx",
     "idx",
     "from_bus",
     "to_bus",
@@ -72,6 +75,7 @@ DC_BRANCH_COLUMNS = [
 ]
 
 YBUS_COLUMNS = [
+    "load_scenario_idx",
     "index1",
     "index2",
     "G",
@@ -79,6 +83,7 @@ YBUS_COLUMNS = [
 ]
 
 RUNTIME_COLUMNS = [
+    "load_scenario_idx",
     "ac",
 ]
 

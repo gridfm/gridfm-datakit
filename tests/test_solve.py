@@ -28,6 +28,7 @@ from gridfm_datakit.utils.column_names import (
 )
 
 import time
+from gridfm_datakit.utils.utils import n_scenario_per_partition
 
 
 class TestSolve:
@@ -80,7 +81,7 @@ class TestSolve:
         print(f"  OPF time: {end_time - start_time} seconds")
         # Step 2: PF post-processing on OPF results
         print("  PF post-processing OPF results...")
-        opf_pf_data = pf_post_processing(net, opf_result, None, include_dc_res=False)
+        opf_pf_data = pf_post_processing(0, net, opf_result, None, include_dc_res=False)
         assert "bus" in opf_pf_data
         assert "gen" in opf_pf_data
         assert "branch" in opf_pf_data
@@ -101,7 +102,7 @@ class TestSolve:
 
         # Step 4: PF post-processing on PF results
         print("  PF post-processing PF results...")
-        pf_pf_data = pf_post_processing(net, pf_result, None, include_dc_res=False)
+        pf_pf_data = pf_post_processing(0, net, pf_result, None, include_dc_res=False)
         assert "bus" in pf_pf_data
         assert "gen" in pf_pf_data
         assert "branch" in pf_pf_data
@@ -194,6 +195,7 @@ class TestSolve:
         # Post-process DC OPF results and ensure no NaNs in outputs
         print("  Post-processing DC OPF results and checking for NaNs...")
         dcopf_pf_data = pf_post_processing(
+            0,
             net,
             opf_result,
             dcopf_result,
@@ -294,6 +296,7 @@ class TestSolve:
         # Post-process DC PF results and ensure no NaNs in outputs
         print("  Post-processing DC PF results and checking for NaNs...")
         dcpf_pf_data = pf_post_processing(
+            0,
             net_pf,
             opf_result,
             dcpf_result,
@@ -349,6 +352,7 @@ class TestSolve:
         # Post-process DC PF results and ensure no NaNs in outputs
         print("  Post-processing DC PF results and checking for NaNs...")
         dcpf_pf_data = pf_post_processing(
+            0,
             net_pf,
             opf_result,
             dcpf_result,
@@ -418,6 +422,7 @@ class TestSolve:
 
         # Post-process with include_dc_res=True and verify DC columns are NaN
         pf_data_opf_mode = pf_post_processing(
+            0,
             net,
             opf_result,
             dcopf_result,
@@ -467,6 +472,7 @@ class TestSolve:
             assert "ITERATION_LIMIT" in str(e)
 
         pf_data_pf_mode = pf_post_processing(
+            0,
             net_pf,
             pf_result,
             dcpf_result,
@@ -496,8 +502,9 @@ class TestSolve:
         print("DC columns are NaN when DC PF and DC OPF do not converge")
         print(f"{case_name} completed successfully")
 
+    # skip this test
     @pytest.mark.skip(
-        reason="Slow DC PF does not always converge so this has to be further investigated",
+        reason="TODO: remove slow dc pf as fast works better in pretty much all cases",
     )
     def test_dcpf_fast_matches_slow(self):
         """Fast DC PF should match slow DC PF after post-processing."""
@@ -526,12 +533,14 @@ class TestSolve:
         # Post-process and compare outputs
         print("  Post-processing and comparing outputs...")
         pf_data_slow = pf_post_processing(
+            0,
             net_pf,
             opf_result,
             dcpf_slow,
             include_dc_res=True,
         )
         pf_data_fast = pf_post_processing(
+            0,
             net_pf,
             opf_result,
             dcpf_fast,
@@ -579,7 +588,7 @@ class TestSolve:
 
         # Call pf_post_processing with res_dc=None and include_dc_res=True
         print("  Post-processing with res_dc=None and include_dc_res=True...")
-        pf_data = pf_post_processing(net, opf_result, None, include_dc_res=True)
+        pf_data = pf_post_processing(0, net, opf_result, None, include_dc_res=True)
 
         # Check that all DC columns are NaN in memory
         print("  Checking DC columns are NaN in memory...")
@@ -648,22 +657,60 @@ class TestSolve:
             runtime_df = pd.DataFrame(pf_data["runtime"], columns=runtime_columns)
             runtime_df.insert(0, "scenario", 0)
 
-            # Save to parquet
+            # Save to partitioned parquet
             bus_path = os.path.join(tmpdir, "bus_data.parquet")
             gen_path = os.path.join(tmpdir, "gen_data.parquet")
             branch_path = os.path.join(tmpdir, "branch_data.parquet")
             runtime_path = os.path.join(tmpdir, "runtime_data.parquet")
 
-            bus_df.to_parquet(bus_path, engine="fastparquet", index=False)
-            gen_df.to_parquet(gen_path, engine="fastparquet", index=False)
-            branch_df.to_parquet(branch_path, engine="fastparquet", index=False)
-            runtime_df.to_parquet(runtime_path, engine="fastparquet", index=False)
+            # Add partition column for scenario-based partitioning (n_scenario_per_partition scenarios per partition)
+            bus_df["scenario_partition"] = (
+                bus_df["scenario"] // n_scenario_per_partition
+            ).astype("int64")
+            gen_df["scenario_partition"] = (
+                gen_df["scenario"] // n_scenario_per_partition
+            ).astype("int64")
+            branch_df["scenario_partition"] = (
+                branch_df["scenario"] // n_scenario_per_partition
+            ).astype(
+                "int64",
+            )
+            runtime_df["scenario_partition"] = (
+                runtime_df["scenario"] // n_scenario_per_partition
+            ).astype(
+                "int64",
+            )
+
+            bus_df.to_parquet(
+                bus_path,
+                partition_cols=["scenario_partition"],
+                engine="pyarrow",
+                index=False,
+            )
+            gen_df.to_parquet(
+                gen_path,
+                partition_cols=["scenario_partition"],
+                engine="pyarrow",
+                index=False,
+            )
+            branch_df.to_parquet(
+                branch_path,
+                partition_cols=["scenario_partition"],
+                engine="pyarrow",
+                index=False,
+            )
+            runtime_df.to_parquet(
+                runtime_path,
+                partition_cols=["scenario_partition"],
+                engine="pyarrow",
+                index=False,
+            )
 
             # Read back from parquet
-            bus_df_read = pd.read_parquet(bus_path, engine="fastparquet")
-            gen_df_read = pd.read_parquet(gen_path, engine="fastparquet")
-            branch_df_read = pd.read_parquet(branch_path, engine="fastparquet")
-            runtime_df_read = pd.read_parquet(runtime_path, engine="fastparquet")
+            bus_df_read = pd.read_parquet(bus_path, engine="pyarrow")
+            gen_df_read = pd.read_parquet(gen_path, engine="pyarrow")
+            branch_df_read = pd.read_parquet(branch_path, engine="pyarrow")
+            runtime_df_read = pd.read_parquet(runtime_path, engine="pyarrow")
 
             # Verify NaN values are preserved after round-trip
             print("  Verifying NaN values are preserved after parquet round-trip...")

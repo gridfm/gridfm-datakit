@@ -149,7 +149,7 @@ def _prepare_network_and_scenarios(
         max_iter=args.settings.max_iter,
     )
     scenarios_df = load_scenarios_to_df(scenarios)
-    scenarios_df.to_parquet(file_paths["scenarios"], index=False, engine="fastparquet")
+    scenarios_df.to_parquet(file_paths["scenarios"], index=False, engine="pyarrow")
     if net.buses.shape[0] <= 100:
         plot_load_scenarios_combined(scenarios_df, file_paths["scenarios_plot"])
     else:

@@ -492,6 +492,7 @@ def apply_slack_single_gen(
 
 
 def pf_post_processing(
+    scenario_index: int,
     net: Network,
     res: Dict[str, Any],
     res_dc: Dict[str, Any],
@@ -528,9 +529,10 @@ def pf_post_processing(
         else len(BRANCH_COLUMNS)
     )
     X_branch = np.zeros((n_branches, n_cols))
-    X_branch[:, 0] = list(range(n_branches))
-    X_branch[:, 1] = np.real(net.branches[:, F_BUS])
-    X_branch[:, 2] = np.real(net.branches[:, T_BUS])
+    X_branch[:, 0] = scenario_index
+    X_branch[:, 1] = list(range(n_branches))
+    X_branch[:, 2] = np.real(net.branches[:, F_BUS])
+    X_branch[:, 3] = np.real(net.branches[:, T_BUS])
 
     # pf, qf, pt, qt
     if res["solution"]["pf"]:
@@ -544,55 +546,55 @@ def pf_post_processing(
             "Number of branches in solution should match number of branches in network"
         )
 
-    X_branch[net.idx_branches_in_service, 3] = np.array(
+    X_branch[net.idx_branches_in_service, 4] = np.array(
         [
             res["solution"]["branch"][str(i + 1)]["pf"] * net.baseMVA
             for i in net.idx_branches_in_service
         ],
     )
-    X_branch[net.idx_branches_in_service, 4] = np.array(
+    X_branch[net.idx_branches_in_service, 5] = np.array(
         [
             res["solution"]["branch"][str(i + 1)]["qf"] * net.baseMVA
             for i in net.idx_branches_in_service
         ],
     )
-    X_branch[net.idx_branches_in_service, 5] = np.array(
+    X_branch[net.idx_branches_in_service, 6] = np.array(
         [
             res["solution"]["branch"][str(i + 1)]["pt"] * net.baseMVA
             for i in net.idx_branches_in_service
         ],
     )
-    X_branch[net.idx_branches_in_service, 6] = np.array(
+    X_branch[net.idx_branches_in_service, 7] = np.array(
         [
             res["solution"]["branch"][str(i + 1)]["qt"] * net.baseMVA
             for i in net.idx_branches_in_service
         ],
     )
 
-    X_branch[:, 7] = net.branches[:, BR_R]
-    X_branch[:, 8] = net.branches[:, BR_X]
-    X_branch[:, 9] = net.branches[:, BR_B]
+    X_branch[:, 8] = net.branches[:, BR_R]
+    X_branch[:, 9] = net.branches[:, BR_X]
+    X_branch[:, 10] = net.branches[:, BR_B]
 
     # admittances
     Ytt, Yff, Yft, Ytf = branch_vectors(net.branches, net.branches.shape[0])
-    X_branch[:, 10] = np.real(Yff)
-    X_branch[:, 11] = np.imag(Yff)
-    X_branch[:, 12] = np.real(Yft)
-    X_branch[:, 13] = np.imag(Yft)
-    X_branch[:, 14] = np.real(Ytf)
-    X_branch[:, 15] = np.imag(Ytf)
-    X_branch[:, 16] = np.real(Ytt)
-    X_branch[:, 17] = np.imag(Ytt)
+    X_branch[:, 11] = np.real(Yff)
+    X_branch[:, 12] = np.imag(Yff)
+    X_branch[:, 13] = np.real(Yft)
+    X_branch[:, 14] = np.imag(Yft)
+    X_branch[:, 15] = np.real(Ytf)
+    X_branch[:, 16] = np.imag(Ytf)
+    X_branch[:, 17] = np.real(Ytt)
+    X_branch[:, 18] = np.imag(Ytt)
 
-    X_branch[:, 18] = net.branches[:, TAP]
+    X_branch[:, 19] = net.branches[:, TAP]
     # assign 1 to tap = 0
-    X_branch[net.branches[:, TAP] == 0, 18] = 1
+    X_branch[net.branches[:, TAP] == 0, 19] = 1
 
-    X_branch[:, 19] = net.branches[:, SHIFT]
-    X_branch[:, 20] = net.branches[:, ANGMIN]
-    X_branch[:, 21] = net.branches[:, ANGMAX]
-    X_branch[:, 22] = net.branches[:, RATE_A]
-    X_branch[:, 23] = net.branches[:, BR_STATUS]
+    X_branch[:, 20] = net.branches[:, SHIFT]
+    X_branch[:, 21] = net.branches[:, ANGMIN]
+    X_branch[:, 22] = net.branches[:, ANGMAX]
+    X_branch[:, 23] = net.branches[:, RATE_A]
+    X_branch[:, 24] = net.branches[:, BR_STATUS]
 
     if include_dc_res:
         if res_dc is not None:
@@ -608,11 +610,11 @@ def pf_post_processing(
                     for i in net.idx_branches_in_service
                 ],
             )
-            X_branch[net.idx_branches_in_service, 24] = pf_dc
-            X_branch[net.idx_branches_in_service, 25] = pt_dc
+            X_branch[net.idx_branches_in_service, 25] = pf_dc
+            X_branch[net.idx_branches_in_service, 26] = pt_dc
         else:
-            X_branch[net.idx_branches_in_service, 24] = np.nan
             X_branch[net.idx_branches_in_service, 25] = np.nan
+            X_branch[net.idx_branches_in_service, 26] = np.nan
 
     # --- Bus data ---
     n_buses = net.buses.shape[0]
@@ -622,9 +624,10 @@ def pf_post_processing(
     X_bus = np.zeros((n_buses, n_cols))
 
     # --- Loads ---
-    X_bus[:, 0] = net.buses[:, BUS_I]  # bus
-    X_bus[:, 1] = net.buses[:, PD]
-    X_bus[:, 2] = net.buses[:, QD]
+    X_bus[:, 0] = scenario_index
+    X_bus[:, 1] = net.buses[:, BUS_I]  # bus
+    X_bus[:, 2] = net.buses[:, PD]
+    X_bus[:, 3] = net.buses[:, QD]
 
     # --- Generator injections
     assert len(res["solution"]["gen"]) == len(net.idx_gens_in_service), (
@@ -664,19 +667,19 @@ def pf_post_processing(
             Pg_bus_dc = np.bincount(gen_bus, weights=pg_gen_dc, minlength=n_buses)
             assert np.all(Pg_bus_dc[net.buses[:, BUS_TYPE] == PQ] == 0)
 
-    X_bus[:, 3] = Pg_bus
-    X_bus[:, 4] = Qg_bus
+    X_bus[:, 4] = Pg_bus
+    X_bus[:, 5] = Qg_bus
 
     # Voltage
     assert set([int(k) for k in res["solution"]["bus"].keys()]) == set(
         net.reverse_bus_index_mapping.values(),
     ), "Buses in solution should match buses in network"
 
-    X_bus[:, 5] = [
+    X_bus[:, 6] = [
         res["solution"]["bus"][str(net.reverse_bus_index_mapping[i])]["vm"]
         for i in range(n_buses)
     ]
-    X_bus[:, 6] = np.rad2deg(
+    X_bus[:, 7] = np.rad2deg(
         [
             res["solution"]["bus"][str(net.reverse_bus_index_mapping[i])]["va"]
             for i in range(n_buses)
@@ -687,17 +690,17 @@ def pf_post_processing(
     assert np.all(np.isin(net.buses[:, BUS_TYPE], [PQ, PV, REF])), (
         "Bus type should be PQ, PV, or REF, no disconnected buses (4)"
     )
-    X_bus[np.arange(n_buses), 7 + net.buses[:, BUS_TYPE].astype(int) - 1] = (
+    X_bus[np.arange(n_buses), 8 + net.buses[:, BUS_TYPE].astype(int) - 1] = (
         1  # because type is 1, 2, 3, not 0, 1, 2
     )
 
     # base_kv, min_vm_pu, max_vm_pu
-    X_bus[:, 10] = net.buses[:, BASE_KV]
-    X_bus[:, 11] = net.buses[:, VMIN]
-    X_bus[:, 12] = net.buses[:, VMAX]
+    X_bus[:, 11] = net.buses[:, BASE_KV]
+    X_bus[:, 12] = net.buses[:, VMIN]
+    X_bus[:, 13] = net.buses[:, VMAX]
 
-    X_bus[:, 13] = net.buses[:, GS] / net.baseMVA
-    X_bus[:, 14] = net.buses[:, BS] / net.baseMVA
+    X_bus[:, 14] = net.buses[:, GS] / net.baseMVA
+    X_bus[:, 15] = net.buses[:, BS] / net.baseMVA
 
     if include_dc_res:
         if res_dc is not None:
@@ -709,11 +712,11 @@ def pf_post_processing(
                     for i in range(n_buses)
                 ],
             )
-            X_bus[:, 15] = va
-            X_bus[:, 16] = Pg_bus_dc
+            X_bus[:, 16] = va
+            X_bus[:, 17] = Pg_bus_dc
         else:
-            X_bus[:, 15] = np.nan
             X_bus[:, 16] = np.nan
+            X_bus[:, 17] = np.nan
 
     # --- Generator data ---
     assert np.all(net.gencosts[:, NCOST] == 3), "NCOST should be 3"
@@ -723,29 +726,29 @@ def pf_post_processing(
     )
 
     X_gen = np.zeros((n_gens, n_cols))
-
-    X_gen[:, 0] = list(range(n_gens))
-    X_gen[:, 1] = net.gens[:, GEN_BUS]
-    X_gen[net.idx_gens_in_service, 2] = pg_gen  # 0 if not in service
-    X_gen[net.idx_gens_in_service, 3] = qg_gen  # 0 if not in service
-    X_gen[:, 4] = net.gens[:, PMIN]
-    X_gen[:, 5] = net.gens[:, PMAX]
-    X_gen[:, 6] = net.gens[:, QMIN]
-    X_gen[:, 7] = net.gens[:, QMAX]
-    X_gen[:, 8] = net.gencosts[:, COST]
-    X_gen[:, 9] = net.gencosts[:, COST + 1]
-    X_gen[:, 10] = net.gencosts[:, COST + 2]
-    X_gen[net.idx_gens_in_service, 11] = 1
+    X_gen[:, 0] = scenario_index
+    X_gen[:, 1] = list(range(n_gens))
+    X_gen[:, 2] = net.gens[:, GEN_BUS]
+    X_gen[net.idx_gens_in_service, 3] = pg_gen  # 0 if not in service
+    X_gen[net.idx_gens_in_service, 4] = qg_gen  # 0 if not in service
+    X_gen[:, 5] = net.gens[:, PMIN]
+    X_gen[:, 6] = net.gens[:, PMAX]
+    X_gen[:, 7] = net.gens[:, QMIN]
+    X_gen[:, 8] = net.gens[:, QMAX]
+    X_gen[:, 9] = net.gencosts[:, COST]
+    X_gen[:, 10] = net.gencosts[:, COST + 1]
+    X_gen[:, 11] = net.gencosts[:, COST + 2]
+    X_gen[net.idx_gens_in_service, 12] = 1
 
     # slack gen (can be any generator connected to the ref node)
     slack_gen_idx = np.where(net.gens[:, GEN_BUS] == net.ref_bus_idx)[0]
-    X_gen[slack_gen_idx, 12] = 1
+    X_gen[slack_gen_idx, 13] = 1
 
     if include_dc_res:
         if res_dc is not None:
-            X_gen[net.idx_gens_in_service, 13] = pg_gen_dc
+            X_gen[net.idx_gens_in_service, 14] = pg_gen_dc
         else:
-            X_gen[net.idx_gens_in_service, 13] = np.nan
+            X_gen[net.idx_gens_in_service, 14] = np.nan
 
     # --- Y-bus ---
     Y_bus, Yf, Yt = makeYbus(net.baseMVA, net.buses, net.branches)
@@ -759,7 +762,11 @@ def pf_post_processing(
 
     edge_index = np.column_stack((i, j))
     edge_attr = np.stack((G, B)).T
-    Y_bus = np.column_stack((edge_index, edge_attr))
+    Y_bus = np.zeros(
+        (edge_index.shape[0], edge_attr.shape[1] + edge_index.shape[1] + 1),
+    )
+    Y_bus[:, 0] = scenario_index
+    Y_bus[:, 1:] = np.column_stack((edge_index, edge_attr))
 
     # ---- runtime data ----
     n_cols = (
@@ -768,12 +775,13 @@ def pf_post_processing(
         else len(RUNTIME_COLUMNS)
     )
     X_runtime = np.zeros((1, n_cols))
-    X_runtime[0, 0] = res["solve_time"]
+    X_runtime[0, 0] = scenario_index
+    X_runtime[0, 1] = res["solve_time"]
     if include_dc_res:
         if res_dc is not None:
-            X_runtime[0, 1] = res_dc["solve_time"]
+            X_runtime[0, 2] = res_dc["solve_time"]
         else:
-            X_runtime[0, 1] = np.nan
+            X_runtime[0, 2] = np.nan
     return {
         "bus": X_bus,
         "gen": X_gen,
@@ -874,7 +882,13 @@ def process_scenario_pf_mode(
             continue
 
         # Append processed power flow data
-        pf_data = pf_post_processing(perturbation, res, res_dcpf, include_dc_res)
+        pf_data = pf_post_processing(
+            scenario_index,
+            perturbation,
+            res,
+            res_dcpf,
+            include_dc_res,
+        )
         local_processed_data.append(
             (
                 pf_data["bus"],
@@ -1052,7 +1066,13 @@ def process_scenario_opf_mode(
             continue
 
         # Append processed power flow data
-        pf_data = pf_post_processing(perturbation, res, res_dcopf, include_dc_res)
+        pf_data = pf_post_processing(
+            scenario_index,
+            perturbation,
+            res,
+            res_dcopf,
+            include_dc_res,
+        )
         local_processed_data.append(
             (
                 pf_data["bus"],

@@ -10,11 +10,14 @@ from gridfm_datakit.utils.power_balance import (
     compute_branch_powers_vectorized,
     compute_bus_balance,
 )
+from gridfm_datakit.utils.utils import get_num_scenarios
+from gridfm_datakit.utils.utils import read_partitions, n_scenario_per_partition
 
 
 def compute_stats_from_data(
     data_dir: str,
     sn_mva: float,
+    n_partitions: int = 0,
 ) -> Dict[str, np.ndarray]:
     """Compute statistics from parquet data files (vectorized).
 
@@ -24,6 +27,7 @@ def compute_stats_from_data(
     Args:
         data_dir: Directory containing bus_data.parquet, branch_data.parquet, gen_data.parquet, runtime_data.parquet
         sn_mva: Base MVA used to scale power quantities
+        n_partitions: Number of partitions to compute stats for (0 for all partitions)
 
     Returns:
         Dictionary with the following keys and corresponding numpy arrays:
@@ -47,23 +51,38 @@ def compute_stats_from_data(
         Power balance errors are computed as the mean absolute difference between net injections
         (including shunt contributions) and aggregated branch flows at each bus.
     """
-    # --- Load ---
-    bus_data = pd.read_parquet(
-        os.path.join(data_dir, "bus_data.parquet"),
-        engine="fastparquet",
-    )
-    branch_data = pd.read_parquet(
-        os.path.join(data_dir, "branch_data.parquet"),
-        engine="fastparquet",
-    )
-    gen_data = pd.read_parquet(
-        os.path.join(data_dir, "gen_data.parquet"),
-        engine="fastparquet",
-    )
-    runtime_data = pd.read_parquet(
-        os.path.join(data_dir, "runtime_data.parquet"),
-        engine="fastparquet",
-    )
+    # --- Load from partitioned parquet ---
+    # Get total number of scenarios efficiently
+    total_scenarios = get_num_scenarios(data_dir)
+
+    total_partitions = (
+        total_scenarios + n_scenario_per_partition - 1
+    ) // n_scenario_per_partition
+
+    if n_partitions > 0:
+        sampled_partitions = sorted(
+            np.random.choice(
+                total_partitions,
+                size=min(n_partitions, total_partitions),
+                replace=False,
+            ),
+        )
+        print(
+            f"Computing stats for {len(sampled_partitions)} partitions out of {total_partitions}",
+        )
+    else:
+        sampled_partitions = list(range(total_partitions))
+
+    # Read filtered data from partitioned parquet using partition filter
+    bus_file = os.path.join(data_dir, "bus_data.parquet")
+    branch_file = os.path.join(data_dir, "branch_data.parquet")
+    gen_file = os.path.join(data_dir, "gen_data.parquet")
+    runtime_file = os.path.join(data_dir, "runtime_data.parquet")
+
+    bus_data = read_partitions(bus_file, sampled_partitions)
+    branch_data = read_partitions(branch_file, sampled_partitions)
+    gen_data = read_partitions(gen_file, sampled_partitions)
+    runtime_data = read_partitions(runtime_file, sampled_partitions)
 
     dc = True if "p_mw_dc" in gen_data.columns else False
     # The canonical scenario ordering (to match the original function's behavior)
@@ -155,9 +174,13 @@ def compute_stats_from_data(
         ].reindex(scenarios)
 
     # ---4) Runtime data ---
-    runtime_data_ac = runtime_data["ac"].reindex(scenarios) * 1000.0
+    runtime_data_ac = (
+        runtime_data.set_index("scenario")["ac"].reindex(scenarios) * 1000.0
+    )
     if dc:
-        runtime_data_dc = runtime_data["dc"].reindex(scenarios) * 1000.0
+        runtime_data_dc = (
+            runtime_data.set_index("scenario")["dc"].reindex(scenarios) * 1000.0
+        )
 
     # --- Pack results (preserve original array shapes/order) ---
     result = {
@@ -184,7 +207,7 @@ def compute_stats_from_data(
     return result
 
 
-def plot_stats(data_dir: str, sn_mva: float) -> None:
+def plot_stats(data_dir: str, sn_mva: float, n_partitions: int = 0) -> None:
     """Generate and save statistics plots using matplotlib.
 
     Creates a multi-panel histogram plot showing distributions of key metrics across all scenarios.
@@ -194,6 +217,7 @@ def plot_stats(data_dir: str, sn_mva: float) -> None:
         data_dir: Directory containing data files (bus_data.parquet, branch_data.parquet, gen_data.parquet, runtime_data.parquet)
                   and where the plot will be saved
         sn_mva: Base MVA used to scale power quantities
+        n_partitions: Number of partitions to compute stats for (0 for all partitions)
 
     The generated plot contains histograms (with log scale on y-axis) for:
     - Number of generators per scenario
@@ -206,7 +230,7 @@ def plot_stats(data_dir: str, sn_mva: float) -> None:
     - Runtime (AC solver execution time in milliseconds)
     - (If DC data available) DC active power balance error, bus index with max DC PBE, and DC runtime
     """
-    stats = compute_stats_from_data(data_dir, sn_mva=sn_mva)
+    stats = compute_stats_from_data(data_dir, sn_mva=sn_mva, n_partitions=n_partitions)
     filename = os.path.join(data_dir, "stats_plot.png")
 
     # Save per-scenario statistics to a parquet file with one row per scenario
@@ -236,7 +260,16 @@ def plot_stats(data_dir: str, sn_mva: float) -> None:
         mean_mean_p_balance_error_dc = np.nanmean(stats["p_balance_error_dc_mean"])
 
     df_stats = pd.DataFrame(per_scenario)
-    df_stats.to_parquet(os.path.join(data_dir, "stats.parquet"), index=False)
+    # Add partition column for scenario-based partitioning (n_scenario_per_partition scenarios per partition)
+    df_stats["scenario_partition"] = (
+        df_stats["scenario"] // n_scenario_per_partition
+    ).astype("int64")
+    df_stats.to_parquet(
+        os.path.join(data_dir, "stats.parquet"),
+        partition_cols=["scenario_partition"],
+        engine="pyarrow",
+        index=False,
+    )
 
     # Titles and data pairs
     plots = [
@@ -342,6 +375,7 @@ def plot_feature_distributions(
     output_dir: str,
     sn_mva: float,
     buses: List[int] = None,
+    n_partitions: int = 0,
 ) -> None:
     """Create and save violin plots showing the distribution of each feature across all buses.
 
@@ -354,6 +388,7 @@ def plot_feature_distributions(
         output_dir: Directory where plots will be saved as `distribution_{feature_name}.png`.
         sn_mva: Base MVA used to normalize power-related columns (Pd, Qd, Pg, Qg) by dividing by this value.
         buses: List of bus indices to plot. If None, randomly samples 30 buses (or all buses if fewer than 30).
+        n_partitions: Number of partitions to plot (0 for all partitions)
 
     Each generated plot displays:
     - Violin plots showing the probability density of feature values per bus
@@ -365,7 +400,29 @@ def plot_feature_distributions(
     import matplotlib.pyplot as plt
     from gridfm_datakit.utils.column_names import BUS_COLUMNS, DC_BUS_COLUMNS
 
-    node_data = pd.read_parquet(node_file, engine="fastparquet")
+    # Get total number of scenarios and partitions
+    data_dir = os.path.dirname(node_file)
+    total_scenarios = get_num_scenarios(data_dir)
+    total_partitions = (
+        total_scenarios + n_scenario_per_partition - 1
+    ) // n_scenario_per_partition
+
+    if n_partitions > 0:
+        sampled_partitions = sorted(
+            np.random.choice(
+                total_partitions,
+                size=min(n_partitions, total_partitions),
+                replace=False,
+            ),
+        )
+        print(
+            f"Plotting for {len(sampled_partitions)} partitions out of {total_partitions}",
+        )
+    else:
+        sampled_partitions = list(range(total_partitions))
+
+    # Read filtered data from partitioned parquet using partition filter
+    node_data = read_partitions(node_file, sampled_partitions)
     os.makedirs(output_dir, exist_ok=True)
 
     if not buses:
@@ -390,10 +447,6 @@ def plot_feature_distributions(
         feature_cols = BUS_COLUMNS + DC_BUS_COLUMNS
     else:
         feature_cols = BUS_COLUMNS
-
-    assert node_data.shape[1] == len(feature_cols) + 1, (
-        "Node data has the wrong number of columns"
-    )
 
     for feature_name in feature_cols:
         fig, ax = plt.subplots(figsize=(15, 6))

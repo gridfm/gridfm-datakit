@@ -7,6 +7,7 @@ to provide comprehensive validation of generated power flow data.
 
 import pandas as pd
 import numpy as np
+import os
 from typing import Dict, Iterable
 from gridfm_datakit.utils.column_names import (
     BUS_COLUMNS,
@@ -23,20 +24,69 @@ from gridfm_datakit.utils.power_balance import (
     compute_branch_powers_vectorized,
     compute_bus_balance,
 )
+from gridfm_datakit.utils.utils import get_num_scenarios
+from gridfm_datakit.utils.utils import read_partitions, n_scenario_per_partition
+
+
+def _validate_partition_structure(
+    file_paths: Dict[str, str],
+    total_scenarios: int,
+) -> None:
+    """
+    for each partitioned parquet directory (n_scenario_per_partition scenarios/partition),
+    check that:
+      - All partitions except the last contain 100 unique scenarios.
+      - Last partition contains (total_scenarios % 100) unique scenarios (unless perfectly divided, then 100).
+      - For each partition, minimum and maximum scenario numbers are as expected.
+      - The entire span covers scenarios from 0 to total_scenarios-1.
+      - Prints results for each check.
+    """
+    print("Validating partition structure (easy checks)...")
+    partitions = (
+        total_scenarios + n_scenario_per_partition - 1
+    ) // n_scenario_per_partition  # ceiling division
+
+    for k in range(partitions):
+        expected_first = k * n_scenario_per_partition
+        expected_last = min((k + 1) * n_scenario_per_partition, total_scenarios) - 1
+        expect_count = expected_last - expected_first + 1
+
+        # Construct partition path
+        partition_path = os.path.join(file_paths["bus_data"], f"scenario_partition={k}")
+
+        # Read all parquet files in this partition folder
+        part = pd.read_parquet(partition_path, columns=["scenario"], engine="pyarrow")[
+            "scenario"
+        ]
+        unique_scenarios = part.unique()
+        min_scenario, max_scenario = np.min(unique_scenarios), np.max(unique_scenarios)
+        if len(unique_scenarios) != expect_count:
+            raise AssertionError(
+                f"Partition {k}: found {len(unique_scenarios)} scenarios, expected {expect_count}",
+            )
+
+        if min_scenario != expected_first or max_scenario != expected_last:
+            raise AssertionError(
+                f"Partition {k}: scenario range is {min_scenario}-{max_scenario}, expected {expected_first}-{expected_last}",
+            )
+
+        print(
+            f"  ✓ Partition {k:>2}: {len(unique_scenarios)} scenarios ({min_scenario}-{max_scenario}) OK",
+        )
 
 
 def validate_generated_data(
     file_paths: Dict[str, str],
     mode: str,
     sn_mva: float,
-    n_scenarios: int = 0,
+    n_partitions: int = 0,
 ) -> bool:
     """Run all validation tests on the generated data.
 
     Args:
         file_paths: Dictionary containing paths to data files (bus_data, branch_data, gen_data, y_bus_data).
         mode: Operating mode ("opf" or "pf").
-        n_scenarios: Number of scenarios to sample for validation (0 for all scenarios).
+        n_partitions: Number of partitions to sample for validation (0 for all partitions).
         sn_mva: Base MVA used to scale power quantities
 
     Returns:
@@ -45,12 +95,44 @@ def validate_generated_data(
     Raises:
         AssertionError: If any validation fails.
     """
-    # Load the generated data
-    bus_data = pd.read_parquet(file_paths["bus_data"], engine="fastparquet")
-    branch_data = pd.read_parquet(file_paths["branch_data"], engine="fastparquet")
-    gen_data = pd.read_parquet(file_paths["gen_data"], engine="fastparquet")
-    y_bus_data = pd.read_parquet(file_paths["y_bus_data"], engine="fastparquet")
-    runtime_data = pd.read_parquet(file_paths["runtime_data"], engine="fastparquet")
+    # Get total scenarios from metadata
+    data_dir = os.path.dirname(file_paths["bus_data"])
+    total_scenarios = get_num_scenarios(data_dir)
+
+    # Step 1: Validate partition structure on ALL partitions
+    # print("Step 1: Validating partition structure on all partitions...")
+    # _validate_partition_structure(file_paths, total_scenarios)
+
+    # Calculate number of partitions (n_scenario_per_partition scenarios per partition)
+    num_partitions = (
+        total_scenarios + n_scenario_per_partition - 1
+    ) // n_scenario_per_partition
+
+    # Sample partitions
+    if n_partitions > 0:
+        n_partitions_to_sample = n_partitions
+        sampled_partitions = sorted(
+            np.random.choice(
+                num_partitions,
+                size=min(n_partitions_to_sample, num_partitions),
+                replace=False,
+            ),
+        )
+        max_scenarios_to_validate = len(sampled_partitions) * n_scenario_per_partition
+        print(
+            f"Step 2: Running core validations on {len(sampled_partitions)} sampled partitions (up to {max_scenarios_to_validate} scenarios) out of {num_partitions} total",
+        )
+    else:
+        sampled_partitions = list(range(num_partitions))
+        print(
+            f"Step 2: Running core validations on all {num_partitions} partitions ({total_scenarios} total scenarios)",
+        )
+
+    bus_data = read_partitions(file_paths["bus_data"], sampled_partitions)
+    branch_data = read_partitions(file_paths["branch_data"], sampled_partitions)
+    gen_data = read_partitions(file_paths["gen_data"], sampled_partitions)
+    y_bus_data = read_partitions(file_paths["y_bus_data"], sampled_partitions)
+    runtime_data = read_partitions(file_paths["runtime_data"], sampled_partitions)
 
     generated_data = {
         "bus_data": bus_data,
@@ -62,12 +144,12 @@ def validate_generated_data(
         "file_paths": file_paths,
     }
 
+    # Run core validations on sampled partitions
     try:
         validate_scenario_indexing_consistency(generated_data)
     except Exception as e:
         raise AssertionError(f"Scenario indexing consistency validation failed: {e}")
 
-    # Run Data Integrity Tests
     try:
         validate_bus_indexing_consistency(generated_data)
     except Exception as e:
@@ -78,38 +160,10 @@ def validate_generated_data(
     except Exception as e:
         raise AssertionError(f"Data completeness validation failed: {e}")
 
-        # DC columns consistency: if any DC column has NaN, all DC columns must be NaN
     try:
         validate_dc_columns_consistency(generated_data)
     except Exception as e:
         raise AssertionError(f"DC columns consistency validation failed: {e}")
-
-    # Sample scenarios if n_scenarios is provided to avoid too long validation times
-    if n_scenarios > 0:
-        max_scenarios = len(generated_data["bus_data"]["scenario"].unique())
-        sampled_scenarios = np.random.choice(
-            generated_data["bus_data"]["scenario"].unique(),
-            size=min(n_scenarios, max_scenarios),
-            replace=False,
-        )
-        generated_data["bus_data"] = generated_data["bus_data"][
-            generated_data["bus_data"]["scenario"].isin(sampled_scenarios)
-        ]
-        generated_data["branch_data"] = generated_data["branch_data"][
-            generated_data["branch_data"]["scenario"].isin(sampled_scenarios)
-        ]
-        generated_data["gen_data"] = generated_data["gen_data"][
-            generated_data["gen_data"]["scenario"].isin(sampled_scenarios)
-        ]
-        generated_data["y_bus_data"] = generated_data["y_bus_data"][
-            generated_data["y_bus_data"]["scenario"].isin(sampled_scenarios)
-        ]
-        generated_data["runtime_data"] = generated_data["runtime_data"][
-            generated_data["runtime_data"]["scenario"].isin(sampled_scenarios)
-        ]
-        print(
-            f"Sampled {len(sampled_scenarios)} scenarios for validation out of {max_scenarios}",
-        )
 
     # Run Y-Bus Consistency Tests
     try:
@@ -395,69 +449,54 @@ def validate_branch_loading_opf_mode(generated_data: Dict[str, pd.DataFrame]) ->
     branch_data = generated_data["branch_data"]
 
     scenarios = bus_data["scenario"].unique()
+
+    # Filter to active, rated branches
     rated_branches = branch_data[
         (branch_data["br_status"] == 1) & (branch_data["rate_a"] > 0)
-    ]
+    ].copy()
 
     mode_label = "opf" if generated_data["mode"] == "opf" else "pf"
     print(
         f"    Branch loading limits ({mode_label} mode): validating {len(rated_branches)} rated branches across {len(scenarios)} scenarios",
     )
 
-    # Track binding constraints and overloads
-    binding_loadings = []
-    overloaded_branches = []
+    # Vectorized computation of loading
+    # Compute apparent power: S = sqrt(P^2 + Q^2)
+    s_from = np.sqrt(
+        rated_branches["pf"].to_numpy() ** 2 + rated_branches["qf"].to_numpy() ** 2,
+    )
+    s_to = np.sqrt(
+        rated_branches["pt"].to_numpy() ** 2 + rated_branches["qt"].to_numpy() ** 2,
+    )
+    rate_a = rated_branches["rate_a"].to_numpy()
 
-    for scenario in scenarios:
-        branch_scenario = branch_data[branch_data["scenario"] == scenario]
-        active_branches = branch_scenario[
-            (branch_scenario["br_status"] == 1) & (branch_scenario["rate_a"] > 0)
-        ]
+    # Loading = max(S_from, S_to) / rate_a
+    loading = np.maximum(s_from, s_to) / rate_a
 
-        if active_branches.empty:
-            continue
+    # Identify binding and overloaded branches
+    binding_mask = loading >= 0.99
+    overload_mask = loading > 1.01
 
-        for _, branch in active_branches.iterrows():
-            from_bus = int(branch["from_bus"])
-            to_bus = int(branch["to_bus"])
-            rate_a = branch["rate_a"]
+    binding_loadings = loading[binding_mask]
+    n_binding = len(binding_loadings)
+    n_overloads = overload_mask.sum()
 
-            # Get power flow values from branch data
-            pf = branch["pf"]  # Real power from
-            qf = branch["qf"]  # Reactive power from
-            pt = branch["pt"]  # Real power to
-            qt = branch["qt"]  # Reactive power to
-
-            # Compute apparent power squared: S^2 = P^2 + Q^2
-            s_from_sq = pf**2 + qf**2
-            s_to_sq = pt**2 + qt**2
-
-            # Loading is the ratio of apparent power to rate_a
-            # PowerModels constraint: p[f_idx]^2 + q[f_idx]^2 <= rate_a^2
-            loading_f = np.sqrt(s_from_sq) / rate_a if rate_a > 0 else 0
-            loading_t = np.sqrt(s_to_sq) / rate_a if rate_a > 0 else 0
-            loading = max(loading_f, loading_t)
-
-            # Track if loading is binding (within 1% of limit)
-            if loading >= 0.99:
-                binding_loadings.append(loading)
-
-            # Track overloads (loading > 1.0)
-            if loading > 1.01:
-                overloaded_branches.append((scenario, from_bus, to_bus, loading))
-
-            # Only assert loading limits in OPF mode
-            if generated_data["mode"] == "opf":
-                assert loading <= 1.01, (
-                    f"Scenario {scenario}, Branch {from_bus}->{to_bus}: "
-                    f"Loading {loading:.3f} exceeds 1.01 in OPF mode"
-                )
+    # In OPF mode, assert no overloads
+    if generated_data["mode"] == "opf":
+        if n_overloads > 0:
+            overloaded_idx = np.where(overload_mask)[0]
+            overload_info = rated_branches.iloc[overloaded_idx[0]]
+            raise AssertionError(
+                f"Scenario {int(overload_info['scenario'])}, "
+                f"Branch {int(overload_info['from_bus'])}->{int(overload_info['to_bus'])}: "
+                f"Loading {loading[overloaded_idx[0]]:.3f} exceeds 1.01 in OPF mode",
+            )
 
     print(
-        f"    Binding loading constraints (>= 0.99): {len(binding_loadings)} branches",
+        f"    Binding loading constraints (>= 0.99): {n_binding} branches",
     )
     if generated_data["mode"] == "pf":
-        print(f"    Overloaded branches (> 1.0): {len(overloaded_branches)} branches")
+        print(f"    Overloaded branches (> 1.0): {n_overloads} branches")
         print("    Branch loading limits (PF mode): statistics computed")
     else:
         print("    Branch loading limits (OPF mode): OK")
@@ -825,29 +864,34 @@ def validate_non_slack_pg_consistency(generated_data: Dict[str, pd.DataFrame]) -
         return
 
     scenarios = bus_data["scenario"].unique()
-    non_slack_buses = bus_data[bus_data["REF"] == 0]
+
+    # Filter to non-slack buses
+    non_slack_buses = bus_data[bus_data["REF"] == 0].copy()
     print(
         f"    Non-slack Pg consistency: validating {len(non_slack_buses)} non-slack bus entries across {len(scenarios)} scenarios",
     )
 
-    for scenario in scenarios:
-        bus_scenario = bus_data[bus_data["scenario"] == scenario]
-        non_slack_buses_scenario = bus_scenario[bus_scenario["REF"] == 0]
+    # Vectorized comparison: Pg vs Pg_dc for non-slack buses
 
-        for _, bus_row in non_slack_buses_scenario.iterrows():
-            bus_idx = int(bus_row["bus"])
-            pg = bus_row["Pg"]
-            pg_dc = bus_row["Pg_dc"]
+    pg = non_slack_buses["Pg"].to_numpy()
+    pg_dc = non_slack_buses["Pg_dc"].to_numpy()
 
-            # Allow NaN Pg_dc rows to pass silently (e.g., if DC solution not available)
-            if pd.isna(pg_dc):
-                continue
+    # Create mask for valid comparisons (exclude NaN Pg_dc)
+    valid_mask = ~np.isnan(pg_dc)
 
-            tolerance = 1e-6
-            assert abs(pg - pg_dc) < tolerance, (
-                f"Scenario {scenario}, Bus {bus_idx}: Pg and Pg_dc mismatch (dispatch should not change in PF mode), "
-                f"Pg: {pg}, Pg_dc: {pg_dc}"
-            )
+    tolerance = 1e-6
+    mismatch_mask = np.abs(pg - pg_dc) >= tolerance
+    violations_mask = valid_mask & mismatch_mask
+
+    if violations_mask.any():
+        # Get first violation for error message
+        violation_idx = np.where(violations_mask)[0][0]
+        violation_row = non_slack_buses.iloc[violation_idx]
+        raise AssertionError(
+            f"Scenario {int(violation_row['scenario'])}, Bus {int(violation_row['bus'])}: "
+            f"Pg and Pg_dc mismatch (dispatch should not change in PF mode), "
+            f"Pg: {violation_row['Pg']}, Pg_dc: {violation_row['Pg_dc']}",
+        )
 
     print("    Non-slack Pg consistency: OK")
 
