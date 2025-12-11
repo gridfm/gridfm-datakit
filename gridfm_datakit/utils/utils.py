@@ -28,7 +28,17 @@ def get_num_scenarios(data_dir: str) -> int:
         with open(n_scenarios_file, "r") as f:
             return int(f.read().strip())
 
-    raise ValueError(f"No n_scenarios metadata file found in {data_dir}")
+    else:
+        print(
+            f"No n_scenarios metadata file found in {data_dir}, using bus_data.parquet to get total number of scenarios",
+        )
+        return int(
+            pd.read_parquet(
+                os.path.join(data_dir, "bus_data.parquet"),
+                engine="pyarrow",
+            )["scenario"].max()
+            + 1,
+        )
 
 
 def write_ram_usage_distributed(tqdm_log: TextIO) -> None:

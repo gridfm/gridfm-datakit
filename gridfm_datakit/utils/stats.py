@@ -25,7 +25,7 @@ def compute_stats_from_data(
     in the parquet files and returns per-scenario metrics as well as global statistics.
 
     Args:
-        data_dir: Directory containing bus_data.parquet, branch_data.parquet, gen_data.parquet, runtime_data.parquet
+        data_dir: Directory containing bus_data.parquet, branch_data.parquet, gen_data.parquet, and optionally runtime_data.parquet
         sn_mva: Base MVA used to scale power quantities
         n_partitions: Number of partitions to compute stats for (0 for all partitions)
 
@@ -41,11 +41,11 @@ def compute_stats_from_data(
         - **p_balance_error_ac_mean**: Array of mean active power balance error per scenario (float array)
         - **q_balance_error_ac_max**: Array of maximum reactive power balance error per scenario (float array)
         - **q_balance_error_ac_mean**: Array of mean reactive power balance error per scenario (float array)
-        - **runtime_data_ac_ms**: Array of AC solver runtime per scenario in milliseconds (float array)
+        - **runtime_data_ac_ms**: (if runtime data available) Array of AC solver runtime per scenario in milliseconds (float array)
         - **p_balance_error_dc_max**: (if DC data available) Array of maximum DC active power balance error per scenario (float array)
         - **p_balance_error_dc_mean**: (if DC data available) Array of mean DC active power balance error per scenario (float array)
         - **bus_idx_max_p_balance_error_dc_per_scenario**: (if DC data available) Array of bus index with max DC PBE per scenario (int array)
-        - **runtime_data_dc_ms**: (if DC data available) Array of DC solver runtime per scenario in milliseconds (float array)
+        - **runtime_data_dc_ms**: (if DC and runtime data available) Array of DC solver runtime per scenario in milliseconds (float array)
 
         Branch loading is computed as max(||S_from||/rate_a, ||S_to||/rate_a) where ||S|| = sqrt(P² + Q²).
         Power balance errors are computed as the mean absolute difference between net injections
@@ -82,7 +82,13 @@ def compute_stats_from_data(
     bus_data = read_partitions(bus_file, sampled_partitions)
     branch_data = read_partitions(branch_file, sampled_partitions)
     gen_data = read_partitions(gen_file, sampled_partitions)
-    runtime_data = read_partitions(runtime_file, sampled_partitions)
+
+    # Runtime data is optional
+    has_runtime = os.path.exists(runtime_file)
+    if has_runtime:
+        runtime_data = read_partitions(runtime_file, sampled_partitions)
+    else:
+        print("Runtime data not found, skipping runtime statistics")
 
     dc = True if "p_mw_dc" in gen_data.columns else False
     # The canonical scenario ordering (to match the original function's behavior)
@@ -173,14 +179,15 @@ def compute_stats_from_data(
             "bus",
         ].reindex(scenarios)
 
-    # ---4) Runtime data ---
-    runtime_data_ac = (
-        runtime_data.set_index("scenario")["ac"].reindex(scenarios) * 1000.0
-    )
-    if dc:
-        runtime_data_dc = (
-            runtime_data.set_index("scenario")["dc"].reindex(scenarios) * 1000.0
+    # ---4) Runtime data (optional) ---
+    if has_runtime:
+        runtime_data_ac = (
+            runtime_data.set_index("scenario")["ac"].reindex(scenarios) * 1000.0
         )
+        if dc:
+            runtime_data_dc = (
+                runtime_data.set_index("scenario")["dc"].reindex(scenarios) * 1000.0
+            )
 
     # --- Pack results (preserve original array shapes/order) ---
     result = {
@@ -194,15 +201,18 @@ def compute_stats_from_data(
         "p_balance_error_ac_mean": p_balance_ac_mean.to_numpy(dtype=float),
         "q_balance_error_ac_max": q_balance_ac_max.to_numpy(dtype=float),
         "q_balance_error_ac_mean": q_balance_ac_mean.to_numpy(dtype=float),
-        "runtime_data_ac_ms": runtime_data_ac.to_numpy(dtype=float),
     }
+    if has_runtime:
+        result["runtime_data_ac_ms"] = runtime_data_ac.to_numpy(dtype=float)
+
     if dc:
         result["p_balance_error_dc_max"] = p_balance_dc_max.to_numpy(dtype=float)
         result["p_balance_error_dc_mean"] = p_balance_dc_mean.to_numpy(dtype=float)
         result["bus_idx_max_p_balance_error_dc_per_scenario"] = (
             idx_bus_max_p_balance_error_dc_per_scenario.to_numpy(dtype=int)
         )
-        result["runtime_data_dc_ms"] = runtime_data_dc.to_numpy(dtype=float)
+        if has_runtime:
+            result["runtime_data_dc_ms"] = runtime_data_dc.to_numpy(dtype=float)
 
     return result
 
@@ -214,7 +224,7 @@ def plot_stats(data_dir: str, sn_mva: float, n_partitions: int = 0) -> None:
     The plot is saved as `stats_plot.png` in the specified directory with 300 DPI resolution.
 
     Args:
-        data_dir: Directory containing data files (bus_data.parquet, branch_data.parquet, gen_data.parquet, runtime_data.parquet)
+        data_dir: Directory containing data files (bus_data.parquet, branch_data.parquet, gen_data.parquet, and optionally runtime_data.parquet)
                   and where the plot will be saved
         sn_mva: Base MVA used to scale power quantities
         n_partitions: Number of partitions to compute stats for (0 for all partitions)
@@ -227,8 +237,9 @@ def plot_stats(data_dir: str, sn_mva: float, n_partitions: int = 0) -> None:
     - Branch loading (all branches across all scenarios)
     - Active power balance error (mean absolute error per scenario, normalized)
     - Reactive power balance error (mean absolute error per scenario, normalized)
-    - Runtime (AC solver execution time in milliseconds)
-    - (If DC data available) DC active power balance error, bus index with max DC PBE, and DC runtime
+    - (If runtime data available) Runtime (AC solver execution time in milliseconds)
+    - (If DC data available) DC active power balance error, bus index with max DC PBE
+    - (If DC and runtime data available) DC runtime
     """
     stats = compute_stats_from_data(data_dir, sn_mva=sn_mva, n_partitions=n_partitions)
     filename = os.path.join(data_dir, "stats_plot.png")
@@ -245,8 +256,10 @@ def plot_stats(data_dir: str, sn_mva: float, n_partitions: int = 0) -> None:
         "p_balance_error_ac_mean": stats["p_balance_error_ac_mean"],
         "q_balance_error_ac_max": stats["q_balance_error_ac_max"],
         "q_balance_error_ac_mean": stats["q_balance_error_ac_mean"],
-        "runtime_data_ac_ms": stats["runtime_data_ac_ms"],
     }
+    if "runtime_data_ac_ms" in stats:
+        per_scenario["runtime_data_ac_ms"] = stats["runtime_data_ac_ms"]
+
     mean_mean_p_balance_error_ac = np.nanmean(stats["p_balance_error_ac_mean"])
     mean_mean_q_balance_error_ac = np.nanmean(stats["q_balance_error_ac_mean"])
 
@@ -256,7 +269,8 @@ def plot_stats(data_dir: str, sn_mva: float, n_partitions: int = 0) -> None:
         per_scenario["bus_idx_max_p_balance_error_dc_per_scenario"] = stats[
             "bus_idx_max_p_balance_error_dc_per_scenario"
         ]
-        per_scenario["runtime_data_dc_ms"] = stats["runtime_data_dc_ms"]
+        if "runtime_data_dc_ms" in stats:
+            per_scenario["runtime_data_dc_ms"] = stats["runtime_data_dc_ms"]
         mean_mean_p_balance_error_dc = np.nanmean(stats["p_balance_error_dc_mean"])
 
     df_stats = pd.DataFrame(per_scenario)
@@ -288,11 +302,18 @@ def plot_stats(data_dir: str, sn_mva: float, n_partitions: int = 0) -> None:
             f"Mean Reactive PBE (AC, normalized). Mean={np.format_float_scientific(mean_mean_q_balance_error_ac, precision=2)}",
             stats["q_balance_error_ac_mean"],
         ),
-        (
-            "Runtime (AC, ms). Mean={:.2f}".format(stats["runtime_data_ac_ms"].mean()),
-            stats["runtime_data_ac_ms"],
-        ),
     ]
+
+    # Add runtime plot if runtime data exists
+    if "runtime_data_ac_ms" in stats:
+        plots.append(
+            (
+                "Runtime (AC, ms). Mean={:.2f}".format(
+                    stats["runtime_data_ac_ms"].mean(),
+                ),
+                stats["runtime_data_ac_ms"],
+            ),
+        )
 
     # Optionally add DC power balance if available
     if "p_balance_error_dc_max" in stats:
@@ -314,14 +335,15 @@ def plot_stats(data_dir: str, sn_mva: float, n_partitions: int = 0) -> None:
                 stats["bus_idx_max_p_balance_error_dc_per_scenario"],
             ),
         )
-        plots.append(
-            (
-                "Runtime (DC, ms). Mean={:.2f}".format(
-                    np.nanmean(stats["runtime_data_dc_ms"]),
+        if "runtime_data_dc_ms" in stats:
+            plots.append(
+                (
+                    "Runtime (DC, ms). Mean={:.2f}".format(
+                        np.nanmean(stats["runtime_data_dc_ms"]),
+                    ),
+                    stats["runtime_data_dc_ms"],
                 ),
-                stats["runtime_data_dc_ms"],
-            ),
-        )
+            )
 
     # sort plots by title
     plots.sort(key=lambda x: x[0])
@@ -398,7 +420,7 @@ def plot_feature_distributions(
       and optionally `DC_BUS_COLUMNS` if DC columns (e.g., Va_dc) are present in the data
     """
     import matplotlib.pyplot as plt
-    from gridfm_datakit.utils.column_names import BUS_COLUMNS, DC_BUS_COLUMNS
+    from gridfm_datakit.utils.column_names import DC_BUS_COLUMNS
 
     # Get total number of scenarios and partitions
     data_dir = os.path.dirname(node_file)
@@ -443,10 +465,21 @@ def plot_feature_distributions(
     bus_groups = node_data.groupby("bus")
     sorted_buses = sorted(bus_groups.groups.keys())
 
+    feature_cols = [
+        "Pd",
+        "Qd",
+        "Pg",
+        "Qg",
+        "Vm",
+        "Va",
+        "PQ",
+        "PV",
+        "REF",
+    ]
     if "Va_dc" in node_data.columns:
-        feature_cols = BUS_COLUMNS + DC_BUS_COLUMNS
+        feature_cols = feature_cols + DC_BUS_COLUMNS
     else:
-        feature_cols = BUS_COLUMNS
+        feature_cols = feature_cols
 
     for feature_name in feature_cols:
         fig, ax = plt.subplots(figsize=(15, 6))

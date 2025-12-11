@@ -5,6 +5,67 @@ import pandas as pd
 from typing import Tuple
 
 
+def compute_branch_admittances(
+    r,
+    x,
+    b,
+    tap_mag,
+    shift,
+):
+    """
+    Compute branch admittances (Yff, Yft, Ytf, Ytt) from branch parameters.
+
+    Implements the admittance matrix equations:
+        Yff = (y_series + y_sh_f) / t2
+        Yft = -y_series / tap.conjugate()
+        Ytf = -y_series / tap
+        Ytt = y_series + y_sh_t
+
+    where:
+        - y_series = 1/(r + jx) (series admittance)
+        - y_sh_f, y_sh_t = shunt admittances (b/2 each side)
+        - tap = tap_mag * exp(j*shift) (complex tap with phase shift)
+        - t2 = |tap|^2 = tap_mag^2
+
+    Args:
+        r: Series resistance (ohms) - float or numpy array
+        x: Series reactance (ohms) - float or numpy array
+        b: Total shunt susceptance (split equally between both ends) - float or numpy array
+        tap_mag: Tap magnitude (default: 1.0 for AC lines) - float or numpy array
+        shift: Phase shift in radians (default: 0.0) - float or numpy array
+
+    Returns:
+        Tuple of (Yff, Yft, Ytf, Ytt) complex admittances
+        - If inputs are scalars: returns scalars (complex)
+        - If inputs are arrays: returns arrays (numpy.ndarray of complex)
+    """
+    # Convert to numpy arrays for vectorized operations
+    r = np.asarray(r)
+    x = np.asarray(x)
+    b = np.asarray(b)
+    tap_mag = np.asarray(tap_mag)
+    shift = np.asarray(shift)
+
+    # Calculate series admittance: y_series = 1/(r + jx)
+    z_series = r + 1j * x
+    y_series = 1.0 / z_series
+
+    # Calculate tap with phase shift: tap = tap_mag * exp(j*shift)
+    tap = tap_mag * (np.cos(shift) + 1j * np.sin(shift))
+    t2 = tap_mag**2  # |tap|^2 = tap_mag^2
+
+    # Calculate shunt admittances (split equally between both ends)
+    y_sh = 1j * (b / 2.0)
+
+    # Calculate admittance matrix elements
+    Yff = (y_series + y_sh) / t2
+    Yft = -y_series / np.conj(tap)
+    Ytf = -y_series / tap
+    Ytt = y_series + y_sh
+
+    return Yff, Yft, Ytf, Ytt
+
+
 def compute_branch_powers_vectorized(
     branch_df: pd.DataFrame,
     bus_df: pd.DataFrame,
