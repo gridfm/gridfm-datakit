@@ -21,6 +21,7 @@ from gridfm_datakit.utils.column_names import (
     RUNTIME_COLUMNS,
     DC_RUNTIME_COLUMNS,
 )
+import copy
 from gridfm_datakit.utils.power_balance import (
     compute_branch_powers_vectorized,
     compute_bus_balance,
@@ -1150,6 +1151,7 @@ def validate_bus_indexing_consistency(generated_data: Dict[str, pd.DataFrame]) -
 
 
 def _require_columns(df: pd.DataFrame, name: str, required: Iterable[str]) -> None:
+    required = copy.deepcopy(required)  # deepcopy to avoid modifying the original list
     if "load_scenario_idx" in required:
         required.remove("load_scenario_idx")
     missing = set(required) - set(df.columns)
