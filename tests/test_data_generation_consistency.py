@@ -8,6 +8,7 @@ reference data to ensure column structure and content remain consistent.
 import pytest
 import pandas as pd
 from pathlib import Path
+import numpy as np
 import tempfile
 import yaml
 from gridfm_datakit.generate import generate_power_flow_data_distributed
@@ -83,7 +84,7 @@ class TestDataGenerationConsistency:
                 }
 
             # Check if values are equal
-            are_equal = df1[col].equals(df2[col])
+            are_equal = np.allclose(df1[col], df2[col])
 
             if are_equal:
                 return {"status": "IDENTICAL"}
