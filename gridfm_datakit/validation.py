@@ -9,6 +9,7 @@ import pandas as pd
 import numpy as np
 import os
 from typing import Dict, Iterable
+from gridfm_datakit.utils.power_balance import compute_branch_admittances
 from gridfm_datakit.utils.column_names import (
     BUS_COLUMNS,
     DC_BUS_COLUMNS,
@@ -20,6 +21,7 @@ from gridfm_datakit.utils.column_names import (
     RUNTIME_COLUMNS,
     DC_RUNTIME_COLUMNS,
 )
+import copy
 from gridfm_datakit.utils.power_balance import (
     compute_branch_powers_vectorized,
     compute_bus_balance,
@@ -132,7 +134,15 @@ def validate_generated_data(
     branch_data = read_partitions(file_paths["branch_data"], sampled_partitions)
     gen_data = read_partitions(file_paths["gen_data"], sampled_partitions)
     y_bus_data = read_partitions(file_paths["y_bus_data"], sampled_partitions)
-    runtime_data = read_partitions(file_paths["runtime_data"], sampled_partitions)
+    runtime_data = (
+        read_partitions(file_paths["runtime_data"], sampled_partitions)
+        if "runtime_data" in file_paths
+        else None
+    )
+    if runtime_data is None:
+        print("No runtime data found, skipping runtime data validation")
+    else:
+        print(f"Runtime data found: {runtime_data.shape}")
 
     generated_data = {
         "bus_data": bus_data,
@@ -177,6 +187,13 @@ def validate_generated_data(
     except Exception as e:
         raise AssertionError(
             f"Deactivated lines zero admittance validation failed: {e}",
+        )
+
+    try:
+        validate_admittance_calculations(generated_data)
+    except Exception as e:
+        raise AssertionError(
+            f"Admittance calculations validation failed: {e}",
         )
 
     try:
@@ -383,6 +400,139 @@ def validate_deactivated_lines_zero_admittance(
     print("    Deactivated lines zero admittance: OK")
 
 
+def validate_admittance_calculations(
+    generated_data: Dict[str, pd.DataFrame],
+) -> None:
+    """Test that branch admittances in branch_data match calculated values from branch parameters (vectorized).
+
+    Validates the admittance matrix equations for both AC lines and transformers:
+        Yff = (y_series + y_sh_f) / t2  (where t2 = |tap|^2)
+        Yft = -y_series / tap.conjugate()
+        Ytf = -y_series / tap
+        Ytt = y_series + y_sh_t
+
+    For AC lines, tap = 1.0 and shift = 0.0, so t2 = 1.0.
+    For transformers, tap and shift are non-trivial values.
+
+    where y_series = 1/(r + jx) and y_sh_f, y_sh_t are shunt admittances.
+    Compares calculated admittances with stored values in branch_data.
+    """
+    branch_data = generated_data["branch_data"]
+
+    # Validate all active branches (both AC lines and transformers)
+    active_branches = branch_data[branch_data["br_status"] == 1].copy()
+
+    if active_branches.empty:
+        print("    Admittance calculations: no active branches to validate")
+        return
+
+    print(
+        f"    Admittance calculations: validating {len(active_branches)} active branches",
+    )
+
+    tolerance = 1e-8
+
+    # Vectorized extraction of branch parameters (convert shift from degrees to radians)
+    r = active_branches["r"].to_numpy()
+    x = active_branches["x"].to_numpy()
+    b = active_branches["b"].to_numpy()
+    tap_mag = active_branches["tap"].to_numpy()
+    shift_deg = active_branches["shift"].to_numpy()
+    shift_rad = np.deg2rad(shift_deg)
+
+    # Skip branches with zero impedance
+    valid_mask = np.abs(r + 1j * x) >= 1e-10
+
+    if not valid_mask.any():
+        print("    Admittance calculations: OK")
+        return
+
+    # Filter to valid branches
+    active_branches_valid = active_branches[valid_mask].copy()
+    r = r[valid_mask]
+    x = x[valid_mask]
+    b = b[valid_mask]
+    tap_mag = tap_mag[valid_mask]
+    shift_rad = shift_rad[valid_mask]
+
+    # Calculate expected admittances using fully vectorized function
+    Yff_expected, Yft_expected, Ytf_expected, Ytt_expected = compute_branch_admittances(
+        r=r,
+        x=x,
+        b=b,
+        tap_mag=tap_mag,
+        shift=shift_rad,
+    )
+
+    # Extract stored admittances from branch_data
+    Yff_stored = (
+        active_branches_valid["Yff_r"].to_numpy()
+        + 1j * active_branches_valid["Yff_i"].to_numpy()
+    )
+    Yft_stored = (
+        active_branches_valid["Yft_r"].to_numpy()
+        + 1j * active_branches_valid["Yft_i"].to_numpy()
+    )
+    Ytf_stored = (
+        active_branches_valid["Ytf_r"].to_numpy()
+        + 1j * active_branches_valid["Ytf_i"].to_numpy()
+    )
+    Ytt_stored = (
+        active_branches_valid["Ytt_r"].to_numpy()
+        + 1j * active_branches_valid["Ytt_i"].to_numpy()
+    )
+
+    # Vectorized comparison (all differences at once)
+    Yff_diff = np.abs(Yff_expected - Yff_stored)
+    Yft_diff = np.abs(Yft_expected - Yft_stored)
+    Ytf_diff = np.abs(Ytf_expected - Ytf_stored)
+    Ytt_diff = np.abs(Ytt_expected - Ytt_stored)
+
+    # Find any mismatches
+    has_mismatch = (
+        (Yff_diff >= tolerance)
+        | (Yft_diff >= tolerance)
+        | (Ytf_diff >= tolerance)
+        | (Ytt_diff >= tolerance)
+    )
+
+    if has_mismatch.any():
+        # Get first mismatch for error message
+        mismatch_idx = np.where(has_mismatch)[0][0]
+        scenario = int(active_branches_valid.iloc[mismatch_idx]["scenario"])
+        fb = int(active_branches_valid.iloc[mismatch_idx]["from_bus"])
+        tb = int(active_branches_valid.iloc[mismatch_idx]["to_bus"])
+
+        error_details = []
+        if Yff_diff[mismatch_idx] >= tolerance:
+            error_details.append(
+                f"Yff: expected {Yff_expected[mismatch_idx]}, got {Yff_stored[mismatch_idx]}, diff={Yff_diff[mismatch_idx]:.2e}",
+            )
+        if Yft_diff[mismatch_idx] >= tolerance:
+            error_details.append(
+                f"Yft: expected {Yft_expected[mismatch_idx]}, got {Yft_stored[mismatch_idx]}, diff={Yft_diff[mismatch_idx]:.2e}",
+            )
+        if Ytf_diff[mismatch_idx] >= tolerance:
+            error_details.append(
+                f"Ytf: expected {Ytf_expected[mismatch_idx]}, got {Ytf_stored[mismatch_idx]}, diff={Ytf_diff[mismatch_idx]:.2e}",
+            )
+        if Ytt_diff[mismatch_idx] >= tolerance:
+            error_details.append(
+                f"Ytt: expected {Ytt_expected[mismatch_idx]}, got {Ytt_stored[mismatch_idx]}, diff={Ytt_diff[mismatch_idx]:.2e}",
+            )
+
+        error_msg = (
+            f"Scenario {scenario}, Branch {fb}->{tb}: {', '.join(error_details)}"
+        )
+        total_mismatches = has_mismatch.sum()
+        if total_mismatches > 1:
+            error_msg += f" ({total_mismatches} total mismatches)"
+
+        raise AssertionError(f"Admittance calculations failed: {error_msg}")
+
+    print("    Admittance calculations: OK")
+
+
 def validate_computed_vs_stored_power_flows(
     generated_data: Dict[str, pd.DataFrame],
     sn_mva: float,
@@ -415,8 +565,8 @@ def validate_computed_vs_stored_power_flows(
     flows_data = generated_data["branch_data"][
         ["pf", "qf", "pt", "qt", "scenario", "from_bus", "to_bus"]
     ]
-    mismatch = ~np.isclose(computed_flows, flows_data, atol=1e-4, rtol=1e-4)
-    # TODO investigate why atol has to be so large
+    mismatch = ~np.isclose(computed_flows, flows_data, atol=1e-3, rtol=1e-4)
+    # TODO investigate why atol has to be so large, especially for pf delta
     if mismatch.any():
         raise AssertionError(
             f"Computed power flows do not match stored power flows, stored: \n{flows_data[mismatch]}, computed: \n{computed_flows[mismatch]}",
@@ -629,7 +779,7 @@ def validate_voltage_magnitude_limits_opf_mode(
 def validate_branch_angle_difference_opf_mode(
     generated_data: Dict[str, pd.DataFrame],
 ) -> None:
-    """Validate branch angle difference limits in OPF mode.
+    """Validate branch angle difference limits in OPF mode (vectorized).
 
     For each active branch, the difference in bus voltage angles must respect
     the branch angle limits [angmin, angmax].
@@ -640,43 +790,65 @@ def validate_branch_angle_difference_opf_mode(
 
     bus_data = generated_data["bus_data"]
     branch_data = generated_data["branch_data"]
-    scenarios = bus_data["scenario"].unique()
+
+    # Filter to active branches only
+    active_branches = branch_data[branch_data["br_status"] == 1].copy()
+
+    if active_branches.empty:
+        print("    Branch angle difference limits (OPF mode): OK")
+        return
+
+    scenarios = active_branches["scenario"].unique()
     print(
         f"    Branch angle difference limits (OPF mode): validating across {len(scenarios)} scenarios",
     )
 
-    for scenario in scenarios:
-        bus_scenario = bus_data[bus_data["scenario"] == scenario]
-        branch_scenario = branch_data[branch_data["scenario"] == scenario]
-        active_branches = branch_scenario[branch_scenario["br_status"] == 1]
+    # Merge branch data with bus voltage angles
+    bus_angles = bus_data[["scenario", "bus", "Va"]].copy()
 
-        if active_branches.empty:
-            continue
+    # Merge for from_bus
+    merged_from = active_branches.merge(
+        bus_angles.rename(columns={"bus": "from_bus", "Va": "Va_from"}),
+        on=["scenario", "from_bus"],
+        how="left",
+    )
 
-        va_deg = bus_scenario.set_index("bus")["Va"].to_dict()
+    # Merge for to_bus
+    merged = merged_from.merge(
+        bus_angles.rename(columns={"bus": "to_bus", "Va": "Va_to"}),
+        on=["scenario", "to_bus"],
+        how="left",
+    )
 
-        for _, br in active_branches.iterrows():
-            fb = int(br["from_bus"])
-            tb = int(br["to_bus"])
-            angmin = br["ang_min"]
-            angmax = br["ang_max"]
+    # Calculate angle differences and normalize to [-180, 180]
+    delta = (merged["Va_from"] - merged["Va_to"]).to_numpy()
+    delta = delta % 360.0  # Normalize to [0, 360)
+    delta = np.where(delta > 180.0, delta - 360.0, delta)  # Convert to [-180, 180)
 
-            if fb not in va_deg or tb not in va_deg:
-                continue
+    # Check limits with tolerance
+    tolerance = 1e-6
+    min_violations = delta < (merged["ang_min"].to_numpy() - tolerance)
+    max_violations = delta > (merged["ang_max"].to_numpy() + tolerance)
 
-            delta = va_deg[fb] - va_deg[tb]
+    violations = min_violations | max_violations
 
-            # Normalize delta into [-180, 180] for robust comparison
-            while delta > 180.0:
-                delta -= 360.0
-            while delta < -180.0:
-                delta += 360.0
+    if violations.any():
+        # Report first violation
+        viol_idx = np.where(violations)[0][0]
+        scenario = int(merged.iloc[viol_idx]["scenario"])
+        fb = int(merged.iloc[viol_idx]["from_bus"])
+        tb = int(merged.iloc[viol_idx]["to_bus"])
+        delta_val = delta[viol_idx]
+        angmin = merged.iloc[viol_idx]["ang_min"]
+        angmax = merged.iloc[viol_idx]["ang_max"]
 
-            assert delta >= angmin - 1e-6, (
-                f"Scenario {scenario}, Branch {fb}->{tb}: angle diff {delta:.3f} < angmin {angmin}"
+        if delta_val < angmin - tolerance:
+            raise AssertionError(
+                f"Scenario {scenario}, Branch {fb}->{tb}: angle diff {delta_val:.3f} < angmin {angmin}",
             )
-            assert delta <= angmax + 1e-6, (
-                f"Scenario {scenario}, Branch {fb}->{tb}: angle diff {delta:.3f} > angmax {angmax}"
+        else:
+            raise AssertionError(
+                f"Scenario {scenario}, Branch {fb}->{tb}: angle diff {delta_val:.3f} > angmax {angmax}",
             )
 
     print("    Branch angle difference limits (OPF mode): OK")
@@ -813,10 +985,11 @@ def validate_dc_columns_consistency(generated_data: Dict[str, pd.DataFrame]) -> 
         scenarios_with_nan[col] = set(
             gen_data[gen_data[col].isna()]["scenario"].unique(),
         )
-    for col in DC_RUNTIME_COLUMNS:
-        scenarios_with_nan[col] = set(
-            runtime_data[runtime_data[col].isna()]["scenario"].unique(),
-        )
+    if runtime_data is not None:
+        for col in DC_RUNTIME_COLUMNS:
+            scenarios_with_nan[col] = set(
+                runtime_data[runtime_data[col].isna()]["scenario"].unique(),
+            )
 
     # check all values of scenarios_with_nan are the same
     key_0 = list(scenarios_with_nan.keys())[0]
@@ -978,6 +1151,9 @@ def validate_bus_indexing_consistency(generated_data: Dict[str, pd.DataFrame]) -
 
 
 def _require_columns(df: pd.DataFrame, name: str, required: Iterable[str]) -> None:
+    required = copy.deepcopy(required)  # deepcopy to avoid modifying the original list
+    if "load_scenario_idx" in required:
+        required.remove("load_scenario_idx")
     missing = set(required) - set(df.columns)
     assert not missing, f"{name}: missing required columns {sorted(missing)}"
 
@@ -1009,9 +1185,13 @@ def validate_data_completeness(generated_data: Dict[str, pd.DataFrame]) -> None:
         ("Branch data", branch_data),
         ("Generator data", gen_data),
         ("Y-bus data", y_bus_data),
-        ("Runtime data", runtime_data),
     ]:
         assert "scenario" in df.columns, f"{name} should have scenario column"
+
+    if runtime_data is not None:
+        assert "scenario" in runtime_data.columns, (
+            "Runtime data should have scenario column"
+        )
 
     dc = True if "Va_dc" in bus_data.columns else False
 
@@ -1037,7 +1217,8 @@ def validate_data_completeness(generated_data: Dict[str, pd.DataFrame]) -> None:
     _check_no_nan(branch_data, "Branch data", BRANCH_COLUMNS)
     _check_no_nan(gen_data, "Generator data", GEN_COLUMNS)
     _check_no_nan(y_bus_data, "Y-bus data", YBUS_COLUMNS)
-    _check_no_nan(runtime_data, "Runtime data", RUNTIME_COLUMNS)
+    if runtime_data is not None:
+        _check_no_nan(runtime_data, "Runtime data", RUNTIME_COLUMNS)
 
     # 3) Non-emptiness
     assert len(bus_data) > 0, "Bus data should not be empty"

@@ -42,6 +42,7 @@ def validate_data_directory(
     data_path: str,
     sn_mva: float,
     n_partitions: int,
+    mode: str | None,
 ) -> bool:
     """
     Validate generated power flow data in a directory.
@@ -49,32 +50,40 @@ def validate_data_directory(
     Args:
         data_path (str): Path to directory containing generated files
         n_partitions (int): Number of partitions to sample for validation (0 = all partitions)
+        mode (str): Operating mode ("opf" or "pf"). If None, reads from args.log.
+
     Returns:
         bool: True if all validations pass, False otherwise
+
     """
     data_path = Path(data_path)
 
-    # Expected file names for validation
+    # Required and optional file names for validation
     expected_files = {
         "bus_data": "bus_data.parquet",
         "branch_data": "branch_data.parquet",
         "gen_data": "gen_data.parquet",
         "y_bus_data": "y_bus_data.parquet",
-        "runtime_data": "runtime_data.parquet",
     }
 
-    try:
-        with open(data_path / "args.log", "r") as f:
-            lines = f.readlines()
-            # Skip the first two lines (empty line and timestamp)
-            yaml_content = "".join(lines[2:])
-            args = yaml.safe_load(yaml_content)
-        mode = args["settings"]["mode"]
-        print(f"   Found mode: {mode}")
-    except Exception as e:
-        print(f"   Could not read mode from args.log: {e}")
-        print("   Using default mode: opf")
-        mode = "opf"
+    # Determine mode: use provided mode or read from args.log
+    if mode is None:
+        try:
+            with open(data_path / "args.log", "r") as f:
+                lines = f.readlines()
+                # Skip the first two lines (empty line and timestamp)
+                yaml_content = "".join(lines[2:])
+                args = yaml.safe_load(yaml_content)
+            mode = args["settings"]["mode"]
+            print(f"   Found mode from args.log: {mode}")
+        except Exception as e:
+            print(f"   Could not read mode from args.log: {e}")
+            print(
+                "   ERROR: Mode must be provided via --mode argument or args.log file",
+            )
+            return False
+    else:
+        print(f"   Using provided mode: {mode}")
 
     # Check if all required files exist
     file_paths = {}
@@ -85,7 +94,10 @@ def validate_data_directory(
         if file_path.exists():
             file_paths[key] = str(file_path)
         else:
-            missing_files.append(filename)
+            if key != "runtime_data":
+                missing_files.append(filename)
+            else:
+                print(f"WARNING: Runtime data file not found: {filename}")
 
     if missing_files:
         print(f"ERROR: Missing required files: {', '.join(missing_files)}")
@@ -141,6 +153,10 @@ Examples:
   # Compute statistics from generated data with custom number of partitions
   gridfm-datakit stats /path/to/data/ --n-partitions
 
+  # Validate all partitions with explicit mode
+  gridfm-datakit validate /path/to/data/ --n-partitions 0 --mode pf
+
+
   # Compute statistics from generated data using all scenarios
   gridfm-datakit stats /path/to/data/ --n-partitions 0
 
@@ -187,6 +203,14 @@ Examples:
         type=int,
         default=100,
         help="Number of partitions to sample for validation (default: 100). Use 0 to validate all partitions.",
+    )
+
+    validate_parser.add_argument(
+        "--mode",
+        type=str,
+        default=None,
+        choices=["opf", "pf"],
+        help="Operating mode: 'opf' or 'pf'. If not provided, reads from args.log in data directory.",
     )
     validate_parser.add_argument(
         "--sn-mva",
@@ -274,6 +298,7 @@ Examples:
             args.data_path,
             sn_mva=args.sn_mva,
             n_partitions=args.n_partitions,
+            mode=args.mode,
         )
 
         if success:

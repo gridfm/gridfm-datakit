@@ -28,6 +28,7 @@ import pandas as pd
 import numpy as np
 from multiprocessing import Pool, cpu_count
 from gridfm_datakit.utils.utils import n_scenario_per_partition
+from gridfm_datakit.utils.power_balance import compute_branch_admittances
 
 
 # ---------- Utilities ----------
@@ -76,8 +77,6 @@ def parse_scenario_from_path(p: Path) -> Tuple[str, int]:
 def convert_one(
     data: dict,
     scenario: int,
-    atol: float,
-    rtol: float,
 ) -> Tuple[List[dict], List[dict], List[dict], List[dict]]:
     require(
         "grid" in data and "solution" in data,
@@ -245,18 +244,21 @@ def convert_one(
         f, t = ac_send[k], ac_recv[k]
         angmin, angmax, b_fr, b_to, br_r, br_x, rate_a, rate_b, rate_c = ac_feat[k][:9]
         require(br_x != 0.0, f"Nonphysical line reactance at line {k}: x == 0.")
-        z_series = to_complex(br_r, br_x)
-        y_series = inv_complex(z_series)
         assert b_fr == b_to, (
             f"b_fr and b_to are not equal at line {k}: b_fr: {b_fr}, b_to: {b_to}"
         )
-        y_sh_f = complex(0.0, b_fr)
-        y_sh_t = complex(0.0, b_to)
 
-        Yff = y_series + y_sh_f
-        Ytt = y_series + y_sh_t
-        Yft = -y_series
-        Ytf = -y_series
+        # Calculate admittances (AC line: tap=1.0, shift=0.0)
+        try:
+            Yff, Yft, Ytf, Ytt = compute_branch_admittances(
+                r=br_r,
+                x=br_x,
+                b=b_fr * 2,  # Total shunt susceptance
+                tap_mag=1.0,  # AC line has tap = 1.0
+                shift=0.0,  # No phase shift
+            )
+        except ValueError as e:
+            raise ValueError(f"Admittance calculation failed at AC line {k}: {e}")
 
         pt, qt, pf, qf = sol_ac["features"][k]
         tap = 1.0
@@ -286,10 +288,9 @@ def convert_one(
                 "ang_max": np.rad2deg(angmax),
                 "rate_a": rate_a * baseMVA,
                 "br_status": br_status,
-                "br_r": br_r,
-                "br_x": br_x,
-                "b_fr": b_fr,
-                "b_to": b_to,
+                "r": br_r,
+                "x": br_x,
+                "b": b_fr * 2,
             },
         )
 
@@ -317,22 +318,24 @@ def convert_one(
             b_to,
         ) = tf_feat[k][:11]
         require(br_x != 0.0, f"Nonphysical transformer reactance at tf {k}: x == 0.")
-        z_series = to_complex(br_r, br_x)
-        y_series = inv_complex(z_series)
-        y_sh_f = complex(0.0, b_fr)
-        y_sh_t = complex(0.0, b_to)
-        assert shift == 0, f"shift is not equal to 0 at transformer {k}: shift: {shift}"
+        assert b_fr == b_to, (
+            f"b_fr and b_to are not equal at transformer {k}: b_fr: {b_fr}, b_to: {b_to}"
+        )
+        b = b_fr * 2
 
         require(
             tap_mag > 0.0,
             f"Nonphysical transformer tap magnitude at transformer {k}: tap == 0.",
         )
-        t2 = tap_mag * tap_mag
 
-        Yff = (y_series + y_sh_f) / t2
-        Yft = -y_series / tap_mag
-        Ytf = -y_series / tap_mag
-        Ytt = y_series + y_sh_t
+        # Calculate admittances
+        Yff, Yft, Ytf, Ytt = compute_branch_admittances(
+            r=br_r,
+            x=br_x,
+            b=b,  # Total shunt susceptance
+            tap_mag=tap_mag,
+            shift=shift,
+        )
 
         pt, qt, pf, qf = sol_tf["features"][k]
         br_status = 1.0
@@ -361,10 +364,9 @@ def convert_one(
                 "ang_max": np.rad2deg(angmax),
                 "rate_a": rate_a * baseMVA,
                 "br_status": br_status,
-                "br_r": br_r,
-                "br_x": br_x,
-                "b_fr": b_fr,
-                "b_to": b_to,
+                "r": br_r,
+                "x": br_x,
+                "b": b,
             },
         )
 
@@ -465,15 +467,10 @@ def convert_one(
 
 
 def process_one(args):
-    jf, scen_idx, atol, rtol = args
+    jf, scen_idx = args
     with open(jf, "r") as f:
         data = json.load(f)
-    return convert_one(
-        data,
-        scenario=scen_idx,
-        atol=atol,
-        rtol=rtol,
-    )
+    return convert_one(data, scenario=scen_idx)
 
 
 # ---------- I/O helpers ----------
@@ -512,18 +509,7 @@ def main():
         default=2000,
         help="Files per processing chunk (default: 100).",
     )
-    parser.add_argument(
-        "--atol",
-        type=float,
-        default=1e-5,
-        help="Absolute tolerance for Ybus equality (default: 1e-9).",
-    )
-    parser.add_argument(
-        "--rtol",
-        type=float,
-        default=1e-5,
-        help="Relative tolerance for Ybus equality (default: 1e-9).",
-    )
+
     args = parser.parse_args()
 
     data_dir = Path(args.data_dir)
@@ -566,9 +552,7 @@ def main():
         chunk_items = parsed[start:end]
 
         # Prepare args for multiprocessing
-        pool_args = [
-            (jf, scen_idx, args.atol, args.rtol) for jf, scen_idx in chunk_items
-        ]
+        pool_args = [(jf, scen_idx) for jf, scen_idx in chunk_items]
 
         # ---- Multiprocessing pool ----
         with Pool(cpu_count()) as pool:
