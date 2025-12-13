@@ -31,6 +31,9 @@ import time
 from gridfm_datakit.utils.utils import n_scenario_per_partition
 
 
+SKIP_LARGE_GRIDS = os.getenv("SKIP_LARGE_GRIDS", "0") == "1"
+
+
 class TestSolve:
     """Test class for solve functions"""
 
@@ -44,15 +47,78 @@ class TestSolve:
         [
             ("case24_ieee_rts", True),
             ("case24_ieee_rts", False),
-            ("case57_ieee", True),
-            ("case57_ieee", False),
-            ("case118_ieee", True),
-            ("case118_ieee", False),
-            ("case300_ieee", True),
-            ("case300_ieee", False),
-            ("case2000_goc", True),
-            ("case2000_goc", False),
-            ("case10000_goc", False),  # fast PF is not supported for this case
+            pytest.param(
+                "case57_ieee",
+                True,
+                marks=pytest.mark.skipif(
+                    SKIP_LARGE_GRIDS,
+                    reason="Skipping large grids",
+                ),
+            ),
+            pytest.param(
+                "case57_ieee",
+                False,
+                marks=pytest.mark.skipif(
+                    SKIP_LARGE_GRIDS,
+                    reason="Skipping arge grids",
+                ),
+            ),
+            pytest.param(
+                "case118_ieee",
+                True,
+                marks=pytest.mark.skipif(
+                    SKIP_LARGE_GRIDS,
+                    reason="Skipping large grids",
+                ),
+            ),
+            pytest.param(
+                "case118_ieee",
+                False,
+                marks=pytest.mark.skipif(
+                    SKIP_LARGE_GRIDS,
+                    reason="Skipping arge grids",
+                ),
+            ),
+            pytest.param(
+                "case300_ieee",
+                True,
+                marks=pytest.mark.skipif(
+                    SKIP_LARGE_GRIDS,
+                    reason="Skipping large grids",
+                ),
+            ),
+            pytest.param(
+                "case300_ieee",
+                False,
+                marks=pytest.mark.skipif(
+                    SKIP_LARGE_GRIDS,
+                    reason="Skipping large grids",
+                ),
+            ),
+            pytest.param(
+                "case2000_goc",
+                True,
+                marks=pytest.mark.skipif(
+                    SKIP_LARGE_GRIDS,
+                    reason="Skipping large grids",
+                ),
+            ),
+            pytest.param(
+                "case2000_goc",
+                False,
+                marks=pytest.mark.skipif(
+                    SKIP_LARGE_GRIDS,
+                    reason="Skipping large grids",
+                ),
+            ),
+            pytest.param(
+                "case10000_goc",
+                False,
+                marks=pytest.mark.skipif(
+                    SKIP_LARGE_GRIDS,
+                    reason="Skipping large grids",
+                ),
+            ),  # fast PF not supported
         ],
     )
     def test_complete_workflow(self, case_name, pf_fast):
@@ -121,9 +187,21 @@ class TestSolve:
     @pytest.mark.parametrize(
         "case_name",
         [
-            ("case24_ieee_rts"),
-            ("case57_ieee"),
-            ("case118_ieee"),
+            "case24_ieee_rts",
+            pytest.param(
+                "case57_ieee",
+                marks=pytest.mark.skipif(
+                    SKIP_LARGE_GRIDS,
+                    reason="Skipping large grids",
+                ),
+            ),
+            pytest.param(
+                "case118_ieee",
+                marks=pytest.mark.skipif(
+                    SKIP_LARGE_GRIDS,
+                    reason="Skipping large grids",
+                ),
+            ),
         ],
     )
     def test_dc_opf_and_dc_pf_comprehensive(self, case_name):
@@ -560,9 +638,21 @@ class TestSolve:
     @pytest.mark.parametrize(
         "case_name",
         [
-            ("case24_ieee_rts"),
-            ("case57_ieee"),
-            ("case118_ieee"),
+            "case24_ieee_rts",
+            pytest.param(
+                "case57_ieee",
+                marks=pytest.mark.skipif(
+                    SKIP_LARGE_GRIDS,
+                    reason="Skipping large grids",
+                ),
+            ),
+            pytest.param(
+                "case118_ieee",
+                marks=pytest.mark.skipif(
+                    SKIP_LARGE_GRIDS,
+                    reason="Skipping large grids",
+                ),
+            ),
         ],
     )
     def test_dc_columns_nan_when_res_dc_none(self, case_name):

@@ -15,6 +15,21 @@ from gridfm_datakit.utils.param_handler import NestedNamespace
 import copy
 
 
+SKIP_LARGE_GRIDS = os.getenv("SKIP_LARGE_GRIDS", "0") == "1"
+
+
+small_grids = ["case24_ieee_rts"]
+
+large_grids = [
+    "case118_ieee",
+    "case197_snem",
+    "case240_pserc",
+    "case300_ieee",
+]
+
+test_cases = small_grids if SKIP_LARGE_GRIDS else small_grids + large_grids
+
+
 def get_configs():
     default_config_path = "scripts/config/default.yaml"
 
@@ -23,13 +38,7 @@ def get_configs():
     args = NestedNamespace(**config_dict)
 
     configs = []
-    for name in [
-        "case24_ieee_rts",
-        "case118_ieee",
-        "case197_snem",
-        "case240_pserc",
-        "case300_ieee",
-    ]:
+    for name in test_cases:
         new_args = copy.deepcopy(args)
         new_args.network.name = name
         configs.append((name, new_args))

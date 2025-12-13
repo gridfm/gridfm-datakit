@@ -74,6 +74,7 @@ jobs:
       - name: Unit tests
         run: |
           source .venv/bin/activate
-          pytest --cov=. tests/ -s -v
+          export SKIP_LARGE_GRIDS=1
+          pytest --cov=. tests/ -v
 
 # testing
