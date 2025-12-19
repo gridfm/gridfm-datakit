@@ -174,10 +174,11 @@ def compute_stats_from_data(
         p_balance_dc_mean = group_by_scenario["P_mis_dc"].mean().reindex(scenarios)
         # bus index of the bus with the largest DC P-mismatch per scenario
         idxmax = group_by_scenario["P_mis_dc"].idxmax().dropna()
-        idx_bus_max_p_balance_error_dc_per_scenario = balance_dc.loc[
-            idxmax,
-            "bus",
-        ].reindex(scenarios)
+        idx_bus_max_p_balance_error_dc_per_scenario = (
+            balance_dc.loc[idxmax.dropna(), ["scenario", "bus"]]
+            .set_index("scenario")["bus"]
+            .reindex(scenarios)
+        )
 
     # ---4) Runtime data (optional) ---
     if has_runtime:
@@ -357,24 +358,23 @@ def plot_stats(data_dir: str, sn_mva: float, n_partitions: int = 0) -> None:
     # Plot histograms
     for ax, (title, data) in zip(axes, plots):
         print(title)
-        if isinstance(data, np.ndarray) and np.issubdtype(data.dtype, np.floating):
-            # For DC-related metrics, exclude NaNs from plot but show count in legend
-            if "DC" in title:
-                valid = data[~np.isnan(data)]
-                nan_count = int(np.isnan(data).sum())
-                ax.hist(
-                    valid,
-                    bins=100,
-                    color="steelblue",
-                    edgecolor="black",
-                    alpha=0.7,
-                    label=f"valid={len(valid)}, nan={nan_count}",
-                )
-                ax.legend()
-            else:
-                ax.hist(data, bins=100, color="steelblue", edgecolor="black", alpha=0.7)
+        # For DC-related metrics, exclude NaNs from plot but show count in legend
+        if "DC" in title:
+            valid = data[~np.isnan(data)]
+            nan_count = int(np.isnan(data).sum())
+            ax.hist(
+                valid,
+                bins=100,
+                color="steelblue",
+                edgecolor="black",
+                alpha=0.7,
+                label=f"valid={len(valid)}, nan={nan_count}",
+            )
+            ax.legend()
         else:
-            ax.hist(data, bins=100, color="steelblue", edgecolor="black", alpha=0.7)
+            if data.size > 0:
+                ax.hist(data, bins=100, color="steelblue", edgecolor="black", alpha=0.7)
+
         ax.set_title(title, fontsize=12, pad=10)
         ax.set_xlabel(title, fontsize=10)
         ax.set_ylabel("Count", fontsize=10)

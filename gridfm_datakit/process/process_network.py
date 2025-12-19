@@ -679,12 +679,16 @@ def pf_post_processing(
         res["solution"]["bus"][str(net.reverse_bus_index_mapping[i])]["vm"]
         for i in range(n_buses)
     ]
-    X_bus[:, 7] = np.rad2deg(
+    va = np.rad2deg(
         [
             res["solution"]["bus"][str(net.reverse_bus_index_mapping[i])]["va"]
             for i in range(n_buses)
         ],
     )
+
+    # convert to range [-180, 180]
+    va = (va + 180) % 360 - 180
+    X_bus[:, 7] = va
 
     # one-hot encoding of bus type
     assert np.all(np.isin(net.buses[:, BUS_TYPE], [PQ, PV, REF])), (
@@ -712,6 +716,8 @@ def pf_post_processing(
                     for i in range(n_buses)
                 ],
             )
+            # convert to range [-180, 180]
+            va = (va + 180) % 360 - 180
             X_bus[:, 16] = va
             X_bus[:, 17] = Pg_bus_dc
         else:

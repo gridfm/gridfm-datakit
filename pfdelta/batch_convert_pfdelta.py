@@ -479,12 +479,12 @@ def convert_one_pfdelta(
             "cp0_eur": c0,
             "cp1_eur_per_mw": c1 / baseMVA,
             "cp2_eur_per_mw2": c2 / (baseMVA**2),
-            "in_service": 1,
+            "in_service": status,
             "is_slack_gen": 1 if bus_of_g == slack_bus else 0,
         }
         gen_rows.append(gen_row)
 
-        total_cost += (
+        total_cost += status * (
             gen_row["cp0_eur"]
             + gen_row["cp1_eur_per_mw"] * p_mw
             + gen_row["cp2_eur_per_mw2"] * (p_mw) ** 2
@@ -493,7 +493,7 @@ def convert_one_pfdelta(
 
     sol_obj = float(data["solution"]["objective"])
     require(
-        np.isclose(total_cost, sol_obj, atol=1e-3),
+        np.isclose(total_cost, sol_obj, atol=1e-3, rtol=1e-5),
         f"Generator cost sum {total_cost:.8f} != solution objective {sol_obj:.8f}, scenario {scenario}",
     )
 
