@@ -179,6 +179,7 @@ def compute_stats_from_data(
             .set_index("scenario")["bus"]
             .reindex(scenarios)
         )
+        
 
     # ---4) Runtime data (optional) ---
     if has_runtime:
@@ -210,7 +211,7 @@ def compute_stats_from_data(
         result["p_balance_error_dc_max"] = p_balance_dc_max.to_numpy(dtype=float)
         result["p_balance_error_dc_mean"] = p_balance_dc_mean.to_numpy(dtype=float)
         result["bus_idx_max_p_balance_error_dc_per_scenario"] = (
-            idx_bus_max_p_balance_error_dc_per_scenario.to_numpy(dtype=int)
+            idx_bus_max_p_balance_error_dc_per_scenario.to_numpy(dtype=float)
         )
         if has_runtime:
             result["runtime_data_dc_ms"] = runtime_data_dc.to_numpy(dtype=float)
@@ -485,7 +486,7 @@ def plot_feature_distributions(
         fig, ax = plt.subplots(figsize=(15, 6))
 
         bus_data = [
-            bus_groups.get_group(bus)[feature_name].values for bus in sorted_buses
+        bus_groups.get_group(bus)[feature_name].dropna().values for bus in sorted_buses
         ]
 
         parts = ax.violinplot(bus_data, showmeans=True)
