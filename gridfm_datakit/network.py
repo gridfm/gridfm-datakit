@@ -36,12 +36,91 @@ from gridfm_datakit.utils.idx_brch import (
     BR_R_ASYM,
     BR_X_ASYM,
 )
-from gridfm_datakit.utils.idx_cost import NCOST
+from gridfm_datakit.utils.idx_cost import NCOST, MODEL, POLYNOMIAL
 import warnings
 import networkx as nx
 import numpy as np
 import copy
 from typing import Dict, Tuple, Any
+from multiprocessing import Pool
+
+
+def _correct_network_worker(args: Tuple[str, str]) -> str:
+    """
+    Worker that initializes Julia and corrects a MATPOWER network file.
+
+    Args:
+        args: (network_path, corrected_path)
+
+    Returns:
+        Path to corrected network file.
+    """
+    network_path, corrected_path = args
+
+    # IMPORTANT: import Julia ONLY inside the worker
+    from juliacall import Main as jl
+
+    # Initialize Julia environment for this process
+    jl.seval("""
+    using PowerModels
+    using Ipopt
+    using Memento
+    """)
+
+    try:
+        data = jl.PowerModels.parse_file(network_path)
+        jl.export_matpower(corrected_path, data)
+        return corrected_path
+
+    except Exception as e:
+        raise RuntimeError(f"Failed to correct network file {network_path}: {e}")
+
+
+# =========================
+# Public API
+# =========================
+
+
+def correct_network(network_path: str, force: bool = False) -> str:
+    """
+    Load a MATPOWER network file using PowerModels and save a corrected version.
+
+    The Julia runtime is fully isolated in a subprocess to ensure fork safety
+    and avoid global Julia state corruption.
+
+    Args:
+        network_path: Path to the original MATPOWER .m file.
+        force: If True, regenerate the corrected file even if it exists.
+
+    Returns:
+        Path to the corrected network file.
+
+    Raises:
+        FileNotFoundError: If input file does not exist.
+        RuntimeError: If PowerModels fails.
+    """
+    if not os.path.exists(network_path):
+        raise FileNotFoundError(f"Network file not found: {network_path}")
+
+    base_path, ext = os.path.splitext(network_path)
+    corrected_path = f"{base_path}_corrected{ext}"
+
+    if os.path.exists(corrected_path) and not force:
+        return corrected_path
+
+    # Single-process pool (matches your OPF pattern)
+    pool = Pool(processes=1)
+
+    try:
+        result = pool.apply(
+            _correct_network_worker,
+            ((network_path, corrected_path),),
+        )
+        return result
+
+    finally:
+        pool.close()
+        pool.join()
 
 
 def numpy_to_matlab_matrix(array: np.ndarray, name: str) -> str:
@@ -140,6 +219,11 @@ class Network:
         # assert only one reference bus
         assert np.sum(self.buses[:, BUS_TYPE] == REF) == 1, (
             "There should be exactly one reference bus"
+        )
+
+        # assert cost model is polynomial (2)
+        assert np.all(self.gencosts[:, MODEL] == POLYNOMIAL), (
+            "Cost model should be polynomial"
         )
         self.ref_bus_idx = np.where(self.buses[:, BUS_TYPE] == REF)[0][0]
 
@@ -527,11 +611,13 @@ class Network:
         # print(f"MATPOWER case file saved as {filename}")
 
 
-def load_net_from_file(network_path: str) -> Network:
+def load_net_from_file(network_path: str, use_corrected: bool = True) -> Network:
     """Load a network from a MATPOWER file.
 
     Args:
         network_path: Path to the MATPOWER file (without extension).
+        use_corrected: If True, first correct the network file using PowerModels.
+                       If False, load the file directly without correction.
 
     Returns:
         Network object containing the power network configuration.
@@ -540,6 +626,10 @@ def load_net_from_file(network_path: str) -> Network:
         FileNotFoundError: If the network file doesn't exist.
         ValueError: If the file format is invalid.
     """
+    # Optionally correct the network file first
+    if use_corrected:
+        network_path = correct_network(network_path)
+
     # Load network using matpowercaseframes
     mpc_frames = CaseFrames(network_path)
     mpc = {
@@ -552,7 +642,7 @@ def load_net_from_file(network_path: str) -> Network:
     return Network(mpc)
 
 
-def load_net_from_pglib(grid_name: str) -> Network:
+def load_net_from_pglib(grid_name: str, use_corrected: bool = True) -> Network:
     """Load a power grid network from PGLib using matpowercaseframes.
 
     Downloads the network file if not locally available and loads it into a Network object.
@@ -560,6 +650,8 @@ def load_net_from_pglib(grid_name: str) -> Network:
     Args:
         grid_name: Name of the grid file without the prefix 'pglib_opf_'
                   (e.g., 'case14_ieee', 'case118_ieee').
+        use_corrected: If True, first correct the network file using PowerModels.
+                       If False, load the file directly without correction.
 
     Returns:
         Network object containing the power network configuration.
@@ -585,6 +677,10 @@ def load_net_from_pglib(grid_name: str) -> Network:
 
         with open(file_path, "wb") as f:
             f.write(response.content)
+
+    # Optionally correct the network file first
+    if use_corrected:
+        file_path = correct_network(file_path)
 
     # Load network using matpowercaseframes
     mpc_frames = CaseFrames(file_path)

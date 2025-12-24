@@ -725,7 +725,13 @@ def pf_post_processing(
             X_bus[:, 17] = np.nan
 
     # --- Generator data ---
-    assert np.all(net.gencosts[:, NCOST] == 3), "NCOST should be 3"
+    assert np.all(net.gencosts[:, NCOST] <= 3), (
+        "NCOST should be less than or equal to 3"
+    )
+    assert np.all(net.gencosts[:, NCOST] == net.gencosts[0, NCOST]), (
+        "NCOST should be the same for all generators"
+    )
+    n_cost = int(net.gencosts[0, NCOST])
     n_gens = net.gens.shape[0]
     n_cols = (
         len(GEN_COLUMNS) + len(DC_GEN_COLUMNS) if include_dc_res else len(GEN_COLUMNS)
@@ -741,9 +747,9 @@ def pf_post_processing(
     X_gen[:, 6] = net.gens[:, PMAX]
     X_gen[:, 7] = net.gens[:, QMIN]
     X_gen[:, 8] = net.gens[:, QMAX]
-    X_gen[:, 9] = net.gencosts[:, COST]
-    X_gen[:, 10] = net.gencosts[:, COST + 1]
-    X_gen[:, 11] = net.gencosts[:, COST + 2]
+    coeffs = net.gencosts[:, COST : COST + n_cost]  # slice all coefficients
+    # reverse columns to get order: c0 (constant), c1 (linear), c2 (quadratic)
+    X_gen[:, 9 : 9 + n_cost] = coeffs[:, ::-1]
     X_gen[net.idx_gens_in_service, 12] = 1
 
     # slack gen (can be any generator connected to the ref node)

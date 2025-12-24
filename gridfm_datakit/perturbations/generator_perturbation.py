@@ -75,6 +75,7 @@ class PermuteGenCostGenerator(GenerationGenerator):
         assert np.all(base_net.gencosts[:, NCOST] == base_net.gencosts[:, NCOST][0]), (
             "All generators must have the same number of cost coefficients"
         )
+        self.n_cost = int(base_net.gencosts[:, NCOST][0])
 
     def generate(
         self,
@@ -94,7 +95,11 @@ class PermuteGenCostGenerator(GenerationGenerator):
         for scenario in example_generator:
             new_idx = np.random.permutation(self.num_gens)
             # Permute the rows (generators) of the cost coefficients (and NCOST, although we assume it is the same for all generators)
-            scenario.gencosts[:, NCOST:] = scenario.gencosts[:, NCOST:][new_idx]
+            scenario.gencosts[:, NCOST : COST + self.n_cost] = scenario.gencosts[
+                :,
+                NCOST : COST + self.n_cost,
+            ][new_idx]
+            print(scenario.gencosts[:5, NCOST : COST + self.n_cost])
             yield scenario
 
 
@@ -120,10 +125,10 @@ class PerturbGenCostGenerator(GenerationGenerator):
         assert np.all(base_net.gencosts[:, NCOST] == base_net.gencosts[:, NCOST][0]), (
             "All generators must have the same number of cost coefficients"
         )
-        n_costs = int(base_net.gencosts[:, NCOST][0])
+        self.n_cost = int(base_net.gencosts[:, NCOST][0])
         self.lower = np.max([0.0, 1.0 - sigma])
         self.upper = 1.0 + sigma
-        self.sample_size = [self.num_gens, n_costs]
+        self.sample_size = [self.num_gens, self.n_cost]
 
     def generate(
         self,
@@ -150,5 +155,8 @@ class PerturbGenCostGenerator(GenerationGenerator):
                 high=self.upper,
                 size=self.sample_size,
             )
-            example.gencosts[:, COST:] = example.gencosts[:, COST:] * scale_fact
+            example.gencosts[:, COST : COST + self.n_cost] = (
+                example.gencosts[:, COST : COST + self.n_cost] * scale_fact
+            )
+            print(example.gencosts[:5, COST : COST + self.n_cost])
             yield example
