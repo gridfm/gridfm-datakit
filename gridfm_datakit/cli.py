@@ -64,6 +64,7 @@ def validate_data_directory(
         "branch_data": "branch_data.parquet",
         "gen_data": "gen_data.parquet",
         "y_bus_data": "y_bus_data.parquet",
+        "runtime_data": "runtime_data.parquet",
     }
 
     # Determine mode: use provided mode or read from args.log

@@ -409,8 +409,8 @@ def validate_voltage_angles_within_bounds(
     generated_data: Dict[str, pd.DataFrame],
 ) -> None:
     """
-    Validate that all bus voltage angles (Va) are within [-180, 180] degrees
-    for both PF and OPF scenarios.
+    Validate that all bus voltage angles (Va, and Va_dc if present)
+    are within [-180, 180] degrees for both PF and OPF scenarios.
 
     Raises:
         AssertionError: if any voltage angle is out of bounds.
@@ -421,12 +421,26 @@ def validate_voltage_angles_within_bounds(
         f"    Voltage angles bounds check: validating {len(bus_data)} bus entries across {len(scenarios)} scenarios",
     )
 
-    va_within_bounds = (bus_data["Va"] >= -180 - 1e-6) & (bus_data["Va"] <= 180 + 1e-6)
-    if not va_within_bounds.all():
-        out_of_bounds = bus_data.loc[~va_within_bounds, ["scenario", "bus", "Va"]]
-        raise AssertionError(
-            f"Voltage angles out of bounds [-180, 180]:\n{out_of_bounds}",
+    def _check_angle(col: str) -> None:
+        values = bus_data[col]
+        within_bounds = values.isna() | (
+            (values >= -180 - 1e-6) & (values <= 180 + 1e-6)
         )
+        if not within_bounds.all():
+            out_of_bounds = bus_data.loc[~within_bounds, ["scenario", "bus", col]]
+            raise AssertionError(
+                f"{col} angles out of bounds [-180, 180]:\n{out_of_bounds}",
+            )
+
+    # AC voltage angles
+    _check_angle("Va")
+
+    # DC voltage angles (if present)
+    if "Va_dc" in bus_data.columns:
+        print("    DC voltage angles (Va_dc) present, performing check for Va_dc")
+        _check_angle("Va_dc")
+    else:
+        print("    No DC voltage angles (Va_dc) present, skipping check for Va_dc")
 
     print("    Voltage angles bounds check: OK")
 
