@@ -23,7 +23,9 @@ def read_args_log(path: Path):
 
     return {
         "scenarios": data.get("load", {}).get("scenarios"),
-        "n_topology_variants": data.get("topology_perturbation", {}).get("n_topology_variants"),
+        "n_topology_variants": data.get("topology_perturbation", {}).get(
+            "n_topology_variants",
+        ),
         "large_chunk_size": data.get("settings", {}).get("large_chunk_size"),
         "pf_fast": data.get("settings", {}).get("pf_fast"),
         "cpu": data.get("settings", {}).get("num_processes"),
@@ -31,6 +33,7 @@ def read_args_log(path: Path):
         "mode": data.get("settings", {}).get("mode"),
         "max_iter": data.get("settings", {}).get("max_iter"),
     }
+
 
 def read_samples(raw_dir: Path):
     f = raw_dir / "n_scenarios.txt"
@@ -91,6 +94,7 @@ def read_last_tqdm_time(raw_dir: Path):
 # IPOPT maximum iteration extraction using YOUR PARSER
 ###############################################################################
 
+
 def compute_max_iter(solver_log_dir: Path, mode: str):
     patterns = {
         "opf": "opf_*.log",
@@ -122,6 +126,7 @@ def compute_max_iter(solver_log_dir: Path, mode: str):
 ###############################################################################
 # Per-grid extraction
 ###############################################################################
+
 
 def process_grid(grid_root: Path):
     raw_dir = grid_root / "raw"
@@ -170,6 +175,7 @@ def process_grid(grid_root: Path):
 # Directory traversal
 ###############################################################################
 
+
 def main(base_dir="/dccstor/gridfm/powermodels_data/v3/finetuning"):
     base = Path(base_dir)
     rows = []
@@ -190,7 +196,7 @@ def main(base_dir="/dccstor/gridfm/powermodels_data/v3/finetuning"):
 
     df = pd.DataFrame(rows)
     df.to_csv(base / "summary.csv", index=False)
-    print(f"Wrote {base / "summary.csv"}")
+    print(f"Wrote {base / 'summary.csv'}")
 
 
 if __name__ == "__main__":
