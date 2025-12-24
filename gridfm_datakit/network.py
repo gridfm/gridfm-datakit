@@ -43,37 +43,41 @@ import numpy as np
 import copy
 from typing import Dict, Tuple, Any
 from multiprocessing import Pool
+import multiprocessing
+multiprocessing.set_start_method("spawn", force=True)
 
-
-def _correct_network_worker(args: Tuple[str, str]) -> str:
-    """
-    Worker that initializes Julia and corrects a MATPOWER network file.
-
-    Args:
-        args: (network_path, corrected_path)
-
-    Returns:
-        Path to corrected network file.
-    """
+def _correct_network_worker(args):
     network_path, corrected_path = args
 
-    # IMPORTANT: import Julia ONLY inside the worker
     from juliacall import Main as jl
+    import os
+    import tempfile
 
-    # Initialize Julia environment for this process
     jl.seval("""
     using PowerModels
     using Ipopt
     using Memento
     """)
 
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".m")
+    os.close(tmp_fd)
+
     try:
         data = jl.PowerModels.parse_file(network_path)
-        jl.export_matpower(corrected_path, data)
+        jl.export_matpower(tmp_path, data)
+
+        # Sanity check: file must be non-empty
+        if os.path.getsize(tmp_path) == 0:
+            raise RuntimeError("Julia produced empty MATPOWER file")
+
+        # Atomic replace
+        os.replace(tmp_path, corrected_path)
         return corrected_path
 
-    except Exception as e:
-        raise RuntimeError(f"Failed to correct network file {network_path}: {e}")
+    except Exception:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        raise
 
 
 # =========================
@@ -110,18 +114,17 @@ def correct_network(network_path: str, force: bool = False) -> str:
 
     # Single-process pool (matches your OPF pattern)
     pool = Pool(processes=1)
-
-    try:
-        result = pool.apply(
+    result = pool.apply_async(
             _correct_network_worker,
             ((network_path, corrected_path),),
         )
-        return result
 
+    try:
+        return result.get(timeout=None)
     finally:
         pool.close()
         pool.join()
-
+    
 
 def numpy_to_matlab_matrix(array: np.ndarray, name: str) -> str:
     """Format a NumPy array as a MATLAB matrix assignment to mpc.<name>.
