@@ -179,7 +179,6 @@ def compute_stats_from_data(
             .set_index("scenario")["bus"]
             .reindex(scenarios)
         )
-        
 
     # ---4) Runtime data (optional) ---
     if has_runtime:
@@ -486,7 +485,8 @@ def plot_feature_distributions(
         fig, ax = plt.subplots(figsize=(15, 6))
 
         bus_data = [
-        bus_groups.get_group(bus)[feature_name].dropna().values for bus in sorted_buses
+            bus_groups.get_group(bus)[feature_name].dropna().values
+            for bus in sorted_buses
         ]
 
         parts = ax.violinplot(bus_data, showmeans=True)
