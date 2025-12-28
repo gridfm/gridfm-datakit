@@ -1,50 +1,45 @@
-# gridfm-datakit
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gridfm/gridfm-datakit/refs/heads/main/docs/figs/KIT_logo.png" alt="GridFM logo" style="width: 40%; height: auto;"/>
+  <br/>
+</p>
+
+<p align="center" style="font-size: 25px;">
+</p>
 
 
-This library is brought to you by the GridFM team to generate power flow data to train machine learning and foundation models.
+# GridFM DataKit
 
-<!-- ---
+**GridFM DataKit** (`gridfm-datakit`) is a Python library for generating realistic, diverse, and scalable synthetic datasets for power flow (PF) and optimal power flow (OPF) machine learning solvers. It unifies state-of-the-art methods for perturbing loads, generator dispatches, network topologies, and branch parameters, addressing limitations of existing data generation libraries.
 
-### Workflow
+## Key Features
+
+* **Scalable**: Supports grids with up to 30,000 buses for PF and 10,000 buses for OPF. Compatible with MATPOWER (`.m`) files and the PGLib dataset.
+* **Realistic load scenarios**: Combines global scaling from real-world aggregated profiles with localized per-bus noise, preserving temporal and spatial correlations.
+* **Flexible topology perturbations**: Handles arbitrary (N-k) outages for lines, transformers, and generators, ensuring feasible network states.
+* **Generator cost diversity**: Permutes or randomly scales generator cost functions when solving OPF to produce diverse dispatches and improve generalization across different cost conditions.
+* **Out-of-operating-limits scenarios for PF**: PF datasets include realistic violations of operating limits (e.g., voltage or branch overloads) resulting from topology and load perturbations without re-optimizing generator dispatch.
+* **Admittance perturbations**: Randomly scales branch resistances and reactances to enhance diversity.
+* **Structured outputs for ML**: Per-bus, per-branch, and per-generator data ready for training neural PF/OPF solvers, with pre-computed DC-PF and DC-OPF baselines and runtime.
+* **Data validation and benchmarking**: Includes CLI tools for consistency checks, statistics, and constraint validation.
+
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/gridfm/gridfm-datakit/refs/heads/main/docs/figs/pipeline_docs.png" alt=""/>
+  <img src="https://raw.githubusercontent.com/gridfm/gridfm-datakit/refs/heads/main/docs/figs/comparison_table.png" alt="Comparison table" style="width: 80%; height: auto;"/>
   <br/>
-</p> -->
+</p>
 
+## Citation
 
----
+Please cite the library when using it in your work:
 
-
-
-### Comparison with other PF datasets/ libraries
-TODO
-<!-- <div style="display: flex; justify-content: center;">
-  <div style="transform: scale(0.75); transform-origin: top center;">
-    <table>
-      <thead>
-        <tr>
-          <th>Feature</th>
-          <th><a href="https://doi.org/10.1016/j.epsr.2020.106547">Graph Neural Solver [1]</a></th>
-          <th><a href="https://arxiv.org/abs/2406.07234">OPFData [2]</a></th>
-          <th><a href="https://arxiv.org/abs/2111.01228">OPFLearn [3]</a></th>
-          <th><a href="https://arxiv.org/abs/2311.03415">PowerFlowNet [4]</a></th>
-          <th><a href="https://doi.org/10.1016/j.engappai.2022.105567">TypedGNN [5]</a></th>
-          <th><a href="https://www.climatechange.ai/papers/iclr2025/67">PF△ [6]</a></th>
-          <th><a href="https://openreview.net/pdf?id=cecIf0CKnH"><strong>PGLearn [7]</strong></a></th>
-          <th><strong><a href="https://www.cell.com/joule/fulltext/S2542-4351(24)00470-7">gridfm-datakit [8]</a></strong></th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr><td>Generator cost perturbation</td><td>✅</td><td>❌</td><td>❌</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td><td>✅</td></tr>
-        <tr><td>N-1</td><td>❌</td><td>✅</td><td>❌</td><td>❌</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td></tr>
-        <tr><td>&gt; 1000 Buses</td><td>❌</td><td>✅</td><td>✅</td><td>❌</td><td>❌</td><td>✅</td><td>✅</td><td>✅</td></tr>
-        <tr><td>N-k, k &gt; 1</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>✅</td></tr>
-        <tr><td>Load Scenarios from Real World</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>✅</td></tr>
-        <tr><td>Net Param Perturbation</td><td>✅</td><td>❌</td><td>❌</td><td>✅</td><td>✅</td><td>❌</td><td>❌</td><td>✅</td></tr>
-        <tr><td>Scalable to 1M+</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>✅</td><td>✅</td></tr>
-      </tbody>
-    </table>
-
-  </div>
-</div> -->
+```bibtex
+@misc{puech2025gridfmdatakitv1pythonlibraryscalable,
+      title={gridfm-datakit-v1: A Python Library for Scalable and Realistic Power Flow and Optimal Power Flow Data Generation},
+      author={Alban Puech and Matteo Mazzonelli and Celia Cintas and Tamara R. Govindasamy and Mangaliso Mngomezulu and Jonas Weiss and Matteo Baù and Anna Varbella and François Mirallès and Kibaek Kim and Le Xie and Hendrik F. Hamann and Etienne Vos and Thomas Brunschwiler},
+      year={2025},
+      eprint={2512.14658},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2512.14658},
+}
+```

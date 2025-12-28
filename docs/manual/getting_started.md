@@ -30,6 +30,7 @@ Sample configuration files are provided in `scripts/config`, e.g. `default.yaml`
 network:
   name: "case24_ieee_rts" # Name of the power grid network (without extension)
   source: "pglib" # Data source for the grid; options: pglib, file
+  # WARNING: the following parameter is only used if source is "file"
   network_dir: "scripts/grids" # if using source "file", this is the directory containing the network file (relative to the project root)
 
 load:
@@ -54,10 +55,12 @@ topology_perturbation:
 
 generation_perturbation:
   type: "cost_permutation" # Type of generation perturbation; options: cost_permutation, cost_perturbation, none
-  sigma: 1.0 # Size of range use for sampling scaling factor
+  # WARNING: the following parameter is only used if type is "cost_permutation"
+  sigma: 1.0 # Size of range used for sampling scaling factor
 
 admittance_perturbation:
   type: "random_perturbation" # Type of admittance perturbation; options: random_perturbation, none
+  # WARNING: the following parameter is only used if type is "random_perturbation"
   sigma: 0.2 # Size of range used for sampling scaling factor
 
 settings:
@@ -65,7 +68,7 @@ settings:
   data_dir: "./data_out" # Directory to save generated data relative to the project root
   large_chunk_size: 1000 # Number of load scenarios processed before saving
   overwrite: true # If true, overwrites existing files, if false, appends to files
-  mode: "pf" # Mode of the script; options: pf, opf. pf: power flow data where one or more operating limits – the inequality constraints defined in OPF, e.g., voltage magnitude or branch limits – may be violated. opf:  datapoints for training OPF solvers, with cost-optimal dispatches that satisfy all operating limits (OPF-feasible)
+  mode: "pf" # Mode of the script; options: pf, opf. pf: power flow data where one or more operating limits – the inequality constraints defined in OPF, e.g., voltage magnitude or branch limits – may be violated. opf: generates datapoints for training OPF solvers, with cost-optimal dispatches that satisfy all operating limits (OPF-feasible)
   include_dc_res: true # If true, also stores the results of dc power flow and dc optimal power flow
   pf_fast: true # Whether to use fast PF solver by default (compute_ac_pf from powermodels.jl); if false, uses Ipopt-based PF. Some networks e.g. case10000_goc do not work with pf_fast: true
   dcpf_fast: true # Whether to use fast DC PF solver (compute_dc_pf from powermodels.jl); if false, uses optimizer-based DC PF

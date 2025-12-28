@@ -32,7 +32,7 @@
 
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/gridfm/gridfm-datakit/refs/heads/main/docs/figs/comparison_table.png" alt="Comparison table" style="width: 40%; height: auto;"/>
+  <img src="https://raw.githubusercontent.com/gridfm/gridfm-datakit/refs/heads/main/docs/figs/comparison_table.png" alt="Comparison table" style="width: 80%; height: auto;"/>
   <br/>
 </p>
 
@@ -68,7 +68,7 @@ Please cite the library when using it in your work:
     pip install gridfm-datakit
     ```
 
-4. Install Julia with Powermodels and Ipopt
+4. Install Julia with PowerModels and Ipopt
 
     ```bash
     gridfm_datakit setup_pm
@@ -169,7 +169,7 @@ topology_perturbation:
 generation_perturbation:
   type: "cost_permutation" # Type of generation perturbation; options: cost_permutation, cost_perturbation, none
   # WARNING: the following parameter is only used if type is "cost_permutation"
-  sigma: 1.0 # Size of range use for sampling scaling factor
+  sigma: 1.0 # Size of range used for sampling scaling factor
 
 admittance_perturbation:
   type: "random_perturbation" # Type of admittance perturbation; options: random_perturbation, none
@@ -181,7 +181,7 @@ settings:
   data_dir: "./data_out" # Directory to save generated data relative to the project root
   large_chunk_size: 1000 # Number of load scenarios processed before saving
   overwrite: true # If true, overwrites existing files, if false, appends to files
-  mode: "pf" # Mode of the script; options: pf, opf. pf: power flow data where one or more operating limits – the inequality constraints defined in OPF, e.g., voltage magnitude or branch limits – may be violated. opf:  datapoints for training OPF solvers, with cost-optimal dispatches that satisfy all operating limits (OPF-feasible)
+  mode: "pf" # Mode of the script; options: pf, opf. pf: power flow data where one or more operating limits – the inequality constraints defined in OPF, e.g., voltage magnitude or branch limits – may be violated. opf: generates datapoints for training OPF solvers, with cost-optimal dispatches that satisfy all operating limits (OPF-feasible)
   include_dc_res: true # If true, also stores the results of dc power flow (in addition to the results AC power flow). does not work with mode "opf"
   enable_solver_logs: true # If true, write OPF/PF logs to {data_dir}/solver_log; PF fast and DCPF fast do not log.
   pf_fast: true # Whether to use fast PF solver by default (compute_ac_pf from powermodels.jl); if false, uses Ipopt-based PF. Some networks e.g. case10000_goc do not work with pf_fast: true. pf_fast is faster and more accurate than the Ipopt-based PF.
@@ -203,8 +203,8 @@ The data generation process writes the following artifacts under:
 - **scenarios_{generator}.html**: Plot of the generated load scenarios.
 - **scenarios_{generator}.log**: Generator-specific notes (e.g., bounds for the global scaling factor when using `agg_load_profile`).
 - **n_scenarios.txt**: Metadata file containing the total number of scenarios (used for efficient partition management).
-- **bus_data.parquet**: Bus-level features for each processed scenario, partitioned by `scenario_partition` (columns `BUS_COLUMNS` and, if `settings.include_dc_res=True`, also `DC_BUS_COLUMNS`).
-- **gen_data.parquet**: Generator features per scenario, partitioned by `scenario_partition` (columns `GEN_COLUMNS`).
-- **branch_data.parquet**: Branch features per scenario, partitioned by `scenario_partition` (columns `BRANCH_COLUMNS`).
-- **y_bus_data.parquet**: Nonzero Y-bus entries per scenario, partitioned by `scenario_partition` with columns `[scenario, index1, index2, G, B]`.
-- **runtime_data.parquet**: Runtime data for each scenario, partitioned by `scenario_partition` (AC and DC solver execution times).
+- **bus_data.parquet**: Bus-level features for each processed scenario (columns `BUS_COLUMNS` and, if `settings.include_dc_res=True`, also `DC_BUS_COLUMNS`).
+- **gen_data.parquet**: Generator features per scenario (columns `GEN_COLUMNS`).
+- **branch_data.parquet**: Branch features per scenario (columns `BRANCH_COLUMNS`).
+- **y_bus_data.parquet**: Nonzero Y-bus entries per scenario with columns `[scenario, index1, index2, G, B]`.
+- **runtime_data.parquet**: Runtime data for each scenario (AC and DC solver execution times).

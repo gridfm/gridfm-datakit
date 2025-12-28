@@ -26,6 +26,9 @@ Plot of the generated load scenarios.
 #### `scenarios_{generator}.log`
 Generator-specific notes (e.g., bounds for the global scaling factor when using `agg_load_profile`).
 
+#### `n_scenarios.txt`
+Metadata file containing the total number of scenarios (used for efficient partition management).
+
 ### Network Data Files
 
 #### `bus_data.parquet`
@@ -114,6 +117,11 @@ Nonzero Y-bus entries per scenario with columns:
 - **index2**: Column index in the Y-bus matrix
 - **G**: Conductance value (p.u.)
 - **B**: Susceptance value (p.u.)
+
+### Runtime Data Files
+
+#### `runtime_data.parquet`
+Runtime data for each scenario (AC and DC solver execution times).
 
 ### Statistics Files
 

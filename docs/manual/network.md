@@ -10,7 +10,7 @@ network:
 
 ```
 
-Networks can be loaded from three different sources, specified in `source:
+Networks can be loaded from two different sources, specified in `source:
 
 ## [PGLib repository](https://github.com/power-grid-lib/pglib-opf) (recommended)
 
@@ -21,12 +21,12 @@ network:
   name: "case24_ieee_rts"   # Name of the power grid network **without the pglib prefix**
 ```
 
-## Local matpower files
+## Local MATPOWER files
 
 e.g.
 ```yaml
 network:
-  source: "Texas2k_case1_2016summerpeak"
-  name: "case24_ieee_rts"          # Name of the power grid network **without .m extension**
-  network_dir: "scripts/grids"    # Directory containing the network files
+  source: "file"
+  name: "Texas2k_case1_2016summerpeak"  # Name of the power grid network **without .m extension**
+  network_dir: "scripts/grids"          # Directory containing the network files
 ```
