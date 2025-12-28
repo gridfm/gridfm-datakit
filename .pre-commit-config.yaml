@@ -7,7 +7,7 @@ repos:
     -   id: check-yaml
     -   id: debug-statements
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.13.3
+  rev: v0.14.10
   hooks:
     - id: ruff-check
     - id: ruff-format
@@ -17,7 +17,7 @@ repos:
     -   id: flake8
         args: ["--ignore=E501,W503,E203"]
 -   repo: https://github.com/asottile/add-trailing-comma
-    rev: v3.2.0
+    rev: v4.0.0
     hooks:
     -   id: add-trailing-comma
 -   repo: https://github.com/ibm/detect-secrets

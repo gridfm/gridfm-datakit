@@ -2,16 +2,21 @@
 
 import numpy as np
 import pandas as pd
-from typing import Tuple
+from typing import Tuple, Union
 
 
 def compute_branch_admittances(
-    r,
-    x,
-    b,
-    tap_mag,
-    shift,
-):
+    r: Union[float, np.ndarray],
+    x: Union[float, np.ndarray],
+    b: Union[float, np.ndarray],
+    tap_mag: Union[float, np.ndarray],
+    shift: Union[float, np.ndarray],
+) -> Tuple[
+    Union[complex, np.ndarray],
+    Union[complex, np.ndarray],
+    Union[complex, np.ndarray],
+    Union[complex, np.ndarray],
+]:
     """
     Compute branch admittances (Yff, Yft, Ytf, Ytt) from branch parameters.
 

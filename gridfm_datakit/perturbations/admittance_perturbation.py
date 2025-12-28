@@ -21,7 +21,7 @@ class AdmittanceGenerator(ABC):
 
         Args:
             example_generator: A generator producing example (load/topology/generation)
-            scenarios to which line admittance perturbations are added.
+                scenarios to which line admittance perturbations are added.
 
         Yields:
             An admittance-perturbed scenario.
@@ -43,9 +43,8 @@ class NoAdmittancePerturbationGenerator(AdmittanceGenerator):
         """Yield the original examples without any perturbations.
 
         Args:
-            example_generator: A generator producing example
-            (load/topology/generation) scenarios to which line admittance
-            perturbations are added.
+            example_generator: A generator producing example (load/topology/generation)
+                scenarios to which line admittance perturbations are added.
 
         Yields:
             The original example produced by the example_generator.
@@ -71,6 +70,10 @@ class PerturbAdmittanceGenerator(AdmittanceGenerator):
 
         Args:
             base_net: The base power network.
+            sigma: A constant that specifies the range from which to draw
+                samples from a uniform distribution to be used as a scaling
+                factor for resistance and reactance. The range is
+                set as [max([0, 1-sigma]), 1+sigma).
         """
         self.base_net = base_net
         self.r_original = self.base_net.branches[:, BR_R]
@@ -86,14 +89,8 @@ class PerturbAdmittanceGenerator(AdmittanceGenerator):
         """Generate a network with perturbed line admittance values.
 
         Args:
-            example_generator: A generator producing example
-                (load/topology/generation) scenarios to which line admittance
-                perturbations are added.
-
-            sigma: A constant that specifies the range from which to draw
-                samples from a uniform distribution to be used as a scaling
-                factor for resistance and and reactance. The range is
-                set as [max([0,1-sigma]), 1+sigma)
+            example_generator: A generator producing example (load/topology/generation)
+                scenarios to which line admittance perturbations are added.
 
         Yields:
             An example scenario with random perturbations applied to line

@@ -22,7 +22,7 @@ class GenerationGenerator(ABC):
 
         Args:
             example_generator: A generator producing example (load/topology/generation)
-            scenarios to which line admittance perturbations are added.
+                scenarios to which generator cost perturbations are added.
 
         Yields:
             A generation-perturbed scenario.
@@ -44,9 +44,8 @@ class NoGenPerturbationGenerator(GenerationGenerator):
         """Yield the original examples without any perturbations.
 
         Args:
-            example_generator: A generator producing example
-            (load/topology/generation) scenarios to which generator
-            cost perturbations should be applied.
+            example_generator: A generator producing example (load/topology/generation)
+                scenarios to which generator cost perturbations should be applied.
 
         Yields:
             The original example produced by the example_generator.
@@ -113,6 +112,10 @@ class PerturbGenCostGenerator(GenerationGenerator):
 
         Args:
             base_net: The base power network.
+            sigma: A constant that specifies the range from which to draw
+                samples from a uniform distribution to be used as a scaling
+                factor for cost coefficient perturbations. The range is
+                set as [max([0, 1-sigma]), 1+sigma).
         """
         self.base_net = base_net
         self.num_gens = base_net.gens.shape[0]  # acount for deactivated generators
@@ -132,13 +135,8 @@ class PerturbGenCostGenerator(GenerationGenerator):
         """Generate a network with perturbed generator cost coefficients.
 
         Args:
-            example_generator: A generator producing example
-                (load/topology) scenarios to which generator cost coefficient
-                perturbations should be added.
-            sigma: A constant that specifies the range from which to draw
-                samples from a uniform distribution to be used as a scaling
-                factor for cost coefficient perturbations. The range is
-                set as [max([0,1-sigma]), 1+sigma)
+            example_generator: A generator producing example (load/topology) scenarios
+                to which generator cost coefficient perturbations should be added.
 
         Yields:
             An example scenario with cost coeffiecients in the poly_cost

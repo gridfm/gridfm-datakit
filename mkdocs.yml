@@ -18,6 +18,8 @@ nav:
     - Perturbations:
       - Load: components/load.md
       - Topology: components/topology.md
+      - Generator: components/generator_perturbation.md
+      - Admittance: components/admittance_perturbation.md
     - Process:
       - Process Network: components/process_network.md
       - Solvers: components/solvers.md
@@ -25,6 +27,7 @@ nav:
     - Utils:
       - Utils: components/utils.md
       - Stats: components/stats.md
+      - Power Balance: components/power_balance.md
       - Param Handler: components/param_handler.md
     - Generate: components/generate.md
     - Validation: components/validation.md
