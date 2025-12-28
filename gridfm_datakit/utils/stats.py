@@ -1,201 +1,461 @@
+"""Statistics computation and visualization for power flow data."""
+
+from __future__ import annotations
 import pandas as pd
-import plotly.express as px
-from pandapower.auxiliary import pandapowerNet
-from gridfm_datakit.process.solvers import calculate_power_imbalance
-import matplotlib.pyplot as plt
 import numpy as np
 import os
+from typing import Dict, List
+import matplotlib.pyplot as plt
+from gridfm_datakit.utils.power_balance import (
+    compute_branch_powers_vectorized,
+    compute_bus_balance,
+)
+from gridfm_datakit.utils.utils import get_num_scenarios
+from gridfm_datakit.utils.utils import read_partitions, n_scenario_per_partition
 
 
-def plot_stats(base_path: str) -> None:
-    """Generates and saves HTML plots of network statistics.
+def compute_stats_from_data(
+    data_dir: str,
+    sn_mva: float,
+    n_partitions: int = 0,
+) -> Dict[str, np.ndarray]:
+    """Compute statistics from parquet data files (vectorized).
 
-    Creates histograms for various network statistics including number of generators,
-    lines, transformers, overloads, and maximum loading. Saves the plots to an HTML file.
+    Computes aggregated statistics from generated power flow data. Processes all scenarios
+    in the parquet files and returns per-scenario metrics as well as global statistics.
 
     Args:
-        base_path: Directory path where the stats CSV file is located and where
-            the HTML plot will be saved.
+        data_dir: Directory containing bus_data.parquet, branch_data.parquet, gen_data.parquet, and optionally runtime_data.parquet
+        sn_mva: Base MVA used to scale power quantities
+        n_partitions: Number of partitions to compute stats for (0 for all partitions)
 
-    Raises:
-        FileNotFoundError: If stats.csv is not found in the base_path directory.
+    Returns:
+        Dictionary with the following keys and corresponding numpy arrays:
+        - **scenario_ids**: Array of scenario IDs
+        - **n_generators**: Array of active generator counts per scenario (int array)
+        - **n_branches**: Array of active branch counts per scenario (int array)
+        - **n_overloads**: Array of overloaded branch counts per scenario (loading > 1.01, int array)
+        - **max_loading**: Array of maximum branch loading per scenario (float array)
+        - **branch_loadings**: Vector of all branch loading values across all scenarios (float array)
+        - **p_balance_error_ac_max**: Array of maximum active power balance error per scenario (float array)
+        - **p_balance_error_ac_mean**: Array of mean active power balance error per scenario (float array)
+        - **q_balance_error_ac_max**: Array of maximum reactive power balance error per scenario (float array)
+        - **q_balance_error_ac_mean**: Array of mean reactive power balance error per scenario (float array)
+        - **runtime_data_ac_ms**: (if runtime data available) Array of AC solver runtime per scenario in milliseconds (float array)
+        - **p_balance_error_dc_max**: (if DC data available) Array of maximum DC active power balance error per scenario (float array)
+        - **p_balance_error_dc_mean**: (if DC data available) Array of mean DC active power balance error per scenario (float array)
+        - **bus_idx_max_p_balance_error_dc_per_scenario**: (if DC data available) Array of bus index with max DC PBE per scenario (int array)
+        - **runtime_data_dc_ms**: (if DC and runtime data available) Array of DC solver runtime per scenario in milliseconds (float array)
+
+        Branch loading is computed as max(||S_from||/rate_a, ||S_to||/rate_a) where ||S|| = sqrt(P² + Q²).
+        Power balance errors are computed as the mean absolute difference between net injections
+        (including shunt contributions) and aggregated branch flows at each bus.
     """
-    stats_to_plot = Stats()
-    stats_to_plot.load(base_path)
-    filename = base_path + "/stats_plot.html"
+    # --- Load from partitioned parquet ---
+    # Get total number of scenarios efficiently
+    total_scenarios = get_num_scenarios(data_dir)
 
-    with open(filename, "w") as f:
-        # Plot for n_generators
-        fig_generators = px.histogram(stats_to_plot.n_generators)
-        fig_generators.update_layout(xaxis_title="Number of Generators")
-        f.write(fig_generators.to_html(full_html=False, include_plotlyjs="cdn"))
+    total_partitions = (
+        total_scenarios + n_scenario_per_partition - 1
+    ) // n_scenario_per_partition
 
-        # Plot for n_lines
-        fig_lines = px.histogram(stats_to_plot.n_lines)
-        fig_lines.update_layout(xaxis_title="Number of Lines")
-        f.write(fig_lines.to_html(full_html=False, include_plotlyjs=False))
+    if n_partitions > 0:
+        sampled_partitions = sorted(
+            np.random.choice(
+                total_partitions,
+                size=min(n_partitions, total_partitions),
+                replace=False,
+            ),
+        )
+        print(
+            f"Computing stats for {len(sampled_partitions)} partitions out of {total_partitions}",
+        )
+    else:
+        sampled_partitions = list(range(total_partitions))
 
-        # Plot for n_trafos
-        fig_trafos = px.histogram(stats_to_plot.n_trafos)
-        fig_trafos.update_layout(xaxis_title="Number of Transformers")
-        f.write(fig_trafos.to_html(full_html=False, include_plotlyjs=False))
+    # Read filtered data from partitioned parquet using partition filter
+    bus_file = os.path.join(data_dir, "bus_data.parquet")
+    branch_file = os.path.join(data_dir, "branch_data.parquet")
+    gen_file = os.path.join(data_dir, "gen_data.parquet")
+    runtime_file = os.path.join(data_dir, "runtime_data.parquet")
 
-        # Plot for n_overloads
-        fig_overloads = px.histogram(stats_to_plot.n_overloads)
-        fig_overloads.update_layout(xaxis_title="Number of Overloads")
-        f.write(fig_overloads.to_html(full_html=False, include_plotlyjs=False))
+    bus_data = read_partitions(bus_file, sampled_partitions)
+    branch_data = read_partitions(branch_file, sampled_partitions)
+    gen_data = read_partitions(gen_file, sampled_partitions)
 
-        # Plot for max_loading
-        fig_max_loading = px.histogram(stats_to_plot.max_loading)
-        fig_max_loading.update_layout(xaxis_title="Max Loading")
-        f.write(fig_max_loading.to_html(full_html=False, include_plotlyjs=False))
+    # Runtime data is optional
+    has_runtime = os.path.exists(runtime_file)
+    if has_runtime:
+        runtime_data = read_partitions(runtime_file, sampled_partitions)
+    else:
+        print("Runtime data not found, skipping runtime statistics")
 
-        # Plot for total_p_diff
-        fig_total_p_diff = px.histogram(stats_to_plot.total_p_diff)
-        fig_total_p_diff.update_layout(xaxis_title="Total Active Power Imbalance")
-        f.write(fig_total_p_diff.to_html(full_html=False, include_plotlyjs=False))
+    dc = True if "p_mw_dc" in gen_data.columns else False
+    # The canonical scenario ordering (to match the original function's behavior)
+    scenarios = bus_data["scenario"].unique()
 
-        # Plot for total_q_diff
-        fig_total_q_diff = px.histogram(stats_to_plot.total_q_diff)
-        fig_total_q_diff.update_layout(xaxis_title="Total Reactive Power Imbalance")
-        f.write(fig_total_q_diff.to_html(full_html=False, include_plotlyjs=False))
+    # --- 1) Counts: generators and branches (active by status only) ---
+    n_generators_s = (
+        gen_data.loc[gen_data["in_service"] == 1]
+        .groupby("scenario", sort=False)
+        .size()
+        .reindex(scenarios, fill_value=0)
+    )
+
+    n_branches_s = (
+        branch_data.loc[branch_data["br_status"] == 1]
+        .groupby("scenario", sort=False)
+        .size()
+        .reindex(scenarios, fill_value=0)
+    )
+
+    # --- 2) Branch loadings & overloads (only active and with finite rating) ---
+    active_br = branch_data[
+        (branch_data["br_status"] == 1) & (branch_data["rate_a"] > 0)
+    ]
+
+    # loading_f = ||S_f||/rate_a, loading_t = ||S_t||/rate_a; loading = max(loading_f, loading_t)
+    # Avoid division-by-zero because we've already filtered rate_a > 0
+    s_f = np.sqrt(active_br["pf"].to_numpy() ** 2 + active_br["qf"].to_numpy() ** 2)
+    s_t = np.sqrt(active_br["pt"].to_numpy() ** 2 + active_br["qt"].to_numpy() ** 2)
+    rate = active_br["rate_a"].to_numpy()
+    loading_f = s_f / rate
+    loading_t = s_t / rate
+    loading = np.maximum(loading_f, loading_t)
+
+    # Attach loading to frame for groupby aggregations
+    active_br = active_br.assign(_loading=loading)
+
+    n_overloads_s = (
+        (active_br["_loading"] > 1.01)
+        .groupby(active_br["scenario"], sort=False)
+        .sum()
+        .reindex(scenarios, fill_value=0)
+    )
+
+    max_loading_s = (
+        active_br.groupby("scenario", sort=False)["_loading"]
+        .max()
+        .reindex(scenarios, fill_value=0.0)
+    )
+
+    # Global vector of per-branch loadings (matches prior behavior of extending a list)
+    branch_loadings_vec = active_br["_loading"].to_numpy(copy=False)
+
+    # --- 3) Power balance errors ---
+    balance_ac = compute_bus_balance(
+        bus_data,
+        branch_data,
+        branch_data[["pf", "qf", "pt", "qt"]],
+        False,
+        sn_mva=sn_mva,
+    )
+    group_by_scenario = balance_ac.groupby("scenario")
+    p_balance_ac_max = group_by_scenario["P_mis_ac"].max().reindex(scenarios)
+    p_balance_ac_mean = group_by_scenario["P_mis_ac"].mean().reindex(scenarios)
+    q_balance_ac_max = group_by_scenario["Q_mis_ac"].max().reindex(scenarios)
+    q_balance_ac_mean = group_by_scenario["Q_mis_ac"].mean().reindex(scenarios)
+    if dc:
+        pf_dc, _, pt_dc, _ = compute_branch_powers_vectorized(
+            branch_data,
+            bus_data,
+            True,
+            sn_mva=sn_mva,
+        )
+        balance_dc = compute_bus_balance(
+            bus_data,
+            branch_data,
+            pd.DataFrame({"pf_dc": pf_dc, "pt_dc": pt_dc}, index=branch_data.index),
+            True,
+            sn_mva=sn_mva,
+        )
+        group_by_scenario = balance_dc.groupby("scenario")
+        p_balance_dc_max = group_by_scenario["P_mis_dc"].max().reindex(scenarios)
+        p_balance_dc_mean = group_by_scenario["P_mis_dc"].mean().reindex(scenarios)
+        # bus index of the bus with the largest DC P-mismatch per scenario
+        idxmax = group_by_scenario["P_mis_dc"].idxmax().dropna()
+        idx_bus_max_p_balance_error_dc_per_scenario = (
+            balance_dc.loc[idxmax.dropna(), ["scenario", "bus"]]
+            .set_index("scenario")["bus"]
+            .reindex(scenarios)
+        )
+
+    # ---4) Runtime data (optional) ---
+    if has_runtime:
+        runtime_data_ac = (
+            runtime_data.set_index("scenario")["ac"].reindex(scenarios) * 1000.0
+        )
+        if dc:
+            runtime_data_dc = (
+                runtime_data.set_index("scenario")["dc"].reindex(scenarios) * 1000.0
+            )
+
+    # --- Pack results (preserve original array shapes/order) ---
+    result = {
+        "scenario_ids": scenarios,
+        "n_generators": n_generators_s.to_numpy(dtype=int),
+        "n_branches": n_branches_s.to_numpy(dtype=int),
+        "n_overloads": n_overloads_s.to_numpy(dtype=int),
+        "max_loading": max_loading_s.to_numpy(dtype=float),
+        "branch_loadings": branch_loadings_vec.astype(float, copy=False),
+        "p_balance_error_ac_max": p_balance_ac_max.to_numpy(dtype=float),
+        "p_balance_error_ac_mean": p_balance_ac_mean.to_numpy(dtype=float),
+        "q_balance_error_ac_max": q_balance_ac_max.to_numpy(dtype=float),
+        "q_balance_error_ac_mean": q_balance_ac_mean.to_numpy(dtype=float),
+    }
+    if has_runtime:
+        result["runtime_data_ac_ms"] = runtime_data_ac.to_numpy(dtype=float)
+
+    if dc:
+        result["p_balance_error_dc_max"] = p_balance_dc_max.to_numpy(dtype=float)
+        result["p_balance_error_dc_mean"] = p_balance_dc_mean.to_numpy(dtype=float)
+        result["bus_idx_max_p_balance_error_dc_per_scenario"] = (
+            idx_bus_max_p_balance_error_dc_per_scenario.to_numpy(dtype=float)
+        )
+        if has_runtime:
+            result["runtime_data_dc_ms"] = runtime_data_dc.to_numpy(dtype=float)
+
+    return result
 
 
-class Stats:  # network stats
-    """A class to track and analyze statistics related to power grid networks.
+def plot_stats(data_dir: str, sn_mva: float, n_partitions: int = 0) -> None:
+    """Generate and save statistics plots using matplotlib.
 
-    This class maintains data lists of various network metrics including
-    number of lines, transformers, generators, overloads, maximum loading, total active power imbalance, and total reactive power imbalance.
+    Creates a multi-panel histogram plot showing distributions of key metrics across all scenarios.
+    The plot is saved as `stats_plot.png` in the specified directory with 300 DPI resolution.
 
-    Attributes:
-        n_lines: List of number of in-service lines over time.
-        n_trafos: List of number of in-service transformers over time.
-        n_generators: List of total in-service generators (gen + sgen) over time.
-        n_overloads: List of number of overloaded elements over time.
-        max_loading: List of maximum loading percentages over time.
-        total_p_diff: List of total active power imbalance over time.
-        total_q_diff: List of total reactive power imbalance over time.
+    Args:
+        data_dir: Directory containing data files (bus_data.parquet, branch_data.parquet, gen_data.parquet, and optionally runtime_data.parquet)
+                  and where the plot will be saved
+        sn_mva: Base MVA used to scale power quantities
+        n_partitions: Number of partitions to compute stats for (0 for all partitions)
+
+    The generated plot contains histograms (with log scale on y-axis) for:
+    - Number of generators per scenario
+    - Number of branches per scenario
+    - Number of overloads per scenario
+    - Maximum loading per scenario
+    - Branch loading (all branches across all scenarios)
+    - Active power balance error (mean absolute error per scenario, normalized)
+    - Reactive power balance error (mean absolute error per scenario, normalized)
+    - (If runtime data available) Runtime (AC solver execution time in milliseconds)
+    - (If DC data available) DC active power balance error, bus index with max DC PBE
+    - (If DC and runtime data available) DC runtime
     """
+    stats = compute_stats_from_data(data_dir, sn_mva=sn_mva, n_partitions=n_partitions)
+    filename = os.path.join(data_dir, "stats_plot.png")
 
-    def __init__(self) -> None:
-        """Initializes the Stats object with empty lists for all tracked metrics."""
-        self.n_lines = []
-        self.n_trafos = []
-        self.n_generators = []
-        self.n_overloads = []
-        self.max_loading = []
-        self.total_p_diff = []
-        self.total_q_diff = []
+    # Save per-scenario statistics to a parquet file with one row per scenario
 
-    def update(self, net: pandapowerNet) -> None:
-        """Adds the current state of the network to the data lists.
+    per_scenario = {
+        "scenario": stats["scenario_ids"],
+        "n_generators": stats["n_generators"],
+        "n_branches": stats["n_branches"],
+        "n_overloads": stats["n_overloads"],
+        "max_loading": stats["max_loading"],
+        "p_balance_error_ac_max": stats["p_balance_error_ac_max"],
+        "p_balance_error_ac_mean": stats["p_balance_error_ac_mean"],
+        "q_balance_error_ac_max": stats["q_balance_error_ac_max"],
+        "q_balance_error_ac_mean": stats["q_balance_error_ac_mean"],
+    }
+    if "runtime_data_ac_ms" in stats:
+        per_scenario["runtime_data_ac_ms"] = stats["runtime_data_ac_ms"]
 
-        Args:
-            net: A pandapower network object containing the current state of the grid.
-        """
-        self.n_lines.append(net.line.in_service.sum())
-        self.n_trafos.append(net.trafo.in_service.sum())
-        self.n_generators.append(net.gen.in_service.sum() + net.sgen.in_service.sum())
-        self.n_overloads.append(
-            np.sum(
-                [
-                    (net.res_line["loading_percent"] > 100.01).sum(),
-                    (net.res_trafo["loading_percent"] > 100.01).sum(),
-                ],
+    mean_mean_p_balance_error_ac = np.nanmean(stats["p_balance_error_ac_mean"])
+    mean_mean_q_balance_error_ac = np.nanmean(stats["q_balance_error_ac_mean"])
+
+    if "p_balance_error_dc_max" in stats:
+        per_scenario["p_balance_error_dc_max"] = stats["p_balance_error_dc_max"]
+        per_scenario["p_balance_error_dc_mean"] = stats["p_balance_error_dc_mean"]
+        per_scenario["bus_idx_max_p_balance_error_dc_per_scenario"] = stats[
+            "bus_idx_max_p_balance_error_dc_per_scenario"
+        ]
+        if "runtime_data_dc_ms" in stats:
+            per_scenario["runtime_data_dc_ms"] = stats["runtime_data_dc_ms"]
+        mean_mean_p_balance_error_dc = np.nanmean(stats["p_balance_error_dc_mean"])
+
+    df_stats = pd.DataFrame(per_scenario)
+    # Add partition column for scenario-based partitioning (n_scenario_per_partition scenarios per partition)
+    df_stats["scenario_partition"] = (
+        df_stats["scenario"] // n_scenario_per_partition
+    ).astype("int64")
+    df_stats.to_parquet(
+        os.path.join(data_dir, "stats.parquet"),
+        partition_cols=["scenario_partition"],
+        engine="pyarrow",
+        index=False,
+    )
+
+    # Titles and data pairs
+    plots = [
+        ("Number of Generators", stats["n_generators"]),
+        ("Number of Branches", stats["n_branches"]),
+        ("Number of Overloads", stats["n_overloads"]),
+        ("Max Loading", stats["max_loading"]),
+        ("Branch Loading", stats["branch_loadings"]),
+        # ("Max Active PBE (AC, normalized)", stats["p_balance_error_ac_max"]),
+        (
+            f"Mean Active PBE (AC, normalized). Mean={np.format_float_scientific(mean_mean_p_balance_error_ac, precision=2)}",
+            stats["p_balance_error_ac_mean"],
+        ),
+        # ("Max Reactive PBE (AC, normalized)", stats["q_balance_error_ac_max"]),
+        (
+            f"Mean Reactive PBE (AC, normalized). Mean={np.format_float_scientific(mean_mean_q_balance_error_ac, precision=2)}",
+            stats["q_balance_error_ac_mean"],
+        ),
+    ]
+
+    # Add runtime plot if runtime data exists
+    if "runtime_data_ac_ms" in stats:
+        plots.append(
+            (
+                "Runtime (AC, ms). Mean={:.2f}".format(
+                    stats["runtime_data_ac_ms"].mean(),
+                ),
+                stats["runtime_data_ac_ms"],
             ),
         )
 
-        self.max_loading.append(
-            np.max(
-                [
-                    net.res_line["loading_percent"].max(),
-                    net.res_trafo["loading_percent"].max(),
-                ],
+    # Optionally add DC power balance if available
+    if "p_balance_error_dc_max" in stats:
+        plots.append(
+            (
+                "Max Active PBE (DC in AC model, normalized)",
+                stats["p_balance_error_dc_max"],
             ),
         )
-        total_p_diff, total_q_diff = calculate_power_imbalance(net)
-        self.total_p_diff.append(total_p_diff)
-        self.total_q_diff.append(total_q_diff)
-
-    def merge(self, other: "Stats") -> None:
-        """Merges another Stats object into this one.
-
-        Args:
-            other: Another Stats object whose data will be merged into this one.
-        """
-        self.n_lines.extend(other.n_lines)
-        self.n_trafos.extend(other.n_trafos)
-        self.n_generators.extend(other.n_generators)
-        self.n_overloads.extend(other.n_overloads)
-        self.max_loading.extend(other.max_loading)
-        self.total_p_diff.extend(other.total_p_diff)
-        self.total_q_diff.extend(other.total_q_diff)
-
-    def save(self, base_path: str) -> None:
-        """Saves the tracked statistics to a CSV file.
-
-        If the file already exists, appends the new data with a continuous index.
-        If the file doesn't exist, creates a new file.
-
-        Args:
-            base_path: Directory path where the CSV file will be saved.
-        """
-        filename = os.path.join(base_path, "stats.csv")
-
-        new_data = pd.DataFrame(
-            {
-                "n_lines": self.n_lines,
-                "n_trafos": self.n_trafos,
-                "n_generators": self.n_generators,
-                "n_overloads": self.n_overloads,
-                "max_loading": self.max_loading,
-                "total_p_diff": self.total_p_diff,
-                "total_q_diff": self.total_q_diff,
-            },
+        plots.append(
+            (
+                f"Mean Active PBE (DC in AC model, normalized). Mean={mean_mean_p_balance_error_dc:.2f}",
+                stats["p_balance_error_dc_mean"],
+            ),
         )
+        plots.append(
+            (
+                "Bus Index with Max Active PBE (DC in AC model, normalized)",
+                stats["bus_idx_max_p_balance_error_dc_per_scenario"],
+            ),
+        )
+        if "runtime_data_dc_ms" in stats:
+            plots.append(
+                (
+                    "Runtime (DC, ms). Mean={:.2f}".format(
+                        np.nanmean(stats["runtime_data_dc_ms"]),
+                    ),
+                    stats["runtime_data_dc_ms"],
+                ),
+            )
 
-        if os.path.exists(filename):
-            # Read existing file to determine the new index start
-            existing_data = pd.read_csv(filename)
-            start_index = existing_data.index[-1] + 1 if not existing_data.empty else 0
-            new_data.index = range(start_index, start_index + len(new_data))
+    # sort plots by title
+    plots.sort(key=lambda x: x[0])
+    # Define figure and subplots
+    n_plots = len(plots)
+    import math
 
-            new_data.to_csv(filename, mode="a", header=False)
+    fig, axes = plt.subplots(math.ceil(n_plots / 2), 2, figsize=(12, 14))
+    axes = axes.ravel()
+
+    # Plot histograms
+    for ax, (title, data) in zip(axes, plots):
+        print(title)
+        # For DC-related metrics, exclude NaNs from plot but show count in legend
+        if "DC" in title:
+            valid = data[~np.isnan(data)]
+            nan_count = int(np.isnan(data).sum())
+            ax.hist(
+                valid,
+                bins=100,
+                color="steelblue",
+                edgecolor="black",
+                alpha=0.7,
+                label=f"valid={len(valid)}, nan={nan_count}",
+            )
+            ax.legend()
         else:
-            new_data.to_csv(filename, index=True)
+            if data.size > 0:
+                ax.hist(data, bins=100, color="steelblue", edgecolor="black", alpha=0.7)
 
-    def load(self, base_path: str) -> None:
-        """Loads the tracked statistics from a CSV file.
+        ax.set_title(title, fontsize=12, pad=10)
+        ax.set_xlabel(title, fontsize=10)
+        ax.set_ylabel("Count", fontsize=10)
+        ax.set_yscale("log")
+        ax.grid(True, linestyle="--", alpha=0.4)
 
-        Args:
-            base_path: Directory path where the CSV file is saved.
+    # Remove any unused subplot (if any)
+    for i in range(len(plots), len(axes)):
+        fig.delaxes(axes[i])
 
-        Raises:
-            FileNotFoundError: If stats.csv is not found in the base_path directory.
-        """
-        filename = os.path.join(base_path, "stats.csv")
-        df = pd.read_csv(filename)
-        self.n_lines = df["n_lines"].values
-        self.n_trafos = df["n_trafos"].values
-        self.n_generators = df["n_generators"].values
-        self.n_overloads = df["n_overloads"].values
-        self.max_loading = df["max_loading"].values
-        self.total_p_diff = df["total_p_diff"].values
-        self.total_q_diff = df["total_q_diff"].values
+    fig.tight_layout()
+    fig.savefig(filename, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+
+    print(f"Statistics plots saved to {filename}")
 
 
-def plot_feature_distributions(node_file: str, output_dir: str, sn_mva: float) -> None:
-    """
-    Create and save violin plots showing the distribution of each feature across all buses.
+def plot_feature_distributions(
+    node_file: str,
+    output_dir: str,
+    sn_mva: float,
+    buses: List[int] = None,
+    n_partitions: int = 0,
+) -> None:
+    """Create and save violin plots showing the distribution of each feature across all buses.
+
+    Generates violin plots for each feature column defined in `BUS_COLUMNS` (and `DC_BUS_COLUMNS` if
+    DC columns are present in the data). Each plot shows the probability distribution of feature values across selected buses,
+    with overlaid box plots showing quartiles.
 
     Args:
-        node_file: CSV file containing node data with a 'bus' column.
-        output_dir: Directory to save the plots.
+        node_file: Parquet file containing node data with a 'bus' column (typically bus_data.parquet).
+        output_dir: Directory where plots will be saved as `distribution_{feature_name}.png`.
+        sn_mva: Base MVA used to normalize power-related columns (Pd, Qd, Pg, Qg) by dividing by this value.
+        buses: List of bus indices to plot. If None, randomly samples 30 buses (or all buses if fewer than 30).
+        n_partitions: Number of partitions to plot (0 for all partitions)
+
+    Each generated plot displays:
+    - Violin plots showing the probability density of feature values per bus
+    - Box plots overlaid on violins showing quartiles, median, and min/max
+    - Power-related features (Pd, Qd, Pg, Qg) are normalized by dividing by `sn_mva`
+    - Features are plotted for columns defined in `gridfm_datakit.utils.column_names.BUS_COLUMNS`
+      and optionally `DC_BUS_COLUMNS` if DC columns (e.g., Va_dc) are present in the data
     """
-    node_data = pd.read_csv(node_file)
+    import matplotlib.pyplot as plt
+    from gridfm_datakit.utils.column_names import DC_BUS_COLUMNS
+
+    # Get total number of scenarios and partitions
+    data_dir = os.path.dirname(node_file)
+    total_scenarios = get_num_scenarios(data_dir)
+    total_partitions = (
+        total_scenarios + n_scenario_per_partition - 1
+    ) // n_scenario_per_partition
+
+    if n_partitions > 0:
+        sampled_partitions = sorted(
+            np.random.choice(
+                total_partitions,
+                size=min(n_partitions, total_partitions),
+                replace=False,
+            ),
+        )
+        print(
+            f"Plotting for {len(sampled_partitions)} partitions out of {total_partitions}",
+        )
+    else:
+        sampled_partitions = list(range(total_partitions))
+
+    # Read filtered data from partitioned parquet using partition filter
+    node_data = read_partitions(node_file, sampled_partitions)
     os.makedirs(output_dir, exist_ok=True)
 
-    feature_cols = ["Pd", "Qd", "Pg", "Qg", "Vm", "Va", "PQ", "PV", "REF"]
+    if not buses:
+        # sample 30 buses randomly
+        buses = np.random.choice(
+            node_data["bus"].unique(),
+            size=min(30, len(node_data["bus"].unique())),
+            replace=False,
+        )
+
+    node_data = node_data[node_data["bus"].isin(buses)]
 
     # normalize by sn_mva
     for col in ["Pd", "Qd", "Pg", "Qg"]:
@@ -205,22 +465,36 @@ def plot_feature_distributions(node_file: str, output_dir: str, sn_mva: float) -
     bus_groups = node_data.groupby("bus")
     sorted_buses = sorted(bus_groups.groups.keys())
 
+    feature_cols = [
+        "Pd",
+        "Qd",
+        "Pg",
+        "Qg",
+        "Vm",
+        "Va",
+        "PQ",
+        "PV",
+        "REF",
+    ]
+    if "Va_dc" in node_data.columns:
+        feature_cols = feature_cols + DC_BUS_COLUMNS
+    else:
+        feature_cols = feature_cols
+
     for feature_name in feature_cols:
         fig, ax = plt.subplots(figsize=(15, 6))
 
-        # Efficient and readable data gathering
         bus_data = [
-            bus_groups.get_group(bus)[feature_name].values for bus in sorted_buses
+            bus_groups.get_group(bus)[feature_name].dropna().values
+            for bus in sorted_buses
         ]
 
-        # Violin plot
         parts = ax.violinplot(bus_data, showmeans=True)
 
         for pc in parts["bodies"]:
             pc.set_facecolor("#D43F3A")
             pc.set_alpha(0.7)
 
-        # Add box plot overlay
         ax.boxplot(
             bus_data,
             widths=0.15,
@@ -244,7 +518,7 @@ def plot_feature_distributions(node_file: str, output_dir: str, sn_mva: float) -
 
         out_path = os.path.join(
             output_dir,
-            f"distribution_{feature_name}_all_buses.png",
+            f"distribution_{feature_name}.png",
         )
         plt.savefig(out_path)
         plt.close()

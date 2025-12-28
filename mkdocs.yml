@@ -27,6 +27,7 @@ nav:
       - Stats: components/stats.md
       - Param Handler: components/param_handler.md
     - Generate: components/generate.md
+    - Validation: components/validation.md
     - CLI: components/cli.md
 
 

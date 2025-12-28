@@ -1,7 +1,8 @@
 import numpy as np
-import pandapower as pp
 from abc import ABC, abstractmethod
 from typing import Generator, List, Union
+from gridfm_datakit.network import Network
+from gridfm_datakit.utils.idx_brch import BR_R, BR_X
 
 
 class AdmittanceGenerator(ABC):
@@ -14,8 +15,8 @@ class AdmittanceGenerator(ABC):
     @abstractmethod
     def generate(
         self,
-        example_generator: Generator[pp.pandapowerNet, None, None],
-    ) -> Union[Generator[pp.pandapowerNet, None, None], List[pp.pandapowerNet]]:
+        example_generator: Generator[Network, None, None],
+    ) -> Union[Generator[Network, None, None], List[Network]]:
         """Generate admittance perturbations.
 
         Args:
@@ -37,8 +38,8 @@ class NoAdmittancePerturbationGenerator(AdmittanceGenerator):
 
     def generate(
         self,
-        example_generator: Generator[pp.pandapowerNet, None, None],
-    ) -> Generator[pp.pandapowerNet, None, None]:
+        example_generator: Generator[Network, None, None],
+    ) -> Generator[Network, None, None]:
         """Yield the original examples without any perturbations.
 
         Args:
@@ -63,24 +64,25 @@ class PerturbAdmittanceGenerator(AdmittanceGenerator):
     bound.
     """
 
-    def __init__(self, base_net: pp.pandapowerNet, sigma: float) -> None:
+    def __init__(self, base_net: Network, sigma: float) -> None:
         """
         Initialize the line admittance perturbation generator.
+        TODO: add BR_B
 
         Args:
             base_net: The base power network.
         """
         self.base_net = base_net
-        self.r_original = self.base_net.line["r_ohm_per_km"].values
-        self.x_original = self.base_net.line["x_ohm_per_km"].values
+        self.r_original = self.base_net.branches[:, BR_R]
+        self.x_original = self.base_net.branches[:, BR_X]
         self.lower = np.max([0.0, 1.0 - sigma])
         self.upper = 1.0 + sigma
-        self.sample_size = self.r_original.shape[0]
+        self.sample_size = self.base_net.branches.shape[0]
 
     def generate(
         self,
-        example_generator: Generator[pp.pandapowerNet, None, None],
-    ) -> Generator[pp.pandapowerNet, None, None]:
+        example_generator: Generator[Network, None, None],
+    ) -> Generator[Network, None, None]:
         """Generate a network with perturbed line admittance values.
 
         Args:
@@ -98,13 +100,13 @@ class PerturbAdmittanceGenerator(AdmittanceGenerator):
             admittances.
         """
         for example in example_generator:
-            example.line["r_ohm_per_km"] = np.random.uniform(
+            example.branches[:, BR_R] = np.random.uniform(
                 self.lower * self.r_original,
                 self.upper * self.r_original,
                 self.r_original.shape[0],
             )
 
-            example.line["x_ohm_per_km"] = np.random.uniform(
+            example.branches[:, BR_X] = np.random.uniform(
                 self.lower * self.x_original,
                 self.upper * self.x_original,
                 self.x_original.shape[0],

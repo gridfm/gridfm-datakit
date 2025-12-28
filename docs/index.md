@@ -3,14 +3,14 @@
 
 This library is brought to you by the GridFM team to generate power flow data to train machine learning and foundation models.
 
----
+<!-- ---
 
 ### Workflow
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/gridfm/gridfm-datakit/refs/heads/main/docs/figs/pipeline_docs.png" alt=""/>
   <br/>
-</p>
+</p> -->
 
 
 ---
@@ -18,7 +18,8 @@ This library is brought to you by the GridFM team to generate power flow data to
 
 
 ### Comparison with other PF datasets/ libraries
-<div style="display: flex; justify-content: center;">
+TODO
+<!-- <div style="display: flex; justify-content: center;">
   <div style="transform: scale(0.75); transform-origin: top center;">
     <table>
       <thead>
@@ -35,7 +36,7 @@ This library is brought to you by the GridFM team to generate power flow data to
         </tr>
       </thead>
       <tbody>
-        <tr><td>Generator Profile</td><td>✅</td><td>❌</td><td>❌</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td><td>✅</td></tr>
+        <tr><td>Generator cost perturbation</td><td>✅</td><td>❌</td><td>❌</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td><td>✅</td></tr>
         <tr><td>N-1</td><td>❌</td><td>✅</td><td>❌</td><td>❌</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td></tr>
         <tr><td>&gt; 1000 Buses</td><td>❌</td><td>✅</td><td>✅</td><td>❌</td><td>❌</td><td>✅</td><td>✅</td><td>✅</td></tr>
         <tr><td>N-k, k &gt; 1</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>✅</td></tr>
@@ -46,4 +47,4 @@ This library is brought to you by the GridFM team to generate power flow data to
     </table>
 
   </div>
-</div>
+</div> -->

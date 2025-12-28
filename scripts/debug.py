@@ -9,8 +9,6 @@ if __name__ == "__main__":
     with open(yaml_path) as f:
         config_dict = yaml.safe_load(f)
     args = NestedNamespace(**config_dict)
-    args.load.scenarios = 10
-    args.settings.large_chunk_size = 10
-    args.settings.num_processes = 10
+    args.load.scenarios = 32
     args.settings.data_dir = "debug_data"
     file_paths = generate_power_flow_data_distributed(args)

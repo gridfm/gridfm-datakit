@@ -6,7 +6,7 @@ from gridfm_datakit.perturbations.load_perturbation import (
 )
 from typing import Dict, Any
 import warnings
-from pandapower import pandapowerNet
+from gridfm_datakit.network import Network
 from gridfm_datakit.perturbations.topology_perturbation import (
     NMinusKGenerator,
     RandomComponentDropGenerator,
@@ -200,7 +200,7 @@ def get_load_scenario_generator(args: NestedNamespace) -> LoadScenarioGeneratorB
 
 def initialize_topology_generator(
     args: NestedNamespace,
-    base_net: pandapowerNet,
+    base_net: Network,
 ) -> TopologyGenerator:
     """Initialize the appropriate topology generator based on the given arguments.
 
@@ -263,7 +263,7 @@ def initialize_topology_generator(
 
 def initialize_generation_generator(
     args: NestedNamespace,
-    base_net: pandapowerNet,
+    base_net: Network,
 ) -> GenerationGenerator:
     """Initialize the appropriate generation generator based on the given arguments.
 
@@ -313,7 +313,7 @@ def initialize_generation_generator(
 
 def initialize_admittance_generator(
     args: NestedNamespace,
-    base_net: pandapowerNet,
+    base_net: Network,
 ) -> AdmittanceGenerator:
     """Initialize the appropriate line admittance generator based on the given arguments.
 

@@ -1,10 +1,10 @@
 # Network
 
-This module provides functions to load power grid networks from various sources.
+This module provides functionality for loading, processing, and saving power system networks in MATPOWER format.
 
-### `load_net_from_pp`
+### `Network`
 
-::: gridfm_datakit.network.load_net_from_pp
+::: gridfm_datakit.network.Network
 
 ### `load_net_from_file`
 

@@ -5,7 +5,7 @@ The network parameters are the following:
 ```yaml
 network:
   name: "case24_ieee_rts" # Name of the power grid network (without extension)
-  source: "pglib" # Data source for the grid; options: pglib, pandapower, file
+  source: "pglib" # Data source for the grid; options: pglib, file
   network_dir: "scripts/grids" # if using source "file", this is the directory containing the network file (relative to the project root)
 
 ```
@@ -19,15 +19,6 @@ e.g.
 network:
   source: "pglib"
   name: "case24_ieee_rts"   # Name of the power grid network **without the pglib prefix**
-```
-
-##  [Pandapower library](https://pandapower.readthedocs.io/en/v2.3.0/networks.html)
-
-e.g.
-```yaml
-network:
-  source: "pandapower"
-  name: "case_ieee30"
 ```
 
 ## Local matpower files

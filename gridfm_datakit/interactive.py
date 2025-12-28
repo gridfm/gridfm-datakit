@@ -6,12 +6,13 @@ import yaml
 from pathlib import Path
 from importlib import resources
 from ipyfilechooser import FileChooser
+from typing import List, Dict, Any
 
 # Run the generation function directly
 from gridfm_datakit.generate import generate_power_flow_data_distributed
 
 
-def get_available_load_profiles():
+def get_available_load_profiles() -> List[str]:
     """Get list of available aggregated load profiles."""
     try:
         # Get all .csv files from the load_profiles directory
@@ -42,7 +43,7 @@ def get_available_load_profiles():
         ]
 
 
-def create_config():
+def create_config() -> Dict[str, Any]:
     """Create configuration dictionary from widget values."""
     if network_source.value == "file":
         if not network_file_chooser.selected:
@@ -52,9 +53,6 @@ def create_config():
         network_dir = str(file_path.parent)
     elif network_source.value == "pglib":
         name = pglib_grid_dropdown.value
-        network_dir = "none"
-    else:  # pandapower
-        name = pandapower_grid_dropdown.value
         network_dir = "none"
 
     config = {
@@ -92,15 +90,19 @@ def create_config():
             "num_processes": num_processes.value,
             "data_dir": str(data_dir.value),
             "large_chunk_size": large_chunk_size.value,
-            "no_stats": no_stats.value,
             "overwrite": overwrite.value,
-            "mode": str(mode),
+            "mode": str(mode.value),
+            "include_dc_res": include_dc_res.value,
+            "pf_fast": pf_fast.value,
+            "dcpf_fast": dcpf_fast.value,
+            "enable_solver_logs": enable_solver_logs.value,
+            "max_iter": max_iter.value,
         },
     }
     return config
 
 
-def interactive_interface():
+def interactive_interface() -> None:
     """Main function to create and display the interactive interface."""
     # Get available load profiles
     available_profiles = get_available_load_profiles()
@@ -117,16 +119,11 @@ def interactive_interface():
     )
 
     # Network Configuration
-    global \
-        network_source, \
-        pglib_grid_dropdown, \
-        pandapower_grid_dropdown, \
-        network_file_chooser
+    global network_source, pglib_grid_dropdown, network_file_chooser
 
     network_source = widgets.Dropdown(
         options=[
             ("pglib - Power Grid Library (Recommended)", "pglib"),
-            ("pandapower - Built-in pandapower networks (beta)", "pandapower"),
             ("file - Custom network files (MATPOWER .m)", "file"),
         ],
         value="pglib",
@@ -136,76 +133,79 @@ def interactive_interface():
     )
 
     # --- NEW: pglib grid dropdown ---
+    # Full list of PGLib OPF cases (names without the 'pglib_opf_' prefix)
     pglib_grids = [
+        "case3_lmbd",
+        "case5_pjm",
+        "case14_ieee",
         "case24_ieee_rts",
-        "case30_ieee",
         "case30_as",
+        "case30_ieee",
         "case39_epri",
         "case57_ieee",
         "case60_c",
         "case73_ieee_rts",
         "case89_pegase",
         "case118_ieee",
+        "case162_ieee_dtc",
+        "case179_goc",
         "case197_snem",
-        "case240_pserc",
+        "case200_activ",
+        "case300_ieee",
+        "case500_goc",
+        "case588_sdet",  # Added
         "case793_goc",
+        "case1354_pegase",  # Added
+        "case1803_snem",
+        "case1888_rte",
+        "case1951_rte",
+        "case2000_goc",
         "case2312_goc",
+        "case2383wp_k",
+        "case240_pserc",  # Note: Moved to its correct position by bus count (240 buses)
+        "case2736sp_k",
+        "case2737sop_k",
+        "case2742_goc",
+        "case2746wop_k",
+        "case2746wp_k",
+        "case2848_rte",
+        "case2853_sdet",
+        "case2868_rte",
         "case2869_pegase",
+        "case3012wp_k",
+        "case3022_goc",
+        "case3120sp_k",
+        "case3375wp_k",
         "case3970_goc",
         "case4020_goc",
         "case4601_goc",
+        "case4619_goc",
+        "case4661_sdet",
         "case4837_goc",
         "case4917_goc",
         "case5658_epigrids",
+        "case6468_rte",
+        "case6470_rte",
+        "case6495_rte",
+        "case6515_rte",
         "case7336_epigrids",
+        "case8387_pegase",  # Added
+        "case9241_pegase",
         "case9591_goc",
+        "case10000_goc",  # Note: Moved from bottom to its correct position (10,000 buses)
         "case10192_epigrids",
+        "case10480_goc",
+        "case13659_pegase",
         "case19402_goc",
+        "case20758_epigrids",
+        "case24464_goc",
+        "case30000_goc",  # Note: Moved from bottom to its correct position (30,000 buses)
+        "case78484_epigrids",
     ]
     pglib_grid_dropdown = widgets.Dropdown(
         options=pglib_grids,
         value="case24_ieee_rts",
         description="PGLib Grid:",
-        style={"description_width": "150px"},
-        layout=widgets.Layout(width="550px"),
-    )
-
-    # --- NEW: pandapower grid dropdown ---
-    pandapower_grids = [
-        "GBreducednetwork",
-        "case118",
-        "case11_iwamoto",
-        "case1354pegase",
-        "case14",
-        "case145",
-        "case1888rte",
-        "case24_ieee_rts",
-        "case2848rte",
-        "case2869pegase",
-        "case30",
-        "case300",
-        "case3120sp",
-        "case33bw",
-        "case39",
-        "case4gs",
-        "case5",
-        "case57",
-        "case5_demo_gridcal",
-        "case6470rte",
-        "case6495rte",
-        "case6515rte",
-        "case6ww",
-        "case89pegase",
-        "case9",
-        "case9241pegase",
-        "case_ieee30",
-        "case_illinois200",
-        "iceland",
-    ]
-    pandapower_grid_dropdown = widgets.Dropdown(
-        options=pandapower_grids,
-        value="case14",
-        description="Pandapower Grid:",
         style={"description_width": "150px"},
         layout=widgets.Layout(width="550px"),
     )
@@ -221,15 +221,9 @@ def interactive_interface():
     def update_network_visibility(*args):
         if network_source.value == "pglib":
             pglib_grid_dropdown.layout.display = "block"
-            pandapower_grid_dropdown.layout.display = "none"
-            network_file_chooser.layout.display = "none"
-        elif network_source.value == "pandapower":
-            pglib_grid_dropdown.layout.display = "none"
-            pandapower_grid_dropdown.layout.display = "block"
             network_file_chooser.layout.display = "none"
         else:  # file
             pglib_grid_dropdown.layout.display = "none"
-            pandapower_grid_dropdown.layout.display = "none"
             network_file_chooser.layout.display = "block"
 
     network_source.observe(update_network_visibility, names="value")
@@ -261,9 +255,9 @@ def interactive_interface():
     )
 
     num_scenarios = widgets.IntSlider(
-        value=200,
+        value=10000,
         min=10,
-        max=30000,
+        max=10000,
         step=10,
         description="Load Scenarios:",
         style={"description_width": "150px"},
@@ -305,8 +299,8 @@ def interactive_interface():
 
     max_scaling_factor = widgets.FloatSlider(
         value=4.0,
-        min=1.0,
-        max=10.0,
+        min=0.7,
+        max=4.0,
         step=0.1,
         description="Max Scaling:",
         style={"description_width": "150px"},
@@ -315,9 +309,9 @@ def interactive_interface():
     )
 
     step_size = widgets.FloatSlider(
-        value=0.025,
-        min=0.01,
-        max=0.1,
+        value=0.1,
+        min=0.05,
+        max=0.2,
         step=0.005,
         description="Step Size:",
         style={"description_width": "150px"},
@@ -326,7 +320,7 @@ def interactive_interface():
     )
 
     start_scaling_factor = widgets.FloatSlider(
-        value=0.8,
+        value=1.0,
         min=0.1,
         max=2.0,
         step=0.1,
@@ -340,7 +334,7 @@ def interactive_interface():
 
     global k, n_topology_variants, perturbation_type, elements
     k = widgets.IntSlider(
-        value=2,
+        value=1,
         min=1,
         max=10,
         step=1,
@@ -351,9 +345,9 @@ def interactive_interface():
     )
 
     n_topology_variants = widgets.IntSlider(
-        value=5,
+        value=20,
         min=1,
-        max=20,
+        max=50,
         step=1,
         description="Top. Variants per load scenario:",
         style={"description_width": "200px"},
@@ -375,12 +369,10 @@ def interactive_interface():
 
     elements = widgets.SelectMultiple(
         options=[
-            ("line", "line"),
-            ("trafo", "trafo"),
+            ("branch", "branch"),
             ("gen", "gen"),
-            ("sgen", "sgen"),
         ],
-        value=["line", "trafo", "gen", "sgen"],
+        value=["branch", "gen"],
         description="Elements to Drop:",
         style={"description_width": "150px"},
         layout=widgets.Layout(width="550px", height="120px"),
@@ -441,11 +433,21 @@ def interactive_interface():
 
     # Execution Settings
 
-    global num_processes, data_dir, large_chunk_size, no_stats, overwrite, mode
+    global \
+        num_processes, \
+        data_dir, \
+        large_chunk_size, \
+        overwrite, \
+        mode, \
+        include_dc_res, \
+        pf_fast, \
+        dcpf_fast, \
+        enable_solver_logs, \
+        max_iter
     num_processes = widgets.IntSlider(
-        value=10,
+        value=16,
         min=1,
-        max=16,
+        max=32,
         step=1,
         description="Parallel Processes:",
         style={"description_width": "150px"},
@@ -454,7 +456,7 @@ def interactive_interface():
     )
 
     data_dir = widgets.Text(
-        value="data/",
+        value="./data_out",
         description="Output Directory:",
         placeholder="e.g., data/, /path/to/output",
         style={"description_width": "150px"},
@@ -462,9 +464,9 @@ def interactive_interface():
     )
 
     large_chunk_size = widgets.IntSlider(
-        value=200,
+        value=1000,
         min=10,
-        max=500,
+        max=10000,
         step=10,
         description="Chunk Size:",
         style={"description_width": "150px"},
@@ -474,13 +476,6 @@ def interactive_interface():
 
     # Optional Settings
 
-    no_stats = widgets.Checkbox(
-        value=False,
-        description="Disable statistical calculations (faster)",
-        style={"description_width": "100px"},
-        layout=widgets.Layout(width="500px"),
-    )
-
     overwrite = widgets.Checkbox(
         value=True,
         description="Overwrite existing files (vs. append)",
@@ -488,8 +483,66 @@ def interactive_interface():
         layout=widgets.Layout(width="500px"),
     )
 
-    # Set mode to "pf"
-    mode = "pf"
+    # Mode selection
+    mode = widgets.Dropdown(
+        options=[
+            (
+                "PF mode - Generate Power flow data where one or more operating limits – the inequality constraints defined in OPF, e.g., voltage magnitude or branch limits – may be violated.",
+                "pf",
+            ),
+            (
+                "OPF Mode: Generate Optimal Power Flow data, with cost-optimal dispatches that satisfy all operating limits (OPF-feasible)",
+                "opf",
+            ),
+        ],
+        value="pf",
+        description="Processing Mode:",
+        style={"description_width": "150px"},
+        layout=widgets.Layout(width="650px"),
+    )
+
+    # DC Power Flow option
+    include_dc_res = widgets.Checkbox(
+        value=True,
+        description="Include DC PF/ OPF results",
+        style={"description_width": "100px"},
+        layout=widgets.Layout(width="500px"),
+    )
+
+    # PF fast option
+    pf_fast = widgets.Checkbox(
+        value=True,
+        description="Use fast PF when solving PF (does not work with all networks)",
+        style={"description_width": "100px"},
+        layout=widgets.Layout(width="500px"),
+    )
+
+    dcpf_fast = widgets.Checkbox(
+        value=True,
+        description="Use fast DCPF when solving DC PF (compute_dc_pf)",
+        style={"description_width": "100px"},
+        layout=widgets.Layout(width="500px"),
+    )
+
+    # Enable solver logs option
+    enable_solver_logs = widgets.Checkbox(
+        value=True,
+        description="Enable OPF/PF solver logs",
+        style={"description_width": "100px"},
+        layout=widgets.Layout(width="500px"),
+    )
+
+    # Max iterations for Ipopt-based solvers
+    max_iter = widgets.IntSlider(
+        value=200,
+        min=50,
+        max=1000,
+        step=50,
+        description="Max Iterations (Ipopt):",
+        style={"description_width": "150px"},
+        layout=widgets.Layout(width="550px"),
+        readout_format="d",
+    )
 
     # Load Configuration - Advanced Box
     load_advanced_box = widgets.VBox(
@@ -532,7 +585,6 @@ def interactive_interface():
             ),
             network_source,
             pglib_grid_dropdown,
-            pandapower_grid_dropdown,
             network_file_chooser,
         ],
         layout=widgets.Layout(
@@ -566,6 +618,25 @@ def interactive_interface():
         ),
     )
 
+    # Create containers for topology perturbation components
+    topology_components_container = widgets.VBox([k, n_topology_variants, elements])
+
+    # Function to update topology perturbation component visibility
+    def update_topology_perturbation_visibility(*args):
+        if perturbation_type.value == "none":
+            topology_components_container.layout.display = "none"
+        elif perturbation_type.value == "n_minus_k":
+            # For n_minus_k, only show k parameter, hide variants and elements
+            topology_components_container.children = [k]
+            topology_components_container.layout.display = "block"
+        else:
+            # For random, show all components
+            topology_components_container.children = [k, n_topology_variants, elements]
+            topology_components_container.layout.display = "block"
+
+    perturbation_type.observe(update_topology_perturbation_visibility, names="value")
+    update_topology_perturbation_visibility()  # Set initial state
+
     # Topology Configuration Box
     topology_box = widgets.VBox(
         [
@@ -576,9 +647,7 @@ def interactive_interface():
                 "<p style='margin: 5px 0; color: #666;'>Simulate equipment failures and contingencies</p>",
             ),
             perturbation_type,
-            k,
-            n_topology_variants,
-            elements,
+            topology_components_container,
         ],
         layout=widgets.Layout(
             border="2px solid #F3E5F5",
@@ -587,6 +656,25 @@ def interactive_interface():
             border_radius="10px",
         ),
     )
+
+    # Create container for generation perturbation components
+    generation_components_container = widgets.VBox([gen_sigma])
+
+    # Function to update generation perturbation component visibility
+    def update_generation_perturbation_visibility(*args):
+        if (
+            gen_perturbation_type.value == "none"
+            or gen_perturbation_type.value == "cost_permutation"
+        ):
+            generation_components_container.layout.display = "none"
+        else:
+            generation_components_container.layout.display = "block"
+
+    gen_perturbation_type.observe(
+        update_generation_perturbation_visibility,
+        names="value",
+    )
+    update_generation_perturbation_visibility()  # Set initial state
 
     # Generation Configuration Box
     generation_box = widgets.VBox(
@@ -598,7 +686,7 @@ def interactive_interface():
                 "<p style='margin: 5px 0; color: #666;'>Configure how cost of generation components are perturbed</p>",
             ),
             gen_perturbation_type,
-            gen_sigma,
+            generation_components_container,
         ],
         layout=widgets.Layout(
             border="2px solid #F3E5F5",
@@ -607,6 +695,22 @@ def interactive_interface():
             border_radius="10px",
         ),
     )
+
+    # Create container for admittance perturbation components
+    admittance_components_container = widgets.VBox([admittance_sigma])
+
+    # Function to update admittance perturbation component visibility
+    def update_admittance_perturbation_visibility(*args):
+        if admittance_perturbation_type.value == "none":
+            admittance_components_container.layout.display = "none"
+        else:
+            admittance_components_container.layout.display = "block"
+
+    admittance_perturbation_type.observe(
+        update_admittance_perturbation_visibility,
+        names="value",
+    )
+    update_admittance_perturbation_visibility()  # Set initial state
 
     # Admittance Configuration Box
     admittance_box = widgets.VBox(
@@ -618,7 +722,7 @@ def interactive_interface():
                 "<p style='margin: 5px 0; color: #666;'>Configure how line admittances are perturbed</p>",
             ),
             admittance_perturbation_type,
-            admittance_sigma,
+            admittance_components_container,
         ],
         layout=widgets.Layout(
             border="2px solid #F3E5F5",
@@ -640,10 +744,13 @@ def interactive_interface():
             num_processes,
             data_dir,
             large_chunk_size,
-            widgets.HBox(
-                [no_stats, overwrite],
-                layout=widgets.Layout(justify_content="flex-start"),
-            ),
+            mode,
+            overwrite,
+            include_dc_res,
+            pf_fast,
+            dcpf_fast,
+            enable_solver_logs,
+            max_iter,
         ],
         layout=widgets.Layout(
             border="2px solid #EFEBE9",

@@ -1,0 +1,18 @@
+[run]
+omit =
+    gridfm_datakit/cli.py
+    gridfm_datakit/interactive.py
+    gridfm_datakit/validation.py
+    *.ipynb
+    scripts/*.ipynb
+    scripts/**/*.ipynb
+    tests/*
+
+[report]
+omit =
+    gridfm_datakit/cli.py
+    gridfm_datakit/interactive.py
+    *.ipynb
+    scripts/*.ipynb
+    scripts/**/*.ipynb
+    tests/*

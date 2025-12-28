@@ -1,225 +1,189 @@
-import pandapower as pp
-import numpy as np
-import pandas as pd
-from pandapower.auxiliary import pandapowerNet
+"""
+Data saving and export functionality for power system scenarios.
+
+This module provides functions for saving processed power system data
+to parquet files with proper formatting and scenario indexing.
+"""
+
 import os
-from pandapower.pypower.idx_brch import T_BUS, F_BUS, RATE_A
-from pandapower.pypower.makeYbus import branch_vectors
-from typing import List
+import pandas as pd
+import numpy as np
+from concurrent.futures import ThreadPoolExecutor
+from typing import List, Tuple
+from gridfm_datakit.utils.column_names import (
+    BUS_COLUMNS,
+    DC_BUS_COLUMNS,
+    GEN_COLUMNS,
+    DC_GEN_COLUMNS,
+    BRANCH_COLUMNS,
+    DC_BRANCH_COLUMNS,
+    RUNTIME_COLUMNS,
+    DC_RUNTIME_COLUMNS,
+    YBUS_COLUMNS,
+)
+from gridfm_datakit.network import Network
+from gridfm_datakit.utils.utils import n_scenario_per_partition
 
 
-def save_edge_params(net: pandapowerNet, path: str):
-    """Saves edge parameters for the network to a CSV file.
-
-    Extracts and saves branch parameters including admittance matrices and rate limits.
-
-    Args:
-        net: The power network.
-        path: Path where the edge parameters CSV file should be saved.
-    """
-    pp.rundcpp(net)  # need to run dcpp to create the ppc structure
-    ppc = net._ppc
-    to_bus = np.real(ppc["branch"][:, T_BUS])
-    from_bus = np.real(ppc["branch"][:, F_BUS])
-    Ytt, Yff, Yft, Ytf = branch_vectors(ppc["branch"], ppc["branch"].shape[0])
-    Ytt_r = np.real(Ytt)
-    Ytt_i = np.imag(Ytt)
-    Yff_r = np.real(Yff)
-    Yff_i = np.imag(Yff)
-    Yft_r = np.real(Yft)
-    Yft_i = np.imag(Yft)
-    Ytf_r = np.real(Ytf)
-    Ytf_i = np.imag(Ytf)
-
-    rate_a = np.real(ppc["branch"][:, RATE_A])
-    edge_params = pd.DataFrame(
-        np.column_stack(
-            (
-                from_bus,
-                to_bus,
-                Yff_r,
-                Yff_i,
-                Yft_r,
-                Yft_i,
-                Ytf_r,
-                Ytf_i,
-                Ytt_r,
-                Ytt_i,
-                rate_a,
-            ),
-        ),
-        columns=[
-            "from_bus",
-            "to_bus",
-            "Yff_r",
-            "Yff_i",
-            "Yft_r",
-            "Yft_i",
-            "Ytf_r",
-            "Ytf_i",
-            "Ytt_r",
-            "Ytt_i",
-            "rate_a",
-        ],
-    )
-    # comvert everything to float32
-    edge_params = edge_params.astype(np.float32)
-    edge_params.to_csv(path, index=False)
-
-
-def save_bus_params(net: pandapowerNet, path: str):
-    """Saves bus parameters for the network to a CSV file.
-
-    Extracts and saves bus parameters including voltage limits and base values.
+def _process_and_save(args: Tuple[str, List[np.ndarray], str, int, int, bool]) -> None:
+    """Worker function for processing and saving one dataset type (bus/gen/branch/y_bus).
 
     Args:
-        net: The power network.
-        path: Path where the bus parameters CSV file should be saved.
+        args: Tuple containing:
+            - data_type: Type of data to process ("bus", "gen", "branch", "y_bus")
+            - processed_data: List of processed data arrays
+            - path: Output file path (directory for partitioned parquet)
+            - last_scenario: Last scenario index processed
+            - n_buses: Number of buses in the network
+            - include_dc_res: Whether DC power flow data is included
     """
-    idx = net.bus.index
-    base_kv = net.bus.vn_kv
-    bus_type = net.bus.type
-    vmin = net.bus.min_vm_pu
-    vmax = net.bus.max_vm_pu
+    data_type, processed_data, path, last_scenario, n_buses, include_dc_res = args
 
-    bus_params = pd.DataFrame(
-        np.column_stack((idx, bus_type, vmin, vmax, base_kv)),
-        columns=["bus", "type", "vmin", "vmax", "baseKV"],
-    )
-    bus_params.to_csv(path, index=False)
+    if data_type == "bus":
+        bus_columns = BUS_COLUMNS + DC_BUS_COLUMNS if include_dc_res else BUS_COLUMNS
+        bus_data = np.concatenate([item[0] for item in processed_data], axis=0)
+        df = pd.DataFrame(bus_data, columns=bus_columns)
+        df["bus"] = df["bus"].astype("int64")
+        scenario_indices = np.repeat(
+            range(last_scenario + 1, last_scenario + 1 + (df.shape[0] // n_buses)),
+            n_buses,
+        )
+        df.insert(0, "scenario", scenario_indices)
 
+    elif data_type == "gen":
+        gen_data = np.concatenate([item[1] for item in processed_data], axis=0)
+        df = pd.DataFrame(
+            gen_data,
+            columns=GEN_COLUMNS + DC_GEN_COLUMNS if include_dc_res else GEN_COLUMNS,
+        )
+        df["bus"] = df["bus"].astype("int64")
+        scenario_indices = np.concatenate(
+            [
+                np.full(item[1].shape[0], last_scenario + 1 + i, dtype="int64")
+                for i, item in enumerate(processed_data)
+            ],
+        )
+        df.insert(0, "scenario", scenario_indices)
 
-def save_branch_idx_removed(branch_idx_removed: List[List[int]], path: str):
-    """Saves indices of removed branches for each scenario.
+    elif data_type == "branch":
+        branch_data = np.concatenate([item[2] for item in processed_data], axis=0)
+        df = pd.DataFrame(
+            branch_data,
+            columns=BRANCH_COLUMNS + DC_BRANCH_COLUMNS
+            if include_dc_res
+            else BRANCH_COLUMNS,
+        )
+        df[["from_bus", "to_bus"]] = df[["from_bus", "to_bus"]].astype("int64")
+        scenario_indices = np.concatenate(
+            [
+                np.full(item[2].shape[0], last_scenario + 1 + i, dtype="int64")
+                for i, item in enumerate(processed_data)
+            ],
+        )
+        df.insert(0, "scenario", scenario_indices)
 
-    Appends the removed branch indices to an existing CSV file or creates a new one.
+    elif data_type == "y_bus":
+        y_bus_data = np.concatenate([item[3] for item in processed_data])
+        df = pd.DataFrame(y_bus_data, columns=YBUS_COLUMNS)
+        df[["index1", "index2"]] = df[["index1", "index2"]].astype("int64")
+        scenario_indices = np.concatenate(
+            [
+                np.full(item[3].shape[0], last_scenario + 1 + i, dtype="int64")
+                for i, item in enumerate(processed_data)
+            ],
+        )
+        df.insert(0, "scenario", scenario_indices)
 
-    Args:
-        branch_idx_removed: List of removed branch indices for each scenario.
-        path: Path where the branch indices CSV file should be saved.
-    """
-    if os.path.exists(path):
-        existing_df = pd.read_csv(path, usecols=["scenario"])
-        if not existing_df.empty:
-            last_scenario = existing_df["scenario"].iloc[-1]
+    elif data_type == "runtime":
+        runtime_data = np.concatenate([item[4] for item in processed_data])
+        df = pd.DataFrame(
+            runtime_data,
+            columns=RUNTIME_COLUMNS + DC_RUNTIME_COLUMNS
+            if include_dc_res
+            else RUNTIME_COLUMNS,
+        )
+        scenario_indices = np.concatenate(
+            [
+                np.full(item[4].shape[0], last_scenario + 1 + i, dtype="int64")
+                for i, item in enumerate(processed_data)
+            ],
+        )
+        df.insert(0, "scenario", scenario_indices)
     else:
-        last_scenario = -1
+        raise ValueError(f"Unknown data type: {data_type}")
 
-    scenario_idx = np.arange(
-        last_scenario + 1,
-        last_scenario + 1 + len(branch_idx_removed),
+    # Add partition column for scenario-based partitioning (n_scenario_per_partition scenarios per partition)
+    df["scenario_partition"] = (df["scenario"] // n_scenario_per_partition).astype(
+        "int64",
     )
-    branch_idx_removed_df = pd.DataFrame(branch_idx_removed)
-    branch_idx_removed_df.insert(0, "scenario", scenario_idx)
-    branch_idx_removed_df.to_csv(
+
+    df.to_parquet(
         path,
-        mode="a",
-        header=not os.path.exists(path),
+        partition_cols=["scenario_partition"],
+        engine="pyarrow",
         index=False,
-    )  # append to existing file or create new one
+    )
 
 
 def save_node_edge_data(
-    net: pandapowerNet,
+    net: Network,
     node_path: str,
-    edge_path: str,
-    csv_data: list,
-    adjacency_lists: list,
-    mode: str = "pf",
-):
-    """Saves generated node and edge data to CSV files.
+    branch_path: str,
+    gen_path: str,
+    y_bus_path: str,
+    runtime_path: str,
+    processed_data: List[
+        Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+    ],
+    include_dc_res: bool = False,
+) -> None:
+    """Save processed power system data to partitioned parquet files using parallel processing.
 
-    Saves generated data for nodes and edges,
-    appending to existing files if they exist.
+    This function saves bus, generator, branch, and Y-bus data to separate partitioned parquet directories
+    using parallel processing for improved performance. Data is partitioned by scenario with 1000 scenarios per partition.
 
     Args:
-        net: The power network.
-        node_path: Path where node data should be saved.
-        edge_path: Path where edge data should be saved.
-        csv_data: List of node-level data for each scenario.
-        adjacency_lists: List of edge-level adjacency lists for each scenario.
-        mode: Analysis mode, either 'pf' for power flow or 'contingency' for contingency analysis.
+        net: Network object containing system topology information.
+        node_path: Path for saving bus/node data partitioned parquet directory.
+        branch_path: Path for saving branch data partitioned parquet directory.
+        gen_path: Path for saving generator data partitioned parquet directory.
+        y_bus_path: Path for saving Y-bus data partitioned parquet directory.
+        runtime_path: Path for saving runtime data partitioned parquet directory.
+        processed_data: List of tuples containing processed data arrays for each scenario.
+        include_dc_res: Whether DC power flow data is included in the output.
     """
-    n_buses = net.bus.shape[0]
+    n_buses = net.buses.shape[0]
 
-    # Determine last scenario index
+    # Determine last scenario index from n_scenarios metadata file
     last_scenario = -1
-    if os.path.exists(node_path):
-        existing_df = pd.read_csv(node_path, usecols=["scenario"])
-        if not existing_df.empty:
-            last_scenario = existing_df["scenario"].iloc[-1]
+    base_path = os.path.dirname(node_path)
+    n_scenarios_file = os.path.join(base_path, "n_scenarios.txt")
+    if os.path.exists(n_scenarios_file):
+        with open(n_scenarios_file, "r") as f:
+            last_scenario = int(f.read().strip()) - 1
 
-    # Create DataFrame for node data
-    if mode == "pf":
-        df = pd.DataFrame(
-            csv_data,
-            columns=[
-                "bus",
-                "Pd",
-                "Qd",
-                "Pg",
-                "Qg",
-                "Vm",
-                "Va",
-                "PQ",
-                "PV",
-                "REF",
-            ],
-        )
-    elif (
-        mode == "contingency"
-    ):  # we add the dc voltage to the node data for benchmarking purposes
-        df = pd.DataFrame(
-            csv_data,
-            columns=[
-                "bus",
-                "Pd",
-                "Qd",
-                "Pg",
-                "Qg",
-                "Vm",
-                "Va",
-                "PQ",
-                "PV",
-                "REF",
-                "Vm_dc",
-                "Va_dc",
-            ],
-        )
+    # Define arguments per data type
+    tasks = [
+        ("bus", processed_data, node_path, last_scenario, n_buses, include_dc_res),
+        ("gen", processed_data, gen_path, last_scenario, n_buses, include_dc_res),
+        ("branch", processed_data, branch_path, last_scenario, n_buses, include_dc_res),
+        ("y_bus", processed_data, y_bus_path, last_scenario, n_buses, include_dc_res),
+        (
+            "runtime",
+            processed_data,
+            runtime_path,
+            last_scenario,
+            n_buses,
+            include_dc_res,
+        ),
+    ]
 
-    df["bus"] = df["bus"].astype("int64")
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        futures = [pool.submit(_process_and_save, task) for task in tasks]
+        for f in futures:
+            f.result()  # wait for each task to finish
 
-    # Shift scenario indices
-    scenario_indices = np.repeat(
-        range(last_scenario + 1, last_scenario + 1 + (df.shape[0] // n_buses)),
-        n_buses,
-    )  # repeat each scenario index n_buses times since there are n_buses rows for each scenario
-    df.insert(0, "scenario", scenario_indices)
-
-    # Append to CSV
-    df.to_csv(node_path, mode="a", header=not os.path.exists(node_path), index=False)
-
-    # Create DataFrame for edge data
-    adj_df = pd.DataFrame(
-        np.concatenate(adjacency_lists),
-        columns=["index1", "index2", "G", "B"],
-    )
-
-    adj_df[["index1", "index2"]] = adj_df[["index1", "index2"]].astype("int64")
-
-    # Shift scenario indices
-    scenario_indices = np.concatenate(
-        [
-            np.full(adjacency_lists[i].shape[0], last_scenario + 1 + i, dtype="int64")
-            for i in range(len(adjacency_lists))
-        ],
-    )  # for each scenario, we repeat the scenario index as many times as there are edges in the scenario
-    adj_df.insert(0, "scenario", scenario_indices)
-
-    # Append to CSV
-    adj_df.to_csv(
-        edge_path,
-        mode="a",
-        header=not os.path.exists(edge_path),
-        index=False,
-    )
+    # Write n_scenarios metadata file
+    total_scenarios = last_scenario + 1 + len(processed_data)
+    with open(n_scenarios_file, "w") as f:
+        f.write(str(total_scenarios))

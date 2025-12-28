@@ -3,21 +3,12 @@
 import numpy as np
 import os
 from gridfm_datakit.save import (
-    save_edge_params,
-    save_bus_params,
-    save_branch_idx_removed,
     save_node_edge_data,
 )
 from gridfm_datakit.process.process_network import (
-    network_preprocessing,
-    process_scenario,
-    process_scenario_contingency,
+    process_scenario_opf_mode,
+    process_scenario_pf_mode,
     process_scenario_chunk,
-)
-from gridfm_datakit.utils.stats import (
-    plot_stats,
-    Stats,
-    plot_feature_distributions,
 )
 from gridfm_datakit.utils.param_handler import (
     NestedNamespace,
@@ -27,7 +18,6 @@ from gridfm_datakit.utils.param_handler import (
     initialize_admittance_generator,
 )
 from gridfm_datakit.network import (
-    load_net_from_pp,
     load_net_from_file,
     load_net_from_pglib,
 )
@@ -35,7 +25,6 @@ from gridfm_datakit.perturbations.load_perturbation import (
     load_scenarios_to_df,
     plot_load_scenarios_combined,
 )
-from pandapower.auxiliary import pandapowerNet
 import gc
 from datetime import datetime
 from tqdm import tqdm
@@ -43,12 +32,14 @@ from multiprocessing import Pool, Manager
 import shutil
 from gridfm_datakit.utils.utils import write_ram_usage_distributed, Tee
 import yaml
-from typing import List, Tuple, Any, Dict, Optional, Union
+from typing import List, Tuple, Any, Dict, Union
 import sys
+from gridfm_datakit.network import Network
+from gridfm_datakit.process.process_network import init_julia
 
 
 def _setup_environment(
-    config: Union[str, Dict, NestedNamespace],
+    config: Union[str, Dict[str, Any], NestedNamespace],
 ) -> Tuple[NestedNamespace, str, Dict[str, str]]:
     """Setup the environment for data generation.
 
@@ -78,17 +69,29 @@ def _setup_environment(
         shutil.rmtree(base_path)
     os.makedirs(base_path, exist_ok=True)
 
+    # Setup solver logs directory under data_dir/solver_log
+    solver_log_dir = (
+        os.path.join(base_path, "solver_log")
+        if args.settings.enable_solver_logs
+        else None
+    )
+    os.makedirs(solver_log_dir, exist_ok=True) if solver_log_dir is not None else None
+
     # Setup file paths
     file_paths = {
         "tqdm_log": os.path.join(base_path, "tqdm.log"),
         "error_log": os.path.join(base_path, "error.log"),
         "args_log": os.path.join(base_path, "args.log"),
-        "node_data": os.path.join(base_path, "pf_node.csv"),
-        "edge_data": os.path.join(base_path, "pf_edge.csv"),
-        "branch_indices": os.path.join(base_path, "branch_idx_removed.csv"),
-        "edge_params": os.path.join(base_path, "edge_params.csv"),
-        "bus_params": os.path.join(base_path, "bus_params.csv"),
-        "scenarios": os.path.join(base_path, f"scenarios_{args.load.generator}.csv"),
+        "solver_log_dir": solver_log_dir,
+        "bus_data": os.path.join(base_path, "bus_data.parquet"),
+        "branch_data": os.path.join(base_path, "branch_data.parquet"),
+        "gen_data": os.path.join(base_path, "gen_data.parquet"),
+        "y_bus_data": os.path.join(base_path, "y_bus_data.parquet"),
+        "runtime_data": os.path.join(base_path, "runtime_data.parquet"),
+        "scenarios": os.path.join(
+            base_path,
+            f"scenarios_{args.load.generator}.parquet",
+        ),
         "scenarios_plot": os.path.join(
             base_path,
             f"scenarios_{args.load.generator}.html",
@@ -97,7 +100,6 @@ def _setup_environment(
             base_path,
             f"scenarios_{args.load.generator}.log",
         ),
-        "feature_plots": os.path.join(base_path, "feature_plots"),
     }
 
     # Initialize logs
@@ -111,7 +113,7 @@ def _setup_environment(
         with open(log_file, "a") as f:
             f.write(f"\nNew generation started at {timestamp}\n")
             if log_file == file_paths["args_log"]:
-                yaml.dump(config if isinstance(config, dict) else vars(config), f)
+                yaml.safe_dump(args.to_dict(), f)
 
     return args, base_path, file_paths
 
@@ -119,7 +121,7 @@ def _setup_environment(
 def _prepare_network_and_scenarios(
     args: NestedNamespace,
     file_paths: Dict[str, str],
-) -> Tuple[pandapowerNet, Any]:
+) -> Tuple[Network, np.ndarray]:
     """Prepare the network and generate load scenarios.
 
     Args:
@@ -129,10 +131,7 @@ def _prepare_network_and_scenarios(
     Returns:
         Tuple of (network, scenarios)
     """
-    # Load network
-    if args.network.source == "pandapower":
-        net = load_net_from_pp(args.network.name)
-    elif args.network.source == "pglib":
+    if args.network.source == "pglib":
         net = load_net_from_pglib(args.network.name)
     elif args.network.source == "file":
         net = load_net_from_file(
@@ -141,31 +140,27 @@ def _prepare_network_and_scenarios(
     else:
         raise ValueError("Invalid grid source!")
 
-    network_preprocessing(net)
-    assert (net.sgen["scaling"] == 1).all(), "Scaling factor >1 not supported yet!"
-
     # Generate load scenarios
     load_scenario_generator = get_load_scenario_generator(args.load)
     scenarios = load_scenario_generator(
         net,
         args.load.scenarios,
         file_paths["scenarios_log"],
+        max_iter=args.settings.max_iter,
     )
     scenarios_df = load_scenarios_to_df(scenarios)
-    scenarios_df.to_csv(file_paths["scenarios"], index=False)
-    plot_load_scenarios_combined(scenarios_df, file_paths["scenarios_plot"])
-    save_edge_params(net, file_paths["edge_params"])
-    save_bus_params(net, file_paths["bus_params"])
+    scenarios_df.to_parquet(file_paths["scenarios"], index=False, engine="pyarrow")
+    if net.buses.shape[0] <= 100:
+        plot_load_scenarios_combined(scenarios_df, file_paths["scenarios_plot"])
+    else:
+        print("Skipping plot of scenarios for large networks (number of buses > 100)")
 
     return net, scenarios
 
 
 def _save_generated_data(
-    net: pandapowerNet,
-    csv_data: List,
-    adjacency_lists: List,
-    branch_idx_removed: List,
-    global_stats: Optional[Stats],
+    net: Network,
+    processed_data: List,
     file_paths: Dict[str, str],
     base_path: str,
     args: NestedNamespace,
@@ -173,32 +168,27 @@ def _save_generated_data(
     """Save the generated data to files.
 
     Args:
-        net: Pandapower network
-        csv_data: List of CSV data
-        adjacency_lists: List of adjacency lists
-        branch_idx_removed: List of removed branch indices
-        global_stats: Optional statistics object
+        net: Network object
+        processed_data: List of processed data arrays
         file_paths: Dictionary of file paths
         base_path: Base output directory
         args: Configuration object
     """
-    if len(adjacency_lists) > 0:
+    if len(processed_data) > 0:
         save_node_edge_data(
             net,
-            file_paths["node_data"],
-            file_paths["edge_data"],
-            csv_data,
-            adjacency_lists,
-            mode=args.settings.mode,
+            file_paths["bus_data"],
+            file_paths["branch_data"],
+            file_paths["gen_data"],
+            file_paths["y_bus_data"],
+            file_paths["runtime_data"],
+            processed_data,
+            include_dc_res=args.settings.include_dc_res,
         )
-        save_branch_idx_removed(branch_idx_removed, file_paths["branch_indices"])
-        if not args.settings.no_stats and global_stats:
-            global_stats.save(base_path)
-            plot_stats(base_path)
 
 
 def generate_power_flow_data(
-    config: Union[str, Dict, NestedNamespace],
+    config: Union[str, Dict[str, Any], NestedNamespace],
 ) -> Dict[str, str]:
     """Generate power flow data based on the provided configuration using sequential processing.
 
@@ -207,36 +197,38 @@ def generate_power_flow_data(
             1. Path to a YAML config file (str)
             2. Configuration dictionary (Dict)
             3. NestedNamespace object (NestedNamespace)
-            The config must include settings, network, load, and topology_perturbation configurations.
+            The config must include settings, network, load, and perturbation configurations.
 
     Returns:
-        Dictionary containing paths to generated files:
+        Dictionary with paths to generated artifacts:
         {
-            'node_data': path to node data CSV,
-            'edge_data': path to edge data CSV,
-            'branch_indices': path to branch indices CSV,
-            'edge_params': path to edge parameters CSV,
-            'bus_params': path to bus parameters CSV,
-            'scenarios': path to scenarios CSV,
-            'scenarios_plot': path to scenarios plot HTML,
-            'scenarios_log': path to scenarios log
+            'tqdm_log': progress log file,
+            'error_log': error log file,
+            'args_log': configuration dump file,
+            'bus_data': bus-level features CSV (BUS_COLUMNS),
+            'branch_data': branch-level features CSV (BRANCH_COLUMNS),
+            'gen_data': generator features CSV (GEN_COLUMNS),
+            'y_bus_data': Y-bus nonzero entries CSV,
+            'scenarios': load scenarios Parquet,
+            'scenarios_plot': load scenarios plot HTML,
+            'scenarios_log': load scenario generation log
         }
 
     Note:
-        The function creates several output files in the specified data directory:
+        The function creates output files under {settings.data_dir}/{network.name}/raw/:
 
         - tqdm.log: Progress tracking
         - error.log: Error messages
-        - args.log: Configuration parameters
-        - pf_node.csv: Node data
-        - pf_edge.csv: Edge data
-        - branch_idx_removed.csv: Removed branch indices
-        - edge_params.csv: Edge parameters
-        - bus_params.csv: Bus parameters
-        - scenarios_{generator}.csv: Load scenarios
-        - scenarios_{generator}.html: Scenario plots
-        - scenarios_{generator}.log: Scenario generation log
+        - args.log: Configuration parameters (YAML dump)
+        - bus_data.parquet: Bus-level features for each scenario
+        - branch_data.parquet: Branch-level features for each scenario
+        - gen_data.parquet: Generator features for each scenario
+        - y_bus_data.parquet: Nonzero Y-bus entries for each scenario
+        - scenarios_{generator}.parquet: Load scenarios (per-element time series)
+        - scenarios_{generator}.html: Load scenario plots
+        - scenarios_{generator}.log: Load scenario generation notes
     """
+
     # Setup environment
     args, base_path, file_paths = _setup_environment(config)
 
@@ -258,10 +250,9 @@ def generate_power_flow_data(
         net,
     )
 
-    csv_data = []
-    adjacency_lists = []
-    branch_idx_removed = []
-    global_stats = Stats() if not args.settings.no_stats else None
+    jl = init_julia(args.settings.max_iter, file_paths["solver_log_dir"])
+
+    processed_data = []
 
     # Process scenarios sequentially
     with open(file_paths["tqdm_log"], "a") as f:
@@ -273,110 +264,86 @@ def generate_power_flow_data(
         ) as pbar:
             for scenario_index in range(args.load.scenarios):
                 # Process the scenario
-                if args.settings.mode == "pf":
-                    csv_data, adjacency_lists, branch_idx_removed, global_stats = (
-                        process_scenario(
-                            net,
-                            scenarios,
-                            scenario_index,
-                            topology_generator,
-                            generation_generator,
-                            admittance_generator,
-                            args.settings.no_stats,
-                            csv_data,
-                            adjacency_lists,
-                            branch_idx_removed,
-                            global_stats,
-                            file_paths["error_log"],
-                        )
+                if args.settings.mode == "opf":
+                    processed_data = process_scenario_opf_mode(
+                        net,
+                        scenarios,
+                        scenario_index,
+                        topology_generator,
+                        generation_generator,
+                        admittance_generator,
+                        processed_data,
+                        file_paths["error_log"],
+                        args.settings.include_dc_res,
+                        jl,
                     )
-                elif args.settings.mode == "contingency":
-                    csv_data, adjacency_lists, branch_idx_removed, global_stats = (
-                        process_scenario_contingency(
-                            net,
-                            scenarios,
-                            scenario_index,
-                            topology_generator,
-                            generation_generator,
-                            admittance_generator,
-                            args.settings.no_stats,
-                            csv_data,
-                            adjacency_lists,
-                            branch_idx_removed,
-                            global_stats,
-                            file_paths["error_log"],
-                        )
+                elif args.settings.mode == "pf":
+                    processed_data = process_scenario_pf_mode(
+                        net,
+                        scenarios,
+                        scenario_index,
+                        topology_generator,
+                        generation_generator,
+                        admittance_generator,
+                        processed_data,
+                        file_paths["error_log"],
+                        args.settings.include_dc_res,
+                        args.settings.pf_fast,
+                        args.settings.dcpf_fast,
+                        jl,
                     )
+                else:
+                    raise ValueError("Invalid mode!")
 
                 pbar.update(1)
 
     # Save final data
     _save_generated_data(
         net,
-        csv_data,
-        adjacency_lists,
-        branch_idx_removed,
-        global_stats,
+        processed_data,
         file_paths,
         base_path,
         args,
     )
-    # Plot features
-    if os.path.exists(file_paths["node_data"]):
-        plot_feature_distributions(
-            file_paths["node_data"],
-            file_paths["feature_plots"],
-            net.sn_mva,
-        )
-    else:
-        print("No node data file generated. Skipping feature plotting.")
 
     return file_paths
 
 
 def generate_power_flow_data_distributed(
-    config: Union[str, Dict, NestedNamespace],
+    config: Union[str, Dict[str, Any], NestedNamespace],
 ) -> Dict[str, str]:
     """Generate power flow data based on the provided configuration using distributed processing.
-
 
     Args:
         config: Configuration can be provided in three ways:
             1. Path to a YAML config file (str)
             2. Configuration dictionary (Dict)
             3. NestedNamespace object (NestedNamespace)
-            The config must include settings, network, load, and topology_perturbation configurations.
+            The config must include settings, network, load, and perturbation configurations.
 
     Returns:
-        Dictionary containing paths to generated files:
-        {
-            'node_data': path to node data CSV,
-            'edge_data': path to edge data CSV,
-            'branch_indices': path to branch indices CSV,
-            'edge_params': path to edge parameters CSV,
-            'bus_params': path to bus parameters CSV,
-            'scenarios': path to scenarios CSV,
-            'scenarios_plot': path to scenarios plot HTML,
-            'scenarios_log': path to scenarios log
-        }
+        Dictionary with paths to generated artifacts (same as generate_power_flow_data)
 
     Note:
-        The function creates several output files in the specified data directory:
+        The function creates output files under {settings.data_dir}/{network.name}/raw/:
 
         - tqdm.log: Progress tracking
         - error.log: Error messages
-        - args.log: Configuration parameters
-        - pf_node.csv: Node data
-        - pf_edge.csv: Edge data
-        - branch_idx_removed.csv: Removed branch indices
-        - edge_params.csv: Edge parameters
-        - bus_params.csv: Bus parameters
-        - scenarios_{generator}.csv: Load scenarios
-        - scenarios_{generator}.html: Scenario plots
-        - scenarios_{generator}.log: Scenario generation log
+        - args.log: Configuration parameters (YAML dump)
+        - bus_data.parquet: Bus-level features for each scenario
+        - branch_data.parquet: Branch-level features for each scenario
+        - gen_data.parquet: Generator features for each scenario
+        - y_bus_data.parquet: Nonzero Y-bus entries for each scenario
+        - scenarios_{generator}.parquet: Load scenarios (per-element time series)
+        - scenarios_{generator}.html: Load scenario plots
+        - scenarios_{generator}.log: Load scenario generation notes
     """
     # Setup environment
     args, base_path, file_paths = _setup_environment(config)
+
+    # check if mode is valid
+    if args.settings.mode not in ["opf", "pf"]:
+        raise ValueError("Invalid mode!")
 
     # Prepare network and scenarios
     net, scenarios = _prepare_network_and_scenarios(args, file_paths)
@@ -418,7 +385,7 @@ def generate_power_flow_data_distributed(
                 chunk_size = len(large_chunk)
                 scenario_chunks = np.array_split(
                     large_chunk,
-                    args.settings.num_processes,
+                    min(args.settings.num_processes, chunk_size),
                 )
 
                 tasks = [
@@ -432,8 +399,12 @@ def generate_power_flow_data_distributed(
                         topology_generator,
                         generation_generator,
                         admittance_generator,
-                        args.settings.no_stats,
                         file_paths["error_log"],
+                        args.settings.include_dc_res,
+                        args.settings.pf_fast,
+                        args.settings.dcpf_fast,
+                        file_paths["solver_log_dir"],
+                        args.settings.max_iter,
                     )
                     for chunk in scenario_chunks
                 ]
@@ -452,29 +423,19 @@ def generate_power_flow_data_distributed(
                         completed += 1
 
                     # Gather results
-                    csv_data = []
-                    adjacency_lists = []
-                    branch_idx_removed = []
-                    global_stats = Stats() if not args.settings.no_stats else None
+                    processed_data = []
 
                     for result in results:
                         (
                             e,
                             traceback,
-                            local_csv_data,
-                            local_adjacency_lists,
-                            local_branch_idx_removed,
-                            local_stats,
+                            local_processed_data,
                         ) = result.get()
                         if isinstance(e, Exception):
                             print(f"Error in process_scenario_chunk: {e}")
                             print(traceback)
-                            sys.exit(1)
-                        csv_data.extend(local_csv_data)
-                        adjacency_lists.extend(local_adjacency_lists)
-                        branch_idx_removed.extend(local_branch_idx_removed)
-                        if not args.settings.no_stats and local_stats:
-                            global_stats.merge(local_stats)
+                            sys.exit(e)
+                        processed_data.extend(local_processed_data)
 
                     pool.close()
                     pool.join()
@@ -482,27 +443,13 @@ def generate_power_flow_data_distributed(
                 # Save processed data
                 _save_generated_data(
                     net,
-                    csv_data,
-                    adjacency_lists,
-                    branch_idx_removed,
-                    global_stats,
+                    processed_data,
                     file_paths,
                     base_path,
                     args,
                 )
 
-                del csv_data, adjacency_lists, global_stats
+                del processed_data
                 gc.collect()
-
-    # Plot features
-    # check if node_data csv file exists
-    if os.path.exists(file_paths["node_data"]):
-        plot_feature_distributions(
-            file_paths["node_data"],
-            file_paths["feature_plots"],
-            net.sn_mva,
-        )
-    else:
-        print("No node data file generated. Skipping feature plotting.")
 
     return file_paths

@@ -13,8 +13,9 @@ name = "gridfm-datakit"
 description = "Data Generation Kit"
 readme = "README.md"
 license = "Apache-2.0"
-version = "0.0.8"
+version = "0.0.9a"
 requires-python = ">=3.10,<3.13"
+
 dependencies = [
     "ipykernel",
     "matplotlib",
@@ -22,7 +23,6 @@ dependencies = [
     "nbformat",
     "numba",
     "numpy",
-    "pandapower==2.14.11",
     "pandas",
     "pathlib",
     "plotly",
@@ -31,10 +31,17 @@ dependencies = [
     "urllib3<2.0.0",
     "ipywidgets",
     "ipyfilechooser",
+    "scipy",
+    "juliacall",
+    "networkx",
+    "tqdm",
+    "pyarrow",
+    # Enforce Python <= 3.11 on Windows
+    "gridfm-datakit-winblock ; sys_platform == 'win32' and python_version >= '3.12'"
 ]
 
 authors = [
-  {name = "Alban Puech", email = "apuech@seas.harvard.edu"},
+  {name = "Alban Puech", email = "alban.puech2@ibm.com"},
   {name = "Matteo Mazzonelli", email = "matteo.mazzonelli1@ibm.com"},
   {name = "Tamara Govindasamy", email= "tamara.govindasamy@ibm.com"},
   {name = "Mangaliso Mngomezulu", email= "mngomezulum@ibm.com"},
@@ -68,4 +75,6 @@ dev = [
 test = [
   "pytest",
   "pytest-cov",
+  "pyinstrument",
+  "pytest-xdist"
 ]

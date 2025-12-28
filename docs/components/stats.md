@@ -1,13 +1,17 @@
 # Stats
 
-This module provides functions and classes for tracking and analyzing statistics related to power grid networks.
+This module provides functions for computing statistics and generating visualizations from generated power flow data.
+
+## Functions
+
+### `compute_stats_from_data`
+
+::: gridfm_datakit.utils.stats.compute_stats_from_data
 
 ### `plot_stats`
 
 ::: gridfm_datakit.utils.stats.plot_stats
 
-## Classes
+### `plot_feature_distributions`
 
-### `Stats`
-
-::: gridfm_datakit.utils.stats.Stats
+::: gridfm_datakit.utils.stats.plot_feature_distributions

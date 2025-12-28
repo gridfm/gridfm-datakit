@@ -1,291 +1,348 @@
-import pandapower as pp
-import pandas as pd
+"""
+Power flow and optimal power flow solvers using Julia interface.
+
+This module provides functions for running power flow (PF), optimal power flow (OPF),
+DC power flow (DCPF), and DC optimal power flow (DC OPF) calculations using Julia's PowerModels.jl package.
+It also includes functionality for comparing results between temporary files
+and original case files.
+"""
+
 import numpy as np
-from pandapower.auxiliary import pandapowerNet
-from typing import Any, Tuple
+import tempfile
+import os
+from typing import Any, Dict
+from gridfm_datakit.network import Network
+from typing import Union
 
 
-def run_opf(net: pandapowerNet, **kwargs: Any) -> bool:
-    """Runs Optimal Power Flow (OPF) and adds additional information to network elements.
-
-    This function runs the OPF calculation and adds bus index and type information to the
-    results dataframes. It also performs various validation checks on the results.
+def run_opf(net: Network, jl: Any) -> Dict[str, Any]:
+    """Run Optimal Power Flow (OPF) calculation using Julia interface.
 
     Args:
-        net: A pandapower network object containing the power system model.
-        **kwargs: Additional keyword arguments to pass to pp.runopp().
+        net: A Network object containing the power system model.
+        jl: Julia interface object for running OPF.
 
     Returns:
-        bool: True if the OPF converged successfully, False otherwise.
+        OPF result containing termination status and solution data.
 
     Raises:
-        AssertionError: If any of the validation checks fail, including:
-            - Mismatch in active/reactive power
-            - Power bounds violations
-            - Bus power mismatches
-            - Power balance violations
+        RuntimeError: If OPF fails to converge or encounters an error.
     """
+    # Create a temporary file for the MATPOWER case
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".m", delete=False) as temp_file:
+        temp_filename = temp_file.name
 
-    pp.runopp(net, numba=True, **kwargs)
+    try:
+        # Save network to temporary file
+        net.to_mpc(temp_filename)
 
-    # add bus index and type to dataframe of opf results
-    net.res_gen["bus"] = net.gen.bus
-    net.res_gen["type"] = net.gen.type
-    net.res_load["bus"] = net.load.bus
-    net.res_load["type"] = net.load.type
-    net.res_sgen["bus"] = net.sgen.bus
-    net.res_sgen["type"] = net.sgen.type
-    net.res_shunt["bus"] = net.shunt.bus
-    net.res_ext_grid["bus"] = net.ext_grid.bus
-    net.res_bus["type"] = net.bus["type"]
+        result = jl.run_opf(temp_filename)
 
-    # The load of course stays the same as before
-    assert (net.load.p_mw == net.res_load.p_mw).all(), "Active power load has changed"
-    assert (net.load.q_mvar == net.res_load.q_mvar).all(), (
-        "Reactive power load has changed"
-    )
+        if str(result["termination_status"]) != "LOCALLY_SOLVED":
+            raise RuntimeError(f"OPF did not converge: {result['termination_status']}")
 
-    # Checking bounds on active and reactive power
-    # TODO: see with matteo how we want to handle this
-    if len(net.gen) != 0:
-        in_service_gen = net.gen[net.gen.in_service]
-        in_service_res_gen = net.res_gen[net.gen.in_service]
+        return result
 
-        if "max_p_mw" in net.gen.columns and "min_p_mw" in net.gen.columns:
-            valid_gen = in_service_gen.dropna(
-                subset=["max_p_mw", "min_p_mw"],
-                how="any",
-            )
-            valid_res_gen = in_service_res_gen.loc[valid_gen.index]
-
-            if not valid_gen.empty:
-                assert (valid_gen.max_p_mw - valid_res_gen.p_mw > -1e-4).all(), (
-                    f"Active power exceeds upper bound: "
-                    f"{valid_res_gen.p_mw[valid_gen.max_p_mw - valid_res_gen.p_mw <= -1e-4]} exceeds "
-                    f"{valid_gen.max_p_mw[valid_gen.max_p_mw - valid_res_gen.p_mw <= -1e-4]}"
-                )
-                assert (valid_res_gen.p_mw - valid_gen.min_p_mw > -1e-4).all(), (
-                    f"Active power falls below lower bound: "
-                    f"{valid_res_gen.p_mw[valid_res_gen.p_mw - valid_gen.min_p_mw <= -1e-4]} below "
-                    f"{valid_gen.min_p_mw[valid_res_gen.p_mw - valid_gen.min_p_mw <= -1e-4]}"
-                )
-
-        if "max_q_mvar" in net.gen.columns and "min_q_mvar" in net.gen.columns:
-            valid_q_gen = in_service_gen.dropna(
-                subset=["max_q_mvar", "min_q_mvar"],
-                how="any",
-            )
-            valid_q_res_gen = in_service_res_gen.loc[valid_q_gen.index]
-
-            if not valid_q_gen.empty:
-                assert (
-                    valid_q_gen.max_q_mvar - valid_q_res_gen.q_mvar > -1e-4
-                ).all(), (
-                    f"Reactive power exceeds upper bound: "
-                    f"{valid_q_res_gen.q_mvar[valid_q_gen.max_q_mvar - valid_q_res_gen.q_mvar <= -1e-4]} exceeds "
-                    f"{valid_q_gen.max_q_mvar[valid_q_gen.max_q_mvar - valid_q_res_gen.q_mvar <= -1e-4]}"
-                )
-                assert (
-                    valid_q_res_gen.q_mvar - valid_q_gen.min_q_mvar > -1e-4
-                ).all(), (
-                    f"Reactive power falls below lower bound: "
-                    f"{valid_q_res_gen.q_mvar[valid_q_res_gen.q_mvar - valid_q_gen.min_q_mvar <= -1e-4]} below "
-                    f"{valid_q_gen.min_q_mvar[valid_q_res_gen.q_mvar - valid_q_gen.min_q_mvar <= -1e-4]}"
-                )
-
-    if len(net.sgen) != 0:
-        in_service_sgen = net.sgen[net.sgen.in_service]
-        in_service_res_sgen = net.res_sgen[net.sgen.in_service]
-
-        if "max_p_mw" in net.sgen.columns and "min_p_mw" in net.sgen.columns:
-            valid_sgen = in_service_sgen.dropna(
-                subset=["max_p_mw", "min_p_mw"],
-                how="any",
-            )
-            valid_res_sgen = in_service_res_sgen.loc[valid_sgen.index]
-
-            if not valid_sgen.empty:
-                assert (valid_sgen.max_p_mw - valid_res_sgen.p_mw > -1e-4).all(), (
-                    f"Active power exceeds upper bound for static generators: "
-                    f"{valid_res_sgen.p_mw[valid_sgen.max_p_mw - valid_res_sgen.p_mw <= -1e-4]} exceeds "
-                    f"{valid_sgen.max_p_mw[valid_sgen.max_p_mw - valid_res_sgen.p_mw <= -1e-4]}"
-                )
-                assert (valid_res_sgen.p_mw - valid_sgen.min_p_mw > -1e-4).all(), (
-                    f"Active power falls below lower bound for static generators: "
-                    f"{valid_res_sgen.p_mw[valid_res_sgen.p_mw - valid_sgen.min_p_mw <= -1e-4]} below "
-                    f"{valid_sgen.min_p_mw[valid_res_sgen.p_mw - valid_sgen.min_p_mw <= -1e-4]}"
-                )
-
-        if "max_q_mvar" in net.sgen.columns and "min_q_mvar" in net.sgen.columns:
-            valid_q_sgen = in_service_sgen.dropna(
-                subset=["max_q_mvar", "min_q_mvar"],
-                how="any",
-            )
-            valid_q_res_sgen = in_service_res_sgen.loc[valid_q_sgen.index]
-
-            if not valid_q_sgen.empty:
-                assert (
-                    valid_q_sgen.max_q_mvar - valid_q_res_sgen.q_mvar > -1e-4
-                ).all(), (
-                    f"Reactive power exceeds upper bound for static generators: "
-                    f"{valid_q_res_sgen.q_mvar[valid_q_sgen.max_q_mvar - valid_q_res_sgen.q_mvar <= -1e-4]} exceeds "
-                    f"{valid_q_sgen.max_q_mvar[valid_q_sgen.max_q_mvar - valid_q_res_sgen.q_mvar <= -1e-4]}"
-                )
-                assert (
-                    valid_q_res_sgen.q_mvar - valid_q_sgen.min_q_mvar > -1e-4
-                ).all(), (
-                    f"Reactive power falls below lower bound for static generators: "
-                    f"{valid_q_res_sgen.q_mvar[valid_q_res_sgen.q_mvar - valid_q_sgen.min_q_mvar <= -1e-4]} below "
-                    f"{valid_q_sgen.min_q_mvar[valid_q_res_sgen.q_mvar - valid_q_sgen.min_q_mvar <= -1e-4]}"
-                )
-
-    total_p_diff, total_q_diff = calculate_power_imbalance(net)
-    assert np.abs(total_q_diff) < 1e-1, (
-        f"Total reactive power imbalance in OPF: {total_q_diff}"
-    )
-    assert np.abs(total_p_diff) < 1e-1, (
-        f"Total active power imbalance in OPF: {total_p_diff}"
-    )
-
-    return net.OPF_converged
+    except Exception as e:
+        raise RuntimeError(f"Error running OPF: {e}")
+    finally:
+        # Clean up temporary file
+        if os.path.exists(temp_filename):
+            os.unlink(temp_filename)
+    # TODO: try warm start
 
 
-def run_pf(net: pandapowerNet, **kwargs: Any) -> bool:
-    """Runs Power Flow (PF) calculation and adds additional information to network elements.
+def run_pf(net: Network, jl: Any, fast: Union[bool, None] = None) -> Dict[str, Any]:
+    """Run Power Flow (PF) calculation using Julia interface.
 
-    This function runs the power flow calculation and adds bus index and type information
-    to the results dataframes. It also performs validation checks on the results.
+    This function runs the power flow calculation using the Julia interface
+    and returns the result with termination status.
 
     Args:
-        net: A pandapower network object containing the power system model.
-        **kwargs: Additional keyword arguments to pass to pp.runpp().
+        net: A network object containing the power system model.
+        jl: Julia interface object for running power flow.
+        fast: If True, use the direct (non-optimizer) computation. If None, defaults to False (uses optimizer-based solver).
 
     Returns:
-        bool: True if the power flow converged successfully, False otherwise.
+        Power flow result containing termination status and solution data.
 
     Raises:
-        AssertionError: If any of the validation checks fail, including:
-            - Bus power mismatches
-            - Power balance violations
+        RuntimeError: If power flow fails to converge or encounters an error.
     """
-    pp.runpp(net, **kwargs)
 
-    # add bus number to df of opf results
-    net.res_gen["bus"] = net.gen.bus
-    net.res_gen["type"] = net.gen.type
+    # Create a temporary file for the MATPOWER case
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".m", delete=False) as temp_file:
+        temp_filename = temp_file.name
 
-    net.res_load["bus"] = net.load.bus
-    net.res_load["type"] = net.load.type
+    try:
+        # Save network to temporary file
+        net.to_mpc(temp_filename)
 
-    net.res_sgen["bus"] = net.sgen.bus
-    net.res_sgen["type"] = net.sgen.type
+        # Run PF
+        result = jl.run_pf_fast(temp_filename) if fast else jl.run_pf(temp_filename)
+        if (
+            fast
+            and str(result["termination_status"]) != "True"
+            or (not fast and str(result["termination_status"]) != "LOCALLY_SOLVED")
+        ):
+            raise RuntimeError(
+                f"PF did not converge: {result['termination_status']}, fast={fast}",
+            )
 
-    net.res_shunt["bus"] = net.shunt.bus
-    net.res_ext_grid["bus"] = net.ext_grid.bus
-    net.res_bus["type"] = net.bus["type"]
+        return result
 
-    total_p_diff, total_q_diff = calculate_power_imbalance(net)
-
-    assert np.abs(total_q_diff) < 1e-2, (
-        f"Total reactive power imbalance in PF: {total_q_diff}"
-    )
-    assert np.abs(total_p_diff) < 1e-2, (
-        f"Total active power imbalance in PF: {total_p_diff}"
-    )
-
-    return net.converged
+    except Exception as e:
+        raise RuntimeError(f"Error running PF: {e}")
+    finally:
+        # Clean up temporary file
+        if os.path.exists(temp_filename):
+            os.unlink(temp_filename)
 
 
-def run_dcpf(net: pandapowerNet, **kwargs: Any) -> bool:
-    """Runs DC Power Flow (DCPF) calculation and adds additional information to network elements.
+def run_dcpf(net: Network, jl: Any, fast: Union[bool, None] = None) -> Dict[str, Any]:
+    """Run DC Power Flow (DCPF) calculation using Julia interface.
 
-    This function runs the DC power flow calculation and adds bus index and type information
-    to the results dataframes. It also performs validation checks on the results.
+    This function runs the DC power flow calculation using the Julia interface
+    and returns the result with termination status.
 
     Args:
-        net: A pandapower network object containing the power system model.
-        **kwargs: Additional keyword arguments to pass to pp.rundcpp().
+        net: A network object containing the power system model.
+        jl: Julia interface object for running DC power flow.
+        fast: If True, use the direct (non-optimizer) computation. If None, defaults to False (uses optimizer-based solver).
 
     Returns:
-        bool: True if the DC power flow converged successfully, False otherwise.
+        DC power flow result containing termination status and solution data.
 
     Raises:
-        AssertionError: If any of the validation checks fail, including:
-            - Bus power mismatches
+        RuntimeError: If DC power flow fails to converge or encounters an error.
     """
-    pp.rundcpp(net, **kwargs)
 
-    # add bus number to df of opf results
-    net.res_gen["bus"] = net.gen.bus
-    net.res_gen["type"] = net.gen.type
+    # Create a temporary file for the MATPOWER case
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".m", delete=False) as temp_file:
+        temp_filename = temp_file.name
 
-    net.res_load["bus"] = net.load.bus
-    net.res_load["type"] = net.load.type
+    try:
+        # Save network to temporary file
+        net.to_mpc(temp_filename)
 
-    net.res_sgen["bus"] = net.sgen.bus
-    net.res_sgen["type"] = net.sgen.type
+        # Run DCPF (fast or standard)
+        result = jl.run_dcpf_fast(temp_filename) if fast else jl.run_dcpf(temp_filename)
 
-    net.res_shunt["bus"] = net.shunt.bus
-    net.res_ext_grid["bus"] = net.ext_grid.bus
-    net.res_bus["type"] = net.bus["type"]
+        if (
+            fast
+            and str(result["termination_status"]) != "True"
+            or (not fast and str(result["termination_status"]) != "LOCALLY_SOLVED")
+        ):
+            raise RuntimeError(
+                f"DC PF did not converge: {result['termination_status']}, fast={fast}",
+            )
 
-    total_p_diff, total_q_diff = calculate_power_imbalance(net)
+        return result
 
-    print(
-        "Total reactive power imbalance in DCPF: ",
-        total_q_diff,
-        " (It is normal that this is not 0 as we are using a DC model)",
-    )
-    print(
-        "Total active power imbalance in DCPF: ",
-        total_p_diff,
-        " (Should be close to 0)",
-    )
-
-    return net.converged
+    except Exception as e:
+        raise RuntimeError(f"Error running DC PF: {e}")
+    finally:
+        # Clean up temporary file
+        if os.path.exists(temp_filename):
+            os.unlink(temp_filename)
 
 
-def calculate_power_imbalance(net: pandapowerNet) -> Tuple[float, float]:
-    """Calculates the power imbalance in the network normalized by the number of buses.
+def run_dcopf(net: Network, jl: Any) -> Dict[str, Any]:
+    """Run DC Optimal Power Flow (DC OPF) calculation using Julia interface.
+
+    This function runs the DC optimal power flow calculation using the Julia interface
+    and returns the result with termination status.
 
     Args:
-        net: A pandapower network object containing the power system model.
+        net: A network object containing the power system model.
+        jl: Julia interface object for running DC OPF.
 
     Returns:
-        Tuple containing the total active and reactive power imbalance normalized by the number of buses.
+        DC OPF result containing termination status and solution data.
+
+    Raises:
+        RuntimeError: If DC OPF fails to converge or encounters an error.
     """
-    # check net power at each bus
-    num_buses = len(net.bus)
-    all_gens = (
-        pd.concat([net.res_gen, net.res_sgen, net.res_ext_grid])[
-            ["p_mw", "q_mvar", "bus"]
-        ]
-        .groupby("bus")
-        .sum()
-    )
-    all_loads = (
-        pd.concat([net.res_load, net.res_shunt])[["p_mw", "q_mvar", "bus"]]
-        .groupby("bus")
-        .sum()
-    )  # all load
-    net_load = (
-        pd.concat([all_loads, -all_gens])
-        .groupby("bus")
-        .sum()
-        .reindex_like(net.res_bus[["p_mw", "q_mvar"]])
-        .fillna(0)
-    )  # net load = load - generation
+    # Create a temporary file for the MATPOWER case
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".m", delete=False) as temp_file:
+        temp_filename = temp_file.name
 
-    assert np.allclose(net.res_bus[["p_mw", "q_mvar"]], net_load), (
-        f"Mismatch between net load stored in res_bus and the net load computed by summing up the load and generation after solving DCPF: {net.res_bus[['p_mw', 'q_mvar']] - net_load}"
-    )
+    try:
+        # Save network to temporary file
+        net.to_mpc(temp_filename)
 
-    # check power balance taking into account tansformer and line losses
-    total_q_diff = (
-        net_load.q_mvar.sum() + net.res_line.ql_mvar.sum() + net.res_trafo.ql_mvar.sum()
-    )
-    total_p_diff = (
-        net_load.p_mw.sum() + net.res_line.pl_mw.sum() + net.res_trafo.pl_mw.sum()
-    )
+        # Run DC OPF
+        result = jl.run_dcopf(temp_filename)
 
-    return total_p_diff / num_buses, total_q_diff / num_buses
+        if str(result["termination_status"]) != "LOCALLY_SOLVED":
+            raise RuntimeError(
+                f"DC OPF did not converge: {result['termination_status']}",
+            )
+
+        return result
+
+    except Exception as e:
+        raise RuntimeError(f"Error running DC OPF: {e}")
+    finally:
+        # Clean up temporary file
+        if os.path.exists(temp_filename):
+            os.unlink(temp_filename)
+
+
+def compare_pf_results(
+    net: Network,
+    jl: Any,
+    case_name: str,
+    fast: bool,
+    solver_type: str = "pf",
+) -> bool:
+    """Compare results from run_pf/run_opf (temp file) vs direct solve on original case file.
+
+    This function verifies that the results from running PF/OPF on a temporary file
+    (created by net.to_mpc()) are the same as running PF/OPF directly on the original
+    case file from the grids directory.
+
+    Args:
+        net: A Network object containing the power system model.
+        jl: Julia interface object for running power flow.
+        case_name: Name of the case (e.g., 'case24_ieee_rts') to find the original file.
+        solver_type: Type of solver to test - "pf" for power flow or "opf" for optimal power flow.
+
+    Returns:
+        True if results match exactly, False otherwise.
+
+    Raises:
+        RuntimeError: If either PF/OPF run fails to converge.
+        FileNotFoundError: If the original case file is not found.
+        ValueError: If solver_type is not "pf" or "opf".
+    """
+    import os
+
+    if solver_type not in ["pf", "opf"]:
+        raise ValueError(f"solver_type must be 'pf' or 'opf', got '{solver_type}'")
+
+    solver_name = "PF" if solver_type == "pf" else "OPF"
+
+    # Step 1: Run solver using temporary file (current method)
+    print(f"Running {solver_name} on temporary file for {case_name}...")
+    try:
+        if solver_type == "pf":
+            temp_result = run_pf(net, jl, fast)
+        else:  # opf
+            temp_result = run_opf(net, jl)
+        temp_converged = True
+    except RuntimeError as e:
+        print(f"Error running {solver_name} on temporary file: {e}")
+        temp_converged = False
+
+    # Step 2: Run solver directly on original case file
+    original_file_path = f"gridfm_datakit/grids/pglib_opf_{case_name}.m"
+
+    if not os.path.exists(original_file_path):
+        raise FileNotFoundError(f"Original case file not found: {original_file_path}")
+
+    print(f"Running {solver_name} directly on original file: {original_file_path}")
+    try:
+        if solver_type == "pf" and fast:
+            original_result = jl.run_pf_fast(original_file_path)
+            original_converged = str(original_result["termination_status"]) == "True"
+        elif solver_type == "pf" and not fast:
+            original_result = jl.run_pf(original_file_path)
+            original_converged = (
+                str(original_result["termination_status"]) == "LOCALLY_SOLVED"
+            )
+        elif solver_type == "opf":
+            original_result = jl.run_opf(original_file_path)
+            original_converged = (
+                str(original_result["termination_status"]) == "LOCALLY_SOLVED"
+            )
+    except Exception as e:
+        print(f"Error running {solver_name} directly on original file: {e}")
+        original_converged = False
+
+    # Step 3: Compare results
+    print(f"Comparing {solver_name} results for {case_name}...")
+
+    if temp_converged != original_converged:
+        print(
+            f"Termination status mismatch: temp_converged={temp_converged}, original_converged={original_converged}",
+        )
+        return False
+
+    if not temp_converged and not original_converged and solver_type == "pf":
+        print(
+            f"Both {solver_name} results did not converge. This is expected because the gen setpoints are not necessarily right in the case files.",
+        )
+        return True
+
+    if not temp_converged and not original_converged and solver_type == "opf":
+        print(
+            f"Both {solver_name} results did not converge. This is not expected for OPF.",
+        )
+        return False
+
+    # Compare solution data if they converged
+    temp_solution = temp_result["solution"]
+    original_solution = original_result["solution"]
+
+    # Check same number and indices of buses and generators using sets
+    temp_buses = temp_solution["bus"]
+    original_buses = original_solution["bus"]
+    temp_gens = temp_solution["gen"]
+    original_gens = original_solution["gen"]
+
+    temp_bus_ids = set(temp_buses.keys())
+    original_bus_ids = set(original_buses.keys())
+    temp_gen_ids = set(temp_gens.keys())
+    original_gen_ids = set(original_gens.keys())
+
+    if temp_bus_ids != original_bus_ids:
+        print(
+            f"Bus ID sets don't match: temp={temp_bus_ids}, original={original_bus_ids}",
+        )
+        return False
+
+    if temp_gen_ids != original_gen_ids:
+        print(
+            f"Generator ID sets don't match: temp={temp_gen_ids}, original={original_gen_ids}",
+        )
+        return False
+
+    # Compare bus voltages and angles
+    for bus_id in temp_bus_ids:
+        temp_vm = temp_buses[bus_id]["vm"]
+        temp_va = temp_buses[bus_id]["va"]
+        original_vm = original_buses[bus_id]["vm"]
+        original_va = original_buses[bus_id]["va"]
+
+        # Check if voltages and angles match exactly
+        if (not np.allclose(temp_vm, original_vm)) or (
+            not np.allclose(temp_va, original_va)
+        ):
+            print(
+                f"Bus {bus_id} mismatch: temp_vm={temp_vm}, original_vm={original_vm}, temp_va={temp_va}, original_va={original_va}",
+            )
+            return False
+
+    # Compare generator power outputs
+    for gen_id in temp_gen_ids:
+        temp_pg = temp_gens[gen_id]["pg"]
+        temp_qg = temp_gens[gen_id]["qg"]
+        original_pg = original_gens[gen_id]["pg"]
+        original_qg = original_gens[gen_id]["qg"]
+
+        # Check if power outputs match exactly
+        if (not np.allclose(temp_pg, original_pg)) or (
+            not np.allclose(temp_qg, original_qg)
+        ):
+            print(
+                f"Gen {gen_id} mismatch: temp_pg={temp_pg}, original_pg={original_pg}, temp_qg={temp_qg}, original_qg={original_qg}",
+            )
+            return False
+
+    # All checks passed
+    print(f"All {len(temp_buses)} buses match exactly")
+    print(f"All {len(temp_gens)} generators match exactly")
+    print(f"{solver_name} results are identical for {case_name}")
+
+    return True
