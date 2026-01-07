@@ -741,9 +741,9 @@ def pf_post_processing(
     X_gen[:, 6] = net.gens[:, PMAX]
     X_gen[:, 7] = net.gens[:, QMIN]
     X_gen[:, 8] = net.gens[:, QMAX]
-    X_gen[:, 9] = net.gencosts[:, COST]
+    X_gen[:, 9] = net.gencosts[:, COST + 2]
     X_gen[:, 10] = net.gencosts[:, COST + 1]
-    X_gen[:, 11] = net.gencosts[:, COST + 2]
+    X_gen[:, 11] = net.gencosts[:, COST]
     X_gen[net.idx_gens_in_service, 12] = 1
 
     # slack gen (can be any generator connected to the ref node)

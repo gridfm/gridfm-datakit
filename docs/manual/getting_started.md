@@ -91,17 +91,17 @@ The `mode` parameter controls how the power flow scenarios are generated and val
 - **Constraints**: Since the topology perturbations are performed after solving OPF, the inequality constraints of OPF (e.g. branch loading, voltage magnitude at PQ buses, generator bounds on reactive power, etc) might be violated.
 - **Use Case**: Training data for power flow, contingency analysis, etc
 - **Performance**: Faster as it avoids re-solving OPF for each perturbed scenario
-- **PF Solver Choice**: Controlled by `settings.pf_fast`. If `true`, uses the fast `compute_ac_pf` path. If `false`, uses the Ipopt-based AC PF for higher fidelity at the cost of speed.
+- **PF Solver Choice**: Controlled by `settings.pf_fast`. If `true`, uses the fast `compute_ac_pf` path. If `false`, uses the Ipopt-based AC PF which is slower for smaller grids but has better convergence properties for large grids.
 
 ## Data Validation
 
 The generated data can be validated using the CLI validation command:
 
 ```bash
-# Validate with default sampling (100 partitions)
+# Validate with default sampling (100 partitions of 200 scenarios)
 gridfm-datakit validate ./data_out/case24_ieee_rts/raw
 
-# Validate with custom partition sampling
+# Validate with custom number of partitions
 gridfm-datakit validate ./data_out/case24_ieee_rts/raw --n-partitions 50
 
 # Validate all partitions (slower but complete)

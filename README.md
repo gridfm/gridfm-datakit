@@ -182,9 +182,9 @@ settings:
   large_chunk_size: 1000 # Number of load scenarios processed before saving
   overwrite: true # If true, overwrites existing files, if false, appends to files
   mode: "pf" # Mode of the script; options: pf, opf. pf: power flow data where one or more operating limits – the inequality constraints defined in OPF, e.g., voltage magnitude or branch limits – may be violated. opf: generates datapoints for training OPF solvers, with cost-optimal dispatches that satisfy all operating limits (OPF-feasible)
-  include_dc_res: true # If true, also stores the results of dc power flow (in addition to the results AC power flow). does not work with mode "opf"
+  include_dc_res: true # If true, also stores the results of dc power flow or dc optimal power flow
   enable_solver_logs: true # If true, write OPF/PF logs to {data_dir}/solver_log; PF fast and DCPF fast do not log.
-  pf_fast: true # Whether to use fast PF solver by default (compute_ac_pf from powermodels.jl); if false, uses Ipopt-based PF. Some networks e.g. case10000_goc do not work with pf_fast: true. pf_fast is faster and more accurate than the Ipopt-based PF.
+  pf_fast: true # Whether to use fast PF solver by default (compute_ac_pf from powermodels.jl); if false, uses Ipopt-based PF. Some networks (typically large ones e.g. case10000_goc) do not work with pf_fast: true. pf_fast is faster and more accurate than the Ipopt-based PF.
   dcpf_fast: true # Whether to use fast DCPF solver by default (compute_dc_pf from PowerModels.jl)
   max_iter: 200 # Max iterations for Ipopt-based solvers
 ```

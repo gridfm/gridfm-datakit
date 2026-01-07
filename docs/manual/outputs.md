@@ -31,10 +31,13 @@ Metadata file containing the total number of scenarios (used for efficient parti
 
 ### Network Data Files
 
-#### `bus_data.parquet`
-Bus-level features for each processed scenario. Columns (BUS_COLUMNS):
+**Note**: All network data files are saved as partitioned parquet directories. Each file includes a `scenario_partition` column used for partitioning, which groups scenarios into partitions (default: 200 scenarios per partition).
 
-- **scenario**: Index of the scenario (unique identifier of the power flow case)
+#### `bus_data.parquet`
+Bus-level features for each processed scenario. Columns:
+
+- **scenario**: Global scenario index (unique identifier)
+- **load_scenario_idx**: Index of the load scenario
 - **bus**: Index of the bus
 - **Pd**: Active power demand at the bus (MW)
 - **Qd**: Reactive power demand at the bus (MVAr)
@@ -56,9 +59,10 @@ If `settings.include_dc_res=True`, also includes DC power flow columns (DC_BUS_C
 - **Pg_dc**: DC active power generation at the bus (MW)
 
 #### `gen_data.parquet`
-Generator features per scenario. Columns (GEN_COLUMNS):
+Generator features per scenario. Columns:
 
-- **scenario**: Index of the scenario
+- **scenario**: Global scenario index (unique identifier)
+- **load_scenario_idx**: Index of the load scenario
 - **idx**: Generator row index (0-based)
 - **bus**: Bus index where the generator is connected
 - **p_mw**: Active power output (MW)
@@ -77,9 +81,10 @@ If `settings.include_dc_res=True`, also includes DC generator column (DC_GEN_COL
 - **p_mw_dc**: Active power from DC solution (MW)
 
 #### `branch_data.parquet`
-Branch features per scenario. Columns (BRANCH_COLUMNS):
+Branch features per scenario. Columns:
 
-- **scenario**: Index of the scenario
+- **scenario**: Global scenario index (unique identifier)
+- **load_scenario_idx**: Index of the load scenario
 - **idx**: Branch row index (0-based)
 - **from_bus**: Index of the source bus
 - **to_bus**: Index of the destination bus
@@ -110,9 +115,10 @@ If `settings.include_dc_res=True`, also includes DC branch columns (DC_BRANCH_CO
 - **pt_dc**: DC active power flow from destination to source (MW)
 
 #### `y_bus_data.parquet`
-Nonzero Y-bus entries per scenario with columns:
+Nonzero Y-bus entries per scenario. Columns:
 
-- **scenario**: Index of the scenario
+- **scenario**: Global scenario index (unique identifier)
+- **load_scenario_idx**: Index of the load scenario
 - **index1**: Row index in the Y-bus matrix
 - **index2**: Column index in the Y-bus matrix
 - **G**: Conductance value (p.u.)
@@ -121,7 +127,14 @@ Nonzero Y-bus entries per scenario with columns:
 ### Runtime Data Files
 
 #### `runtime_data.parquet`
-Runtime data for each scenario (AC and DC solver execution times).
+Runtime data for each scenario. Columns:
+
+- **scenario**: Global scenario index (unique identifier)
+- **load_scenario_idx**: Index of the load scenario
+- **ac**: AC solver execution time (seconds)
+
+If `settings.include_dc_res=True`, also includes DC runtime column (DC_RUNTIME_COLUMNS):
+- **dc**: DC solver execution time (seconds)
 
 ### Statistics Files
 
@@ -134,8 +147,8 @@ Aggregated statistics collected during generation (if `settings.no_stats=False`)
 - Maximum loading values
 - Other network performance metrics
 
-#### `stats_plot.html`
-HTML dashboard of the aggregated statistics (if `settings.no_stats=False`).
+#### `stats_plot.png`
+Visualization of the aggregated statistics (if `settings.no_stats=False`).
 
 ### Feature Visualization
 

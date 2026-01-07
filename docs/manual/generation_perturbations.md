@@ -5,7 +5,7 @@ Generation perturbations introduce random changes to the cost functions of gener
 
 The module provides three options for generation perturbation strategies:
 
-- `NoGenPerturbationGenerator` yields the original example produced by the topology perturbation generator without any additional changes in generation cost.
+- `NoGenPerturbationGenerator` yields the original example without any additional changes in generation cost.
 
 - `PermuteGenCostGenerator` randomly permutes the generator cost coefficients across and among generator elements.
 
