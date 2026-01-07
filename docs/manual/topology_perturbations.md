@@ -2,7 +2,7 @@
 
 ## Overview
 
-Topology perturbations generate variations of the original network by altering its structure. These variations simulate contingencies and component failures, and are useful for robustness testing, contingency analysis, and training ML models on diverse grid conditions.
+Topology perturbations generate variations of the original network by altering its topology. These variations simulate contingencies and component failures, and are useful for robustness testing, contingency analysis, and training ML models on diverse grid conditions.
 
 The module provides three topology perturbation strategies:
 

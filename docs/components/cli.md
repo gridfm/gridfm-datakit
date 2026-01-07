@@ -30,7 +30,7 @@ gridfm-datakit validate path/to/data/directory [--n-partitions N] [--sn-mva 100]
 
 **Arguments:**
 - `data_path`: Path to directory containing generated CSV files
-- `--n-partitions N`: Number of partitions to sample for validation (default: 100). Use 0 to validate all partitions.
+- `--n-partitions N`: Number of partitions (of 200 scenarios) to sample for validation (default: 100). Use 0 to validate all partitions.
 - `--sn-mva`: Base MVA used to scale power quantities (default: 100).
 
 **Examples:**
@@ -38,12 +38,38 @@ gridfm-datakit validate path/to/data/directory [--n-partitions N] [--sn-mva 100]
 # Validate with default sampling (100 partitions)
 gridfm-datakit validate ./data_out/case24_ieee_rts/raw
 
-# Validate with custom partition sampling
+# Validate custom number of partitions
 gridfm-datakit validate ./data_out/case24_ieee_rts/raw --n-partitions 50
 
 # Validate all partitions (slower but complete)
 gridfm-datakit validate ./data_out/case24_ieee_rts/raw --n-partitions 0
 ```
+
+The validation command performs the following checks:
+
+#### Y-Bus Consistency
+- Consistency of bus admittance matrix with branch admittance data
+- Y-bus matrix structure validation
+
+#### Branch Constraints
+- Deactivated lines have zero power flows and admittances
+- Computed vs stored power flow consistency
+- Branch loading limits (OPF mode only)
+
+#### Generator Constraints
+- Deactivated generators have zero power output
+- Generator power limits validation
+- Reactive power limits (OPF mode only)
+
+#### Power Balance
+- Bus generation consistency between bus_data and gen_data
+- Power Balance
+
+#### Data Integrity
+- Scenario indexing consistency across all files
+- Bus indexing consistency
+- Data completeness and missing value checks
+
 
 ### Stats
 
@@ -90,34 +116,3 @@ gridfm-datakit plots ./data_out/case24_ieee_rts/raw --sn-mva 100
 ```
 
 This command reads `bus_data.parquet`, normalizes power columns by `sn_mva`, and writes violin plots named `distribution_{feature_name}.png` to the output directory for quick visualization of feature distributions.
-
-## Validation Checks
-
-The validation command performs the following checks:
-
-### Y-Bus Consistency
-- Consistency of bus admittance matrix with branch admittance data
-- Y-bus matrix structure validation
-
-### Branch Constraints
-- Deactivated lines have zero power flows and admittances
-- Computed vs stored power flow consistency
-- Branch loading limits (OPF mode only)
-
-### Generator Constraints
-- Deactivated generators have zero power output
-- Generator power limits validation
-- Reactive power limits (OPF mode only)
-
-### Power Balance
-- Bus generation consistency between bus_data and gen_data
-- Power Balance
-
-### Data Integrity
-- Scenario indexing consistency across all files
-- Bus indexing consistency
-- Data completeness and missing value checks
-
-### `main`
-
-::: gridfm_datakit.cli.main
