@@ -1,0 +1,39 @@
+admittance_perturbation:
+  sigma: 0.2
+  type: random_perturbation
+generation_perturbation:
+  sigma: 1.0
+  type: cost_permutation
+load:
+  agg_profile: default
+  change_reactive_power: true
+  generator: agg_load_profile
+  global_range: 0.4
+  max_scaling_factor: 4.0
+  scenarios: 10000
+  sigma: 0.2
+  start_scaling_factor: 1.0
+  step_size: 0.1
+network:
+  name: case24_ieee_rts
+  network_dir: none
+  source: pglib
+settings:
+  data_dir: ./data_out
+  dcpf_fast: true
+  enable_solver_logs: true
+  include_dc_res: true
+  large_chunk_size: 1000
+  max_iter: 200
+  mode: pf
+  num_processes: 16
+  overwrite: true
+  pf_fast: true
+  seed: null
+topology_perturbation:
+  elements:
+  - branch
+  - gen
+  k: 1
+  n_topology_variants: 20
+  type: random

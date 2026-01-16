@@ -22,6 +22,8 @@ from gridfm_datakit.utils.idx_bus import (
     VM,
     VA,
     REF,
+    PV,
+    PQ,
 )
 from gridfm_datakit.utils.idx_gen import GEN_BUS, GEN_STATUS, PG, QG
 from gridfm_datakit.utils.idx_brch import (
@@ -36,12 +38,71 @@ from gridfm_datakit.utils.idx_brch import (
     BR_R_ASYM,
     BR_X_ASYM,
 )
-from gridfm_datakit.utils.idx_cost import NCOST
+from gridfm_datakit.utils.idx_cost import NCOST, MODEL, POLYNOMIAL
 import warnings
 import networkx as nx
 import numpy as np
 import copy
 from typing import Dict, Tuple, Any
+import tempfile
+from juliapkg.state import STATE
+from juliapkg.deps import run_julia, executable
+
+
+def correct_network(network_path: str, force: bool = False) -> str:
+    """
+    Load a MATPOWER network using PowerModels via run_julia
+    and save a corrected version.
+
+    Args:
+        network_path: Path to the original MATPOWER .m file.
+        force: If True, regenerate the corrected file even if it exists.
+
+    Returns:
+        Path to the corrected network file.
+
+    Raises:
+        FileNotFoundError: If input file does not exist.
+        RuntimeError: If PowerModels fails.
+    """
+    if not os.path.exists(network_path):
+        raise FileNotFoundError(f"Network file not found: {network_path}")
+
+    base_path, ext = os.path.splitext(network_path)
+    corrected_path = f"{base_path}_corrected{ext}"
+
+    if os.path.exists(corrected_path) and not force:
+        return corrected_path
+
+    # Use temporary file for atomic replace
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".m")
+    os.close(tmp_fd)
+
+    try:
+        project = STATE["project"]
+        jl_exe = executable()
+
+        # Julia script as a list of lines
+        julia_code = [
+            "using PowerModels",
+            f'data = PowerModels.parse_file("{network_path}")',
+            f'PowerModels.export_matpower("{tmp_path}", data)',
+        ]
+
+        # Run Julia
+        run_julia(julia_code, project=project, executable=jl_exe)
+
+        # Sanity check
+        if not os.path.exists(tmp_path) or os.path.getsize(tmp_path) == 0:
+            raise RuntimeError("Julia produced empty MATPOWER file")
+
+        # Atomically replace target file
+        os.replace(tmp_path, corrected_path)
+        return corrected_path
+
+    finally:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
 
 
 def numpy_to_matlab_matrix(array: np.ndarray, name: str) -> str:
@@ -132,6 +193,11 @@ class Network:
         assert np.all(np.isin(self.gens[:, GEN_BUS], self.buses[:, BUS_I])), (
             "All generator buses should be in bus IDs"
         )
+
+        assert np.all(self.gencosts[:, MODEL] == POLYNOMIAL), (
+            "MODEL should be POLYNOMIAL"
+        )
+
         # assert all generators have the same number of cost coefficients
         assert np.all(self.gencosts[:, NCOST] == self.gencosts[:, NCOST][0]), (
             "All generators must have the same number of cost coefficients"
@@ -345,6 +411,21 @@ class Network:
             )
         self.gens[idx_gens, GEN_STATUS] = 0
 
+        # -----------------------------
+        # Update PV buses that lost all generators → PQ
+        # -----------------------------
+        n_buses = self.buses.shape[0]
+
+        # Count in-service generators per bus
+        gens_on = self.gens[self.idx_gens_in_service]
+        gen_count = np.bincount(gens_on[:, GEN_BUS].astype(int), minlength=n_buses)
+
+        # Boolean mask: PV buses with no in-service generator
+        pv_no_gen = (self.buses[:, BUS_TYPE] == PV) & (gen_count == 0)
+
+        # Set them to PQ
+        self.buses[pv_no_gen, BUS_TYPE] = PQ
+
     def check_single_connected_component(self) -> bool:
         """
         Check that the network forms a single connected component.
@@ -541,6 +622,7 @@ def load_net_from_file(network_path: str) -> Network:
         ValueError: If the file format is invalid.
     """
     # Load network using matpowercaseframes
+    network_path = correct_network(network_path)
     mpc_frames = CaseFrames(network_path)
     mpc = {
         key: mpc_frames.__getattribute__(key)
@@ -569,6 +651,7 @@ def load_net_from_pglib(grid_name: str) -> Network:
         FileNotFoundError: If the file cannot be found after download.
         ValueError: If the file format is invalid.
     """
+
     # Construct file paths
     file_path = str(
         resources.files("gridfm_datakit.grids").joinpath(f"pglib_opf_{grid_name}.m"),
@@ -585,6 +668,8 @@ def load_net_from_pglib(grid_name: str) -> Network:
 
         with open(file_path, "wb") as f:
             f.write(response.content)
+
+    file_path = correct_network(file_path)
 
     # Load network using matpowercaseframes
     mpc_frames = CaseFrames(file_path)

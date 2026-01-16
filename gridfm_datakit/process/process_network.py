@@ -23,6 +23,7 @@ from typing import Tuple, List, Union, Dict, Any, Optional
 from gridfm_datakit.network import makeYbus, branch_vectors
 import copy
 from gridfm_datakit.process.solvers import run_opf, run_pf, run_dcpf, run_dcopf
+from gridfm_datakit.utils.random_seed import custom_seed
 from gridfm_datakit.utils.idx_bus import (
     GS,
     BS,
@@ -694,6 +695,7 @@ def pf_post_processing(
     assert np.all(np.isin(net.buses[:, BUS_TYPE], [PQ, PV, REF])), (
         "Bus type should be PQ, PV, or REF, no disconnected buses (4)"
     )
+
     X_bus[np.arange(n_buses), 8 + net.buses[:, BUS_TYPE].astype(int) - 1] = (
         1  # because type is 1, 2, 3, not 0, 1, 2
     )
@@ -725,7 +727,11 @@ def pf_post_processing(
             X_bus[:, 17] = np.nan
 
     # --- Generator data ---
-    assert np.all(net.gencosts[:, NCOST] == 3), "NCOST should be 3"
+
+    n_cost = net.gencosts[0, NCOST]
+    assert np.all(net.gencosts[:, NCOST] == n_cost), (
+        "NCOST should be the same for all generators"
+    )
     n_gens = net.gens.shape[0]
     n_cols = (
         len(GEN_COLUMNS) + len(DC_GEN_COLUMNS) if include_dc_res else len(GEN_COLUMNS)
@@ -741,9 +747,22 @@ def pf_post_processing(
     X_gen[:, 6] = net.gens[:, PMAX]
     X_gen[:, 7] = net.gens[:, QMIN]
     X_gen[:, 8] = net.gens[:, QMAX]
-    X_gen[:, 9] = net.gencosts[:, COST + 2]
-    X_gen[:, 10] = net.gencosts[:, COST + 1]
-    X_gen[:, 11] = net.gencosts[:, COST]
+
+    if n_cost == 3:  # order in .m file is c2, c1, c0
+        X_gen[:, 9] = net.gencosts[:, COST + 2]
+        X_gen[:, 10] = net.gencosts[:, COST + 1]
+        X_gen[:, 11] = net.gencosts[:, COST]
+
+    if n_cost == 2:  # order in .m file is c1, c0, and there is no cp2 cost
+        X_gen[:, 9] = net.gencosts[:, COST + 1]
+        X_gen[:, 10] = net.gencosts[:, COST]
+        X_gen[:, 11] = 0  # no cp2 cost for linear cost function
+
+    if n_cost == 1:  # order in .m file is c0, and there is no cp1 or cp2 cost
+        X_gen[:, 9] = net.gencosts[:, COST]
+        X_gen[:, 10] = 0  # no cp1 cost for constant cost function
+        X_gen[:, 11] = 0  # no cp2 cost for constant cost function
+
     X_gen[net.idx_gens_in_service, 12] = 1
 
     # slack gen (can be any generator connected to the ref node)
@@ -833,6 +852,9 @@ def process_scenario_pf_mode(
 
     Returns:
         Updated list of processed data (bus, gen, branch, Y_bus arrays)
+
+    Note:
+        Random seed is controlled by the calling context (process_scenario_chunk).
     """
     net = copy.deepcopy(net)
 
@@ -923,6 +945,7 @@ def process_scenario_chunk(
     dcpf_fast: bool,
     solver_log_dir: str,
     max_iter: int,
+    seed: int,
 ) -> Tuple[
     Union[None, Exception],
     Union[None, str],
@@ -945,6 +968,11 @@ def process_scenario_chunk(
         admittance_generator: Generator for line admittance perturbations.
         error_log_path: Path to error log file for recording failures.
         include_dc_res: Whether to include DC power flow results in output.
+        pf_fast: Whether to use fast AC PF solver.
+        dcpf_fast: Whether to use fast DC PF solver.
+        solver_log_dir: Directory for solver logs.
+        max_iter: Maximum iterations for the solver.
+        seed: Global random seed for reproducibility.
 
     Returns:
         Tuple containing:
@@ -956,37 +984,47 @@ def process_scenario_chunk(
     try:
         jl = init_julia(max_iter, solver_log_dir)
         local_processed_data = []
-        for scenario_index in range(start_idx, end_idx):
-            if mode == "opf":
-                local_processed_data = process_scenario_opf_mode(
-                    net,
-                    scenarios,
-                    scenario_index,
-                    topology_generator,
-                    generation_generator,
-                    admittance_generator,
-                    local_processed_data,
-                    error_log_path,
-                    include_dc_res,
-                    jl,
-                )
-            elif mode == "pf":
-                local_processed_data = process_scenario_pf_mode(
-                    net,
-                    scenarios,
-                    scenario_index,
-                    topology_generator,
-                    generation_generator,
-                    admittance_generator,
-                    local_processed_data,
-                    error_log_path,
-                    include_dc_res,
-                    pf_fast,
-                    dcpf_fast,
-                    jl,
-                )
 
-            progress_queue.put(1)  # update queue
+        # Use custom_seed to set seed based on start_idx for this chunk
+        # This ensures each chunk gets a unique but deterministic seed
+        # we multiply by 20_000 to ensure there is no collision with other runs where the seed would be close to each other
+        # example (assuming we have chunks of length 1, hence an increment of 1 between start indices)
+        # Run A: base seed = 42 → scenario seeds = 42, 43, 44, …, 10041 (for 10,000 scenarios)
+        # Run B: base seed = 120 → scenario seeds = 120, 121, 122, …, 10119
+        # These sets overlap on seeds 120..10041 (so 9,922 overlapping seeds).
+        # we also add 1 in case the seed is 0, to not have collision witht he seed used for the load perturbations
+        with custom_seed(seed * 20_000 + start_idx + 1):
+            for scenario_index in range(start_idx, end_idx):
+                if mode == "opf":
+                    local_processed_data = process_scenario_opf_mode(
+                        net,
+                        scenarios,
+                        scenario_index,
+                        topology_generator,
+                        generation_generator,
+                        admittance_generator,
+                        local_processed_data,
+                        error_log_path,
+                        include_dc_res,
+                        jl,
+                    )
+                elif mode == "pf":
+                    local_processed_data = process_scenario_pf_mode(
+                        net,
+                        scenarios,
+                        scenario_index,
+                        topology_generator,
+                        generation_generator,
+                        admittance_generator,
+                        local_processed_data,
+                        error_log_path,
+                        include_dc_res,
+                        pf_fast,
+                        dcpf_fast,
+                        jl,
+                    )
+
+                progress_queue.put(1)  # update queue
 
         return (
             None,
@@ -1031,9 +1069,13 @@ def process_scenario_opf_mode(
         local_processed_data: List to accumulate processed data tuples.
         error_log_file: Path to error log file for recording failures.
         include_dc_res: Whether to include DC power flow results in output.
+        jl: Julia interface object for running power flow calculations.
 
     Returns:
         Updated list of processed data (bus, gen, branch, Y_bus arrays)
+
+    Note:
+        Random seed is controlled by the calling context (process_scenario_chunk).
     """
 
     # apply the load scenario to the network
