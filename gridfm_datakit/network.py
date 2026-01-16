@@ -6,6 +6,7 @@ networks in MATPOWER format, with support for non-continuous bus indexing.
 """
 
 import os
+import shutil
 import requests
 from importlib import resources
 import pandas as pd
@@ -96,8 +97,8 @@ def correct_network(network_path: str, force: bool = False) -> str:
         if not os.path.exists(tmp_path) or os.path.getsize(tmp_path) == 0:
             raise RuntimeError("Julia produced empty MATPOWER file")
 
-        # Atomically replace target file
-        os.replace(tmp_path, corrected_path)
+        # Atomically replace target file (use shutil.move to allow cross-device)
+        shutil.move(tmp_path, corrected_path)
         return corrected_path
 
     finally:
