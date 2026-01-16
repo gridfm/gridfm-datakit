@@ -55,6 +55,8 @@ settings:
   pf_fast: true # Whether to use fast PF solver by default (compute_ac_pf from powermodels.jl); if false, uses Ipopt-based PF. Some networks (typically large ones e.g. case10000_goc) do not work with pf_fast: true. pf_fast is faster and more accurate than the Ipopt-based PF.
   dcpf_fast: true # Whether to use fast DCPF solver by default (compute_dc_pf from PowerModels.jl)
   max_iter: 200 # Max iterations for Ipopt-based solvers
+  seed: null # Seed for random number generation. If null, a random seed is generated (RECOMMENDED). To get the same data across runs, set the seed and note that ALL OTHER PARAMETERS IN THE CONFIG FILE MUST BE THE SAME.
+
 
 
 """
@@ -177,6 +179,29 @@ def compare_parquet_files(dir1: str, dir2: str, verbose: bool = False) -> None:
             # Load parquet files
             df1 = pd.read_parquet(files_dir1[filename])
             df2 = pd.read_parquet(files_dir2[filename])
+
+            # sort by load_scenario_idx if exists
+            if "load_scenario_idx" in df1.columns:
+                print(f"Sorting {filename} by load_scenario_idx")
+                df1 = df1.sort_values(
+                    by="load_scenario_idx",
+                    kind="stable",
+                ).reset_index(drop=True)
+                df2 = df2.sort_values(
+                    by="load_scenario_idx",
+                    kind="stable",
+                ).reset_index(drop=True)
+
+            else:
+                print(
+                    f"No load_scenario_idx column found in {filename}, using sort by scenario",
+                )
+                df1 = df1.sort_values(by="scenario", kind="stable").reset_index(
+                    drop=True,
+                )
+                df2 = df2.sort_values(by="scenario", kind="stable").reset_index(
+                    drop=True,
+                )
 
             cols1 = set(df1.columns)
             cols2 = set(df2.columns)

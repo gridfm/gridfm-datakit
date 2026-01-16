@@ -36,11 +36,12 @@ from typing import List, Tuple, Any, Dict, Union
 import sys
 from gridfm_datakit.network import Network
 from gridfm_datakit.process.process_network import init_julia
+from gridfm_datakit.utils.random_seed import custom_seed
 
 
 def _setup_environment(
     config: Union[str, Dict[str, Any], NestedNamespace],
-) -> Tuple[NestedNamespace, str, Dict[str, str]]:
+) -> Tuple[NestedNamespace, str, Dict[str, str], int]:
     """Setup the environment for data generation.
 
     Args:
@@ -50,7 +51,7 @@ def _setup_environment(
             3. NestedNamespace object (NestedNamespace)
 
     Returns:
-        Tuple of (args, base_path, file_paths)
+        Tuple of (args, base_path, file_paths, seed)
     """
     # Load config from file if a path is provided
     if isinstance(config, str):
@@ -62,6 +63,25 @@ def _setup_environment(
         args = NestedNamespace(**config)
     else:
         args = config
+
+        # Set global seed if provided, otherwise generate a unique seed for this generation
+    if (
+        hasattr(args.settings, "seed")
+        and args.settings.seed is not None
+        and args.settings.seed != ""
+    ):
+        seed = args.settings.seed
+        print(f"Global random seed set to: {seed}")
+
+    else:
+        # Generate a unique seed for non-reproducible but independent scenarios
+        # This ensures scenarios are i.i.d. within a run, but different across runs
+        import secrets
+
+        seed = secrets.randbelow(50_000)
+        # chunk_seed = seed * 20000 + start_idx + 1 < 2^31 - 1
+        # seed < (2,147,483,647 - n_scenarios) / 20,000 ~= 100_000 so taking 50_000 to be safe
+        print(f"No seed provided. Using seed={seed}")
 
     # Setup output directory
     base_path = os.path.join(args.settings.data_dir, args.network.name, "raw")
@@ -115,18 +135,20 @@ def _setup_environment(
             if log_file == file_paths["args_log"]:
                 yaml.safe_dump(args.to_dict(), f)
 
-    return args, base_path, file_paths
+    return args, base_path, file_paths, seed
 
 
 def _prepare_network_and_scenarios(
     args: NestedNamespace,
     file_paths: Dict[str, str],
+    seed: int,
 ) -> Tuple[Network, np.ndarray]:
     """Prepare the network and generate load scenarios.
 
     Args:
         args: Configuration object
         file_paths: Dictionary of file paths
+        seed: Global random seed for reproducibility.
 
     Returns:
         Tuple of (network, scenarios)
@@ -147,6 +169,7 @@ def _prepare_network_and_scenarios(
         args.load.scenarios,
         file_paths["scenarios_log"],
         max_iter=args.settings.max_iter,
+        seed=seed,
     )
     scenarios_df = load_scenarios_to_df(scenarios)
     scenarios_df.to_parquet(file_paths["scenarios"], index=False, engine="pyarrow")
@@ -230,10 +253,10 @@ def generate_power_flow_data(
     """
 
     # Setup environment
-    args, base_path, file_paths = _setup_environment(config)
+    args, base_path, file_paths, seed = _setup_environment(config)
 
     # Prepare network and scenarios
-    net, scenarios = _prepare_network_and_scenarios(args, file_paths)
+    net, scenarios = _prepare_network_and_scenarios(args, file_paths, seed)
 
     # Initialize topology generator
     topology_generator = initialize_topology_generator(args.topology_perturbation, net)
@@ -254,48 +277,50 @@ def generate_power_flow_data(
 
     processed_data = []
 
-    # Process scenarios sequentially
-    with open(file_paths["tqdm_log"], "a") as f:
-        with tqdm(
-            total=args.load.scenarios,
-            desc="Processing scenarios",
-            file=Tee(sys.stdout, f),
-            miniters=5,
-        ) as pbar:
-            for scenario_index in range(args.load.scenarios):
-                # Process the scenario
-                if args.settings.mode == "opf":
-                    processed_data = process_scenario_opf_mode(
-                        net,
-                        scenarios,
-                        scenario_index,
-                        topology_generator,
-                        generation_generator,
-                        admittance_generator,
-                        processed_data,
-                        file_paths["error_log"],
-                        args.settings.include_dc_res,
-                        jl,
-                    )
-                elif args.settings.mode == "pf":
-                    processed_data = process_scenario_pf_mode(
-                        net,
-                        scenarios,
-                        scenario_index,
-                        topology_generator,
-                        generation_generator,
-                        admittance_generator,
-                        processed_data,
-                        file_paths["error_log"],
-                        args.settings.include_dc_res,
-                        args.settings.pf_fast,
-                        args.settings.dcpf_fast,
-                        jl,
-                    )
-                else:
-                    raise ValueError("Invalid mode!")
+    # Process scenarios sequentially with deterministic seed
+    # Use custom_seed to control randomness for reproducibility
+    with custom_seed(seed + 1):
+        with open(file_paths["tqdm_log"], "a") as f:
+            with tqdm(
+                total=args.load.scenarios,
+                desc="Processing scenarios",
+                file=Tee(sys.stdout, f),
+                miniters=5,
+            ) as pbar:
+                for scenario_index in range(args.load.scenarios):
+                    # Process the scenario
+                    if args.settings.mode == "opf":
+                        processed_data = process_scenario_opf_mode(
+                            net,
+                            scenarios,
+                            scenario_index,
+                            topology_generator,
+                            generation_generator,
+                            admittance_generator,
+                            processed_data,
+                            file_paths["error_log"],
+                            args.settings.include_dc_res,
+                            jl,
+                        )
+                    elif args.settings.mode == "pf":
+                        processed_data = process_scenario_pf_mode(
+                            net,
+                            scenarios,
+                            scenario_index,
+                            topology_generator,
+                            generation_generator,
+                            admittance_generator,
+                            processed_data,
+                            file_paths["error_log"],
+                            args.settings.include_dc_res,
+                            args.settings.pf_fast,
+                            args.settings.dcpf_fast,
+                            jl,
+                        )
+                    else:
+                        raise ValueError("Invalid mode!")
 
-                pbar.update(1)
+                    pbar.update(1)
 
     # Save final data
     _save_generated_data(
@@ -339,14 +364,14 @@ def generate_power_flow_data_distributed(
         - scenarios_{generator}.log: Load scenario generation notes
     """
     # Setup environment
-    args, base_path, file_paths = _setup_environment(config)
+    args, base_path, file_paths, seed = _setup_environment(config)
 
     # check if mode is valid
     if args.settings.mode not in ["opf", "pf"]:
         raise ValueError("Invalid mode!")
 
     # Prepare network and scenarios
-    net, scenarios = _prepare_network_and_scenarios(args, file_paths)
+    net, scenarios = _prepare_network_and_scenarios(args, file_paths, seed)
 
     # Initialize topology generator
     topology_generator = initialize_topology_generator(args.topology_perturbation, net)
@@ -405,6 +430,7 @@ def generate_power_flow_data_distributed(
                         args.settings.dcpf_fast,
                         file_paths["solver_log_dir"],
                         args.settings.max_iter,
+                        seed,
                     )
                     for chunk in scenario_chunks
                 ]

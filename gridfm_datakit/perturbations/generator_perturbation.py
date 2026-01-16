@@ -58,8 +58,10 @@ class PermuteGenCostGenerator(GenerationGenerator):
     """Class for permuting generator costs.
 
     This class is for generating different generation scenarios
-    by permuting all the coeffiecient costs between and among
-    generators of power grid networks.
+    by permuting cost coefficients between and among generators
+    of power grid networks. Only generators with non-zero linear (c1)
+    or quadratic (c2) cost coefficients are permuted, preserving
+    zero-cost and constant-only generators.
     """
 
     def __init__(self, base_net: Network) -> None:
@@ -75,6 +77,16 @@ class PermuteGenCostGenerator(GenerationGenerator):
             "All generators must have the same number of cost coefficients"
         )
 
+        # Identify generators to permute (skip zero-cost and constant-only cost)
+        costs = base_net.gencosts[
+            :,
+            COST:,
+        ]  # all cost coefficients [c2, c1, c0] for NCOST=3
+        # Keep only generators with non-constant terms (c1, c2, ...) non-zero
+        # costs[:, :-1] excludes the last coefficient (c0, the constant term)
+        self.permutable_mask = np.any(costs[:, :-1] != 0, axis=1)
+        self.permutable_indices = np.where(self.permutable_mask)[0]
+
     def generate(
         self,
         example_generator: Generator[Network, None, None],
@@ -88,12 +100,16 @@ class PermuteGenCostGenerator(GenerationGenerator):
 
         Yields:
             An example scenario with cost coeffiecients in the
-            poly_cost table permuted
+            poly_cost table permuted (only for dispatchable generators)
         """
         for scenario in example_generator:
-            new_idx = np.random.permutation(self.num_gens)
+            # Only permute the selected generators
+            new_idx = np.random.permutation(self.permutable_indices)
             # Permute the rows (generators) of the cost coefficients (and NCOST, although we assume it is the same for all generators)
-            scenario.gencosts[:, NCOST:] = scenario.gencosts[:, NCOST:][new_idx]
+            scenario.gencosts[self.permutable_indices, NCOST:] = scenario.gencosts[
+                new_idx,
+                NCOST:,
+            ]
             yield scenario
 
 
@@ -101,9 +117,11 @@ class PerturbGenCostGenerator(GenerationGenerator):
     """Class for perturbing generator cost.
 
     This class is for generating different generation scenarios
-    by randomly perturbing all the cost coeffiecient of generators
-    in a power network by multiplying with a scaling factor sampled
-    from a uniform distribution.
+    by randomly perturbing cost coefficients of generators in a
+    power network by multiplying with a scaling factor sampled
+    from a uniform distribution. Only generators with non-zero
+    linear (c1) or quadratic (c2) cost coefficients are perturbed,
+    preserving zero-cost and constant-only generators.
     """
 
     def __init__(self, base_net: Network, sigma: float) -> None:
@@ -126,7 +144,19 @@ class PerturbGenCostGenerator(GenerationGenerator):
         n_costs = int(base_net.gencosts[:, NCOST][0])
         self.lower = np.max([0.0, 1.0 - sigma])
         self.upper = 1.0 + sigma
-        self.sample_size = [self.num_gens, n_costs]
+
+        # Mask generators to perturb (skip zero-cost or constant-only)
+        costs = base_net.gencosts[
+            :,
+            COST:,
+        ]  # all cost coefficients [c2, c1, c0] for NCOST=3
+        # Keep only generators with non-constant terms (c1, c2, ...) non-zero
+        # costs[:, :-1] excludes the last coefficient (c0, the constant term)
+        self.perturb_mask = np.any(costs[:, :-1] != 0, axis=1)
+        self.n_perturbable = np.sum(self.perturb_mask)
+
+        # Sample size for only the perturbable generators
+        self.sample_size = [self.n_perturbable, n_costs]
 
     def generate(
         self,
@@ -140,13 +170,17 @@ class PerturbGenCostGenerator(GenerationGenerator):
 
         Yields:
             An example scenario with cost coeffiecients in the poly_cost
-            table perturbed by multiplying with a scaling factor.
+            table perturbed by multiplying with a scaling factor (only for dispatchable generators).
         """
         for example in example_generator:
+            # Generate scaling factors only for generators that can be perturbed
             scale_fact = np.random.uniform(
                 low=self.lower,
                 high=self.upper,
                 size=self.sample_size,
             )
-            example.gencosts[:, COST:] = example.gencosts[:, COST:] * scale_fact
+            # Apply scaling only to selected generators
+            example.gencosts[self.perturb_mask, COST:] = (
+                example.gencosts[self.perturb_mask, COST:] * scale_fact
+            )
             yield example

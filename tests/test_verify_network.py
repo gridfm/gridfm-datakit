@@ -12,7 +12,9 @@ from gridfm_datakit.network import (
     T_BUS,
     GEN_BUS,
 )
+from gridfm_datakit.utils.idx_bus import BUS_TYPE, PV, PQ
 from gridfm_datakit.process.process_network import init_julia
+import numpy as np
 
 
 def verify_deactivated_branches():
@@ -167,6 +169,48 @@ def verify_generator_bus_assignment():
     print(f"   ✓ All {net.gens.shape[0]} generators have matching bus assignments")
 
 
+def verify_pv_to_pq_on_gen_deactivation():
+    """Check that PV buses become PQ when all their generators are deactivated."""
+    print("\n5. Testing PV→PQ bus type change on generator deactivation...")
+
+    case_name = "case24_ieee_rts"
+    net = load_net_from_pglib(case_name)
+
+    # Find the continuous index for original bus 21
+    original_bus_21 = 21
+    if original_bus_21 not in net.bus_index_mapping:
+        raise ValueError(f"Bus {original_bus_21} not found in network")
+
+    continuous_bus_21_idx = net.bus_index_mapping[original_bus_21]
+
+    # Assert bus 21 is initially PV type
+    initial_bus_type = net.buses[continuous_bus_21_idx, BUS_TYPE]
+    assert initial_bus_type == PV, (
+        f"Bus {original_bus_21} (continuous index {continuous_bus_21_idx}) should be PV type, "
+        f"but has type {initial_bus_type}"
+    )
+    print(f"   ✓ Bus {original_bus_21} is initially PV type")
+
+    # Find all generators connected to bus 21
+    gens_at_bus_21 = np.where(net.gens[:, GEN_BUS] == continuous_bus_21_idx)[0]
+    assert len(gens_at_bus_21) > 0, f"No generators found at bus {original_bus_21}"
+    print(
+        f"   ✓ Found {len(gens_at_bus_21)} generator(s) at bus {original_bus_21}: {gens_at_bus_21}",
+    )
+
+    # Deactivate all generators at bus 21
+    net.deactivate_gens(gens_at_bus_21)
+    print(f"   ✓ Deactivated generator(s): {gens_at_bus_21}")
+
+    # Check that bus 21 has changed to PQ type
+    final_bus_type = net.buses[continuous_bus_21_idx, BUS_TYPE]
+    assert final_bus_type == PQ, (
+        f"Bus {original_bus_21} should have changed to PQ type after generator deactivation, "
+        f"but has type {final_bus_type}"
+    )
+    print(f"   ✓ Bus {original_bus_21} successfully changed from PV to PQ type")
+
+
 class TestVerifyNetwork:
     @classmethod
     def setup_class(cls):
@@ -184,3 +228,6 @@ class TestVerifyNetwork:
 
     def test_generator_bus_assignment(self):
         verify_generator_bus_assignment()
+
+    def test_pv_to_pq_on_gen_deactivation(self):
+        verify_pv_to_pq_on_gen_deactivation()

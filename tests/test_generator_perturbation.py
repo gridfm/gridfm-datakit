@@ -50,53 +50,52 @@ class TestGeneratorPerturbation:
         )
 
     def test_generator_cost_perturbation_changes_values(self):
-        """Test that PerturbGenCostGenerator changes cost values"""
+        """Test that PerturbGenCostGenerator changes ALL cost coefficients for non-constant generators"""
         # Load the original network
         original_network = load_net_from_pglib("case24_ieee_rts")
 
         # Store original cost values
         original_gencosts = original_network.gencosts.copy()
 
-        # Create perturbation generator with sigma=0.1
+        # Identify generators with non-constant costs (c1 or c2 != 0)
+        # MATPOWER cost order: [c2, c1, c0] for NCOST=3
+        costs = original_gencosts[:, COST:]
+        non_constant_mask = np.any(costs[:, :-1] != 0, axis=1)
+
+        # Ensure there are actually non-constant generators in the test
+        assert np.sum(non_constant_mask) > 0, (
+            "Test requires generators with non-constant costs"
+        )
+
+        # Create perturbation generator with significant sigma
         perturb_generator = PerturbGenCostGenerator(
             base_net=original_network,
             sigma=0.1,
         )
 
-        # Create a simple generator that yields a copy of the original network
-        def example_generator():
-            yield copy.deepcopy(original_network)
+        # Generate one perturbation
+        test_network = copy.deepcopy(original_network)
 
-        # Generate perturbed networks
-        perturbed_networks = list(perturb_generator.generate(example_generator()))
+        def example_gen():
+            yield test_network
 
-        # Verify we got exactly one network
-        assert len(perturbed_networks) == 1, (
-            f"Expected 1 network, got {len(perturbed_networks)}"
-        )
+        perturbed_networks = list(perturb_generator.generate(example_gen()))
+        perturbed_gencosts = perturbed_networks[0].gencosts
 
-        perturbed_network = perturbed_networks[0]
-        perturbed_gencosts = perturbed_network.gencosts
+        # Check that ALL cost coefficients have changed for each non-constant generator
+        for gen_idx in np.where(non_constant_mask)[0]:
+            original_costs = original_gencosts[gen_idx, COST:]
+            perturbed_costs = perturbed_gencosts[gen_idx, COST:]
 
-        # Check that cost values are actually different
-        # This might not always be true due to randomness, so we'll check multiple times
-        different_perturbations = 0
-        for _ in range(10):  # Try multiple perturbations
-            test_network = copy.deepcopy(original_network)
-
-            def example_gen():
-                yield test_network
-
-            perturbed_networks = list(perturb_generator.generate(example_gen()))
-            perturbed_gencosts = perturbed_networks[0].gencosts
-
-            if not np.array_equal(original_gencosts, perturbed_gencosts):
-                different_perturbations += 1
-
-        # We expect at least some perturbations to be different
-        assert different_perturbations > 0, (
-            "Perturbation should change the generator cost values"
-        )
+            # Check each coefficient individually (c2, c1, c0)
+            for coeff_idx in range(len(original_costs)):
+                if original_costs[coeff_idx] != 0:
+                    assert original_costs[coeff_idx] != perturbed_costs[coeff_idx], (
+                        f"Generator {gen_idx}, coefficient {coeff_idx}: "
+                        f"Expected value to change from {original_costs[coeff_idx]}, "
+                        f"but it remained the same. All non-constant generators should have "
+                        f"all their cost coefficients changed by perturbation."
+                    )
 
     def test_generator_cost_perturbation_preserves_structure(self):
         """Test that PerturbGenCostGenerator preserves the structure of cost coefficients"""
@@ -301,3 +300,93 @@ def test_generator_cost_sigma_zero_no_change():
     assert np.allclose(net_out.gencosts, costs0, rtol=0.0, atol=0.0), (
         "gencosts should be unchanged when sigma=0"
     )
+
+
+def test_permute_skips_zero_and_constant_cost_generators():
+    """PermuteGenCostGenerator should skip generators with zero or constant-only costs."""
+    net = load_net_from_pglib("case24_ieee_rts")
+
+    # Modify some generators to have zero or constant-only costs
+    # MATPOWER cost order: [c2, c1, c0] for NCOST=3
+
+    # Generator 0: zero cost (all coefficients = 0)
+    net.gencosts[0, COST:] = 0
+
+    # Generator 1: constant only (c2=0, c1=0, c0=100)
+    net.gencosts[1, COST : COST + 2] = 0  # Set c2 and c1 to 0
+    net.gencosts[1, COST + 2] = 100  # Set c0 to 100
+
+    # Save original costs for these generators
+    original_zero_cost = net.gencosts[0, COST:].copy()
+    original_constant_cost = net.gencosts[1, COST:].copy()
+
+    # Create permutation generator
+    permute_gen = PermuteGenCostGenerator(base_net=net)
+
+    # Test multiple permutations
+    for _ in range(10):
+        test_net = copy.deepcopy(net)
+
+        def gen_net():
+            yield test_net
+
+        [perturbed_net] = list(permute_gen.generate(gen_net()))
+
+        # Verify zero-cost generator is unchanged
+        np.testing.assert_array_equal(
+            perturbed_net.gencosts[0, COST:],
+            original_zero_cost,
+            "Zero-cost generator should not be permuted",
+        )
+
+        # Verify constant-only generator is unchanged
+        np.testing.assert_array_equal(
+            perturbed_net.gencosts[1, COST:],
+            original_constant_cost,
+            "Constant-only generator should not be permuted",
+        )
+
+
+def test_perturb_skips_zero_and_constant_cost_generators():
+    """PerturbGenCostGenerator should skip generators with zero or constant-only costs."""
+    net = load_net_from_pglib("case24_ieee_rts")
+
+    # Modify some generators to have zero or constant-only costs
+    # MATPOWER cost order: [c2, c1, c0] for NCOST=3
+
+    # Generator 0: zero cost (all coefficients = 0)
+    net.gencosts[0, COST:] = 0
+
+    # Generator 1: constant only (c2=0, c1=0, c0=100)
+    net.gencosts[1, COST : COST + 2] = 0  # Set c2 and c1 to 0
+    net.gencosts[1, COST + 2] = 100  # Set c0 to 100
+
+    # Save original costs for these generators
+    original_zero_cost = net.gencosts[0, COST:].copy()
+    original_constant_cost = net.gencosts[1, COST:].copy()
+
+    # Create perturbation generator with significant sigma
+    perturb_gen = PerturbGenCostGenerator(base_net=net, sigma=0.5)
+
+    # Test multiple perturbations
+    for _ in range(10):
+        test_net = copy.deepcopy(net)
+
+        def gen_net():
+            yield test_net
+
+        [perturbed_net] = list(perturb_gen.generate(gen_net()))
+
+        # Verify zero-cost generator is unchanged
+        np.testing.assert_array_equal(
+            perturbed_net.gencosts[0, COST:],
+            original_zero_cost,
+            "Zero-cost generator should not be perturbed",
+        )
+
+        # Verify constant-only generator is unchanged
+        np.testing.assert_array_equal(
+            perturbed_net.gencosts[1, COST:],
+            original_constant_cost,
+            "Constant-only generator should not be perturbed",
+        )
