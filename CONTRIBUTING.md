@@ -3,7 +3,7 @@
 Before opening a PR, make sure you complete all steps:
 
 ### 1. Development setup
-- [ ] Install dev and test dependencies:  
+- [ ] Install dev and test dependencies:
   ```bash
   pip install -e ".[dev,test]"
   ````
@@ -78,6 +78,3 @@ Before opening a PR, make sure you complete all steps:
 * [ ] **Rebase your branch onto the latest `main`/`dev` before opening a PR.**
 * [ ] Open a PR with a short description of your changes and add Alban Puech as a reviewer.
 * [ ] Ensure code, tests, and documentation are clear and complete.
-
-
-
