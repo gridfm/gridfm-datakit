@@ -43,6 +43,7 @@ def validate_data_directory(
     sn_mva: float,
     n_partitions: int,
     mode: str | None,
+    around_nose: bool = False,
 ) -> bool:
     """
     Validate generated power flow data in a directory.
@@ -117,6 +118,7 @@ def validate_data_directory(
             mode,
             sn_mva=sn_mva,
             n_partitions=n_partitions,
+            around_nose= around_nose
         )
         print("All validation tests passed!")
         return True
@@ -219,6 +221,11 @@ Examples:
         default=100.0,
         help="Base MVA used to scale power quantities (default: 100).",
     )
+    validate_parser.add_argument(
+        "--around-nose",
+        action="store_true",
+        help="disable some validation checks to allow data generation around the nose point.",
+    )
 
     # Stats command
     stats_parser = subparsers.add_parser(
@@ -300,6 +307,7 @@ Examples:
             sn_mva=args.sn_mva,
             n_partitions=args.n_partitions,
             mode=args.mode,
+            around_nose=args.around_nose,
         )
 
         if success:

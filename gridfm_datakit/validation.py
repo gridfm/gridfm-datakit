@@ -82,6 +82,7 @@ def validate_generated_data(
     mode: str,
     sn_mva: float,
     n_partitions: int = 0,
+    around_nose: bool = False,
 ) -> bool:
     """Run all validation tests on the generated data.
 
@@ -230,10 +231,11 @@ def validate_generated_data(
             f"Deactivated generators zero output validation failed: {e}",
         )
 
-    try:
-        validate_generator_limits(generated_data)
-    except Exception as e:
-        raise AssertionError(f"Generator limits validation failed: {e}")
+    if not around_nose:
+        try:
+            validate_generator_limits(generated_data)
+        except Exception as e:
+            raise AssertionError(f"Generator limits validation failed: {e}")
 
     # Run OPF mode Constraints
     if mode == "opf":
@@ -275,12 +277,13 @@ def validate_generated_data(
         raise AssertionError(f"Power balance equations validation failed: {e}")
 
     # Run Generator Cost Perturbation Tests
-    try:
-        validate_constant_cost_generators_unchanged(generated_data)
-    except Exception as e:
-        raise AssertionError(
-            f"Constant cost generators unchanged validation failed: {e}",
-        )
+    if not around_nose:
+        try:
+            validate_constant_cost_generators_unchanged(generated_data)
+        except Exception as e:
+            raise AssertionError(
+                f"Constant cost generators unchanged validation failed: {e}",
+            )
 
     # Run Bus Type and Generator Consistency Tests
     try:
