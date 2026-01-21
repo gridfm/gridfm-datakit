@@ -592,6 +592,7 @@ class PrecomputedProfile(LoadScenarioGeneratorBase):
         n_scenarios: int,
         scenario_log: str,
         max_iter: int,  # unused, kept for interface compatibility
+        seed: int,
     ) -> np.ndarray:
         df = self._read()
 
@@ -606,42 +607,46 @@ class PrecomputedProfile(LoadScenarioGeneratorBase):
         df["load_scenario"] = df["load_scenario"].astype(int)
         df["load"] = df["load"].astype(int)
 
-        n_buses = int(np.asarray(net.buses).shape[0])  # or len(net.Pd)
-        if n_buses == 0:
-            raise ValueError("Network has zero buses.")
+        n_buses = int(np.asarray(net.buses).shape[0])
 
-        file_scenarios = int(df["load_scenario"].max()) + 1
-        if n_scenarios > file_scenarios:
+        # Scenario index validation (0..n_scenarios-1)
+        min_scenario = int(df["load_scenario"].min())
+        max_scenario = int(df["load_scenario"].max())
+        if min_scenario < 0 or max_scenario >= n_scenarios:
             raise ValueError(
-                f"Requested n_scenarios={n_scenarios}, but file provides only {file_scenarios}."
+                "Scenario file contains out-of-range scenario indices in column 'load_scenario'. "
+                f"Expected 0..{n_scenarios - 1}, got min={min_scenario}, max={max_scenario}."
             )
 
-        # bus index validation (continuous indices 0..n_buses-1)
-        if int(df["load"].min()) < 0:
-            raise ValueError("Scenario file contains negative bus indices in column 'load'.")
+        # Bus index validation (continuous indices 0..n_buses-1)
+        min_bus = int(df["load"].min())
         max_bus = int(df["load"].max())
-        if max_bus >= n_buses:
+        if min_bus < 0 or max_bus >= n_buses:
             raise ValueError(
-                f"Scenario file references bus index {max_bus}, but network has {n_buses} buses."
+                "Scenario file contains out-of-range bus indices in column 'load'. "
+                f"Expected 0..{n_buses - 1}, got min={min_bus}, max={max_bus}."
             )
 
-        df = df[df["load_scenario"].between(0, n_scenarios - 1)]
+        # uniqueness of (load_scenario, load) pairs
+        dup_mask = df.duplicated(subset=["load_scenario", "load"])
+        if dup_mask.any():
+            dup_count = int(dup_mask.sum())
+            raise ValueError(
+                f"Scenario file contains {dup_count} duplicate (load_scenario, load) pairs. "
+                "Each pair must be unique."
+            )
 
-        # Optional strict coverage check (comment out if you allow missing => 0)
+        # check: require all scenario-bus pairs present
         expected = n_buses * n_scenarios
-        actual = df[["load_scenario", "load"]].drop_duplicates().shape[0]
+        actual = len(df)
         if actual != expected:
             raise ValueError(
-                f"Scenario file does not fully specify all (scenario, bus) pairs: "
-                f"expected {expected}, got {actual}. "
-                f"If you want unspecified buses to default to 0, remove this check."
+                f"Scenario file must contain exactly {expected} rows "
+                f"({n_buses} buses x {n_scenarios} scenarios); got {actual}."
             )
 
         # Allocate output: (n_buses, n_scenarios, 2)
         out = np.zeros((n_buses, n_scenarios, 2), dtype=float)
-
-        # If duplicates exist, keep last
-        df = df.sort_index().drop_duplicates(subset=["load_scenario", "load"], keep="last")
 
         s = df["load_scenario"].to_numpy(dtype=int)
         b = df["load"].to_numpy(dtype=int)
