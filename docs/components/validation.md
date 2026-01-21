@@ -44,6 +44,14 @@ This module provides functions for validating the integrity and physical consist
 
 ::: gridfm_datakit.validation.validate_power_balance_equations
 
+### `validate_constant_cost_generators_unchanged`
+
+::: gridfm_datakit.validation.validate_constant_cost_generators_unchanged
+
+### `validate_bus_type_generator_consistency`
+
+::: gridfm_datakit.validation.validate_bus_type_generator_consistency
+
 ### `validate_scenario_indexing_consistency`
 
 ::: gridfm_datakit.validation.validate_scenario_indexing_consistency

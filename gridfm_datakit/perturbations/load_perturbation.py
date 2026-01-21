@@ -9,6 +9,7 @@ from copy import deepcopy
 from multiprocessing import Pool
 from gridfm_datakit.network import Network
 from gridfm_datakit.process.process_network import init_julia
+from gridfm_datakit.utils.random_seed import custom_seed
 from typing import Tuple, Any
 
 
@@ -172,6 +173,7 @@ class LoadScenarioGeneratorBase(ABC):
         n_scenarios: int,
         scenario_log: str,
         max_iter: int,
+        seed: int,
     ) -> np.ndarray:
         """Generates load scenarios for a power network.
 
@@ -180,7 +182,7 @@ class LoadScenarioGeneratorBase(ABC):
             n_scenarios: Number of scenarios to generate.
             scenario_log: Path to log file for scenario generation details.
             max_iter: Maximum iterations for the OPF solver.
-
+            seed: Global random seed for reproducibility.
         Returns:
             numpy.ndarray: Array of shape (n_loads, n_scenarios, 2) containing p_mw and q_mvar values.
         """
@@ -352,6 +354,7 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
         n_scenarios: int,
         scenarios_log: str,
         max_iter: int,
+        seed: int,
     ) -> np.ndarray:
         """Generates load profiles based on aggregated load data.
 
@@ -360,7 +363,7 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
             n_scenarios: Number of scenarios to generate.
             scenarios_log: Path to log file for scenario generation details.
             max_iter: Maximum iterations for the OPF solver.
-
+            seed: Global random seed for reproducibility.
         Returns:
             numpy.ndarray: Array of shape (n_loads, n_scenarios, 2) containing p_mw and q_mvar values.
 
@@ -430,25 +433,29 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
             )
             ref_curve = self.interpolate_row(ref_curve, data_points=n_scenarios)
 
-        load_profile_pmw = p_mw_array[:, np.newaxis] * ref_curve
-        noise = np.random.uniform(
-            1 - self.sigma,
-            1 + self.sigma,
-            size=load_profile_pmw.shape,
-        )  # Add uniform noise
-        load_profile_pmw *= noise
-
-        if self.change_reactive_power:
-            load_profile_qmvar = q_mvar_array[:, np.newaxis] * ref_curve
+        # Use custom_seed context manager to temporarily set seed for noise generation
+        with custom_seed(seed):
+            load_profile_pmw = p_mw_array[:, np.newaxis] * ref_curve
             noise = np.random.uniform(
                 1 - self.sigma,
                 1 + self.sigma,
-                size=load_profile_qmvar.shape,
+                size=load_profile_pmw.shape,
             )  # Add uniform noise
-            load_profile_qmvar *= noise
-        else:
-            load_profile_qmvar = q_mvar_array[:, np.newaxis] * np.ones_like(ref_curve)
-            print("No change in reactive power across scenarios")
+            load_profile_pmw *= noise
+
+            if self.change_reactive_power:
+                load_profile_qmvar = q_mvar_array[:, np.newaxis] * ref_curve
+                noise = np.random.uniform(
+                    1 - self.sigma,
+                    1 + self.sigma,
+                    size=load_profile_qmvar.shape,
+                )  # Add uniform noise
+                load_profile_qmvar *= noise
+            else:
+                load_profile_qmvar = q_mvar_array[:, np.newaxis] * np.ones_like(
+                    ref_curve,
+                )
+                print("No change in reactive power across scenarios")
 
         # Stack profiles along the last dimension
         load_profiles = np.stack((load_profile_pmw, load_profile_qmvar), axis=-1)
@@ -508,6 +515,7 @@ class Powergraph(LoadScenarioGeneratorBase):
         n_scenarios: int,
         scenario_log: str,
         max_iter: int,
+        seed: int,
     ) -> np.ndarray:
         """Generates load profiles based on aggregated load data.
 
@@ -516,7 +524,7 @@ class Powergraph(LoadScenarioGeneratorBase):
             n_scenarios: Number of scenarios to generate.
             scenario_log: Path to log file for scenario generation details.
             max_iter: Maximum iterations for the OPF solver (unused for Powergraph).
-
+            seed: Global random seed for reproducibility.
         Returns:
             numpy.ndarray: Array of shape (n_loads, n_scenarios, 2) containing p_mw and q_mvar values.
         """

@@ -97,6 +97,7 @@ def create_config() -> Dict[str, Any]:
             "dcpf_fast": dcpf_fast.value,
             "enable_solver_logs": enable_solver_logs.value,
             "max_iter": max_iter.value,
+            "seed": None,  # seed is not used in the interactive interface
         },
     }
     return config

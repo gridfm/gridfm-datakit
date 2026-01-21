@@ -45,7 +45,7 @@ def test_setup_environment(conf):
     """
     Tests if environment setup works correctly
     """
-    args, base_path, file_paths = _setup_environment(conf)
+    args, base_path, file_paths, seed = _setup_environment(conf)
     assert isinstance(file_paths, dict), "File paths should be a dictionary"
     assert "y_bus_data" in file_paths, (
         "Y-bus data file path should be in the dictionary"
@@ -66,7 +66,7 @@ def test_fail_setup_environment():
     """
     # Test with a non-existent configuration file
     with pytest.raises(FileNotFoundError):
-        args, base_path, file_paths = _setup_environment(
+        args, base_path, file_paths, seed = _setup_environment(
             "scripts/config/non_existent_config.yaml",
         )
 
@@ -77,8 +77,8 @@ def test_prepare_network_and_scenarios(conf):
     Tests if network and scenarios are prepared correctly
     """
     # Ensure the configuration is valid
-    args, base_path, file_paths = _setup_environment(conf)
-    net, scenarios = _prepare_network_and_scenarios(args, file_paths)
+    args, base_path, file_paths, seed = _setup_environment(conf)
+    net, scenarios = _prepare_network_and_scenarios(args, file_paths, seed)
 
     assert isinstance(net, Network), "Network should be a Network object"
     assert len(scenarios) > 0, "There should be at least one scenario"
@@ -91,18 +91,18 @@ def test_fail_prepare_network_and_scenarios():
     # Test with a non-existent configuration file
     config = "scripts/config/non_existent_config.yaml"
     with pytest.raises(FileNotFoundError):
-        args, base_path, file_paths = _setup_environment(config)
-        net, scenarios = _prepare_network_and_scenarios(args, file_paths)
+        args, base_path, file_paths, seed = _setup_environment(config)
+        net, scenarios = _prepare_network_and_scenarios(args, file_paths, seed)
 
 
 def test_fail_prepare_network_and_scenarios_config(conf):
     """
     Tests if preparing network and scenarios fails with an invalid grid source in the configuration file
     """
-    args, base_path, file_paths = _setup_environment(conf)
+    args, base_path, file_paths, seed = _setup_environment(conf)
     conf.network.source = "invalid_source"  # Set invalid source
     with pytest.raises(ValueError, match="Invalid grid source!"):
-        net, scenarios = _prepare_network_and_scenarios(conf, file_paths)
+        net, scenarios = _prepare_network_and_scenarios(conf, file_paths, seed)
 
 
 # Test save network function
@@ -221,7 +221,7 @@ def test_setup_environment_overwrite_behavior():
         }
 
         # First setup creates directories
-        args, base_path, file_paths = _setup_environment(config)
+        args, base_path, file_paths, seed = _setup_environment(config)
         marker = os.path.join(base_path, "marker.txt")
         os.makedirs(base_path, exist_ok=True)
         with open(marker, "w") as f:
@@ -229,13 +229,13 @@ def test_setup_environment_overwrite_behavior():
 
         # overwrite=False should keep existing contents
         config["settings"]["overwrite"] = False
-        _args2, base_path2, _ = _setup_environment(config)
+        _args2, base_path2, _, _ = _setup_environment(config)
         assert base_path2 == base_path
         assert os.path.exists(marker), "Marker should persist when overwrite is False"
 
         # overwrite=True should remove and recreate directory
         config["settings"]["overwrite"] = True
-        _args3, base_path3, _ = _setup_environment(config)
+        _args3, base_path3, _, _ = _setup_environment(config)
         assert base_path3 == base_path
         assert not os.path.exists(marker), (
             "Marker should be removed when overwrite is True"
@@ -287,5 +287,99 @@ def test_parquet_append_vs_overwrite():
         )
 
 
+def test_reproducibility_with_same_seed():
+    """
+    Test that generating data with the same seed produces identical results.
+    Uses case14_ieee network with 10 scenarios and 2 processes.
+    """
+    # Load base config
+    config_path = "tests/config/default_pf_mode_test.yaml"
+    with open(config_path, "r") as f:
+        config = yaml.safe_load(f)
+
+    # Modify config for this test
+    config["network"]["name"] = "case14_ieee"
+    config["load"]["scenarios"] = 6
+    config["settings"]["num_processes"] = 2
+    config["settings"]["seed"] = 42  # Fixed seed for reproducibility
+    config["settings"]["overwrite"] = True
+
+    # Use temporary directories for both runs
+    with (
+        tempfile.TemporaryDirectory() as tmpdir1,
+        tempfile.TemporaryDirectory() as tmpdir2,
+    ):
+        # First run
+        config["settings"]["data_dir"] = tmpdir1
+        config1 = NestedNamespace(**config)
+        file_paths_1 = generate_power_flow_data_distributed(config1)
+
+        # Second run with same seed
+        config["settings"]["data_dir"] = tmpdir2
+        config2 = NestedNamespace(**config)
+        file_paths_2 = generate_power_flow_data_distributed(config2)
+
+        # Load all generated parquet files and compare
+        data_files = ["bus_data", "gen_data", "branch_data", "y_bus_data"]
+
+        for data_type in data_files:
+            df1 = pd.read_parquet(file_paths_1[data_type], engine="pyarrow")
+            df2 = pd.read_parquet(file_paths_2[data_type], engine="pyarrow")
+
+            # sort by load_scenario_idx
+            df1 = df1.sort_values(by="load_scenario_idx", kind="stable").reset_index(
+                drop=True,
+            )
+            df2 = df2.sort_values(by="load_scenario_idx", kind="stable").reset_index(
+                drop=True,
+            )
+
+            # Check that shapes match
+            assert df1.shape == df2.shape, (
+                f"{data_type}: Shape mismatch - Run 1: {df1.shape}, Run 2: {df2.shape}"
+            )
+
+            # Check that columns match
+            assert list(df1.columns) == list(df2.columns), (
+                f"{data_type}: Column mismatch - Run 1: {df1.columns}, Run 2: {df2.columns}"
+            )
+
+            # Check that all values are identical
+            # Use pandas testing to handle floating point comparison properly
+            pd.testing.assert_frame_equal(
+                df1,
+                df2,
+                check_dtype=True,
+                check_exact=False,
+                rtol=1e-10,
+                atol=1e-10,
+                obj=f"{data_type}",
+            )
+
+            print(
+                f"   ✓ {data_type}: Both runs produced identical data ({df1.shape[0]} rows)",
+            )
+
+        # Also check the scenarios file
+        scenarios_1 = pd.read_parquet(file_paths_1["scenarios"], engine="pyarrow")
+        scenarios_2 = pd.read_parquet(file_paths_2["scenarios"], engine="pyarrow")
+
+        os.makedirs("tests/test_data", exist_ok=True)
+
+        pd.testing.assert_frame_equal(
+            scenarios_1,
+            scenarios_2,
+            check_dtype=True,
+            check_exact=False,
+            rtol=1e-10,
+            atol=1e-10,
+        )
+
+        print(
+            f"   ✓ scenarios: Both runs produced identical data ({scenarios_1.shape[0]} rows)",
+        )
+        print("\n✓ All data files are identical across runs with the same seed!")
+
+
 if __name__ == "__main__":
-    test_parquet_append_vs_overwrite()
+    test_reproducibility_with_same_seed()

@@ -274,6 +274,22 @@ def validate_generated_data(
     except Exception as e:
         raise AssertionError(f"Power balance equations validation failed: {e}")
 
+    # Run Generator Cost Perturbation Tests
+    try:
+        validate_constant_cost_generators_unchanged(generated_data)
+    except Exception as e:
+        raise AssertionError(
+            f"Constant cost generators unchanged validation failed: {e}",
+        )
+
+    # Run Bus Type and Generator Consistency Tests
+    try:
+        validate_bus_type_generator_consistency(generated_data)
+    except Exception as e:
+        raise AssertionError(
+            f"Bus type-generator consistency validation failed: {e}",
+        )
+
     return True
 
 
@@ -1142,6 +1158,183 @@ def validate_power_balance_equations(
         )
 
     print("    Power balance equations (Kirchhoff's Law): OK")
+
+
+def validate_constant_cost_generators_unchanged(
+    generated_data: Dict[str, pd.DataFrame],
+) -> None:
+    """Test that generators with constant-only costs remain unchanged across scenarios (vectorized).
+
+    Generators with constant costs (only c0 != 0, with c1 == 0 and c2 == 0) should not
+    be perturbed or permuted, so their cost coefficients should remain identical across
+    all scenarios. This validation checks that constraint.
+
+    Args:
+        generated_data: Dictionary containing gen_data DataFrame.
+
+    Raises:
+        AssertionError: If any constant-cost generator has varying costs across scenarios.
+    """
+    gen_data = generated_data["gen_data"]
+
+    if len(gen_data) == 0:
+        print("    Constant cost generators unchanged: no generators to validate")
+        return
+
+    scenarios = gen_data["scenario"].unique()
+
+    # Identify constant-cost generators (c1 == 0 and c2 == 0)
+    # We check the first scenario to identify which generators have constant costs
+    first_scenario_data = gen_data[gen_data["scenario"] == scenarios[0]].copy()
+
+    # Check if generators have non-zero c1 or c2 (columns cp1_eur_per_mw, cp2_eur_per_mw2)
+    # Constant-cost generators have both c1 and c2 equal to zero
+    constant_cost_mask = (first_scenario_data["cp1_eur_per_mw"] == 0) & (
+        first_scenario_data["cp2_eur_per_mw2"] == 0
+    )
+
+    # Use "idx" to uniquely identify generators (bus alone is not unique - multiple gens can be at same bus)
+    constant_cost_gen_idx = first_scenario_data[constant_cost_mask]["idx"].values
+
+    if len(constant_cost_gen_idx) == 0:
+        print(
+            "    Constant cost generators unchanged: no constant-cost generators found",
+        )
+        return
+
+    print(
+        f"    Constant cost generators unchanged: validating {len(constant_cost_gen_idx)} constant-cost generators across {len(scenarios)} scenarios",
+    )
+
+    # Filter to constant-cost generators only
+    constant_gen_data = gen_data[gen_data["idx"].isin(constant_cost_gen_idx)][
+        ["scenario", "idx", "bus", "cp0_eur", "cp1_eur_per_mw", "cp2_eur_per_mw2"]
+    ].copy()
+
+    # Get reference costs from first scenario (for each generator idx)
+    reference_costs = constant_gen_data[
+        constant_gen_data["scenario"] == scenarios[0]
+    ].set_index("idx")[["cp0_eur", "cp1_eur_per_mw", "cp2_eur_per_mw2"]]
+
+    # Merge reference costs with all scenarios for vectorized comparison
+    comparison = constant_gen_data.merge(
+        reference_costs,
+        left_on="idx",
+        right_index=True,
+        suffixes=("", "_ref"),
+    )
+
+    # Vectorized comparison across all generators and scenarios
+    tolerance = 1e-9
+    c0_diff = np.abs(comparison["cp0_eur"] - comparison["cp0_eur_ref"])
+    c1_diff = np.abs(comparison["cp1_eur_per_mw"] - comparison["cp1_eur_per_mw_ref"])
+    c2_diff = np.abs(comparison["cp2_eur_per_mw2"] - comparison["cp2_eur_per_mw2_ref"])
+
+    # Find any mismatches
+    mismatches = (
+        (c0_diff >= tolerance) | (c1_diff >= tolerance) | (c2_diff >= tolerance)
+    )
+
+    if mismatches.any():
+        # Get first mismatch for error reporting
+        mismatch_idx = np.where(mismatches)[0][0]
+        mismatch_row = comparison.iloc[mismatch_idx]
+        raise AssertionError(
+            f"Generator idx={int(mismatch_row['idx'])} at bus {int(mismatch_row['bus'])} (constant-cost) has varying costs across scenarios. "
+            f"Scenario {int(mismatch_row['scenario'])}: "
+            f"c0={mismatch_row['cp0_eur']:.6f}, c1={mismatch_row['cp1_eur_per_mw']:.6f}, c2={mismatch_row['cp2_eur_per_mw2']:.6f} "
+            f"vs reference: c0={mismatch_row['cp0_eur_ref']:.6f}, c1={mismatch_row['cp1_eur_per_mw_ref']:.6f}, c2={mismatch_row['cp2_eur_per_mw2_ref']:.6f}",
+        )
+
+    print("    Constant cost generators unchanged: OK")
+
+
+def validate_bus_type_generator_consistency(
+    generated_data: Dict[str, pd.DataFrame],
+) -> None:
+    """Test that bus types are consistent with generator presence (vectorized).
+
+    Validates fundamental power system constraints:
+    - PV buses (voltage-controlled) must have at least one active generator
+    - PQ buses (load buses) must have NO active generators
+    - REF buses (slack/reference) must have at least one active generator
+
+    Args:
+        generated_data: Dictionary containing bus_data and gen_data DataFrames.
+
+    Raises:
+        AssertionError: If any bus type constraint is violated.
+    """
+    bus_data = generated_data["bus_data"]
+    gen_data = generated_data["gen_data"]
+
+    scenarios = bus_data["scenario"].unique()
+    print(
+        f"    Bus type-generator consistency: validating {len(bus_data)} bus entries across {len(scenarios)} scenarios",
+    )
+
+    # Count active generators per (scenario, bus)
+    active_gens = (
+        gen_data[gen_data["in_service"] == 1]
+        .groupby(
+            ["scenario", "bus"],
+            as_index=False,
+        )
+        .size()
+    )
+    active_gens.columns = ["scenario", "bus", "n_active_gens"]
+
+    # Merge with bus data
+    bus_with_gen_counts = bus_data.merge(
+        active_gens,
+        on=["scenario", "bus"],
+        how="left",
+    ).fillna({"n_active_gens": 0})
+
+    bus_with_gen_counts["n_active_gens"] = bus_with_gen_counts["n_active_gens"].astype(
+        int,
+    )
+
+    # Validate PV buses have at least one active generator
+    pv_buses = bus_with_gen_counts[bus_with_gen_counts["PV"] == 1]
+    pv_no_gen = pv_buses[pv_buses["n_active_gens"] == 0]
+
+    if len(pv_no_gen) > 0:
+        first_violation = pv_no_gen.iloc[0]
+        raise AssertionError(
+            f"PV bus {int(first_violation['bus'])} in scenario {int(first_violation['scenario'])} "
+            f"has no active generators. PV buses must have at least one active generator to control voltage. "
+            f"Found {len(pv_no_gen)} total violations.",
+        )
+
+    # Validate PQ buses have NO active generators
+    pq_buses = bus_with_gen_counts[bus_with_gen_counts["PQ"] == 1]
+    pq_with_gen = pq_buses[pq_buses["n_active_gens"] > 0]
+
+    if len(pq_with_gen) > 0:
+        first_violation = pq_with_gen.iloc[0]
+        raise AssertionError(
+            f"PQ bus {int(first_violation['bus'])} in scenario {int(first_violation['scenario'])} "
+            f"has {int(first_violation['n_active_gens'])} active generator(s). PQ buses (load buses) "
+            f"must have no active generators. Found {len(pq_with_gen)} total violations.",
+        )
+
+    # Validate REF (slack) buses have at least one active generator
+    ref_buses = bus_with_gen_counts[bus_with_gen_counts["REF"] == 1]
+    ref_no_gen = ref_buses[ref_buses["n_active_gens"] == 0]
+
+    if len(ref_no_gen) > 0:
+        first_violation = ref_no_gen.iloc[0]
+        raise AssertionError(
+            f"REF/Slack bus {int(first_violation['bus'])} in scenario {int(first_violation['scenario'])} "
+            f"has no active generators. REF buses must have at least one active generator to balance the system. "
+            f"Found {len(ref_no_gen)} total violations.",
+        )
+
+    print(
+        f"    Bus type-generator consistency: validated {len(pv_buses)} PV, {len(pq_buses)} PQ, {len(ref_buses)} REF bus entries",
+    )
+    print("    Bus type-generator consistency: OK")
 
 
 def validate_scenario_indexing_consistency(
