@@ -34,11 +34,12 @@ network:
   network_dir: "scripts/grids" # if using source "file", this is the directory containing the network file (relative to the project root)
 
 load:
-  generator: "agg_load_profile" # Name of the load generator; options: agg_load_profile, powergraph
+  generator: "agg_load_profile" # Name of the load generator; options: agg_load_profile, powergraph, precomputed_profile
   agg_profile: "default" # Name of the aggregated load profile
   scenarios: 10000 # Number of different load scenarios to generate
+  scenario_file: "load-scenarios-precomputed.csv" # Only used if generator is "precomputed_profile"
   # WARNING: the following parameters are only used if generator is "agg_load_profile"
-  # if using generator "powergraph", these parameters are ignored
+  # if using generator "powergraph" or "precomputed_profile", these parameters are ignored
   sigma: 0.2 # max local noise
   change_reactive_power: true # If true, changes reactive power of loads. If False, keeps the ones from the case file
   global_range: 0.4 # Range of the global scaling factor. used to set the lower bound of the scaling factor

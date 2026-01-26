@@ -24,7 +24,7 @@ Load scenarios (per-element time series) produced by the selected load generator
 Plot of the generated load scenarios.
 
 #### `scenarios_{generator}.log`
-Generator-specific notes (e.g., bounds for the global scaling factor when using `agg_load_profile`).
+Generator-specific notes (e.g., bounds for the global scaling factor when using `agg_load_profile`, or source file path for `precomputed_profile`).
 
 #### `n_scenarios.txt`
 Metadata file containing the total number of scenarios (used for efficient partition management).
