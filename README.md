@@ -106,7 +106,7 @@ interactive_interface()
 Run the data generation routine from the command line:
 
 ```bash
-gridfm-datakit generate path/to/config.yaml
+gridfm_datakit generate path/to/config.yaml
 ```
 
 ### Validate Data
@@ -114,7 +114,7 @@ gridfm-datakit generate path/to/config.yaml
 Validate generated power flow data for integrity and physical consistency:
 
 ```bash
-gridfm-datakit validate /path/to/data/ [--n-partitions 100] [--sn-mva 100]
+gridfm_datakit validate /path/to/data/ [--n-partitions 100] [--sn-mva 100]
 ```
 
 ### Compute Statistics
@@ -122,7 +122,7 @@ gridfm-datakit validate /path/to/data/ [--n-partitions 100] [--sn-mva 100]
 Generate statistics plots from generated data:
 
 ```bash
-gridfm-datakit stats /path/to/data/ [--n-partitions 100] [--sn-mva 100]
+gridfm_datakit stats /path/to/data/ [--n-partitions 100] [--sn-mva 100]
 ```
 
 ### Plot Feature Distributions
@@ -130,7 +130,7 @@ gridfm-datakit stats /path/to/data/ [--n-partitions 100] [--sn-mva 100]
 Create violin plots for bus feature distributions:
 
 ```bash
-gridfm-datakit plots /path/to/data/ [--n-partitions 100] [--output-dir DIR] [--sn-mva 100]
+gridfm_datakit plots /path/to/data/ [--n-partitions 100] [--output-dir DIR] [--sn-mva 100]
 ```
 
 ## Configuration Overview
