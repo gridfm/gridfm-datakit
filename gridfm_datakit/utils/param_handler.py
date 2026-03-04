@@ -3,6 +3,7 @@ from gridfm_datakit.perturbations.load_perturbation import (
     LoadScenarioGeneratorBase,
     LoadScenariosFromAggProfile,
     Powergraph,
+    PrecomputedProfile,
 )
 from typing import Dict, Any
 import warnings
@@ -196,6 +197,19 @@ def get_load_scenario_generator(args: NestedNamespace) -> LoadScenarioGeneratorB
             )
 
         return Powergraph(args.agg_profile)
+    
+    if args.generator == "precomputed_profile":
+        unused_args = {
+            key: value
+            for key, value in args.flatten().items()
+            if key not in ["generator", "scenario_file", "scenarios"]
+        }
+        if unused_args:
+            warnings.warn(
+                f"The following arguments are not used by the precomputed_profile generator: {unused_args}",
+                UserWarning,
+            )
+        return PrecomputedProfile(args.scenario_file)
 
 
 def initialize_topology_generator(
