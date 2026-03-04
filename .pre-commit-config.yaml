@@ -23,10 +23,13 @@ repos:
 -   repo: https://github.com/ibm/detect-secrets
     rev: 0.13.1+ibm.64.dss
     hooks:
-        - id: detect-secrets # pragma: whitelist secret
+    -   id: detect-secrets # pragma: whitelist secret
+        additional_dependencies:
+            - boxsdk<4 # https://github.com/IBM/detect-secrets/issues/173
+            - chardet<7 # https://github.com/IBM/detect-secrets/issues/182
         # Add options for detect-secrets-hook binary. You can run `detect-secrets-hook --help` to list out all possible options.
         # You may also run `pre-commit run detect-secrets` to preview the scan result.
         # when "--baseline" without "--use-all-plugins", pre-commit scan with just plugins in baseline file
         # when "--baseline" with "--use-all-plugins", pre-commit scan with all available plugins
         # add "--fail-on-unaudited" to fail pre-commit for unaudited potential secrets
-          args: [--baseline, .secrets.baseline, --use-all-plugins]
+        args: [--baseline, .secrets.baseline, --use-all-plugins]
