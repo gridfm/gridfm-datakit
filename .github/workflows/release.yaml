@@ -1,31 +1,64 @@
-name: Upload Python Package to PyPI when a Release is Created
+name: Upload Python Package to PyPI when a version tag is pushed
 
 on:
-  release:
-    types: [created]
+  push:
+    tags:
+      - 'v*'
 
 jobs:
   pypi-publish:
-    name: Publish release to PyPI
     runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/gridfm-datakit
+
+    if: startsWith(github.ref, 'refs/tags/') && matches(github.ref_name, '^v[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+)?$')
+
     permissions:
       id-token: write
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure tag is on main
+        run: |
+          git fetch origin main
+          if ! git branch --remotes --contains "$GITHUB_SHA" | grep origin/main; then
+            echo "Tag is not on main"
+            exit 1
+          fi
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Update version in pyproject.toml
+        run: |
+          sed -i 's/^version = .*/version = "'"$VERSION"'"/' pyproject.toml
+
+      - name: Commit version bump
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git checkout main
+          git add pyproject.toml
+          git commit -m "bump version to $VERSION" || echo "no change"
+          git push origin main
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
-      - name: Install dependencies
+
+      - name: Install build tools
         run: |
-          python -m pip install --upgrade pip wheel
-          pip install -e .[dev,test]
+          python -m pip install --upgrade pip build
+
       - name: Build package
         run: |
           python -m build
-      - name: Publish package distributions to PyPI
+
+      - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
