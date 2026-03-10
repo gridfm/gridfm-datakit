@@ -28,7 +28,7 @@ dependencies = [
     "plotly",
     "pyaml",
     "requests",
-    "urllib3<2.0.0",
+    "urllib3>= 2.6.0", # fix security issue
     "ipywidgets",
     "ipyfilechooser",
     "scipy",
