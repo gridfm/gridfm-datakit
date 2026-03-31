@@ -990,8 +990,8 @@ def process_scenario_pf_mode(
                     f.write(
                         f"Caught an exception at scenario {scenario_index} when solving in run_pf function with PowSyBl solver: {e}\n",
                     )
-                    f.write(traceback.format_exc())
-                    f.write("\n")
+                    # f.write(traceback.format_exc())
+                    # f.write("\n")
                 continue
             
         # Append processed power flow data
