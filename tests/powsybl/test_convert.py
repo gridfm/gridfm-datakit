@@ -43,12 +43,13 @@ def load_net_ieee14():
     """Load ieee14 into LoadNet class."""
     from pathlib import Path
     from gridfm_datakit.powsybl import load_net
+    from gridfm_datakit.network import load_net_from_pglib
     import gridfm_datakit.grids as _grids_pkg
 
-    grids_dir = Path(_grids_pkg.__file__).parent
-    network_path = grids_dir / "pglib_opf_case14_ieee.m"
-    loaded_net = load_net(network_path)
-    return loaded_net
+    network_path = Path(_grids_pkg.__file__).parent / "pglib_opf_case14_ieee.m"
+    if not network_path.exists():
+        load_net_from_pglib("case14_ieee")  # downloads the file as a side-effect
+    return load_net(str(network_path))
 
 @pytest.fixture(scope="module")
 def pp_ieee9():
