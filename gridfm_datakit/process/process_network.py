@@ -980,7 +980,7 @@ def process_scenario_pf_mode(
 
             try:
                 start_time = time.perf_counter()
-                lf_parameters = get_default_lf_parameters() # Note the slack is distributed by default.
+                lf_parameters = get_default_lf_parameters()
                 pf_metadata = pp.loadflow.run_ac(pp_perturbation, lf_parameters)
                 end_time = time.perf_counter()
                 solve_time = end_time - start_time
@@ -990,8 +990,6 @@ def process_scenario_pf_mode(
                     f.write(
                         f"Caught an exception at scenario {scenario_index} when solving in run_pf function with PowSyBl solver: {e}\n",
                     )
-                    # f.write(traceback.format_exc())
-                    # f.write("\n")
                 continue
             
         # Append processed power flow data

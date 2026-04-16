@@ -10,6 +10,17 @@ def get_default_lf_parameters():
         pp.loadflow.Parameters: Default configution
     """
 
+    # return pp.loadflow.Parameters(
+    #     distributed_slack=False,
+    #     use_reactive_limits=False,
+    #     provider_parameters={
+    #         'useActiveLimits': 'false',
+    #         'maxNewtonRaphsonIterations': '200',
+    #         "reportedFeatures": "NEWTON_RAPHSON_LOAD_FLOW",
+    #         "voltageInitMode": "DC_VALUES",
+    #         "stateVectorScalingMode": "MAX_VOLTAGE_CHANGE",
+    #     }
+    # )
     return pp.loadflow.Parameters(
-        distributed_slack=False # conform with Power Model behavior;
+        distributed_slack=False
     )

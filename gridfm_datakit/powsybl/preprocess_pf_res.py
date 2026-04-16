@@ -7,7 +7,6 @@ Compatible with the existing pipeline.
 
 from typing import Dict, Any
 import pypowsybl as pp
-from gridfm_datakit.network import Network as gfm_network
 
 
 def preprocess_pp_pf_res(
