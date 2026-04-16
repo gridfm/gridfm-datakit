@@ -38,7 +38,7 @@ import sys
 from gridfm_datakit.network import Network
 from gridfm_datakit.process.process_network import init_julia
 from gridfm_datakit.utils.random_seed import custom_seed
-from gridfm_datakit.powsybl.mapping import to_powsybl_with_mapping
+from gridfm_datakit.powsybl.convert import to_powsybl
 
 def _setup_environment(
     config: Union[str, Dict[str, Any], NestedNamespace],
@@ -289,7 +289,8 @@ def generate_power_flow_data(
     # When using the powermodel solver the maps are not needed and are left as
     # None so process_scenario_pf_mode can ignore them cheaply.
     if args.settings.pf_solver == 'powsybl':
-        _, map_bus_p2g, map_branch_p2g, map_gen_p2g = to_powsybl_with_mapping(net)
+        _conv = to_powsybl(net)
+        map_bus_p2g, map_branch_p2g, map_gen_p2g = _conv.map_bus_p2g, _conv.map_branch_p2g, _conv.map_gen_p2g
     else:
         map_bus_p2g, map_branch_p2g, map_gen_p2g = None, None, None
 
@@ -419,7 +420,8 @@ def generate_power_flow_data_distributed(
     # ({str: float} and {str: int}) they are fully picklable and survive the
     # multiprocessing boundary without any special handling.
     if args.settings.pf_solver == 'powsybl':
-        _, map_bus_p2g, map_branch_p2g, map_gen_p2g = to_powsybl_with_mapping(net)
+        _conv = to_powsybl(net)
+        map_bus_p2g, map_branch_p2g, map_gen_p2g = _conv.map_bus_p2g, _conv.map_branch_p2g, _conv.map_gen_p2g
     else:
         map_bus_p2g, map_branch_p2g, map_gen_p2g = None, None, None
 

@@ -11,11 +11,17 @@ from_powsybl(pp_net) → Network:
     3. Add gencost matrix (not included in pypowsybl export)
     4. Return gridfm_datakit Network
 
-to_powsybl(network) → pypowsybl.network.Network:
-    1. Save Network to temp .m file
-    2. Convert .m to .mat via scipy
+to_powsybl(network) → ConvertedNetwork:
+    1. Restore original bus numbers via network.reverse_bus_index_mapping
+    2. Build MATPOWER struct and save to temp .mat
     3. Load .mat with pypowsybl
-    4. Return pypowsybl Network
+    4. Build pypowsybl-to-gridfm maps (build_p2g_maps)
+    5. Return ConvertedNetwork(pp_net, maps)
+
+    Using reverse_bus_index_mapping ensures that any two networks sharing the
+    same topology (e.g. a base network and its perturbations) produce identical
+    pypowsybl element IDs, so maps computed on the base remain valid for all
+    perturbed variants without recomputing.
 
 Example:
 --------
@@ -23,19 +29,25 @@ Example:
 >>> from gridfm_datakit.powsybl.convert import from_powsybl, to_powsybl
 >>> pp_net = pp.network.create_ieee14()
 >>> gfm_net = from_powsybl(pp_net)
->>> pp_net_roundtrip = to_powsybl(gfm_net)
+>>> result = to_powsybl(gfm_net)
+>>> result.pp_net          # pypowsybl network
+>>> result.map_bus_p2g     # bus ID → gfm index map
 """
 
 from dataclasses import dataclass
 from pathlib import Path
 import shutil
 import tempfile
+from typing import Any, Dict
 
 import numpy as np
 import scipy.io
 
 from gridfm_datakit.network import Network
 from gridfm_datakit.utils.idx_bus import VMAX, VMIN
+from gridfm_datakit.utils.idx_brch import F_BUS, T_BUS
+from gridfm_datakit.utils.idx_gen import GEN_BUS
+from gridfm_datakit.utils.idx_bus import BUS_I
 from gridfm_datakit.utils.idx_cost import MODEL, STARTUP, SHUTDOWN, NCOST, COST, POLYNOMIAL
 
 from .api import check_powsybl_available, pypowsybl
@@ -54,6 +66,35 @@ class ConversionOptions:
     """
 
     gen_costs: dict[str, tuple[float, ...]] | tuple[float, ...] | None = None
+
+
+@dataclass
+class ConvertedNetwork:
+    """
+    Result of converting a gridfm_datakit Network to a pypowsybl network.
+
+    Bundles the pypowsybl network with the three pypowsybl-to-gridfm index
+    maps so callers never need a separate build_p2g_maps call.  The maps are
+    built once here and can be reused across all perturbed variants of the same
+    base network because to_powsybl uses reverse_bus_index_mapping to produce
+    consistent element IDs regardless of normalization history.
+
+    Attributes
+    ----------
+    pp_net : pypowsybl.network.Network
+        The converted pypowsybl network.
+    map_bus_p2g : dict[str, float]
+        ``{pp_bus_id: gfm_bus_index}`` — see build_p2g_maps.
+    map_branch_p2g : dict[str, int]
+        ``{pp_branch_id: gfm_branch_row}`` — see build_p2g_maps.
+    map_gen_p2g : dict[str, int]
+        ``{pp_gen_id: gfm_gen_row}`` — see build_p2g_maps.
+    """
+
+    pp_net: Any
+    map_bus_p2g: Dict[str, float]
+    map_branch_p2g: Dict[str, int]
+    map_gen_p2g: Dict[str, int]
 
 
 def _build_gencost_matrix(
@@ -75,41 +116,29 @@ def _build_gencost_matrix(
     Returns:
         Generator cost matrix (n_generators x 7+).
     """
-    # Default cost function: linear cost of $1/MWh with no fixed cost
-    # Coefficients [0.0, 1.0, 0.0] = 0*P^2 + 1*P + 0 = P ($/hr)
     DEFAULT_GEN_COSTS = (0.0, 1.0, 0.0)
 
     if gen_costs is None:
         gen_costs = {}
 
-    # Handle case where gen_costs is a tuple (same cost for all generators)
     if isinstance(gen_costs, tuple):
         uniform_costs = gen_costs
         gen_costs = {str(i): uniform_costs for i in range(n_generators)}
 
-    # Determine max number of cost coefficients across all generators
-    # This ensures all rows have the same width for the numpy array
     max_coeffs = len(DEFAULT_GEN_COSTS)
     for costs in gen_costs.values():
         max_coeffs = max(max_coeffs, len(costs))
 
-    # Matrix width: 4 header columns + variable number of cost coefficients
     gencost_matrix = np.zeros((n_generators, 4 + max_coeffs))
 
     for i in range(n_generators):
-        # Get per-generator costs or use default
-        # Generator indices are stored as strings (e.g., "0", "1", "2")
         costs = gen_costs.get(str(i), DEFAULT_GEN_COSTS)
         n_cost_coeffs = len(costs)
 
-        # MODEL = 2 means polynomial cost function
         gencost_matrix[i, MODEL] = POLYNOMIAL
-        # Startup and shutdown costs (not used in continuous OPF)
         gencost_matrix[i, STARTUP] = 0.0
         gencost_matrix[i, SHUTDOWN] = 0.0
-        # Number of polynomial coefficients
         gencost_matrix[i, NCOST] = n_cost_coeffs
-        # Cost coefficients in descending order: c_n, c_{n-1}, ..., c_1, c_0
         for j, coeff in enumerate(costs):
             gencost_matrix[i, COST + j] = coeff
 
@@ -150,7 +179,6 @@ def from_powsybl(
     if not isinstance(pp_net, pypowsybl.network.Network):
         raise ValueError("Input must be a pypowsybl Network object")
 
-    # Check for empty network before attempting export
     buses_df = pp_net.get_buses()
     if buses_df.empty:
         raise ValueError("pypowsybl network has no buses")
@@ -158,25 +186,15 @@ def from_powsybl(
     if options is None:
         options = ConversionOptions()
 
-    # -------------------------------------------------------------------------
-    # Step 1: Export pypowsybl network to temporary .mat file
-    # -------------------------------------------------------------------------
-    # pypowsybl can export to MATPOWER .mat format natively, which gives us
-    # properly formatted bus, gen, and branch matrices without manual conversion
     with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmp:
         mat_path = tmp.name
 
     try:
         pp_net.save(mat_path, format="MATPOWER")
 
-        # -------------------------------------------------------------------------
-        # Step 2: Load the .mat file with scipy
-        # -------------------------------------------------------------------------
-        # scipy.io.loadmat reads the MATPOWER mpc struct
         data = scipy.io.loadmat(mat_path, struct_as_record=True, squeeze_me=False)
         mpc_raw = data["mpc"][0, 0]
 
-        # Extract arrays from the mpc struct
         version = str(mpc_raw["version"][0])
         baseMVA = float(mpc_raw["baseMVA"][0, 0])
         bus_matrix = mpc_raw["bus"]
@@ -186,11 +204,6 @@ def from_powsybl(
     finally:
         Path(mat_path).unlink()
 
-    # -------------------------------------------------------------------------
-    # Step 2b: Fix voltage limits if pypowsybl exported 0 values
-    # -------------------------------------------------------------------------
-    # pypowsybl MATPOWER export sometimes sets VMAX/VMIN to 0, which is invalid
-    # Set default values: VMIN=0.9, VMAX=1.1 (typical operational range)
     for i in range(bus_matrix.shape[0]):
         if bus_matrix[i, VMAX] <= 0:
             bus_matrix[i, VMAX] = 1.1
@@ -198,24 +211,15 @@ def from_powsybl(
             bus_matrix[i, VMIN] = 0.9
 
     n_generators = gen_matrix.shape[0]
-
-    # -------------------------------------------------------------------------
-    # Step 3: Build gencost matrix with cost coefficients
-    # -------------------------------------------------------------------------
-    # pypowsybl's MATPOWER export doesn't include gencost, so we add it
     gencost_matrix = _build_gencost_matrix(n_generators, options.gen_costs)
 
-    # -------------------------------------------------------------------------
-    # Step 4: Assemble MATPOWER case structure
-    # -------------------------------------------------------------------------
-    # The mpc dict follows MATPOWER's case file convention
     mpc = {
-        "version": version,       # MATPOWER case format version
-        "baseMVA": baseMVA,       # System base apparent power (MW)
-        "bus": bus_matrix,        # Bus data matrix (n_bus x 13)
-        "gen": gen_matrix,        # Generator data matrix (n_gen x 21)
-        "branch": branch_matrix,  # Branch data matrix (n_branch x 13)
-        "gencost": gencost_matrix,  # Generator cost matrix (n_gen x 7+)
+        "version": version,
+        "baseMVA": baseMVA,
+        "bus": bus_matrix,
+        "gen": gen_matrix,
+        "branch": branch_matrix,
+        "gencost": gencost_matrix,
     }
 
     return Network(mpc)
@@ -224,57 +228,75 @@ def from_powsybl(
 def to_powsybl(
     network: Network,
     network_id: str = "network",
-):
+) -> ConvertedNetwork:
     """
     Convert a gridfm_datakit Network to a pypowsybl Network.
 
-    Uses MATPOWER format as intermediate:
-        1. Save Network to temp .m file
-        2. Convert .m to .mat via scipy
-        3. Load .mat with pypowsybl
+    Bus numbers in the MATPOWER intermediate file are restored from
+    ``network.reverse_bus_index_mapping`` before the file is written.  This
+    means any two networks that share the same topology (e.g. a base network
+    and its perturbations) will always produce the same pypowsybl element IDs,
+    so the maps returned here can be reused across all perturbed variants
+    without recomputing.
 
     Args:
         network: A gridfm_datakit Network object.
-        network_id: ID for the created pypowsybl network.
+        network_id: ID assigned to the created pypowsybl network.
 
     Returns:
-        A pypowsybl Network object.
+        ConvertedNetwork with pp_net and the three p2g index maps.
 
     Example:
         >>> network = load_net_from_pglib("case14_ieee")
-        >>> pp_net = to_powsybl(network)
+        >>> result = to_powsybl(network)
+        >>> result.pp_net           # pypowsybl network
+        >>> result.map_bus_p2g      # reusable for all perturbations of network
     """
     check_powsybl_available()
 
-    # Create temp directory and use network_id in filename
-    # (pypowsybl uses filename as network id)
+    rev = network.reverse_bus_index_mapping
+
+    # Restore original bus numbers so element IDs are stable across
+    # perturbations of the same base network.
+    bus = network.buses.copy()
+    bus[:, BUS_I] = [rev[int(i)] for i in bus[:, BUS_I]]
+
+    gen = network.gens.copy()
+    gen[:, GEN_BUS] = [rev[int(i)] for i in gen[:, GEN_BUS]]
+
+    branch = network.branches.copy()
+    branch[:, F_BUS] = [rev[int(i)] for i in branch[:, F_BUS]]
+    branch[:, T_BUS] = [rev[int(i)] for i in branch[:, T_BUS]]
+
     tmp_dir = tempfile.mkdtemp()
-    m_path = Path(tmp_dir) / f"{network_id}.m"
     mat_path = Path(tmp_dir) / f"{network_id}.mat"
 
     try:
-        # Step 1: Save Network to .m file
-        network.to_mpc(m_path)
-
-        # Step 2: Convert .m to .mat (build mpc struct for scipy)
-        # Use same format as to_mat_file for compatibility
         mpc = {
             "version": "2",
             "baseMVA": np.array([[network.baseMVA]]),
-            "bus": network.buses,
-            "gen": network.gens,
-            "branch": network.branches,
+            "bus": bus,
+            "gen": gen,
+            "branch": branch,
         }
         if hasattr(network, "gencosts") and network.gencosts is not None:
             mpc["gencost"] = network.gencosts
 
         scipy.io.savemat(mat_path, {"mpc": mpc})
-
-        # Step 3: Load .mat with pypowsybl
-        pp_net = pypowsybl.network.load(mat_path, {"matpower.import.ignore-base-voltage": "false"})
+        pp_net = pypowsybl.network.load(
+            str(mat_path),
+            {"matpower.import.ignore-base-voltage": "false"},
+        )
 
     finally:
-        # Clean up temp files and directory
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
-    return pp_net
+    from .mapping import build_p2g_maps
+    map_bus_p2g, map_branch_p2g, map_gen_p2g = build_p2g_maps(network, pp_net)
+
+    return ConvertedNetwork(
+        pp_net=pp_net,
+        map_bus_p2g=map_bus_p2g,
+        map_branch_p2g=map_branch_p2g,
+        map_gen_p2g=map_gen_p2g,
+    )

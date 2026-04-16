@@ -1,10 +1,9 @@
 """Tests for gridfm_datakit.powsybl.preprocess_pf_res module."""
 
 import pytest
-from pathlib import Path
 
 from gridfm_datakit.powsybl.api import is_powsybl_available
-from gridfm_datakit.powsybl import load_net
+from gridfm_datakit.network import load_net_from_pglib
 
 pytestmark = pytest.mark.skipif(
     not is_powsybl_available(),
@@ -21,37 +20,32 @@ def ieee14_acpf_res():
     """ACPF on IEEE14 with default configuration."""
     import pypowsybl as pp
     import time
+    from gridfm_datakit.powsybl.convert import to_powsybl
     from gridfm_datakit.powsybl.utils.lf_parameters import get_default_lf_parameters
-    from gridfm_datakit.powsybl.mapping import to_powsybl_with_mapping
-    
-    grids_dir = Path(__file__).parent/"data"/"grids"
-    loaded_net = load_net(str(grids_dir/"ieee14.m"))
 
-    pp_net = loaded_net.pp_net
-    gfm_net = loaded_net.gfm_net
+    gfm_net = load_net_from_pglib("case14_ieee")
+    conv = to_powsybl(gfm_net)
+    pp_net = conv.pp_net
 
     start_time = time.perf_counter()
     pf_metadata = pp.loadflow.run_ac(pp_net, get_default_lf_parameters())
     end_time = time.perf_counter()
     solve_time = end_time - start_time
 
-    _, map_bus_p2g, map_branch_p2g, map_gen_p2g = to_powsybl_with_mapping(gfm_net)
-    
-    return pp_net, solve_time, pf_metadata, map_bus_p2g, map_branch_p2g, map_gen_p2g
+    return pp_net, solve_time, pf_metadata, conv.map_bus_p2g, conv.map_branch_p2g, conv.map_gen_p2g
+
 
 @pytest.fixture(scope="function")
 def ieee14_acpf_non_convergent_res():
     """ACPF on a IEEE14 network that should not converge because of an excessive load impossible to balance."""
     import pypowsybl as pp
     import time
+    from gridfm_datakit.powsybl.convert import to_powsybl
     from gridfm_datakit.powsybl.utils.lf_parameters import get_default_lf_parameters
-    from gridfm_datakit.powsybl.mapping import to_powsybl_with_mapping
-    
-    grids_dir = Path(__file__).parent/"data"/"grids"
-    loaded_net = load_net(str(grids_dir/"ieee14.m"))
 
-    pp_net = loaded_net.pp_net
-    gfm_net = loaded_net.gfm_net
+    gfm_net = load_net_from_pglib("case14_ieee")
+    conv = to_powsybl(gfm_net)
+    pp_net = conv.pp_net
 
     pp_net.update_loads(id='LOAD-2', p0=4000)
     start_time = time.perf_counter()
@@ -59,9 +53,7 @@ def ieee14_acpf_non_convergent_res():
     end_time = time.perf_counter()
     solve_time = end_time - start_time
 
-    _, map_bus_p2g, map_branch_p2g, map_gen_p2g = to_powsybl_with_mapping(gfm_net)
-    
-    return pp_net, solve_time, pf_metadata, map_bus_p2g, map_branch_p2g, map_gen_p2g
+    return pp_net, solve_time, pf_metadata, conv.map_bus_p2g, conv.map_branch_p2g, conv.map_gen_p2g
 
 
 # ---------------------------------------------------------------------------

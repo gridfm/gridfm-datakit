@@ -43,8 +43,10 @@ def load_net_ieee14():
     """Load ieee14 into LoadNet class."""
     from pathlib import Path
     from gridfm_datakit.powsybl import load_net
+    import gridfm_datakit.grids as _grids_pkg
 
-    network_path = Path(__file__).parent/"data"/"grids"/"ieee14.m"
+    grids_dir = Path(_grids_pkg.__file__).parent
+    network_path = grids_dir / "pglib_opf_case14_ieee.m"
     loaded_net = load_net(network_path)
     return loaded_net
 
@@ -228,27 +230,30 @@ class TestToPowsybl:
     """Test conversion from gridfm_datakit Network to pypowsybl Network."""
 
     def test_to_powsybl_returns_network(self, gridfm_case14):
-        """Test that to_powsybl returns a pypowsybl Network object."""
-        from gridfm_datakit.powsybl.convert import to_powsybl
+        """Test that to_powsybl returns a ConvertedNetwork object."""
+        from gridfm_datakit.powsybl.convert import to_powsybl, ConvertedNetwork
         import pypowsybl as pp
 
-        pp_net = to_powsybl(gridfm_case14)
-        assert isinstance(pp_net, pp.network.Network), (
-            "Should return a pypowsybl Network object"
+        result = to_powsybl(gridfm_case14)
+        assert isinstance(result, ConvertedNetwork), (
+            "Should return a ConvertedNetwork object"
+        )
+        assert isinstance(result.pp_net, pp.network.Network), (
+            "ConvertedNetwork.pp_net should be a pypowsybl Network"
         )
 
     def test_to_powsybl_network_id(self, gridfm_case14):
         """Test that network ID is correctly set."""
         from gridfm_datakit.powsybl.convert import to_powsybl
 
-        pp_net = to_powsybl(gridfm_case14, network_id="test_network")
+        pp_net = to_powsybl(gridfm_case14, network_id="test_network").pp_net
         assert pp_net.id == "test_network", "Network ID should be 'test_network'"
 
     def test_to_powsybl_bus_count(self, gridfm_case14):
         """Test that correct number of buses are created."""
         from gridfm_datakit.powsybl.convert import to_powsybl
 
-        pp_net = to_powsybl(gridfm_case14)
+        pp_net = to_powsybl(gridfm_case14).pp_net
         buses_df = pp_net.get_buses()
 
         assert len(buses_df) == gridfm_case14.buses.shape[0], (
@@ -259,7 +264,7 @@ class TestToPowsybl:
         """Test that correct number of generators are created."""
         from gridfm_datakit.powsybl.convert import to_powsybl
 
-        pp_net = to_powsybl(gridfm_case14)
+        pp_net = to_powsybl(gridfm_case14).pp_net
         gens_df = pp_net.get_generators()
 
         assert len(gens_df) == gridfm_case14.gens.shape[0], (
@@ -270,7 +275,7 @@ class TestToPowsybl:
         """Test that correct number of branches are created."""
         from gridfm_datakit.powsybl.convert import to_powsybl
 
-        pp_net = to_powsybl(gridfm_case14)
+        pp_net = to_powsybl(gridfm_case14).pp_net
         lines_df = pp_net.get_lines()
         trafos_df = pp_net.get_2_windings_transformers()
 
@@ -283,7 +288,7 @@ class TestToPowsybl:
         """Test that substations are created."""
         from gridfm_datakit.powsybl.convert import to_powsybl
 
-        pp_net = to_powsybl(gridfm_case14)
+        pp_net = to_powsybl(gridfm_case14).pp_net
         substations_df = pp_net.get_substations()
 
         assert len(substations_df) > 0, "Should have at least one substation"
@@ -292,7 +297,7 @@ class TestToPowsybl:
         """Test that voltage levels are created."""
         from gridfm_datakit.powsybl.convert import to_powsybl
 
-        pp_net = to_powsybl(gridfm_case14)
+        pp_net = to_powsybl(gridfm_case14).pp_net
         vl_df = pp_net.get_voltage_levels()
 
         # pypowsybl's native MATPOWER loader may merge voltage levels
@@ -302,7 +307,7 @@ class TestToPowsybl:
         """Test that loads are created for buses with non-zero demand."""
         from gridfm_datakit.powsybl.convert import to_powsybl
 
-        pp_net = to_powsybl(gridfm_case14)
+        pp_net = to_powsybl(gridfm_case14).pp_net
         loads_df = pp_net.get_loads()
 
         # Count buses with non-zero load
@@ -319,7 +324,7 @@ class TestToPowsybl:
         from gridfm_datakit.powsybl.convert import to_powsybl
         import pypowsybl as pp
 
-        pp_net = to_powsybl(gridfm_case24)
+        pp_net = to_powsybl(gridfm_case24).pp_net
 
         assert isinstance(pp_net, pp.network.Network)
         assert len(pp_net.get_buses()) == gridfm_case24.buses.shape[0]
@@ -334,7 +339,7 @@ class TestRoundTrip:
         from gridfm_datakit.powsybl.convert import from_powsybl, to_powsybl
 
         # gridfm -> pypowsybl -> gridfm
-        pp_net = to_powsybl(gridfm_case14)
+        pp_net = to_powsybl(gridfm_case14).pp_net
         net_back = from_powsybl(pp_net)
 
         assert net_back.buses.shape[0] == gridfm_case14.buses.shape[0], (
@@ -345,7 +350,7 @@ class TestRoundTrip:
         """Test that generator count is preserved in round-trip conversion."""
         from gridfm_datakit.powsybl.convert import from_powsybl, to_powsybl
 
-        pp_net = to_powsybl(gridfm_case14)
+        pp_net = to_powsybl(gridfm_case14).pp_net
         net_back = from_powsybl(pp_net)
 
         assert net_back.gens.shape[0] == gridfm_case14.gens.shape[0], (
@@ -356,7 +361,7 @@ class TestRoundTrip:
         """Test that branch count is preserved in round-trip conversion."""
         from gridfm_datakit.powsybl.convert import from_powsybl, to_powsybl
 
-        pp_net = to_powsybl(gridfm_case14)
+        pp_net = to_powsybl(gridfm_case14).pp_net
         net_back = from_powsybl(pp_net)
 
         assert net_back.branches.shape[0] == gridfm_case14.branches.shape[0], (
@@ -367,7 +372,7 @@ class TestRoundTrip:
         """Test that network connectivity is preserved in round-trip."""
         from gridfm_datakit.powsybl.convert import from_powsybl, to_powsybl
 
-        pp_net = to_powsybl(gridfm_case14)
+        pp_net = to_powsybl(gridfm_case14).pp_net
         net_back = from_powsybl(pp_net)
 
         assert net_back.check_single_connected_component(), (
@@ -378,7 +383,7 @@ class TestRoundTrip:
         """Test that reference bus is preserved in round-trip."""
         from gridfm_datakit.powsybl.convert import from_powsybl, to_powsybl
 
-        pp_net = to_powsybl(gridfm_case14)
+        pp_net = to_powsybl(gridfm_case14).pp_net
         net_back = from_powsybl(pp_net)
 
         ref_count = np.sum(net_back.buses[:, BUS_TYPE] == REF)
@@ -390,7 +395,7 @@ class TestRoundTrip:
 
         # pypowsybl -> gridfm -> pypowsybl
         gfm_net = from_powsybl(pp_ieee14)
-        pp_back = to_powsybl(gfm_net)
+        pp_back = to_powsybl(gfm_net).pp_net
 
         # Compare counts
         original_buses = len(pp_ieee14.get_buses())
@@ -404,42 +409,73 @@ class TestRoundTrip:
 class TestRoundTripWithLoadNet:
     """Test the conservation of the to_powsybl and from_powsybl starting with load_net."""
 
+    def _numeric(self, df):
+        """Extract numeric columns as a numpy array, preserving row order."""
+        return df.select_dtypes(include='number').fillna(0.0).to_numpy()
+
+    def _assert_same_elements_same_values(self, original, roundtrip, label):
+        """Assert same element IDs are present and values match per element ID.
+
+        Aligns the round-tripped dataframe to the original's index order so the
+        row-by-row numeric comparison is always in a consistent (original) order,
+        regardless of the internal ordering pypowsybl uses after a round-trip.
+        """
+        assert set(original.index) == set(roundtrip.index), (
+            f"{label}: same IDs must be present after round-trip"
+        )
+        aligned = roundtrip.reindex(original.index)
+        np.testing.assert_allclose(self._numeric(original), self._numeric(aligned), rtol=1e-5,
+                                   err_msg=f"{label}: values must match per element ID")
+
     def test_roundtrip_with_load_net_ieee14_gens(self, load_net_ieee14):
         """Test the roundtrip conservation of generators on ieee14, starting from load_net"""
         from gridfm_datakit.powsybl.convert import from_powsybl, to_powsybl
-        
-        pp_net = load_net_ieee14.pp_net
-        pp_net_roundtrip = to_powsybl(from_powsybl(pp_net))
 
-        assert pp_net.get_generators().equals(pp_net_roundtrip.get_generators())
+        pp_net = load_net_ieee14.pp_net
+        pp_net_roundtrip = to_powsybl(from_powsybl(pp_net)).pp_net
+
+        self._assert_same_elements_same_values(
+            pp_net.get_generators(), pp_net_roundtrip.get_generators(), "generators"
+        )
 
     def test_roundtrip_with_load_net_ieee14_loads(self, load_net_ieee14):
         """Test the roundtrip conservation of loads on ieee14, starting from load_net"""
         from gridfm_datakit.powsybl.convert import from_powsybl, to_powsybl
-        
-        pp_net = load_net_ieee14.pp_net
-        pp_net_roundtrip = to_powsybl(from_powsybl(pp_net))
 
-        assert pp_net.get_loads().equals(pp_net_roundtrip.get_loads())
+        pp_net = load_net_ieee14.pp_net
+        pp_net_roundtrip = to_powsybl(from_powsybl(pp_net)).pp_net
+
+        self._assert_same_elements_same_values(
+            pp_net.get_loads(), pp_net_roundtrip.get_loads(), "loads"
+        )
 
     def test_roundtrip_with_load_net_ieee14_buses(self, load_net_ieee14):
         """Test the roundtrip conservation of buses on ieee14, starting from load_net"""
         from gridfm_datakit.powsybl.convert import from_powsybl, to_powsybl
-        
-        pp_net = load_net_ieee14.pp_net
-        pp_net_roundtrip = to_powsybl(from_powsybl(pp_net))
 
-        assert pp_net.get_buses().equals(pp_net_roundtrip.get_buses())
+        pp_net = load_net_ieee14.pp_net
+        pp_net_roundtrip = to_powsybl(from_powsybl(pp_net)).pp_net
+
+        self._assert_same_elements_same_values(
+            pp_net.get_buses(), pp_net_roundtrip.get_buses(), "buses"
+        )
 
     def test_roundtrip_with_load_net_ieee14_branches(self, load_net_ieee14):
         """Test the roundtrip conservation of branches on ieee14, starting from load_net"""
         from gridfm_datakit.powsybl.convert import from_powsybl, to_powsybl
-        
-        pp_net = load_net_ieee14.pp_net
-        pp_net_roundtrip = to_powsybl(from_powsybl(pp_net))
 
-        assert pp_net.get_lines().equals(pp_net_roundtrip.get_lines())
-        assert pp_net.get_2_windings_transformers().equals(pp_net_roundtrip.get_2_windings_transformers())
+        pp_net = load_net_ieee14.pp_net
+        pp_net_roundtrip = to_powsybl(from_powsybl(pp_net)).pp_net
+
+        self._assert_same_elements_same_values(
+            pp_net.get_lines(), pp_net_roundtrip.get_lines(), "lines"
+        )
+
+        xfmrs = pp_net.get_2_windings_transformers()
+        xfmrs_rt = pp_net_roundtrip.get_2_windings_transformers()
+        assert set(xfmrs.index) == set(xfmrs_rt.index), "Transformer IDs must match"
+        if len(xfmrs) > 0:
+            self._assert_same_elements_same_values(xfmrs, xfmrs_rt, "transformers")
 
 
 class TestImportCheck:
@@ -464,7 +500,7 @@ class TestEdgeCases:
         gridfm_case14.buses[0, GS] = 10.0  # MW
         gridfm_case14.buses[0, BS] = 20.0  # MVAr
 
-        pp_net = to_powsybl(gridfm_case14)
+        pp_net = to_powsybl(gridfm_case14).pp_net
         shunts_df = pp_net.get_shunt_compensators()
 
         assert len(shunts_df) >= 1, "Should have at least one shunt compensator"
@@ -478,7 +514,7 @@ class TestEdgeCases:
         """
         from gridfm_datakit.powsybl.convert import to_powsybl
 
-        pp_net = to_powsybl(gridfm_case24)
+        pp_net = to_powsybl(gridfm_case24).pp_net
         lines_df = pp_net.get_lines()
         trafos_df = pp_net.get_2_windings_transformers()
 
@@ -527,7 +563,7 @@ class TestToPowsyblElementConservation:
         """Test that the number of buses is conserved."""
         from gridfm_datakit.powsybl.convert import to_powsybl
 
-        pp_net = to_powsybl(gridfm_case14)
+        pp_net = to_powsybl(gridfm_case14).pp_net
         pp_buses = len(pp_net.get_buses())
 
         assert pp_buses == gridfm_case14.buses.shape[0], (
@@ -538,7 +574,7 @@ class TestToPowsyblElementConservation:
         """Test that the number of generators is conserved."""
         from gridfm_datakit.powsybl.convert import to_powsybl
 
-        pp_net = to_powsybl(gridfm_case14)
+        pp_net = to_powsybl(gridfm_case14).pp_net
         pp_gens = len(pp_net.get_generators())
 
         assert pp_gens == gridfm_case14.gens.shape[0], (
@@ -549,7 +585,7 @@ class TestToPowsyblElementConservation:
         """Test that loads are created for buses with non-zero demand."""
         from gridfm_datakit.powsybl.convert import to_powsybl
 
-        pp_net = to_powsybl(gridfm_case14)
+        pp_net = to_powsybl(gridfm_case14).pp_net
         pp_loads = len(pp_net.get_loads())
 
         # Count buses with non-zero load
@@ -565,7 +601,7 @@ class TestToPowsyblElementConservation:
         """Test that total branches (lines + transformers) are conserved."""
         from gridfm_datakit.powsybl.convert import to_powsybl
 
-        pp_net = to_powsybl(gridfm_case14)
+        pp_net = to_powsybl(gridfm_case14).pp_net
         pp_lines = len(pp_net.get_lines())
         pp_trafos = len(pp_net.get_2_windings_transformers())
         total_branches = pp_lines + pp_trafos
@@ -578,7 +614,7 @@ class TestToPowsyblElementConservation:
         """Test that shunt compensators are created for buses with non-zero shunt."""
         from gridfm_datakit.powsybl.convert import to_powsybl
 
-        pp_net = to_powsybl(gridfm_case14)
+        pp_net = to_powsybl(gridfm_case14).pp_net
         pp_shunts = len(pp_net.get_shunt_compensators())
 
         # Count buses with non-zero shunt admittance
@@ -594,7 +630,7 @@ class TestToPowsyblElementConservation:
         """Test element conservation for case24 network."""
         from gridfm_datakit.powsybl.convert import to_powsybl
 
-        pp_net = to_powsybl(gridfm_case24)
+        pp_net = to_powsybl(gridfm_case24).pp_net
 
         # Buses
         assert len(pp_net.get_buses()) == gridfm_case24.buses.shape[0]

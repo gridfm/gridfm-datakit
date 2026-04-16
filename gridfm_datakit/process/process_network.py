@@ -961,7 +961,7 @@ def process_scenario_pf_mode(
                 continue
 
         if pf_solver == 'powsybl': # TODO: factorizable
-            pp_perturbation = to_powsybl(perturbation)
+            pp_perturbation = to_powsybl(perturbation).pp_net
             res_dcpf = None
             if include_dc_res:
                 try:

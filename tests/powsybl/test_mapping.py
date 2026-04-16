@@ -19,7 +19,7 @@ import pytest
 from gridfm_datakit.powsybl.api import is_powsybl_available
 from gridfm_datakit.network import load_net_from_pglib
 from gridfm_datakit.powsybl.convert import to_powsybl
-from gridfm_datakit.powsybl.mapping import build_p2g_maps, to_powsybl_with_mapping
+from gridfm_datakit.powsybl.mapping import build_p2g_maps
 
 pytestmark = pytest.mark.skipif(
     not is_powsybl_available(),
@@ -35,7 +35,7 @@ pytestmark = pytest.mark.skipif(
 def case14():
     """IEEE 14-bus network: single gen per bus, no parallel branches."""
     net = load_net_from_pglib("case14_ieee")
-    pp_net = to_powsybl(net)
+    pp_net = to_powsybl(net).pp_net
     return net, pp_net
 
 
@@ -43,7 +43,7 @@ def case14():
 def case24():
     """IEEE 24-bus RTS network: multiple gens per bus, parallel lines."""
     net = load_net_from_pglib("case24_ieee_rts")
-    pp_net = to_powsybl(net)
+    pp_net = to_powsybl(net).pp_net
     return net, pp_net
 
 
@@ -194,37 +194,17 @@ class TestBuildP2gMaps:
         map_bus_p2g, _, _ = build_p2g_maps(net, pp_net)
         assert len(map_bus_p2g) == n_bus
 
+    def test_gen_map_preserves_row_order(self, case14):
+        """map_gen_p2g values must be 0, 1, 2, … in the order pypowsybl enumerates generators.
 
-# ---------------------------------------------------------------------------
-# 2. to_powsybl_with_mapping API tests
-# ---------------------------------------------------------------------------
-
-class TestToPowsyblWithMapping:
-    """Tests for the convenience wrapper to_powsybl_with_mapping()."""
-
-    def test_returns_four_tuple(self, case14):
-        net, _ = case14
-        result = to_powsybl_with_mapping(net)
-        assert len(result) == 4
-
-    def test_first_element_is_pypowsybl_network(self, case14):
-        """The first return value must be a pypowsybl Network object."""
-        import pypowsybl as pp
-        net, _ = case14
-        pp_net_out, _, _, _ = to_powsybl_with_mapping(net)
-        assert isinstance(pp_net_out, pp.network.Network)
-
-    def test_maps_match_build_p2g_maps(self, case14):
-        """to_powsybl_with_mapping maps must equal build_p2g_maps called separately."""
-        net, _ = case14
-        pp_net_out, bus1, branch1, gen1 = to_powsybl_with_mapping(net)
-        bus2, branch2, gen2 = build_p2g_maps(net, pp_net_out)
-        assert bus1 == bus2
-        assert branch1 == branch2
-        assert gen1 == gen2
-
-    def test_custom_network_id(self, case14):
-        """network_id parameter is forwarded to pypowsybl without error."""
-        net, _ = case14
-        pp_net_out, _, _, _ = to_powsybl_with_mapping(net, network_id="test_net")
-        assert pp_net_out is not None
+        pypowsybl preserves MATPOWER gen row order, so the map is a pure positional
+        enumeration: pp_gen_ids[i] → i.  Any deviation would silently corrupt PF results.
+        """
+        net, pp_net = case14
+        _, _, map_gen_p2g = build_p2g_maps(net, pp_net)
+        pp_gen_ids = list(pp_net.get_generators().index)
+        for expected_row, pp_gen_id in enumerate(pp_gen_ids):
+            assert map_gen_p2g[pp_gen_id] == expected_row, (
+                f"Generator {pp_gen_id!r} mapped to row {map_gen_p2g[pp_gen_id]}, "
+                f"expected {expected_row}"
+            )

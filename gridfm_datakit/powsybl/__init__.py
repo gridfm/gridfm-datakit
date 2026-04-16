@@ -44,8 +44,8 @@ from gridfm_datakit.network import Network, load_net_from_file
 from gridfm_datakit.utils.idx_cost import MODEL, NCOST, COST, POLYNOMIAL
 
 from .api import check_powsybl_available, pypowsybl
-from .convert import from_powsybl, to_powsybl, ConversionOptions
-from .mapping import build_p2g_maps, to_powsybl_with_mapping
+from .convert import from_powsybl, to_powsybl, ConversionOptions, ConvertedNetwork
+from .mapping import build_p2g_maps
 
 
 # ---------------------------------------------------------------------------
@@ -270,7 +270,7 @@ def load_net(network_path: str) -> LoadedNetwork:
         # and then converting the resulting Network object to pypowsybl via
         # to_powsybl(), which internally serialises it to a temporary .mat file.
         gfm_tmp_net = load_net_from_file(str(path))
-        pp_net = to_powsybl(gfm_tmp_net)
+        pp_net = to_powsybl(gfm_tmp_net).pp_net
     else:
         # For all other formats pypowsybl can handle the file directly.
         pp_net = pypowsybl.network.load(network_path)
@@ -350,7 +350,7 @@ def convert_net(network: Network, network_id: str = "network") -> LoadedNetwork:
     metadata = NetworkMetadata(gen_costs=gen_costs)
 
     # Build the pypowsybl network from the gridfm_datakit Network.
-    pp_net = to_powsybl(network, network_id=network_id)
+    pp_net = to_powsybl(network, network_id=network_id).pp_net
 
     return LoadedNetwork(pp_net=pp_net, gfm_net=network, metadata=metadata)
 
@@ -364,9 +364,9 @@ __all__ = [
     "to_powsybl",
     # PF solver mapping utilities
     "build_p2g_maps",
-    "to_powsybl_with_mapping",
     # Configuration and data classes
     "ConversionOptions",
+    "ConvertedNetwork",
     "LoadedNetwork",
     "NetworkMetadata",
 ]
