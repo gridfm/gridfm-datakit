@@ -6,8 +6,13 @@ running power flow calculations, and generating perturbed scenarios
 for data generation purposes.
 """
 
+import time
 import numpy as np
 from importlib import resources
+import pypowsybl as pp
+from gridfm_datakit.powsybl.convert import to_powsybl
+from gridfm_datakit.powsybl.preprocess_pf_res import preprocess_pp_pf_res
+from gridfm_datakit.powsybl.utils.lf_parameters import get_default_lf_parameters
 from gridfm_datakit.utils.column_names import (
     GEN_COLUMNS,
     DC_GEN_COLUMNS,
@@ -829,32 +834,78 @@ def process_scenario_pf_mode(
     pf_fast: bool,
     dcpf_fast: bool,
     jl: Any,
+    pf_solver: str = 'powermodel',
+    *,
+    map_bus_p2g: Optional[Dict] = None,
+    map_branch_p2g: Optional[Dict] = None,
+    map_gen_p2g: Optional[Dict] = None,
 ) -> List[np.ndarray]:
-    """Processes a load scenario in PF mode
+    """Processes a load scenario in PF mode.
 
     In PF mode, OPF is run first to get generator setpoints, then topology
     perturbations are applied. This can lead to constraint violations (overloads,
     voltage violations) since the setpoints are not re-optimized for the new topology.
 
-    Args:
-        net: The power network.
-        scenarios: Array of load scenarios with shape (n_loads, n_scenarios, 2).
-        scenario_index: Index of the current scenario to process.
-        topology_generator: Generator for topology perturbations (line/transformer outages).
-        generation_generator: Generator for generation cost perturbations.
-        admittance_generator: Generator for line admittance perturbations.
-        local_processed_data: List to accumulate processed data tuples.
-        error_log_file: Path to error log file for recording failures.
-        include_dc_res: Whether to include DC power flow results in output.
-        pf_fast: Whether to use fast AC PF solver.
-        dcpf_fast: Whether to use fast DC PF solver.
-        jl: Julia interface object for running power flow calculations.
+    Parameters
+    ----------
+    net:
+        The base power network (deep-copied internally before mutation).
+    scenarios:
+        Array of load scenarios with shape ``(n_loads, n_scenarios, 2)``.
+    scenario_index:
+        Index of the current scenario to process.
+    topology_generator:
+        Generator for topology perturbations (line/transformer outages).
+    generation_generator:
+        Generator for generation cost perturbations.
+    admittance_generator:
+        Generator for line admittance perturbations.
+    local_processed_data:
+        List to accumulate processed data tuples.
+    error_log_file:
+        Path to error log file for recording failures.
+    include_dc_res:
+        Whether to include DC power flow results in output.
+    pf_fast:
+        Whether to use the fast AC PF solver (``compute_ac_pf`` from
+        PowerModels.jl).  Only consulted when ``pf_solver='powermodel'``.
+    dcpf_fast:
+        Whether to use the fast DC PF solver (``compute_dc_pf`` from
+        PowerModels.jl).  Only consulted when ``pf_solver='powermodel'``.
+    jl:
+        Julia interface object.  Always required — even when
+        ``pf_solver='powsybl'`` Julia is used for the OPF step that
+        produces the generator set-points before topology perturbation.
+    pf_solver:
+        Which engine to use for the power flow solve after topology
+        perturbation.  Must be ``'powermodel'`` (default) or
+        ``'powsybl'``.  OPF is always solved by PowerModels regardless
+        of this value.
 
-    Returns:
-        Updated list of processed data (bus, gen, branch, Y_bus arrays)
+    Keyword-only arguments (only required when ``pf_solver='powsybl'``)
+    -------------------------------------------------------------------
+    map_bus_p2g:
+        ``{pp_bus_id: gfm_bus_index}`` — pypowsybl-to-gridfm bus map
+        returned by :func:`~gridfm_datakit.powsybl.mapping.build_p2g_maps`.
+        Must be pre-computed on the base network and reused across
+        scenarios; perturbations preserve element identity so the base
+        map stays valid.
+    map_branch_p2g:
+        ``{pp_branch_id: gfm_branch_row}`` — pypowsybl-to-gridfm branch map.
+    map_gen_p2g:
+        ``{pp_gen_id: gfm_gen_row}`` — pypowsybl-to-gridfm generator map.
 
-    Note:
-        Random seed is controlled by the calling context (process_scenario_chunk).
+    Returns
+    -------
+    List[np.ndarray]
+        Updated ``local_processed_data`` list with one tuple
+        ``(bus, gen, branch, Y_bus, runtime)`` appended per successfully
+        solved perturbation.
+
+    Note
+    ----
+    Random seed is controlled by the calling context
+    (``process_scenario_chunk`` or ``generate_power_flow_data``).
     """
     net = copy.deepcopy(net)
 
@@ -889,26 +940,60 @@ def process_scenario_pf_mode(
     # to get PF points that can violate some OPF inequality constraints (to train PF solvers that can handle points outside of normal operating limits), we apply the topology perturbation after OPF.
     # The setpoints are then no longer adapted to the new topology, and might lead to e.g. abranch overload or a voltage magnitude violation once we drop an element.
     for perturbation in perturbations:
-        res_dcpf = None
-        if include_dc_res:
-            try:
-                res_dcpf = run_dcpf(perturbation, jl, fast=dcpf_fast)
+        if pf_solver == 'powermodel':
+            res_dcpf = None
+            if include_dc_res:
+                try:
+                    res_dcpf = run_dcpf(perturbation, jl, fast=dcpf_fast)
 
+                except Exception as e:
+                    with open(error_log_file, "a") as f:
+                        f.write(
+                            f"Caught an exception at scenario {scenario_index} when solving dcpf function: {e}\n",
+                        )
+            try:
+                res = run_pf(perturbation, jl, fast=pf_fast)
             except Exception as e:
                 with open(error_log_file, "a") as f:
                     f.write(
-                        f"Caught an exception at scenario {scenario_index} when solving dcpf function: {e}\n",
+                        f"Caught an exception at scenario {scenario_index} when solving in run_pf function: {e}\n",
                     )
+                continue
 
-        try:
-            res = run_pf(perturbation, jl, fast=pf_fast)
-        except Exception as e:
-            with open(error_log_file, "a") as f:
-                f.write(
-                    f"Caught an exception at scenario {scenario_index} when solving in run_pf function: {e}\n",
-                )
-            continue
+        if pf_solver == 'powsybl': # TODO: factorizable
+            pp_perturbation = to_powsybl(perturbation)
+            res_dcpf = None
+            if include_dc_res:
+                try:
+                    start_time = time.perf_counter()
+                    lf_parameters = get_default_lf_parameters() # 
+                    dcpf_metadata = pp.loadflow.run_dc(pp_perturbation, lf_parameters)
+                    end_time = time.perf_counter()
+                    solve_time = end_time - start_time
+                    res_dcpf = preprocess_pp_pf_res(pp_perturbation, solve_time, dcpf_metadata, map_bus_p2g, map_branch_p2g, map_gen_p2g)
 
+                except Exception as e:
+                    with open(error_log_file, "a") as f:
+                        f.write(
+                            f"Caught an exception at scenario {scenario_index} when solving dcpf function with PowSyBl solver: {e}\n",
+                        )
+
+            try:
+                start_time = time.perf_counter()
+                lf_parameters = get_default_lf_parameters() # Note the slack is distributed by default.
+                pf_metadata = pp.loadflow.run_ac(pp_perturbation, lf_parameters)
+                end_time = time.perf_counter()
+                solve_time = end_time - start_time
+                res = preprocess_pp_pf_res(pp_perturbation, solve_time, pf_metadata, map_bus_p2g, map_branch_p2g, map_gen_p2g)
+            except Exception as e:
+                with open(error_log_file, "a") as f:
+                    f.write(
+                        f"Caught an exception at scenario {scenario_index} when solving in run_pf function with PowSyBl solver: {e}\n",
+                    )
+                    f.write(traceback.format_exc())
+                    f.write("\n")
+                continue
+            
         # Append processed power flow data
         pf_data = pf_post_processing(
             scenario_index,
@@ -946,6 +1031,10 @@ def process_scenario_chunk(
     solver_log_dir: str,
     max_iter: int,
     seed: int,
+    pf_solver: str = 'powermodel',
+    map_bus_p2g: Optional[Dict] = None,
+    map_branch_p2g: Optional[Dict] = None,
+    map_gen_p2g: Optional[Dict] = None,
 ) -> Tuple[
     Union[None, Exception],
     Union[None, str],
@@ -973,6 +1062,11 @@ def process_scenario_chunk(
         solver_log_dir: Directory for solver logs.
         max_iter: Maximum iterations for the solver.
         seed: Global random seed for reproducibility.
+        pf_solver: PF solver to use in pf mode; either 'powermodel' or 'powsybl'.
+            OPF is always solved by PowerModels regardless of this value.
+        map_bus_p2g: pypowsybl-to-gridfm bus index map (required when pf_solver='powsybl').
+        map_branch_p2g: pypowsybl-to-gridfm branch row map (required when pf_solver='powsybl').
+        map_gen_p2g: pypowsybl-to-gridfm generator row map (required when pf_solver='powsybl').
 
     Returns:
         Tuple containing:
@@ -1022,6 +1116,10 @@ def process_scenario_chunk(
                         pf_fast,
                         dcpf_fast,
                         jl,
+                        pf_solver,
+                        map_bus_p2g=map_bus_p2g,
+                        map_branch_p2g=map_branch_p2g,
+                        map_gen_p2g=map_gen_p2g,
                     )
 
                 progress_queue.put(1)  # update queue

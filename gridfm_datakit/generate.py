@@ -25,6 +25,7 @@ from gridfm_datakit.perturbations.load_perturbation import (
     load_scenarios_to_df,
     plot_load_scenarios_combined,
 )
+import gridfm_datakit.powsybl as powsybl
 import gc
 from datetime import datetime
 from tqdm import tqdm
@@ -37,7 +38,7 @@ import sys
 from gridfm_datakit.network import Network
 from gridfm_datakit.process.process_network import init_julia
 from gridfm_datakit.utils.random_seed import custom_seed
-
+from gridfm_datakit.powsybl.mapping import to_powsybl_with_mapping
 
 def _setup_environment(
     config: Union[str, Dict[str, Any], NestedNamespace],
@@ -82,6 +83,22 @@ def _setup_environment(
         # chunk_seed = seed * 20000 + start_idx + 1 < 2^31 - 1
         # seed < (2,147,483,647 - n_scenarios) / 20,000 ~= 100_000 so taking 50_000 to be safe
         print(f"No seed provided. Using seed={seed}")
+
+    # Resolve and validate the PF solver setting.
+    #
+    # pf_solver controls which engine is used to solve the power flow equations
+    # in PF mode.  It is completely independent of network.source: you can load
+    # a network from any source and solve it with either engine.
+    #
+    # OPF is always solved by PowerModels (Julia) regardless of this setting.
+    # In OPF mode the value is read and stored on args but is never consulted
+    # during execution — it is kept here purely for consistency and logging.
+    pf_solver = getattr(args.settings, "pf_solver", "powermodel")
+    if pf_solver not in ("powermodel", "powsybl"):
+        raise ValueError(
+            f"settings.pf_solver must be 'powermodel' or 'powsybl', got {pf_solver!r}"
+        )
+    args.settings.pf_solver = pf_solver
 
     # Setup output directory
     base_path = os.path.join(args.settings.data_dir, args.network.name, "raw")
@@ -159,6 +176,9 @@ def _prepare_network_and_scenarios(
         net = load_net_from_file(
             os.path.join(args.network.network_dir, args.network.name) + ".m",
         )
+    elif args.network.source == "powsybl":
+        loaded_net = powsybl.load_net(args.network.file)
+        net = loaded_net.gfm_net
     else:
         raise ValueError("Invalid grid source!")
 
@@ -258,6 +278,21 @@ def generate_power_flow_data(
     # Prepare network and scenarios
     net, scenarios = _prepare_network_and_scenarios(args, file_paths, seed)
 
+    # Build pypowsybl-to-gridfm index maps required when using the powsybl solver.
+    #
+    # The maps are derived in O(n) from the element IDs that pypowsybl assigns
+    # during conversion (see gridfm_datakit.powsybl.mapping for details).
+    # They are computed once here on the base network and reused for every
+    # perturbed scenario.  Perturbations preserve element identity and row
+    # ordering, so the base-network maps remain valid for all perturbed variants.
+    #
+    # When using the powermodel solver the maps are not needed and are left as
+    # None so process_scenario_pf_mode can ignore them cheaply.
+    if args.settings.pf_solver == 'powsybl':
+        _, map_bus_p2g, map_branch_p2g, map_gen_p2g = to_powsybl_with_mapping(net)
+    else:
+        map_bus_p2g, map_branch_p2g, map_gen_p2g = None, None, None
+
     # Initialize topology generator
     topology_generator = initialize_topology_generator(args.topology_perturbation, net)
 
@@ -316,6 +351,10 @@ def generate_power_flow_data(
                             args.settings.pf_fast,
                             args.settings.dcpf_fast,
                             jl,
+                            args.settings.pf_solver,
+                            map_bus_p2g=map_bus_p2g,
+                            map_branch_p2g=map_branch_p2g,
+                            map_gen_p2g=map_gen_p2g,
                         )
                     else:
                         raise ValueError("Invalid mode!")
@@ -372,6 +411,17 @@ def generate_power_flow_data_distributed(
 
     # Prepare network and scenarios
     net, scenarios = _prepare_network_and_scenarios(args, file_paths, seed)
+
+    # Build pypowsybl-to-gridfm index maps required when using the powsybl solver.
+    #
+    # Identical to the sequential path: maps are computed once on the base network
+    # and passed to every worker process.  Because the maps are plain Python dicts
+    # ({str: float} and {str: int}) they are fully picklable and survive the
+    # multiprocessing boundary without any special handling.
+    if args.settings.pf_solver == 'powsybl':
+        _, map_bus_p2g, map_branch_p2g, map_gen_p2g = to_powsybl_with_mapping(net)
+    else:
+        map_bus_p2g, map_branch_p2g, map_gen_p2g = None, None, None
 
     # Initialize topology generator
     topology_generator = initialize_topology_generator(args.topology_perturbation, net)
@@ -431,6 +481,10 @@ def generate_power_flow_data_distributed(
                         file_paths["solver_log_dir"],
                         args.settings.max_iter,
                         seed,
+                        args.settings.pf_solver,
+                        map_bus_p2g,
+                        map_branch_p2g,
+                        map_gen_p2g,
                     )
                     for chunk in scenario_chunks
                 ]
