@@ -4,7 +4,6 @@ import pytest
 from pathlib import Path
 
 from gridfm_datakit.powsybl.api import is_powsybl_available
-from gridfm_datakit.powsybl import load_net
 
 pytestmark = pytest.mark.skipif(
     not is_powsybl_available(),

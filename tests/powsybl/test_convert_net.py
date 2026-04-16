@@ -17,19 +17,19 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def gridfm_case14():
     """Load gridfm_datakit case14_ieee network."""
     return load_net_from_pglib("case14_ieee")
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def gridfm_case24():
     """Load gridfm_datakit case24_ieee_rts network."""
     return load_net_from_pglib("case24_ieee_rts")
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def gridfm_case57():
     """Load gridfm_datakit case57_ieee network."""
     return load_net_from_pglib("case57_ieee")
@@ -45,7 +45,7 @@ class TestConvertNet:
         loaded = convert_net(gridfm_case14)
         assert isinstance(loaded, LoadedNetwork)
 
-    def test_has_pb_net(self, gridfm_case14):
+    def test_has_pp_net(self, gridfm_case14):
         """Test that the result has a pypowsybl network."""
         from gridfm_datakit.powsybl import convert_net
 

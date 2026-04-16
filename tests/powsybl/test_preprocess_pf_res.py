@@ -22,21 +22,20 @@ def ieee14_acpf_res():
     import pypowsybl as pp
     import time
     from gridfm_datakit.powsybl.utils.lf_parameters import get_default_lf_parameters
-    from gridfm_datakit.powsybl.network_mapper import NetworkMapper
+    from gridfm_datakit.powsybl.mapping import to_powsybl_with_mapping
     
     grids_dir = Path(__file__).parent/"data"/"grids"
     loaded_net = load_net(str(grids_dir/"ieee14.m"))
 
     pp_net = loaded_net.pp_net
     gfm_net = loaded_net.gfm_net
-    nm = NetworkMapper(gfm_net, pp_net)
 
     start_time = time.perf_counter()
     pf_metadata = pp.loadflow.run_ac(pp_net, get_default_lf_parameters())
     end_time = time.perf_counter()
     solve_time = end_time - start_time
 
-    map_bus_p2g, map_branch_p2g, map_gen_p2g = nm.map_p2g()
+    _, map_bus_p2g, map_branch_p2g, map_gen_p2g = to_powsybl_with_mapping(gfm_net)
     
     return pp_net, solve_time, pf_metadata, map_bus_p2g, map_branch_p2g, map_gen_p2g
 
@@ -46,14 +45,13 @@ def ieee14_acpf_non_convergent_res():
     import pypowsybl as pp
     import time
     from gridfm_datakit.powsybl.utils.lf_parameters import get_default_lf_parameters
-    from gridfm_datakit.powsybl.network_mapper import NetworkMapper
+    from gridfm_datakit.powsybl.mapping import to_powsybl_with_mapping
     
     grids_dir = Path(__file__).parent/"data"/"grids"
     loaded_net = load_net(str(grids_dir/"ieee14.m"))
 
     pp_net = loaded_net.pp_net
     gfm_net = loaded_net.gfm_net
-    nm = NetworkMapper(gfm_net, pp_net)
 
     pp_net.update_loads(id='LOAD-2', p0=4000)
     start_time = time.perf_counter()
@@ -61,7 +59,7 @@ def ieee14_acpf_non_convergent_res():
     end_time = time.perf_counter()
     solve_time = end_time - start_time
 
-    map_bus_p2g, map_branch_p2g, map_gen_p2g = nm.map_p2g()
+    _, map_bus_p2g, map_branch_p2g, map_gen_p2g = to_powsybl_with_mapping(gfm_net)
     
     return pp_net, solve_time, pf_metadata, map_bus_p2g, map_branch_p2g, map_gen_p2g
 
