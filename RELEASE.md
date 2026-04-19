@@ -8,8 +8,6 @@ This process applies to all repositories under https://github.com/gridfm unless 
 
 ## Release cadence
 
-GridFM follows a time‑boxed release cycle.
-
 - **Patch releases**: as needed for bug fixes
 - **Minor releases**: as needed for new features
 - **Major releases**: when backward‑incompatible changes are introduced
