@@ -165,10 +165,13 @@ def update_powsybl(
     if not isinstance(pp_net, pypowsybl.network.Network):
         raise ValueError("pp_net must be a pypowsybl Network")
 
-    bus_id = pp_net.get_buses().index.to_numpy()
+    # For loads -> bus_id column to have the bus_id
+    loads = pp_net.get_loads()
+    load_id = loads.index.to_numpy()
+    bus_id = loads['bus_id'].to_numpy()
     gfm_bus_idx = np.array([int(mapping_p2g.bus[i]) for i in bus_id])
     pp_net.update_loads(
-        id=bus_id,
+        id=load_id,
         p=gfm_net.buses[gfm_bus_idx, PD].tolist(),
         q=gfm_net.buses[gfm_bus_idx, QD].tolist(),
     )

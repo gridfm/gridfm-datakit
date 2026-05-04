@@ -42,12 +42,10 @@ Public API
 """
 
 import re
-from collections import defaultdict
 from dataclasses import dataclass
 from typing import Dict, Tuple
 
 from gridfm_datakit.network import Network
-from gridfm_datakit.utils.idx_brch import F_BUS, T_BUS
 
 from .api import check_powsybl_available
 
@@ -165,8 +163,13 @@ def build_p2g_maps(
     """
     check_powsybl_available()
 
-    bim = network.bus_index_mapping  # orig_bus_num → gfm_idx
-    rev = network.reverse_bus_index_mapping  # gfm_idx → orig_bus_num
+    # -------------------------------------------------------------------------
+    # 0. Bus map - direct enumeration (row order is preserved by pypowsybl)
+    # -------------------------------------------------------------------------
+    map_bus_p2g: Dict[str, float] = {
+        pp_bus_id: gfm_row
+        for gfm_row, pp_bus_id in enumerate(pp_net.get_buses().index)
+    }
 
     # -------------------------------------------------------------------------
     # 1. Gen map — direct enumeration (row order is preserved by pypowsybl)
@@ -177,70 +180,13 @@ def build_p2g_maps(
     }
 
     # -------------------------------------------------------------------------
-    # 2. Branch map — parse original bus nums from IDs; use per-(f,t) counter
+    # 2. Branch map — direct enumeration (lines, transformers, ...)
     # -------------------------------------------------------------------------
-    # Build lookup from (orig_f, orig_t) → [gfm branch rows in order]
-    gfm_branch_by_endpoints: Dict[Tuple[int, int], list] = defaultdict(list)
-    for row in range(network.branches.shape[0]):
-        orig_f = rev[int(network.branches[row, F_BUS])]
-        orig_t = rev[int(network.branches[row, T_BUS])]
-        gfm_branch_by_endpoints[(orig_f, orig_t)].append(row)
-
-    parallel_counter: Dict[Tuple[int, int], int] = defaultdict(int)
-
+    offset = 0
     map_branch_p2g: Dict[str, int] = {}
-    for pp_branch_id in pp_net.get_branches().index:
-        orig_f, orig_t = _parse_branch_endpoints(pp_branch_id)
-        endpoint_pair = (orig_f, orig_t)
-        occurrence = parallel_counter[endpoint_pair]
-        candidates = gfm_branch_by_endpoints.get(endpoint_pair)
-        if candidates is None or occurrence >= len(candidates):
-            n_found = len(candidates) if candidates else 0
-            raise ValueError(
-                f"Branch ID {pp_branch_id!r} encodes endpoint pair {endpoint_pair}, "
-                f"but only {n_found} gridfm branch(es) share that (orig_F, orig_T) pair. "
-                "Ensure pp_net was produced by to_powsybl() from the same network."
-            )
-        map_branch_p2g[pp_branch_id] = candidates[occurrence]
-        parallel_counter[endpoint_pair] += 1
-
-    # -------------------------------------------------------------------------
-    # 3. Bus map — from branch endpoints; fallback to gen/load IDs
-    # -------------------------------------------------------------------------
-    map_bus_p2g: Dict[str, float] = {}
-
     for df in (pp_net.get_lines(), pp_net.get_2_windings_transformers()):
-        for pp_id, row in df.iterrows():
-            orig_f, orig_t = _parse_branch_endpoints(pp_id)
-            map_bus_p2g[row["bus1_id"]] = float(bim[orig_f])
-            map_bus_p2g[row["bus2_id"]] = float(bim[orig_t])
-
-    # Fallback: isolated buses with a generator but no branch.
-    for pp_gen_id, row in pp_net.get_generators().iterrows():
-        bus_pp_id = row["bus_id"]
-        if bus_pp_id not in map_bus_p2g:
-            orig_bus = _parse_gen_bus(pp_gen_id)
-            map_bus_p2g[bus_pp_id] = float(bim[orig_bus])
-
-    # Fallback: isolated buses with a load but no branch and no gen.
-    for pp_load_id, row in pp_net.get_loads().iterrows():
-        bus_pp_id = row["bus_id"]
-        if bus_pp_id not in map_bus_p2g:
-            m = _LOAD_ID_RE.match(pp_load_id)
-            if m is None:
-                raise ValueError(
-                    f"Unexpected pypowsybl load ID format: {pp_load_id!r}. "
-                    "Expected 'LOAD-N'.  Was the network produced by to_powsybl()?"
-                )
-            map_bus_p2g[bus_pp_id] = float(bim[int(m.group(1))])
-
-    pp_bus_ids = set(pp_net.get_buses().index)
-    missing = pp_bus_ids - set(map_bus_p2g)
-    if missing:
-        raise ValueError(
-            f"Could not determine the gridfm bus index for pypowsybl bus(es): {missing}. "
-            "These buses are isolated (no adjacent branch, generator, or load). "
-            "Ensure pp_net was produced by to_powsybl() from the same network."
-        )
+        for row, pp_branch_id in enumerate(df.index):
+            map_branch_p2g[pp_branch_id] = offset + row
+        offset += len(df)
 
     return MappingP2G(bus=map_bus_p2g, branch=map_branch_p2g, gen=map_gen_p2g)
