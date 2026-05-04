@@ -186,13 +186,13 @@ def update_powsybl(
     gfm_gen_idx = np.array([mapping_p2g.gen[i] for i in gen_id])
     pp_net.update_generators(
         id=gen_id,
-        connected=gfm_net.gens[gfm_gen_idx, GEN_STATUS].tolist(),
+        connected=gfm_net.gens[gfm_gen_idx, GEN_STATUS].astype(bool).tolist(),
         target_p=gfm_net.gens[gfm_gen_idx, PG].tolist()
     )
 
     br_id = pp_net.get_branches().index.to_numpy()
     gfm_br_idx = np.array([mapping_p2g.branch[i] for i in br_id])
-    br_status = gfm_net.branches[gfm_br_idx, BR_STATUS].tolist()
+    br_status = gfm_net.branches[gfm_br_idx, BR_STATUS].astype(bool).tolist()
     pp_net.update_branches(id=br_id, connected1=br_status, connected2=br_status)
 
     line_id = pp_net.get_lines().index.to_numpy()
