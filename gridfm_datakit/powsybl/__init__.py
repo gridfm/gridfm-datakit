@@ -45,7 +45,7 @@ from gridfm_datakit.utils.idx_cost import MODEL, NCOST, COST, POLYNOMIAL
 
 from .api import check_powsybl_available, pypowsybl
 from .convert import from_powsybl, to_powsybl, update_powsybl, ConversionOptions, ConvertedNetwork
-from .mapping import build_p2g_maps
+from .mapping import build_p2g_maps, MappingP2G
 
 
 # ---------------------------------------------------------------------------
@@ -110,12 +110,17 @@ class LoadedNetwork:
     metadata : NetworkMetadata
         Data that pypowsybl cannot represent — primarily generator cost
         coefficients.  See :class:`NetworkMetadata` for details.
+    mapping_p2g : MappingP2G
+        Pypowsybl-to-gridfm index maps built from the canonical
+        MATPOWER-representation of this network.  Valid for all perturbations
+        of the base network (topology is preserved, only values change).
     """
 
     pp_net: Any          # pypowsybl.network.Network (typed as Any to avoid
                          # hard import when pypowsybl is not installed)
     gfm_net: Network
     metadata: NetworkMetadata
+    mapping_p2g: MappingP2G
 
 
 # ---------------------------------------------------------------------------
@@ -264,25 +269,33 @@ def load_net(network_path: str) -> LoadedNetwork:
         raise FileNotFoundError(f"Network file not found: {network_path}")
 
     if path.suffix.lower() == ".m":
-        # pypowsybl cannot load MATPOWER text (.m) files directly — it only
-        # understands the binary MATPOWER (.mat) format.  We bridge the gap by
-        # loading the .m file with gridfm_datakit (which uses matpowercaseframes)
-        # and then converting the resulting Network object to pypowsybl via
-        # to_powsybl(), which internally serialises it to a temporary .mat file.
+        # pypowsybl cannot load MATPOWER text (.m) files directly.  Load with
+        # gridfm_datakit and convert to a temporary pypowsybl network so the
+        # shared from_powsybl path below can normalise the representation.
         gfm_tmp_net = load_net_from_file(str(path))
-        pp_net = to_powsybl(gfm_tmp_net).pp_net
+        pp_net_raw = to_powsybl(gfm_tmp_net).pp_net
     else:
-        # For all other formats pypowsybl can handle the file directly.
-        pp_net = pypowsybl.network.load(network_path)
+        pp_net_raw = pypowsybl.network.load(network_path)
 
-    # Convert the pypowsybl network to a gridfm_datakit Network.
+    # Build the gridfm_datakit Network from the raw pypowsybl network.
     # No gen_costs are passed, so from_powsybl injects default (0, 1, 0) costs.
-    gfm_net = from_powsybl(pp_net)
+    gfm_net = from_powsybl(pp_net_raw)
+
+    # Re-convert gfm_net to pypowsybl to get a canonical pp_net with
+    # MATPOWER-style element IDs and pre-compute the mapping.  This step is
+    # necessary because pp_net_raw may have format-specific IDs (e.g. XIIDM
+    # names) that build_p2g_maps cannot parse.
+    conv = to_powsybl(gfm_net)
 
     # metadata.gen_costs is intentionally left empty — see docstring.
     metadata = NetworkMetadata()
 
-    return LoadedNetwork(pp_net=pp_net, gfm_net=gfm_net, metadata=metadata)
+    return LoadedNetwork(
+        pp_net=conv.pp_net,
+        gfm_net=gfm_net,
+        metadata=metadata,
+        mapping_p2g=conv.mapping_p2g,
+    )
 
 
 def convert_net(network: Network, network_id: str = "network") -> LoadedNetwork:
@@ -350,9 +363,14 @@ def convert_net(network: Network, network_id: str = "network") -> LoadedNetwork:
     metadata = NetworkMetadata(gen_costs=gen_costs)
 
     # Build the pypowsybl network from the gridfm_datakit Network.
-    pp_net = to_powsybl(network, network_id=network_id).pp_net
+    conv = to_powsybl(network, network_id=network_id)
 
-    return LoadedNetwork(pp_net=pp_net, gfm_net=network, metadata=metadata)
+    return LoadedNetwork(
+        pp_net=conv.pp_net,
+        gfm_net=network,
+        metadata=metadata,
+        mapping_p2g=conv.mapping_p2g,
+    )
 
 
 __all__ = [
@@ -365,6 +383,7 @@ __all__ = [
     "update_powsybl",
     # PF solver mapping utilities
     "build_p2g_maps",
+    "MappingP2G",
     # Configuration and data classes
     "ConversionOptions",
     "ConvertedNetwork",

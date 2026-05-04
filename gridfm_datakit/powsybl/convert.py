@@ -31,7 +31,7 @@ Example:
 >>> gfm_net = from_powsybl(pp_net)
 >>> result = to_powsybl(gfm_net)
 >>> result.pp_net          # pypowsybl network
->>> result.map_bus_p2g     # bus ID → gfm index map
+>>> result.mapping_p2g.bus # bus ID → gfm index map
 """
 
 from dataclasses import dataclass
@@ -50,6 +50,7 @@ from gridfm_datakit.utils.idx_gen import GEN_BUS, GEN_STATUS, PG, VG
 from gridfm_datakit.utils.idx_cost import MODEL, STARTUP, SHUTDOWN, NCOST, COST, POLYNOMIAL
 
 from .api import check_powsybl_available, pypowsybl
+from .mapping import MappingP2G
 
 
 @dataclass
@@ -59,12 +60,12 @@ class ConversionOptions:
 
     Attributes:
         gen_costs: Generator cost coefficients. Either:
-            - dict[str, tuple[float, ...]]: Per-generator costs keyed by index
-            - tuple[float, ...]: Uniform costs for all generators
+            - Dict[str, Tuple[float, ...]]: Per-generator costs keyed by index
+            - Tuple[float, ...]: Uniform costs for all generators
             Defaults to (0.0, 1.0, 0.0) for missing entries.
     """
 
-    gen_costs: dict[str, tuple[float, ...]] | tuple[float, ...] | None = None
+    gen_costs: Dict[str, Tuple[float, ...]] | Tuple[float, ...] | None = None
 
 
 @dataclass
@@ -72,28 +73,22 @@ class ConvertedNetwork:
     """
     Result of converting a gridfm_datakit Network to a pypowsybl network.
 
-    Bundles the pypowsybl network with the three pypowsybl-to-gridfm index
-    maps so callers never need a separate build_p2g_maps call.  The maps are
-    built once here and can be reused across all perturbed variants of the same
-    base network because to_powsybl uses reverse_bus_index_mapping to produce
+    Bundles the pypowsybl network with the pypowsybl-to-gridfm index maps so
+    callers never need a separate build_p2g_maps call.  The maps are built once
+    here and can be reused across all perturbed variants of the same base
+    network because to_powsybl uses reverse_bus_index_mapping to produce
     consistent element IDs regardless of normalization history.
 
     Attributes
     ----------
     pp_net : pypowsybl.network.Network
         The converted pypowsybl network.
-    map_bus_p2g : dict[str, float]
-        ``{pp_bus_id: gfm_bus_index}`` — see build_p2g_maps.
-    map_branch_p2g : dict[str, int]
-        ``{pp_branch_id: gfm_branch_row}`` — see build_p2g_maps.
-    map_gen_p2g : dict[str, int]
-        ``{pp_gen_id: gfm_gen_row}`` — see build_p2g_maps.
+    mapping_p2g : MappingP2G
+        Bundled pypowsybl-to-gridfm index maps — see :class:`~.mapping.MappingP2G`.
     """
 
     pp_net: Any
-    map_bus_p2g: Dict[str, float]
-    map_branch_p2g: Dict[str, int]
-    map_gen_p2g: Dict[str, int]
+    mapping_p2g: MappingP2G
 
 
 def _build_gencost_matrix(
@@ -147,15 +142,13 @@ def _build_gencost_matrix(
 def update_powsybl(
     pp_net,
     gfm_net: Network,
-) -> Tuple[Dict[str, float], Dict[str, int], Dict[str, int]]:
+    mapping_p2g: MappingP2G,
+) -> None:
     """
     Update a pypowsybl network in-place from a gridfm_datakit Network.
 
     Applies bus loads, generator setpoints/status, branch connection status,
-    and line/transformer impedances from *gfm_net* to *pp_net*.  Both objects
-    must describe the same topology — i.e. *pp_net* must have been produced by
-    :func:`to_powsybl` from a network sharing ``bus_index_mapping`` /
-    ``reverse_bus_index_mapping`` with *gfm_net*.
+    and line/transformer impedances from *gfm_net* to *pp_net*.
 
     Parameters
     ----------
@@ -163,21 +156,17 @@ def update_powsybl(
         The pypowsybl network to update (mutated in-place).
     gfm_net:
         The gridfm_datakit Network whose values are written into *pp_net*.
-
-    Returns
-    -------
-    map_bus_p2g, map_branch_p2g, map_gen_p2g
-        The three pypowsybl-to-gridfm index maps built internally.
-        Returning them avoids a redundant :func:`~.mapping.build_p2g_maps`
-        call when the caller also needs them (e.g. for
-        :func:`~.preprocess_pf_res.preprocess_pp_pf_res`).
+    mapping_p2g:
+        Pre-computed pypowsybl-to-gridfm index maps.  Must have been built
+        from the base network that *gfm_net* descends from (perturbations
+        preserve element identity, so the base mapping stays valid).
     """
-    from .mapping import build_p2g_maps
-
-    map_bus_p2g, map_branch_p2g, map_gen_p2g = build_p2g_maps(gfm_net, pp_net)
+    check_powsybl_available()
+    if not isinstance(pp_net, pypowsybl.network.Network):
+        raise ValueError("pp_net must be a pypowsybl Network")
 
     bus_id = pp_net.get_buses().index.to_numpy()
-    gfm_bus_idx = np.array([int(map_bus_p2g[i]) for i in bus_id])
+    gfm_bus_idx = np.array([int(mapping_p2g.bus[i]) for i in bus_id])
     pp_net.update_loads(
         id=bus_id,
         p=gfm_net.buses[gfm_bus_idx, PD].tolist(),
@@ -185,7 +174,7 @@ def update_powsybl(
     )
 
     gen_id = pp_net.get_generators().index.to_numpy()
-    gfm_gen_idx = np.array([map_gen_p2g[i] for i in gen_id])
+    gfm_gen_idx = np.array([mapping_p2g.gen[i] for i in gen_id])
     pp_net.update_generators(
         id=gen_id,
         connected=gfm_net.gens[gfm_gen_idx, GEN_STATUS].tolist(),
@@ -194,12 +183,12 @@ def update_powsybl(
     )
 
     br_id = pp_net.get_branches().index.to_numpy()
-    gfm_br_idx = np.array([map_branch_p2g[i] for i in br_id])
+    gfm_br_idx = np.array([mapping_p2g.branch[i] for i in br_id])
     br_status = gfm_net.branches[gfm_br_idx, BR_STATUS].tolist()
     pp_net.update_branches(id=br_id, connected1=br_status, connected2=br_status)
 
     line_id = pp_net.get_lines().index.to_numpy()
-    gfm_line_idx = np.array([map_branch_p2g[i] for i in line_id])
+    gfm_line_idx = np.array([mapping_p2g.branch[i] for i in line_id])
     pp_net.update_lines(
         id=line_id,
         r=gfm_net.branches[gfm_line_idx, BR_R].tolist(),
@@ -207,14 +196,12 @@ def update_powsybl(
     )
 
     wt2_id = pp_net.get_2_windings_transformers().index.to_numpy()
-    gfm_wt2_idx = np.array([map_branch_p2g[i] for i in wt2_id])
+    gfm_wt2_idx = np.array([mapping_p2g.branch[i] for i in wt2_id])
     pp_net.update_2_windings_transformers(
         id=wt2_id,
         r=gfm_net.branches[gfm_wt2_idx, BR_R].tolist(),
         x=gfm_net.branches[gfm_wt2_idx, BR_X].tolist(),
     )
-
-    return map_bus_p2g, map_branch_p2g, map_gen_p2g
 
 
 def from_powsybl(
@@ -322,7 +309,7 @@ def to_powsybl(
         >>> network = load_net_from_pglib("case14_ieee")
         >>> result = to_powsybl(network)
         >>> result.pp_net           # pypowsybl network
-        >>> result.map_bus_p2g      # reusable for all perturbations of network
+        >>> result.mapping_p2g.bus  # reusable for all perturbations of network
     """
     check_powsybl_available()
 
@@ -364,11 +351,6 @@ def to_powsybl(
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
     from .mapping import build_p2g_maps
-    map_bus_p2g, map_branch_p2g, map_gen_p2g = build_p2g_maps(network, pp_net)
+    mapping_p2g = build_p2g_maps(network, pp_net)
 
-    return ConvertedNetwork(
-        pp_net=pp_net,
-        map_bus_p2g=map_bus_p2g,
-        map_branch_p2g=map_branch_p2g,
-        map_gen_p2g=map_gen_p2g,
-    )
+    return ConvertedNetwork(pp_net=pp_net, mapping_p2g=mapping_p2g)

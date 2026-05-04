@@ -38,7 +38,6 @@ import sys
 from gridfm_datakit.network import Network
 from gridfm_datakit.process.process_network import init_julia
 from gridfm_datakit.utils.random_seed import custom_seed
-from gridfm_datakit.powsybl.convert import to_powsybl
 
 def _setup_environment(
     config: Union[str, Dict[str, Any], NestedNamespace],
@@ -180,6 +179,7 @@ def _prepare_network_and_scenarios(
     elif args.network.source == "powsybl":
         loaded_net = powsybl.load_net(args.network.file)
         meta["pp_net"] = loaded_net.pp_net
+        meta["mapping_p2g"] = loaded_net.mapping_p2g
         net = loaded_net.gfm_net
     else:
         raise ValueError("Invalid grid source!")

@@ -8,24 +8,22 @@ Compatible with the existing pipeline.
 from typing import Dict, Any
 import pypowsybl as pp
 
+from gridfm_datakit.powsybl.mapping import MappingP2G
+
 
 def preprocess_pp_pf_res(
     pp_net: "pp.network.Network",
     solve_time: float,
     pf_metadata: list,
-    map_bus_p2g,
-    map_branch_p2g,
-    map_gen_p2g
+    mapping_p2g: MappingP2G,
 ) -> Dict[Any, Any]:
     """ Format pypowsybl power flow results for the pf_post_process function.
 
     Args:
         pp_net: PyPowSyBl network. It contains power flow results
         solve_time: power flow solving time
-        pf_metadaa: power flow metadata
-        map_bus_p2g: mapping of bus indexes from powsybl to gridfm
-        map_branch_p2g: mapping of branch indexes from powsybl to gridfm
-        map_gen_p2g: mapping of generator indexes from powsybl to gridfm
+        pf_metadata: power flow metadata
+        mapping_p2g: bundled pypowsybl-to-gridfm index maps
 
     Returns:
         Power flow results in a nested Dict format, similar to PowerModel's power flow results
@@ -47,11 +45,11 @@ def preprocess_pp_pf_res(
     # Filling the results
     pp_pf_res["solution"] = {
         "baseMVA": pp_net.nominal_apparent_power,
-        'gen': _format_gens_res(pp_net, map_gen_p2g),
-        'branch': _format_branch_res(pp_net, map_branch_p2g),
+        'gen': _format_gens_res(pp_net, mapping_p2g.gen),
+        'branch': _format_branch_res(pp_net, mapping_p2g.branch),
         'multiinfrastructure': None, # TODO check whether really not needed
         'multinetwork': None, # TODO check whether really not needed
-        'bus': _format_buses_res(pp_net, map_bus_p2g),
+        'bus': _format_buses_res(pp_net, mapping_p2g.bus),
         'per_unit': pp_net.per_unit,
         "pf": _is_power_flow_computed(pf_status)
     }
@@ -62,7 +60,7 @@ def preprocess_pp_pf_res(
     # Adding slack to generator of the slack bus
     # This is to conform with the current implementation of the pf_post_processing function.
     # Active power mismatch is counted separately
-    pp_pf_res = _add_slack_results(pp_net, pp_pf_res, pf_metadata, map_gen_p2g)
+    pp_pf_res = _add_slack_results(pp_net, pp_pf_res, pf_metadata, mapping_p2g.gen)
     return pp_pf_res
 
 def _format_gens_res(

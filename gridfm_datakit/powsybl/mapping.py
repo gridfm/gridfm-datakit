@@ -43,12 +43,32 @@ Public API
 
 import re
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import Dict, Tuple
 
 from gridfm_datakit.network import Network
 from gridfm_datakit.utils.idx_brch import F_BUS, T_BUS
 
 from .api import check_powsybl_available
+
+
+@dataclass
+class MappingP2G:
+    """Index maps from pypowsybl element IDs to gridfm row indices.
+
+    Attributes
+    ----------
+    bus : Dict[str, float]
+        ``{pp_bus_id: gfm_bus_index}``
+    branch : Dict[str, int]
+        ``{pp_branch_id: gfm_branch_row}``
+    gen : Dict[str, int]
+        ``{pp_gen_id: gfm_gen_row}``
+    """
+
+    bus: Dict[str, float]
+    branch: Dict[str, int]
+    gen: Dict[str, int]
 
 
 # ---------------------------------------------------------------------------
@@ -98,7 +118,7 @@ def _parse_gen_bus(pp_gen_id: str) -> int:
 def build_p2g_maps(
     network: Network,
     pp_net,
-) -> Tuple[Dict[str, float], Dict[str, int], Dict[str, int]]:
+) -> MappingP2G:
     """Build pypowsybl-to-gridfm ID maps in O(n) by parsing pypowsybl element IDs.
 
     When a gridfm :class:`~gridfm_datakit.network.Network` is converted to
@@ -121,12 +141,8 @@ def build_p2g_maps(
 
     Returns
     -------
-    map_bus_p2g : Dict[str, float]
-        ``{pp_bus_id: gfm_bus_index}``
-    map_branch_p2g : Dict[str, int]
-        ``{pp_branch_id: gfm_branch_row}``
-    map_gen_p2g : Dict[str, int]
-        ``{pp_gen_id: gfm_gen_row}``
+    MappingP2G
+        Dataclass bundling the three maps: ``bus``, ``branch``, and ``gen``.
 
     Raises
     ------
@@ -142,7 +158,10 @@ def build_p2g_maps(
     >>>
     >>> net = load_net_from_pglib("case14_ieee")
     >>> result = to_powsybl(net)
-    >>> map_bus_p2g, map_branch_p2g, map_gen_p2g = build_p2g_maps(net, result.pp_net)
+    >>> mapping = build_p2g_maps(net, result.pp_net)
+    >>> mapping.bus    # pp_bus_id → gfm index
+    >>> mapping.branch # pp_branch_id → gfm row
+    >>> mapping.gen    # pp_gen_id → gfm row
     """
     check_powsybl_available()
 
@@ -224,4 +243,4 @@ def build_p2g_maps(
             "Ensure pp_net was produced by to_powsybl() from the same network."
         )
 
-    return map_bus_p2g, map_branch_p2g, map_gen_p2g
+    return MappingP2G(bus=map_bus_p2g, branch=map_branch_p2g, gen=map_gen_p2g)
