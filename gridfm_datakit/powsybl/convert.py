@@ -165,7 +165,6 @@ def update_powsybl(
     if not isinstance(pp_net, pypowsybl.network.Network):
         raise ValueError("pp_net must be a pypowsybl Network")
 
-    # For loads -> bus_id column to have the bus_id
     loads = pp_net.get_loads()
     load_id = loads.index.to_numpy()
     bus_id = loads['bus_id'].to_numpy()
