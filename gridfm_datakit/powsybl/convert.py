@@ -44,9 +44,9 @@ import numpy as np
 import scipy.io
 
 from gridfm_datakit.network import Network
-from gridfm_datakit.utils.idx_bus import VMAX, VMIN, BUS_I, PD, QD
+from gridfm_datakit.utils.idx_bus import VM, VMAX, VMIN, BUS_I, PD, QD
 from gridfm_datakit.utils.idx_brch import F_BUS, T_BUS, BR_STATUS, BR_R, BR_X
-from gridfm_datakit.utils.idx_gen import GEN_BUS, GEN_STATUS, PG, VG
+from gridfm_datakit.utils.idx_gen import GEN_BUS, GEN_STATUS, PG
 from gridfm_datakit.utils.idx_cost import MODEL, STARTUP, SHUTDOWN, NCOST, COST, POLYNOMIAL
 
 from .api import check_powsybl_available, pypowsybl
@@ -175,13 +175,19 @@ def update_powsybl(
         q=gfm_net.buses[gfm_bus_idx, QD].tolist(),
     )
 
+    bus_id = pp_net.get_buses().index.to_numpy()
+    gfm_bus_idx = np.array([int(mapping_p2g.bus[i]) for i in bus_id])
+    pp_net.update_buses(
+        id=bus_id,
+        v_mag=gfm_net.buses[gfm_bus_idx, VM].tolist(),
+    )
+
     gen_id = pp_net.get_generators().index.to_numpy()
     gfm_gen_idx = np.array([mapping_p2g.gen[i] for i in gen_id])
     pp_net.update_generators(
         id=gen_id,
         connected=gfm_net.gens[gfm_gen_idx, GEN_STATUS].tolist(),
-        target_p=gfm_net.gens[gfm_gen_idx, PG].tolist(),
-        vmag=gfm_net.gens[gfm_gen_idx, VG].tolist(),
+        target_p=gfm_net.gens[gfm_gen_idx, PG].tolist()
     )
 
     br_id = pp_net.get_branches().index.to_numpy()
