@@ -421,8 +421,10 @@ class Network:
         gens_on = self.gens[self.idx_gens_in_service]
         gen_count = np.bincount(gens_on[:, GEN_BUS].astype(int), minlength=n_buses)
 
-        # Boolean mask: PV buses with no in-service generator
-        pv_no_gen = (self.buses[:, BUS_TYPE] == PV) & (gen_count == 0)
+        # Boolean mask: PV buses with no in-service generator.
+        # Index gen_count by bus ID (not row index) to handle non-sorted bus ordering.
+        bus_ids = self.buses[:, BUS_I].astype(int)
+        pv_no_gen = (self.buses[:, BUS_TYPE] == PV) & (gen_count[bus_ids] == 0)
 
         # Set them to PQ
         self.buses[pv_no_gen, BUS_TYPE] = PQ
