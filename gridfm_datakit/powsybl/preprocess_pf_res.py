@@ -32,7 +32,7 @@ def preprocess_pp_pf_res(
     """
     # Retrieve computation status
     pf_status = pf_metadata[0].status_text
-    
+
     # Check whether the power flow computation is susscefful and raise a error if not
     if not _is_power_flow_computed(pf_status):
         raise ValueError(f'Power flow computation failed. The returned power flow status:{pf_status}')
@@ -54,13 +54,13 @@ def preprocess_pp_pf_res(
         'bus': _format_buses_res(pp_net, map_bus_p2g),
         'per_unit': pp_net.per_unit,
         "pf": _is_power_flow_computed(pf_status)
-        }
+    }
     pp_pf_res['solve_time'] = solve_time
-    
+
     pp_net.per_unit = initial_per_unit_status
 
     # Adding slack to generator of the slack bus
-    # This is to conform with the current implementation of the pf_post_processing function. 
+    # This is to conform with the current implementation of the pf_post_processing function.
     # Active power mismatch is counted separately
     pp_pf_res = _add_slack_results(pp_net, pp_pf_res, pf_metadata, map_gen_p2g)
     return pp_pf_res
@@ -143,7 +143,7 @@ def _add_slack_results(pp_net, pf_res, pf_metadata, map_gen_p2g):
 
     slack_bus = pf_metadata[0].slack_bus_results[0].id
     slack_res = pf_metadata[0].slack_bus_results[0].active_power_mismatch
-    
+
     df_gens = pp_net.get_generators()
     slack_gen_id = df_gens[df_gens['bus_id'] == slack_bus].index[0] # assigning slack results to the first generator attached to the slack bus.
 

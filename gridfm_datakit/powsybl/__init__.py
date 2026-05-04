@@ -44,7 +44,7 @@ from gridfm_datakit.network import Network, load_net_from_file
 from gridfm_datakit.utils.idx_cost import MODEL, NCOST, COST, POLYNOMIAL
 
 from .api import check_powsybl_available, pypowsybl
-from .convert import from_powsybl, to_powsybl, ConversionOptions, ConvertedNetwork
+from .convert import from_powsybl, to_powsybl, update_powsybl, ConversionOptions, ConvertedNetwork
 from .mapping import build_p2g_maps
 
 
@@ -362,6 +362,7 @@ __all__ = [
     # Lower-level conversion primitives (for advanced use)
     "from_powsybl",
     "to_powsybl",
+    "update_powsybl",
     # PF solver mapping utilities
     "build_p2g_maps",
     # Configuration and data classes

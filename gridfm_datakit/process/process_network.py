@@ -10,7 +10,7 @@ import time
 import numpy as np
 from importlib import resources
 import pypowsybl as pp
-from gridfm_datakit.powsybl.convert import to_powsybl
+from gridfm_datakit.powsybl.convert import update_powsybl
 from gridfm_datakit.powsybl.preprocess_pf_res import preprocess_pp_pf_res
 from gridfm_datakit.powsybl.utils.lf_parameters import get_default_lf_parameters
 from gridfm_datakit.utils.column_names import (
@@ -836,9 +836,7 @@ def process_scenario_pf_mode(
     jl: Any,
     pf_solver: str = 'powermodel',
     *,
-    map_bus_p2g: Optional[Dict] = None,
-    map_branch_p2g: Optional[Dict] = None,
-    map_gen_p2g: Optional[Dict] = None,
+    meta: Optional[Dict] = None,
 ) -> List[np.ndarray]:
     """Processes a load scenario in PF mode.
 
@@ -884,16 +882,9 @@ def process_scenario_pf_mode(
 
     Keyword-only arguments (only required when ``pf_solver='powsybl'``)
     -------------------------------------------------------------------
-    map_bus_p2g:
-        ``{pp_bus_id: gfm_bus_index}`` — pypowsybl-to-gridfm bus map
-        returned by :func:`~gridfm_datakit.powsybl.mapping.build_p2g_maps`.
-        Must be pre-computed on the base network and reused across
-        scenarios; perturbations preserve element identity so the base
-        map stays valid.
-    map_branch_p2g:
-        ``{pp_branch_id: gfm_branch_row}`` — pypowsybl-to-gridfm branch map.
-    map_gen_p2g:
-        ``{pp_gen_id: gfm_gen_row}`` — pypowsybl-to-gridfm generator map.
+    meta:
+    Optional dictionary containing metadata for PowSyBl processing, with keys:
+        - pp_net: the PowSyBl network.
 
     Returns
     -------
@@ -960,17 +951,19 @@ def process_scenario_pf_mode(
                     )
                 continue
 
-        if pf_solver == 'powsybl': # TODO: factorizable
-            pp_perturbation = to_powsybl(perturbation).pp_net
+        if pf_solver == 'powsybl':
+            pp_pert: pp.network.Network = copy.deepcopy(meta["pp_net"])
+            map_bus_p2g, map_branch_p2g, map_gen_p2g = update_powsybl(pp_pert, perturbation)
+
             res_dcpf = None
             if include_dc_res:
                 try:
                     start_time = time.perf_counter()
-                    lf_parameters = get_default_lf_parameters() # 
-                    dcpf_metadata = pp.loadflow.run_dc(pp_perturbation, lf_parameters)
+                    lf_parameters = get_default_lf_parameters() #
+                    dcpf_metadata = pp.loadflow.run_dc(pp_pert, lf_parameters)
                     end_time = time.perf_counter()
                     solve_time = end_time - start_time
-                    res_dcpf = preprocess_pp_pf_res(pp_perturbation, solve_time, dcpf_metadata, map_bus_p2g, map_branch_p2g, map_gen_p2g)
+                    res_dcpf = preprocess_pp_pf_res(pp_pert, solve_time, dcpf_metadata, map_bus_p2g, map_branch_p2g, map_gen_p2g)
 
                 except Exception as e:
                     with open(error_log_file, "a") as f:
@@ -981,17 +974,17 @@ def process_scenario_pf_mode(
             try:
                 start_time = time.perf_counter()
                 lf_parameters = get_default_lf_parameters()
-                pf_metadata = pp.loadflow.run_ac(pp_perturbation, lf_parameters)
+                pf_metadata = pp.loadflow.run_ac(pp_pert, lf_parameters)
                 end_time = time.perf_counter()
                 solve_time = end_time - start_time
-                res = preprocess_pp_pf_res(pp_perturbation, solve_time, pf_metadata, map_bus_p2g, map_branch_p2g, map_gen_p2g)
+                res = preprocess_pp_pf_res(pp_pert, solve_time, pf_metadata, map_bus_p2g, map_branch_p2g, map_gen_p2g)
             except Exception as e:
                 with open(error_log_file, "a") as f:
                     f.write(
                         f"Caught an exception at scenario {scenario_index} when solving in run_pf function with PowSyBl solver: {e}\n",
                     )
                 continue
-            
+
         # Append processed power flow data
         pf_data = pf_post_processing(
             scenario_index,

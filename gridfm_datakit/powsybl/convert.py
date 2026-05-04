@@ -38,16 +38,15 @@ from dataclasses import dataclass
 from pathlib import Path
 import shutil
 import tempfile
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 
 import numpy as np
 import scipy.io
 
 from gridfm_datakit.network import Network
-from gridfm_datakit.utils.idx_bus import VMAX, VMIN
-from gridfm_datakit.utils.idx_brch import F_BUS, T_BUS
-from gridfm_datakit.utils.idx_gen import GEN_BUS
-from gridfm_datakit.utils.idx_bus import BUS_I
+from gridfm_datakit.utils.idx_bus import VMAX, VMIN, BUS_I, PD, QD
+from gridfm_datakit.utils.idx_brch import F_BUS, T_BUS, BR_STATUS, BR_R, BR_X
+from gridfm_datakit.utils.idx_gen import GEN_BUS, GEN_STATUS, PG, VG
 from gridfm_datakit.utils.idx_cost import MODEL, STARTUP, SHUTDOWN, NCOST, COST, POLYNOMIAL
 
 from .api import check_powsybl_available, pypowsybl
@@ -143,6 +142,79 @@ def _build_gencost_matrix(
             gencost_matrix[i, COST + j] = coeff
 
     return gencost_matrix
+
+
+def update_powsybl(
+    pp_net,
+    gfm_net: Network,
+) -> Tuple[Dict[str, float], Dict[str, int], Dict[str, int]]:
+    """
+    Update a pypowsybl network in-place from a gridfm_datakit Network.
+
+    Applies bus loads, generator setpoints/status, branch connection status,
+    and line/transformer impedances from *gfm_net* to *pp_net*.  Both objects
+    must describe the same topology — i.e. *pp_net* must have been produced by
+    :func:`to_powsybl` from a network sharing ``bus_index_mapping`` /
+    ``reverse_bus_index_mapping`` with *gfm_net*.
+
+    Parameters
+    ----------
+    pp_net:
+        The pypowsybl network to update (mutated in-place).
+    gfm_net:
+        The gridfm_datakit Network whose values are written into *pp_net*.
+
+    Returns
+    -------
+    map_bus_p2g, map_branch_p2g, map_gen_p2g
+        The three pypowsybl-to-gridfm index maps built internally.
+        Returning them avoids a redundant :func:`~.mapping.build_p2g_maps`
+        call when the caller also needs them (e.g. for
+        :func:`~.preprocess_pf_res.preprocess_pp_pf_res`).
+    """
+    from .mapping import build_p2g_maps
+
+    map_bus_p2g, map_branch_p2g, map_gen_p2g = build_p2g_maps(gfm_net, pp_net)
+
+    bus_id = pp_net.get_buses().index.to_numpy()
+    gfm_bus_idx = np.array([int(map_bus_p2g[i]) for i in bus_id])
+    pp_net.update_loads(
+        id=bus_id,
+        p=gfm_net.buses[gfm_bus_idx, PD].tolist(),
+        q=gfm_net.buses[gfm_bus_idx, QD].tolist(),
+    )
+
+    gen_id = pp_net.get_generators().index.to_numpy()
+    gfm_gen_idx = np.array([map_gen_p2g[i] for i in gen_id])
+    pp_net.update_generators(
+        id=gen_id,
+        connected=gfm_net.gens[gfm_gen_idx, GEN_STATUS].tolist(),
+        target_p=gfm_net.gens[gfm_gen_idx, PG].tolist(),
+        vmag=gfm_net.gens[gfm_gen_idx, VG].tolist(),
+    )
+
+    br_id = pp_net.get_branches().index.to_numpy()
+    gfm_br_idx = np.array([map_branch_p2g[i] for i in br_id])
+    br_status = gfm_net.branches[gfm_br_idx, BR_STATUS].tolist()
+    pp_net.update_branches(id=br_id, connected1=br_status, connected2=br_status)
+
+    line_id = pp_net.get_lines().index.to_numpy()
+    gfm_line_idx = np.array([map_branch_p2g[i] for i in line_id])
+    pp_net.update_lines(
+        id=line_id,
+        r=gfm_net.branches[gfm_line_idx, BR_R].tolist(),
+        x=gfm_net.branches[gfm_line_idx, BR_X].tolist(),
+    )
+
+    wt2_id = pp_net.get_2_windings_transformers().index.to_numpy()
+    gfm_wt2_idx = np.array([map_branch_p2g[i] for i in wt2_id])
+    pp_net.update_2_windings_transformers(
+        id=wt2_id,
+        r=gfm_net.branches[gfm_wt2_idx, BR_R].tolist(),
+        x=gfm_net.branches[gfm_wt2_idx, BR_X].tolist(),
+    )
+
+    return map_bus_p2g, map_branch_p2g, map_gen_p2g
 
 
 def from_powsybl(
