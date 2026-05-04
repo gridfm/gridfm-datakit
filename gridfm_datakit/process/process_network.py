@@ -930,7 +930,7 @@ def process_scenario_pf_mode(
 
     # to get PF points that can violate some OPF inequality constraints (to train PF solvers that can handle points outside of normal operating limits), we apply the topology perturbation after OPF.
     # The setpoints are then no longer adapted to the new topology, and might lead to e.g. abranch overload or a voltage magnitude violation once we drop an element.
-    for perturbation in perturbations:
+    for pert_index, perturbation in enumerate(perturbations):
         if pf_solver == 'powermodel':
             res_dcpf = None
             if include_dc_res:
@@ -953,19 +953,23 @@ def process_scenario_pf_mode(
 
         if pf_solver == 'powsybl':
             import pypowsybl as pp
-            pp_pert = copy.deepcopy(meta["pp_net"])
+            variant_id = f"scenario_{scenario_index}_perturbation_{pert_index}"
+            pp_net = meta["pp_net"]
+            base_variant_id = pp_net.get_working_variant_id()
+            pp_net.clone_variant(base_variant_id, variant_id)
+            pp_net.set_working_variant(variant_id)
             mapping_p2g = meta["mapping_p2g"]
-            update_powsybl(pp_pert, perturbation, mapping_p2g)
+            update_powsybl(pp_net, perturbation, mapping_p2g)
 
             res_dcpf = None
             if include_dc_res:
                 try:
                     start_time = time.perf_counter()
                     lf_parameters = get_default_lf_parameters()
-                    dcpf_metadata = pp.loadflow.run_dc(pp_pert, lf_parameters)
+                    dcpf_metadata = pp.loadflow.run_dc(pp_net, lf_parameters)
                     end_time = time.perf_counter()
                     solve_time = end_time - start_time
-                    res_dcpf = preprocess_pp_pf_res(pp_pert, solve_time, dcpf_metadata, mapping_p2g)
+                    res_dcpf = preprocess_pp_pf_res(pp_net, solve_time, dcpf_metadata, mapping_p2g)
 
                 except Exception as e:
                     with open(error_log_file, "a") as f:
@@ -976,16 +980,17 @@ def process_scenario_pf_mode(
             try:
                 start_time = time.perf_counter()
                 lf_parameters = get_default_lf_parameters()
-                pf_metadata = pp.loadflow.run_ac(pp_pert, lf_parameters)
+                pf_metadata = pp.loadflow.run_ac(pp_net, lf_parameters)
                 end_time = time.perf_counter()
                 solve_time = end_time - start_time
-                res = preprocess_pp_pf_res(pp_pert, solve_time, pf_metadata, mapping_p2g)
+                res = preprocess_pp_pf_res(pp_net, solve_time, pf_metadata, mapping_p2g)
             except Exception as e:
                 with open(error_log_file, "a") as f:
                     f.write(
                         f"Caught an exception at scenario {scenario_index} when solving in run_pf function with PowSyBl solver: {e}\n",
                     )
                 continue
+            pp_net.set_working_variant(base_variant_id)
 
         # Append processed power flow data
         pf_data = pf_post_processing(
