@@ -36,11 +36,17 @@ Network's ``gencost`` matrix are extracted and returned inside the
 those costs separately if they need to survive a round-trip through pypowsybl.
 """
 
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
-from gridfm_datakit.network import Network, load_net_from_file
+import numpy as np
+import pandas as pd
+import scipy.io
+from matpowercaseframes import CaseFrames
+
+from gridfm_datakit.network import Network
 from gridfm_datakit.utils.idx_cost import MODEL, NCOST, COST, POLYNOMIAL
 
 from .api import check_powsybl_available, pypowsybl
@@ -269,32 +275,36 @@ def load_net(network_path: str) -> LoadedNetwork:
         raise FileNotFoundError(f"Network file not found: {network_path}")
 
     if path.suffix.lower() == ".m":
-        # pypowsybl cannot load MATPOWER text (.m) files directly.  Load with
-        # gridfm_datakit and convert to a temporary pypowsybl network so the
-        # shared from_powsybl path below can normalise the representation.
-        gfm_tmp_net = load_net_from_file(str(path))
-        pp_net_raw = to_powsybl(gfm_tmp_net).pp_net
+        # pypowsybl cannot load MATPOWER text (.m) files directly.
+        # Parse with CaseFrames and write a temporary binary .mat file
+        # so pypowsybl gets the original bus numbers and GEN-{bus}[#k] IDs.
+        mpc_frames = CaseFrames(str(path))
+        mpc = {
+            key: getattr(mpc_frames, key).to_numpy()
+                 if isinstance(getattr(mpc_frames, key), pd.DataFrame)
+                 else np.array([[float(getattr(mpc_frames, key))]])
+                 if key == "baseMVA"
+                 else getattr(mpc_frames, key)
+            for key in mpc_frames._attributes
+        }
+        with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmp:
+            mat_path = tmp.name
+        try:
+            scipy.io.savemat(mat_path, {"mpc": mpc})
+            pp_net = pypowsybl.network.load(mat_path, {"matpower.import.ignore-base-voltage": "false"})
+        finally:
+            Path(mat_path).unlink()
     else:
-        pp_net_raw = pypowsybl.network.load(network_path)
+        pp_net = pypowsybl.network.load(str(path))
 
-    # Build the gridfm_datakit Network from the raw pypowsybl network.
-    # No gen_costs are passed, so from_powsybl injects default (0, 1, 0) costs.
-    gfm_net = from_powsybl(pp_net_raw)
-
-    # Re-convert gfm_net to pypowsybl to get a canonical pp_net with
-    # MATPOWER-style element IDs and pre-compute the mapping.  This step is
-    # necessary because pp_net_raw may have format-specific IDs (e.g. XIIDM
-    # names) that build_p2g_maps cannot parse.
-    conv = to_powsybl(gfm_net)
-
-    # metadata.gen_costs is intentionally left empty — see docstring.
-    metadata = NetworkMetadata()
+    gfm_net = from_powsybl(pp_net)
+    mapping_p2g = build_p2g_maps(gfm_net, pp_net)
 
     return LoadedNetwork(
-        pp_net=conv.pp_net,
+        pp_net=pp_net,
         gfm_net=gfm_net,
-        metadata=metadata,
-        mapping_p2g=conv.mapping_p2g,
+        metadata=NetworkMetadata(),
+        mapping_p2g=mapping_p2g,
     )
 
 
