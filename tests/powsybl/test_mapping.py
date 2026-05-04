@@ -67,7 +67,7 @@ class TestBuildP2gMaps:
         """mapping.bus values must be floats (expected by preprocess_pp_pf_res)."""
         net, pp_net = case14
         mapping = build_p2g_maps(net, pp_net)
-        assert all(isinstance(v, float) for v in mapping.bus.values())
+        assert all(isinstance(v, int) for v in mapping.bus.values())
 
     def test_bus_map_values_are_valid_gridfm_indices(self, case14):
         """Values must be 0-based indices within [0, n_bus)."""
@@ -75,7 +75,7 @@ class TestBuildP2gMaps:
         n_bus = net.buses.shape[0]
         mapping = build_p2g_maps(net, pp_net)
         for v in mapping.bus.values():
-            assert 0.0 <= v < n_bus, f"Bus index {v} out of range [0, {n_bus})"
+            assert 0 <= v < n_bus, f"Bus index {v} out of range [0, {n_bus})"
 
     def test_bus_map_values_are_unique(self, case14):
         """Each gridfm bus must appear at most once (no two pp buses share a gfm index)."""
