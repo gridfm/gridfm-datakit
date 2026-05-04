@@ -275,9 +275,6 @@ def load_net(network_path: str) -> LoadedNetwork:
         raise FileNotFoundError(f"Network file not found: {network_path}")
 
     if path.suffix.lower() == ".m":
-        # pypowsybl cannot load MATPOWER text (.m) files directly.
-        # Parse with CaseFrames and write a temporary binary .mat file
-        # so pypowsybl gets the original bus numbers and GEN-{bus}[#k] IDs.
         mpc_frames = CaseFrames(str(path))
         mpc = {
             key: getattr(mpc_frames, key).to_numpy()
