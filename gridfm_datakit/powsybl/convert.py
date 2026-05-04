@@ -165,6 +165,9 @@ def update_powsybl(
     if not isinstance(pp_net, pypowsybl.network.Network):
         raise ValueError("pp_net must be a pypowsybl Network")
 
+    initial_per_unit_status = pp_net.per_unit
+
+    pp_net.per_unit = False
     loads = pp_net.get_loads()
     load_id = loads.index.to_numpy()
     bus_id = loads['bus_id'].to_numpy()
@@ -175,6 +178,7 @@ def update_powsybl(
         q=gfm_net.buses[gfm_bus_idx, QD].tolist(),
     )
 
+    pp_net.per_unit = True
     bus_id = pp_net.get_buses().index.to_numpy()
     gfm_bus_idx = np.array([int(mapping_p2g.bus[i]) for i in bus_id])
     pp_net.update_buses(
@@ -182,6 +186,7 @@ def update_powsybl(
         v_mag=gfm_net.buses[gfm_bus_idx, VM].tolist(),
     )
 
+    pp_net.per_unit = False
     gen_id = pp_net.get_generators().index.to_numpy()
     gfm_gen_idx = np.array([mapping_p2g.gen[i] for i in gen_id])
     pp_net.update_generators(
@@ -195,6 +200,7 @@ def update_powsybl(
     br_status = gfm_net.branches[gfm_br_idx, BR_STATUS].astype(bool).tolist()
     pp_net.update_branches(id=br_id, connected1=br_status, connected2=br_status)
 
+    pp_net.per_unit = True
     line_id = pp_net.get_lines().index.to_numpy()
     gfm_line_idx = np.array([mapping_p2g.branch[i] for i in line_id])
     pp_net.update_lines(
@@ -211,6 +217,7 @@ def update_powsybl(
         x=gfm_net.branches[gfm_wt2_idx, BR_X].tolist(),
     )
 
+    pp_net.per_unit = initial_per_unit_status
 
 def from_powsybl(
     pp_net,
