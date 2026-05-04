@@ -22,7 +22,7 @@ import numpy as np
 
 from gridfm_datakit.powsybl.api import is_powsybl_available
 from gridfm_datakit.network import Network
-from gridfm_datakit.utils.idx_cost import MODEL, NCOST, COST, POLYNOMIAL
+from gridfm_datakit.utils.idx_cost import MODEL, POLYNOMIAL
 
 pytestmark = pytest.mark.skipif(
     not is_powsybl_available(),
