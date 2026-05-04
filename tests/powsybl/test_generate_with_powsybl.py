@@ -19,7 +19,7 @@ def config_ieee14_m():
     """Load configuration that uses IEEE 14 bus network in .m format."""
     import yaml
     
-    configs_dir = Path(__file__).parent/"data"/"configs"
+    configs_dir = Path(__file__).parent/"configs"
     with open(configs_dir/"config_test_powsybl_IEEE14_m.yaml", 'r') as f:
         config = yaml.safe_load(f)
     return config
@@ -29,7 +29,7 @@ def config_ieee14_mat():
     """Load configuration that uses IEEE 14 bus network in .mat format."""
     import yaml
     
-    configs_dir = Path(__file__).parent/"data"/"configs"
+    configs_dir = Path(__file__).parent/"configs"
     with open(configs_dir/"config_test_powsybl_IEEE14_mat.yaml", 'r') as f:
         config = yaml.safe_load(f)
     return config
@@ -39,7 +39,7 @@ def config_ieee14_raw():
     """Load configuration that uses IEEE 14 bus network in .raw format."""
     import yaml
     
-    configs_dir = Path(__file__).parent/"data"/"configs"
+    configs_dir = Path(__file__).parent/"configs"
     with open(configs_dir/"config_test_powsybl_IEEE14_raw.yaml", 'r') as f:
         config = yaml.safe_load(f)
     return config
@@ -49,7 +49,7 @@ def config_ieee14_xiidm():
     """Load configuration that uses IEEE 14 bus network in .xiidm format."""
     import yaml
     
-    configs_dir = Path(__file__).parent/"data"/"configs"
+    configs_dir = Path(__file__).parent/"configs"
     with open(configs_dir/"config_test_powsybl_IEEE14_xiidm.yaml", 'r') as f:
         config = yaml.safe_load(f)
     return config
@@ -59,7 +59,7 @@ def config_ieee14_cgmes():
     """Load configuration that uses IEEE 14 bus network in cgmes format."""
     import yaml
     
-    configs_dir = Path(__file__).parent/"data"/"configs"
+    configs_dir = Path(__file__).parent/"configs"
     with open(configs_dir/"config_test_powsybl_IEEE14_zip.yaml", 'r') as f:
         config = yaml.safe_load(f)
     return config
