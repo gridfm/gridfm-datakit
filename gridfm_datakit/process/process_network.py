@@ -654,8 +654,14 @@ def pf_post_processing(
     Pg_bus = np.bincount(gen_bus, weights=pg_gen, minlength=n_buses)
     Qg_bus = np.bincount(gen_bus, weights=qg_gen, minlength=n_buses)
 
-    assert np.all(Pg_bus[net.buses[:, BUS_TYPE] == PQ] == 0)
-    assert np.all(Qg_bus[net.buses[:, BUS_TYPE] == PQ] == 0)
+    # Pg_bus / Qg_bus are indexed by 0-based bus INDEX; net.buses rows may be
+    # in a different order (pypowsybl does not guarantee sorted bus export).
+    # Build a bus-type array indexed by bus index so the mask aligns correctly.
+    bus_type_by_idx = np.zeros(n_buses)
+    bus_type_by_idx[net.buses[:, BUS_I].astype(int)] = net.buses[:, BUS_TYPE]
+
+    assert np.all(Pg_bus[bus_type_by_idx == PQ] == 0)
+    assert np.all(Qg_bus[bus_type_by_idx == PQ] == 0)
 
     if include_dc_res:
         if res_dc is not None:
@@ -670,10 +676,12 @@ def pf_post_processing(
             else:
                 pg_gen_dc = apply_slack_single_gen(net, pg_gen, Pg_bus, pf_dc, pt_dc)
             Pg_bus_dc = np.bincount(gen_bus, weights=pg_gen_dc, minlength=n_buses)
-            assert np.all(Pg_bus_dc[net.buses[:, BUS_TYPE] == PQ] == 0)
+            assert np.all(Pg_bus_dc[bus_type_by_idx == PQ] == 0)
 
-    X_bus[:, 4] = Pg_bus
-    X_bus[:, 5] = Qg_bus
+    # Reindex Pg/Qg from bus-index order to bus-row order for X_bus assignment.
+    bus_row_idx = net.buses[:, BUS_I].astype(int)
+    X_bus[:, 4] = Pg_bus[bus_row_idx]
+    X_bus[:, 5] = Qg_bus[bus_row_idx]
 
     # Voltage
     assert set([int(k) for k in res["solution"]["bus"].keys()]) == set(
@@ -725,7 +733,7 @@ def pf_post_processing(
             # convert to range [-180, 180]
             va = (va + 180) % 360 - 180
             X_bus[:, 16] = va
-            X_bus[:, 17] = Pg_bus_dc
+            X_bus[:, 17] = Pg_bus_dc[bus_row_idx]
         else:
             X_bus[:, 16] = np.nan
             X_bus[:, 17] = np.nan
