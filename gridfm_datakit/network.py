@@ -8,6 +8,7 @@ networks in MATPOWER format, with support for non-continuous bus indexing.
 import os
 import shutil
 import requests
+import json
 from importlib import resources
 import pandas as pd
 from numpy import ones, conj, nonzero, any, exp, pi, hstack, real, int64
@@ -86,8 +87,8 @@ def correct_network(network_path: str, force: bool = False) -> str:
         # Julia script as a list of lines
         julia_code = [
             "using PowerModels",
-            f'data = PowerModels.parse_file("{network_path}")',
-            f'PowerModels.export_matpower("{tmp_path}", data)',
+            f"data = PowerModels.parse_file({json.dumps(network_path)})",
+            f"PowerModels.export_matpower({json.dumps(tmp_path)}, data)",
         ]
 
         # Run Julia

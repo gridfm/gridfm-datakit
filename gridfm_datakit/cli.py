@@ -15,16 +15,78 @@ from gridfm_datakit.utils.stats import plot_stats, plot_feature_distributions
 
 def _pm_setup_worker() -> None:
     """Worker function for setting up Julia packages required for PowerModels.jl."""
-    from juliacall import Main as jl
+    import os
+    import shutil
+    import subprocess
 
-    jl.seval(
-        """
-        using Pkg
-        Pkg.add("Ipopt")
-        Pkg.add("PowerModels")
-        Pkg.add("Memento")
-        """,
-    )
+    env = os.environ.copy()
+
+    # Use Julia's documented host verification controls. In corporate proxy
+    # environments this is often required for artifact/package downloads.
+    env.setdefault("JULIA_PKG_IGNORE_UNKNOWN_REGISTRIES", "true")
+    env.setdefault("JULIA_SSL_NO_VERIFY_HOSTS", "**")
+    env.setdefault("JULIA_NO_VERIFY_HOSTS", "**")
+
+    # Keep proxy settings if they exist in either lowercase/uppercase form.
+    http_proxy = env.get("http_proxy") or env.get("HTTP_PROXY")
+    https_proxy = env.get("https_proxy") or env.get("HTTPS_PROXY")
+    if http_proxy:
+        env["http_proxy"] = http_proxy
+        env["HTTP_PROXY"] = http_proxy
+    if https_proxy:
+        env["https_proxy"] = https_proxy
+        env["HTTPS_PROXY"] = https_proxy
+
+    julia_exe = env.get("JULIA_EXE")
+    if not julia_exe:
+        try:
+            from juliapkg.compat import Compat
+            from juliapkg.find_julia import find_julia
+
+            conda_prefix = env.get("CONDA_PREFIX")
+            prefix = None
+            if conda_prefix:
+                candidate_prefix = os.path.join(
+                    conda_prefix,
+                    "julia_env",
+                    "pyjuliapkg",
+                    "install",
+                )
+                if os.path.isdir(candidate_prefix):
+                    prefix = candidate_prefix
+            julia_exe, _ = find_julia(
+                compat=Compat.parse("^1.10.3"),
+                prefix=prefix,
+                install=True,
+            )
+        except Exception:
+            julia_exe = shutil.which("julia")
+
+    if not julia_exe:
+        raise RuntimeError(
+            "Unable to locate Julia executable. Set JULIA_EXE or install Julia.",
+        )
+
+    project_arg = []
+    conda_prefix = env.get("CONDA_PREFIX")
+    if conda_prefix:
+        candidate_project = os.path.join(conda_prefix, "julia_env")
+        if os.path.isdir(candidate_project):
+            project_arg = [f"--project={candidate_project}"]
+
+    julia_code = """
+using Pkg
+ENV["JULIA_PKG_IGNORE_UNKNOWN_REGISTRIES"] = "true"
+ENV["JULIA_SSL_NO_VERIFY_HOSTS"] = "**"
+ENV["JULIA_NO_VERIFY_HOSTS"] = "**"
+for pkg in ("Ipopt", "PowerModels", "Memento")
+    Pkg.add(pkg)
+end
+Pkg.precompile()
+"""
+
+    cmd = [julia_exe, *project_arg, "--startup-file=no", "-e", julia_code]
+    subprocess.run(cmd, env=env, check=True)
 
 
 def pm_setup():
