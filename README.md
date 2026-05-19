@@ -9,6 +9,8 @@
 
 ![Docs](https://img.shields.io/badge/docs-available-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-76%25-yellow)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12594/badge)](https://www.bestpractices.dev/projects/12594)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/gridfm/gridfm-datakit/badge)](https://scorecard.dev/viewer/?uri=github.com/gridfm/gridfm-datakit)
 ![Python](https://img.shields.io/badge/python-3.10%20%E2%80%93%203.12-blue)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 
