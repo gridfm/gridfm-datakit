@@ -76,15 +76,12 @@ def _format_gens_res(
     Returns:
         Dict containing active and reactive injections for the generators.
     """
-    gen_dict = {}
-    df_gens_pp = pp_net.get_generators()
-    for idx in df_gens_pp.index:
-        if df_gens_pp.loc[idx, 'connected']:
-            gen_dict[str(int(map_gen_p2g[idx]+1))] = {
-                'pg': -float(df_gens_pp.loc[idx]['p']), # sign convention in PowSyBl, negative = injection
-                'qg': -float(df_gens_pp.loc[idx]['q'])  # sign convention in PowSyBl, negative = injection
-            }
-    return gen_dict
+    df = pp_net.get_generators()
+    # sign convention in PowSyBl: negative = injection
+    return {
+        str(int(map_gen_p2g[row.Index] + 1)): {'pg': -row.p, 'qg': -row.q}
+        for row in df[df['connected']][['p', 'q']].itertuples()
+    }
 
 def _format_branch_res(
     pp_net: "pp.network.Network",
@@ -99,16 +96,11 @@ def _format_branch_res(
     Returns:
         Dict containing active and reactive flows in both directions for each branch.
     """
-    branch_dict = {}
-    df_branches_pp = pp_net.get_branches()
-    for idx in df_branches_pp.index:
-        branch_dict[str(int(map_branch_p2g[idx]+1))] = {
-            'pf': float(df_branches_pp.loc[idx]['p1']),
-            'qf': float(df_branches_pp.loc[idx]['q1']),
-            'pt': float(df_branches_pp.loc[idx]['p2']),
-            'qt': float(df_branches_pp.loc[idx]['q2'])
-        }
-    return branch_dict
+    df = pp_net.get_branches()
+    return {
+        str(int(map_branch_p2g[row.Index] + 1)): {'pf': row.p1, 'qf': row.q1, 'pt': row.p2, 'qt': row.q2}
+        for row in df[['p1', 'q1', 'p2', 'q2']].itertuples()
+    }
 
 def _format_buses_res(
     pp_net: "pp.network.Network",
@@ -123,14 +115,11 @@ def _format_buses_res(
     Returns:
         Dict containing voltage magnitude and angle for each bus.
     """
-    bus_dict = {}
-    df_buses_pp = pp_net.get_buses()
-    for idx in df_buses_pp.index:
-        bus_dict[str(int(map_bus_p2g[idx]+1))] = {
-            'vm': float(df_buses_pp.loc[idx]['v_mag']),
-            'va': float(df_buses_pp.loc[idx]['v_angle'])
-        }
-    return bus_dict
+    df = pp_net.get_buses()
+    return {
+        str(int(map_bus_p2g[row.Index] + 1)): {'vm': row.v_mag, 'va': row.v_angle}
+        for row in df[['v_mag', 'v_angle']].itertuples()
+    }
 
 def _is_power_flow_computed(pf_status: str):
     """ Check whether the power flow computation was successful."""
