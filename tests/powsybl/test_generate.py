@@ -82,7 +82,7 @@ def _make_config(
 
 @pytest.fixture(scope="module")
 def tmp_data_dir(tmp_path_factory):
-    return tmp_path_factory.mktemp("data_out")
+    return tmp_path_factory.mktemp("data")
 
 
 @pytest.fixture(scope="module")
@@ -111,8 +111,8 @@ def config_ieee14_cgmes(tmp_data_dir):
 
 
 @pytest.fixture(scope="module")
-def config_case300_ieee(tmp_data_dir):
-    return _make_config("case300_ieee", tmp_data_dir, source="pglib")
+def case24_ieee_rts(tmp_data_dir):
+    return _make_config("case24_ieee_rts", tmp_data_dir, source="pglib")
 
 # ---------------------------------------------------------------------------
 # 1. Format tests
@@ -157,9 +157,9 @@ class TestFormats:
         generate_power_flow_data(config_ieee14_cgmes)
         assert True
 
-    def test_case300_ieee(self, config_case300_ieee):
+    def test_case24_ieee_rts(self, case24_ieee_rts):
         """Test handling of PGLIB format (source='pglib')."""
         from gridfm_datakit import generate_power_flow_data
 
-        generate_power_flow_data(config_case300_ieee)
+        generate_power_flow_data(case24_ieee_rts)
         assert True
