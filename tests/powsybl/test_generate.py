@@ -11,7 +11,6 @@ pytestmark = pytest.mark.skipif(
 )
 
 _GRIDS_DIR = Path(__file__).parent / "grids"
-_DATA_DIR = "./tests/powsybl/data/generated_test_data"
 
 _BASE_CONFIG = {
     "network": {
@@ -44,7 +43,6 @@ _BASE_CONFIG = {
     },
     "settings": {
         "num_processes": 1,
-        "data_dir": _DATA_DIR,
         "large_chunk_size": 5,
         "overwrite": True,
         "mode": "pf",
@@ -59,13 +57,17 @@ _BASE_CONFIG = {
 }
 
 
-def _make_config(name: str, *, filename: str | None = None, source: str | None = None) -> dict:
+def _make_config(
+    name: str,
+    data_dir: Path,
+    *,
+    filename: str | None = None,
+    source: str | None = None,
+) -> dict:
     import copy
     config = copy.deepcopy(_BASE_CONFIG)
-    if source is not None:
-        config["network"]["source"] = source
-    else:
-        config["network"]["source"] = "file"
+    config["settings"]["data_dir"] = str(data_dir)
+    config["network"]["source"] = source if source is not None else "file"
     config["network"]["name"] = name
     if filename is not None:
         config["network"]["file"] = str(_GRIDS_DIR / filename)
@@ -79,32 +81,38 @@ def _make_config(name: str, *, filename: str | None = None, source: str | None =
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="module")
-def config_ieee14_m():
-    return _make_config("IEEE14_m", filename="ieee14.m")
+def tmp_data_dir(tmp_path_factory):
+    return tmp_path_factory.mktemp("data_out")
 
 
 @pytest.fixture(scope="module")
-def config_ieee14_mat():
-    return _make_config("IEEE14_mat", filename="ieee14.mat")
+def config_ieee14_m(tmp_data_dir):
+    return _make_config("IEEE14_m", tmp_data_dir, filename="ieee14.m")
 
 
 @pytest.fixture(scope="module")
-def config_ieee14_raw():
-    return _make_config("IEEE14_raw", filename="ieee14.raw")
+def config_ieee14_mat(tmp_data_dir):
+    return _make_config("IEEE14_mat", tmp_data_dir, filename="ieee14.mat")
 
 
 @pytest.fixture(scope="module")
-def config_ieee14_xiidm():
-    return _make_config("IEEE14_xiidm", filename="ieee14.xiidm")
+def config_ieee14_raw(tmp_data_dir):
+    return _make_config("IEEE14_raw", tmp_data_dir, filename="ieee14.raw")
 
 
 @pytest.fixture(scope="module")
-def config_ieee14_cgmes():
-    return _make_config("IEEE14_cgmes", filename="ieee14.zip")
+def config_ieee14_xiidm(tmp_data_dir):
+    return _make_config("IEEE14_xiidm", tmp_data_dir, filename="ieee14.xiidm")
+
 
 @pytest.fixture(scope="module")
-def config_case300_ieee():
-    return _make_config("case300_ieee", source="pglib")
+def config_ieee14_cgmes(tmp_data_dir):
+    return _make_config("IEEE14_cgmes", tmp_data_dir, filename="ieee14.zip")
+
+
+@pytest.fixture(scope="module")
+def config_case300_ieee(tmp_data_dir):
+    return _make_config("case300_ieee", tmp_data_dir, source="pglib")
 
 # ---------------------------------------------------------------------------
 # 1. Format tests
