@@ -1,13 +1,13 @@
 """Default load flow parameters for power system simulations."""
 
-import pypowsybl as pp
+from gridfm_datakit.powsybl.api import pypowsybl as pp
 
-def get_default_lf_parameters():
+def get_default_lf_params():
     """
     Get default load flow parameters for Open Load Flow solver.
 
     Returns:
-        pp.loadflow.Parameters: Default configution
+        pp.loadflow.Parameters: Default configuration
     """
 
     # return pp.loadflow.Parameters(

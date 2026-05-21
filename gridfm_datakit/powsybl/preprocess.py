@@ -6,8 +6,8 @@ Compatible with the existing pipeline.
 """
 
 from typing import Dict, Any
-import pypowsybl as pp
 
+from gridfm_datakit.powsybl.api import pypowsybl as pp
 from gridfm_datakit.powsybl.mapping import MappingP2G
 
 

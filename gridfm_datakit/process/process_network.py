@@ -9,9 +9,11 @@ for data generation purposes.
 import time
 import numpy as np
 from importlib import resources
+from gridfm_datakit.powsybl.api import pypowsybl as pp
+from gridfm_datakit.powsybl.api import check_powsybl_available
 from gridfm_datakit.powsybl.convert import update_powsybl
 from gridfm_datakit.powsybl.preprocess import preprocess_pp_pf_res
-from gridfm_datakit.powsybl.utils.lf_parameters import get_default_lf_parameters
+from gridfm_datakit.powsybl.params import get_default_lf_params
 from gridfm_datakit.utils.column_names import (
     GEN_COLUMNS,
     DC_GEN_COLUMNS,
@@ -960,7 +962,9 @@ def process_scenario_pf_mode(
                 continue
 
         if pf_solver == 'powsybl':
-            import pypowsybl as pp
+            check_powsybl_available()
+            if meta is None or "pp_net" not in meta or "mapping_p2g" not in meta:
+                raise ValueError("Network seems to not be initialized for PowSyBl solver")
             variant_id = f"scenario_{scenario_index}_perturbation_{pert_index}"
             pp_net = meta["pp_net"]
             base_variant_id = pp_net.get_working_variant_id()
@@ -973,8 +977,8 @@ def process_scenario_pf_mode(
             if include_dc_res:
                 try:
                     start_time = time.perf_counter()
-                    lf_parameters = get_default_lf_parameters()
-                    dcpf_metadata = pp.loadflow.run_dc(pp_net, lf_parameters)
+                    lf_params = get_default_lf_params()
+                    dcpf_metadata = pp.loadflow.run_dc(pp_net, lf_params)
                     end_time = time.perf_counter()
                     solve_time = end_time - start_time
                     res_dcpf = preprocess_pp_pf_res(pp_net, solve_time, dcpf_metadata, mapping_p2g)
@@ -987,8 +991,8 @@ def process_scenario_pf_mode(
 
             try:
                 start_time = time.perf_counter()
-                lf_parameters = get_default_lf_parameters()
-                pf_metadata = pp.loadflow.run_ac(pp_net, lf_parameters)
+                lf_params = get_default_lf_params()
+                pf_metadata = pp.loadflow.run_ac(pp_net, lf_params)
                 end_time = time.perf_counter()
                 solve_time = end_time - start_time
                 res = preprocess_pp_pf_res(pp_net, solve_time, pf_metadata, mapping_p2g)

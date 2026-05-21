@@ -18,17 +18,17 @@ pytestmark = pytest.mark.skipif(
 @pytest.fixture(scope="function")
 def ieee14_acpf_res():
     """ACPF on IEEE14 with default configuration."""
-    import pypowsybl as pp
     import time
+    from gridfm_datakit.powsybl.api import pypowsybl as pp
     from gridfm_datakit.powsybl.convert import to_powsybl
-    from gridfm_datakit.powsybl.utils.lf_parameters import get_default_lf_parameters
+    from gridfm_datakit.powsybl.params import get_default_lf_params
 
     gfm_net = load_net_from_pglib("case14_ieee")
     conv = to_powsybl(gfm_net)
     pp_net = conv.pp_net
 
     start_time = time.perf_counter()
-    pf_metadata = pp.loadflow.run_ac(pp_net, get_default_lf_parameters())
+    pf_metadata = pp.loadflow.run_ac(pp_net, get_default_lf_params())
     end_time = time.perf_counter()
     solve_time = end_time - start_time
 
@@ -38,10 +38,10 @@ def ieee14_acpf_res():
 @pytest.fixture(scope="function")
 def ieee14_acpf_non_convergent_res():
     """ACPF on a IEEE14 network that should not converge because of an excessive load impossible to balance."""
-    import pypowsybl as pp
     import time
+    from gridfm_datakit.powsybl.api import pypowsybl as pp
     from gridfm_datakit.powsybl.convert import to_powsybl
-    from gridfm_datakit.powsybl.utils.lf_parameters import get_default_lf_parameters
+    from gridfm_datakit.powsybl.params import get_default_lf_params
 
     gfm_net = load_net_from_pglib("case14_ieee")
     conv = to_powsybl(gfm_net)
@@ -49,7 +49,7 @@ def ieee14_acpf_non_convergent_res():
 
     pp_net.update_loads(id='LOAD-2', p0=4000)
     start_time = time.perf_counter()
-    pf_metadata = pp.loadflow.run_ac(pp_net, get_default_lf_parameters())
+    pf_metadata = pp.loadflow.run_ac(pp_net, get_default_lf_params())
     end_time = time.perf_counter()
     solve_time = end_time - start_time
 
