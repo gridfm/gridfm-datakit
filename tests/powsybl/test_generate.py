@@ -15,9 +15,7 @@ _DATA_DIR = "./tests/powsybl/data/generated_test_data"
 
 _BASE_CONFIG = {
     "network": {
-        "source": "file",
         "reader": "powsybl",
-        "network_dir": "scripts/grids",
     },
     "load": {
         "generator": "agg_load_profile",
@@ -61,11 +59,18 @@ _BASE_CONFIG = {
 }
 
 
-def _make_config(name: str, grid_file: str) -> dict:
+def _make_config(name: str, *, filename: str | None = None, source: str | None = None) -> dict:
     import copy
     config = copy.deepcopy(_BASE_CONFIG)
+    if source is not None:
+        config["network"]["source"] = source
+    else:
+        config["network"]["source"] = "file"
     config["network"]["name"] = name
-    config["network"]["file"] = str(_GRIDS_DIR / grid_file)
+    if filename is not None:
+        config["network"]["file"] = str(_GRIDS_DIR / filename)
+    else:
+        config["network"]["network_dir"] = str(_GRIDS_DIR)
     return config
 
 
@@ -75,28 +80,31 @@ def _make_config(name: str, grid_file: str) -> dict:
 
 @pytest.fixture(scope="module")
 def config_ieee14_m():
-    return _make_config("IEEE14_m", "ieee14.m")
+    return _make_config("IEEE14_m", filename="ieee14.m")
 
 
 @pytest.fixture(scope="module")
 def config_ieee14_mat():
-    return _make_config("IEEE14_mat", "ieee14.mat")
+    return _make_config("IEEE14_mat", filename="ieee14.mat")
 
 
 @pytest.fixture(scope="module")
 def config_ieee14_raw():
-    return _make_config("IEEE14_raw", "ieee14.raw")
+    return _make_config("IEEE14_raw", filename="ieee14.raw")
 
 
 @pytest.fixture(scope="module")
 def config_ieee14_xiidm():
-    return _make_config("IEEE14_xiidm", "ieee14.xiidm")
+    return _make_config("IEEE14_xiidm", filename="ieee14.xiidm")
 
 
 @pytest.fixture(scope="module")
 def config_ieee14_cgmes():
-    return _make_config("IEEE14_cgmes", "ieee14.zip")
+    return _make_config("IEEE14_cgmes", filename="ieee14.zip")
 
+@pytest.fixture(scope="module")
+def config_case300_ieee():
+    return _make_config("case300_ieee", source="pglib")
 
 # ---------------------------------------------------------------------------
 # 1. Format tests
@@ -139,4 +147,11 @@ class TestFormats:
         from gridfm_datakit import generate_power_flow_data
 
         generate_power_flow_data(config_ieee14_cgmes)
+        assert True
+
+    def test_case300_ieee(self, config_case300_ieee):
+        """Test handling of PGLIB format (source='pglib')."""
+        from gridfm_datakit import generate_power_flow_data
+
+        generate_power_flow_data(config_case300_ieee)
         assert True

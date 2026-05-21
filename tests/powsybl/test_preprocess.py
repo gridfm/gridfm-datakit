@@ -146,7 +146,7 @@ class TestPreprocessPPPFRes:
 # ---------------------------------------------------------------------------
 
 class TestNonConvergence:
-    """In cas of no converge, the preprocess function should return a ValueError."""
+    """In case of non convergence, the preprocess function should return a ValueError."""
 
     def test_non_convergence(self, ieee14_acpf_non_convergent_res):
         """Non convergent power flow result should raise a ValueError."""

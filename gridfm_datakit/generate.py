@@ -495,7 +495,7 @@ def generate_power_flow_data_distributed(
                 ]
 
                 # Run parallel processing
-                _mp_ctx = multiprocessing.get_context("fork")
+                _mp_ctx = multiprocessing.get_context("spawn")
                 with _mp_ctx.Pool(processes=args.settings.num_processes) as pool:
                     results = [
                         pool.apply_async(process_scenario_chunk, task) for task in tasks
