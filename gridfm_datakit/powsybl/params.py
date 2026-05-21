@@ -1,6 +1,7 @@
 """Default load flow parameters for power system simulations."""
 
-from gridfm_datakit.powsybl.api import pypowsybl as pp
+from .api import pypowsybl as pp
+
 
 def get_default_lf_params():
     """
@@ -21,6 +22,4 @@ def get_default_lf_params():
     #         "stateVectorScalingMode": "MAX_VOLTAGE_CHANGE",
     #     }
     # )
-    return pp.loadflow.Parameters(
-        distributed_slack=False
-    )
+    return pp.loadflow.Parameters(distributed_slack=False)

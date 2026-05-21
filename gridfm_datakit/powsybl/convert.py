@@ -34,23 +34,30 @@ Example:
 >>> result.mapping_p2g.bus # bus ID → gfm index map
 """
 
-from dataclasses import dataclass
-from pathlib import Path
 import shutil
 import tempfile
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, Tuple
 
 import numpy as np
 import scipy.io
 
 from gridfm_datakit.network import Network
-from gridfm_datakit.utils.idx_bus import VM, VMAX, VMIN, BUS_I, PD, QD
-from gridfm_datakit.utils.idx_brch import F_BUS, T_BUS, BR_STATUS, BR_R, BR_X
+from gridfm_datakit.utils.idx_brch import BR_R, BR_STATUS, BR_X, F_BUS, T_BUS
+from gridfm_datakit.utils.idx_bus import BUS_I, PD, QD, VM, VMAX, VMIN
+from gridfm_datakit.utils.idx_cost import (
+    COST,
+    MODEL,
+    NCOST,
+    POLYNOMIAL,
+    SHUTDOWN,
+    STARTUP,
+)
 from gridfm_datakit.utils.idx_gen import GEN_BUS, GEN_STATUS, PG
-from gridfm_datakit.utils.idx_cost import MODEL, STARTUP, SHUTDOWN, NCOST, COST, POLYNOMIAL
 
 from .api import check_powsybl_available, pypowsybl
-from .mapping import MappingP2G
+from .mapping import MappingP2G, build_p2g_maps
 
 
 @dataclass
@@ -170,7 +177,7 @@ def update_powsybl(
     pp_net.per_unit = False
     loads = pp_net.get_loads()
     load_id = loads.index.to_numpy()
-    bus_id = loads['bus_id'].to_numpy()
+    bus_id = loads["bus_id"].to_numpy()
     gfm_bus_idx = np.array([int(mapping_p2g.bus[i]) for i in bus_id])
     pp_net.update_loads(
         id=load_id,
@@ -192,7 +199,7 @@ def update_powsybl(
     pp_net.update_generators(
         id=gen_id,
         connected=gfm_net.gens[gfm_gen_idx, GEN_STATUS].astype(bool).tolist(),
-        target_p=gfm_net.gens[gfm_gen_idx, PG].tolist()
+        target_p=gfm_net.gens[gfm_gen_idx, PG].tolist(),
     )
 
     br_id = pp_net.get_branches().index.to_numpy()
@@ -218,6 +225,7 @@ def update_powsybl(
     )
 
     pp_net.per_unit = initial_per_unit_status
+
 
 def from_powsybl(
     pp_net,
@@ -365,7 +373,6 @@ def to_powsybl(
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
-    from .mapping import build_p2g_maps
     mapping_p2g = build_p2g_maps(network, pp_net)
 
     return ConvertedNetwork(pp_net=pp_net, mapping_p2g=mapping_p2g)

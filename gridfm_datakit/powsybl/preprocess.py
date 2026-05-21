@@ -5,19 +5,19 @@ Format Powsybl power flow format into Power Model power flow format.
 Compatible with the existing pipeline.
 """
 
-from typing import Dict, Any
+from typing import Any, Dict
 
-from gridfm_datakit.powsybl.api import pypowsybl as pp
-from gridfm_datakit.powsybl.mapping import MappingP2G
+from .api import pypowsybl as pp
+from .mapping import MappingP2G
 
 
-def preprocess_pp_pf_res(
+def get_pf_res(
     pp_net: "pp.network.Network",
     solve_time: float,
     pf_metadata: list,
     mapping_p2g: MappingP2G,
 ) -> Dict[Any, Any]:
-    """ Format pypowsybl power flow results for the pf_post_process function.
+    """Format pypowsybl power flow results for the pf_post_process function.
 
     Args:
         pp_net: PyPowSyBl network. It contains power flow results
@@ -33,27 +33,29 @@ def preprocess_pp_pf_res(
 
     # Check whether the power flow computation is susscefful and raise a error if not
     if not _is_power_flow_computed(pf_status):
-        raise ValueError(f'Power flow computation failed. The returned power flow status:{pf_status}')
+        raise ValueError(
+            f"Power flow computation failed. The returned power flow status:{pf_status}",
+        )
 
     # Store initial per-unit status
     initial_per_unit_status = pp_net.per_unit
 
     # Conform with PowerModel's pf results
-    pp_net.per_unit=True
+    pp_net.per_unit = True
 
     pp_pf_res = {}
     # Filling the results
     pp_pf_res["solution"] = {
         "baseMVA": pp_net.nominal_apparent_power,
-        'gen': _format_gens_res(pp_net, mapping_p2g.gen),
-        'branch': _format_branch_res(pp_net, mapping_p2g.branch),
-        'multiinfrastructure': None, # TODO check whether really not needed
-        'multinetwork': None, # TODO check whether really not needed
-        'bus': _format_buses_res(pp_net, mapping_p2g.bus),
-        'per_unit': pp_net.per_unit,
-        "pf": _is_power_flow_computed(pf_status)
+        "gen": _format_gens_res(pp_net, mapping_p2g.gen),
+        "branch": _format_branch_res(pp_net, mapping_p2g.branch),
+        "multiinfrastructure": None,  # TODO check whether really not needed
+        "multinetwork": None,  # TODO check whether really not needed
+        "bus": _format_buses_res(pp_net, mapping_p2g.bus),
+        "per_unit": pp_net.per_unit,
+        "pf": _is_power_flow_computed(pf_status),
     }
-    pp_pf_res['solve_time'] = solve_time
+    pp_pf_res["solve_time"] = solve_time
 
     pp_net.per_unit = initial_per_unit_status
 
@@ -63,11 +65,12 @@ def preprocess_pp_pf_res(
     pp_pf_res = _add_slack_results(pp_net, pp_pf_res, pf_metadata, mapping_p2g.gen)
     return pp_pf_res
 
+
 def _format_gens_res(
     pp_net: "pp.network.Network",
     map_gen_p2g: Dict[str, float],
 ) -> Dict[str, float]:
-    """ Format PowSyBl power flow results for generators.
+    """Format PowSyBl power flow results for generators.
 
     Args:
         pp_net: PowSyBl network. It contains power flow results.
@@ -79,15 +82,16 @@ def _format_gens_res(
     df = pp_net.get_generators()
     # sign convention in PowSyBl: negative = injection
     return {
-        str(int(map_gen_p2g[row.Index] + 1)): {'pg': -row.p, 'qg': -row.q}
-        for row in df[df['connected']][['p', 'q']].itertuples()
+        str(int(map_gen_p2g[row.Index] + 1)): {"pg": -row.p, "qg": -row.q}
+        for row in df[df["connected"]][["p", "q"]].itertuples()
     }
+
 
 def _format_branch_res(
     pp_net: "pp.network.Network",
-    map_branch_p2g: Dict[Any, Any]
+    map_branch_p2g: Dict[Any, Any],
 ) -> Dict[str, float]:
-    """ Format PowSyBl power flow results for the branches (lines and 2-windings transformers).
+    """Format PowSyBl power flow results for the branches (lines and 2-windings transformers).
 
     Args:
         pp_net: PowSyBl network. It contains power flow results.
@@ -98,15 +102,21 @@ def _format_branch_res(
     """
     df = pp_net.get_branches()
     return {
-        str(int(map_branch_p2g[row.Index] + 1)): {'pf': row.p1, 'qf': row.q1, 'pt': row.p2, 'qt': row.q2}
-        for row in df[['p1', 'q1', 'p2', 'q2']].itertuples()
+        str(int(map_branch_p2g[row.Index] + 1)): {
+            "pf": row.p1,
+            "qf": row.q1,
+            "pt": row.p2,
+            "qt": row.q2,
+        }
+        for row in df[["p1", "q1", "p2", "q2"]].itertuples()
     }
+
 
 def _format_buses_res(
     pp_net: "pp.network.Network",
     map_bus_p2g: Dict[Any, Any],
 ) -> Dict[str, float]:
-    """ Format PowSyBl power flow results for the buses.
+    """Format PowSyBl power flow results for the buses.
 
     Args:
         pp_net: PowSyBl network. It contains power flow results.
@@ -117,13 +127,15 @@ def _format_buses_res(
     """
     df = pp_net.get_buses()
     return {
-        str(int(map_bus_p2g[row.Index] + 1)): {'vm': row.v_mag, 'va': row.v_angle}
-        for row in df[['v_mag', 'v_angle']].itertuples()
+        str(int(map_bus_p2g[row.Index] + 1)): {"vm": row.v_mag, "va": row.v_angle}
+        for row in df[["v_mag", "v_angle"]].itertuples()
     }
 
+
 def _is_power_flow_computed(pf_status: str):
-    """ Check whether the power flow computation was successful."""
-    return pf_status == 'Converged'
+    """Check whether the power flow computation was successful."""
+    return pf_status == "Converged"
+
 
 def _add_slack_results(pp_net, pf_res, pf_metadata, map_gen_p2g):
     """Add slack results to a generator attached to the slack bus."""
@@ -132,7 +144,11 @@ def _add_slack_results(pp_net, pf_res, pf_metadata, map_gen_p2g):
     slack_res = pf_metadata[0].slack_bus_results[0].active_power_mismatch
 
     df_gens = pp_net.get_generators()
-    slack_gen_id = df_gens[df_gens['bus_id'] == slack_bus].index[0] # assigning slack results to the first generator attached to the slack bus.
+    slack_gen_id = df_gens[df_gens["bus_id"] == slack_bus].index[
+        0
+    ]  # assigning slack results to the first generator attached to the slack bus.
 
-    pf_res['solution']['gen'][str(int(map_gen_p2g[slack_gen_id]+1))]['pg'] += slack_res/pf_res['solution']['baseMVA']
+    pf_res["solution"]["gen"][str(int(map_gen_p2g[slack_gen_id] + 1))]["pg"] += (
+        slack_res / pf_res["solution"]["baseMVA"]
+    )
     return pf_res

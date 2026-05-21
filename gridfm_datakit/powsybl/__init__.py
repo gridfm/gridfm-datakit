@@ -47,16 +47,24 @@ import scipy.io
 from matpowercaseframes import CaseFrames
 
 from gridfm_datakit.network import Network
-from gridfm_datakit.utils.idx_cost import MODEL, NCOST, COST, POLYNOMIAL
+from gridfm_datakit.utils.idx_cost import COST, MODEL, NCOST, POLYNOMIAL
 
-from .api import check_powsybl_available, pypowsybl
-from .convert import from_powsybl, to_powsybl, update_powsybl, ConversionOptions, ConvertedNetwork
-from .mapping import build_p2g_maps, MappingP2G
-
+from .api import check_powsybl_available, is_powsybl_available, pypowsybl
+from .convert import (
+    ConversionOptions,
+    ConvertedNetwork,
+    from_powsybl,
+    to_powsybl,
+    update_powsybl,
+)
+from .mapping import MappingP2G, build_p2g_maps
+from .params import get_default_lf_params
+from .preprocess import get_pf_res
 
 # ---------------------------------------------------------------------------
 # Public data classes
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class NetworkMetadata:
@@ -122,8 +130,8 @@ class LoadedNetwork:
         of the base network (topology is preserved, only values change).
     """
 
-    pp_net: Any          # pypowsybl.network.Network (typed as Any to avoid
-                         # hard import when pypowsybl is not installed)
+    pp_net: Any  # pypowsybl.network.Network (typed as Any to avoid
+    # hard import when pypowsybl is not installed)
     gfm_net: Network
     metadata: NetworkMetadata
     mapping_p2g: MappingP2G
@@ -132,6 +140,7 @@ class LoadedNetwork:
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
+
 
 def _extract_gen_costs(network: Network) -> Dict[str, Tuple[float, ...]]:
     """
@@ -189,6 +198,7 @@ def _extract_gen_costs(network: Network) -> Dict[str, Tuple[float, ...]]:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def load_net(network_path: str) -> LoadedNetwork:
     """
@@ -278,17 +288,20 @@ def load_net(network_path: str) -> LoadedNetwork:
         mpc_frames = CaseFrames(str(path))
         mpc = {
             key: getattr(mpc_frames, key).to_numpy()
-                 if isinstance(getattr(mpc_frames, key), pd.DataFrame)
-                 else np.array([[float(getattr(mpc_frames, key))]])
-                 if key == "baseMVA"
-                 else getattr(mpc_frames, key)
+            if isinstance(getattr(mpc_frames, key), pd.DataFrame)
+            else np.array([[float(getattr(mpc_frames, key))]])
+            if key == "baseMVA"
+            else getattr(mpc_frames, key)
             for key in mpc_frames._attributes
         }
         with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmp:
             mat_path = tmp.name
         try:
             scipy.io.savemat(mat_path, {"mpc": mpc})
-            pp_net = pypowsybl.network.load(mat_path, {"matpower.import.ignore-base-voltage": "false"})
+            pp_net = pypowsybl.network.load(
+                mat_path,
+                {"matpower.import.ignore-base-voltage": "false"},
+            )
         finally:
             Path(mat_path).unlink()
     else:
@@ -381,19 +394,27 @@ def convert_net(network: Network, network_id: str = "network") -> LoadedNetwork:
 
 
 __all__ = [
-    # Primary entry points
+    #
     "load_net",
     "convert_net",
-    # Lower-level conversion primitives (for advanced use)
+    #
     "from_powsybl",
     "to_powsybl",
     "update_powsybl",
-    # PF solver mapping utilities
+    #
     "build_p2g_maps",
     "MappingP2G",
-    # Configuration and data classes
+    #
     "ConversionOptions",
     "ConvertedNetwork",
     "LoadedNetwork",
     "NetworkMetadata",
+    #
+    "pypowsybl",
+    "is_powsybl_available",
+    "check_powsybl_available",
+    #
+    "get_default_lf_params",
+    #
+    "get_pf_res",
 ]

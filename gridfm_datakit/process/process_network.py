@@ -6,64 +6,63 @@ running power flow calculations, and generating perturbed scenarios
 for data generation purposes.
 """
 
-import time
-import numpy as np
-from importlib import resources
-from gridfm_datakit.powsybl.api import pypowsybl as pp
-from gridfm_datakit.powsybl.api import check_powsybl_available
-from gridfm_datakit.powsybl.convert import update_powsybl
-from gridfm_datakit.powsybl.preprocess import preprocess_pp_pf_res
-from gridfm_datakit.powsybl.params import get_default_lf_params
-from gridfm_datakit.utils.column_names import (
-    GEN_COLUMNS,
-    DC_GEN_COLUMNS,
-    BUS_COLUMNS,
-    DC_BUS_COLUMNS,
-    BRANCH_COLUMNS,
-    DC_BRANCH_COLUMNS,
-    RUNTIME_COLUMNS,
-    DC_RUNTIME_COLUMNS,
-)
-import os
-from typing import Tuple, List, Union, Dict, Any, Optional
-from gridfm_datakit.network import makeYbus, branch_vectors
 import copy
-from gridfm_datakit.process.solvers import run_opf, run_pf, run_dcpf, run_dcopf
-from gridfm_datakit.utils.random_seed import custom_seed
+import multiprocessing
+import os
+import time
+import traceback
+from importlib import resources
+from queue import Queue
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import numpy as np
+
+import gridfm_datakit.powsybl as powsybl
+from gridfm_datakit.network import Network, branch_vectors, makeYbus
+from gridfm_datakit.perturbations.admittance_perturbation import AdmittanceGenerator
+from gridfm_datakit.perturbations.generator_perturbation import GenerationGenerator
+from gridfm_datakit.perturbations.topology_perturbation import TopologyGenerator
+from gridfm_datakit.process.solvers import run_dcopf, run_dcpf, run_opf, run_pf
+from gridfm_datakit.utils.column_names import (
+    BRANCH_COLUMNS,
+    BUS_COLUMNS,
+    DC_BRANCH_COLUMNS,
+    DC_BUS_COLUMNS,
+    DC_GEN_COLUMNS,
+    DC_RUNTIME_COLUMNS,
+    GEN_COLUMNS,
+    RUNTIME_COLUMNS,
+)
+from gridfm_datakit.utils.idx_brch import (
+    ANGMAX,
+    ANGMIN,
+    BR_B,
+    BR_R,
+    BR_STATUS,
+    BR_X,
+    F_BUS,
+    RATE_A,
+    SHIFT,
+    T_BUS,
+    TAP,
+)
 from gridfm_datakit.utils.idx_bus import (
-    GS,
-    BS,
-    BUS_TYPE,
     BASE_KV,
-    VMIN,
-    VMAX,
+    BS,
+    BUS_I,
+    BUS_TYPE,
+    GS,
+    PD,
     PQ,
     PV,
+    QD,
     REF,
+    VMAX,
+    VMIN,
 )
-from gridfm_datakit.utils.idx_brch import SHIFT
-from gridfm_datakit.utils.idx_gen import GEN_BUS, PMIN, PMAX, QMIN, QMAX
-from gridfm_datakit.utils.idx_cost import NCOST, COST
-from gridfm_datakit.utils.idx_brch import (
-    F_BUS,
-    T_BUS,
-    RATE_A,
-    BR_STATUS,
-    TAP,
-    ANGMIN,
-    ANGMAX,
-    BR_R,
-    BR_X,
-    BR_B,
-)
-from queue import Queue
-from gridfm_datakit.perturbations.topology_perturbation import TopologyGenerator
-from gridfm_datakit.perturbations.generator_perturbation import GenerationGenerator
-from gridfm_datakit.perturbations.admittance_perturbation import AdmittanceGenerator
-import traceback
-from gridfm_datakit.network import Network
-from gridfm_datakit.utils.idx_bus import BUS_I, PD, QD
-import multiprocessing
+from gridfm_datakit.utils.idx_cost import COST, NCOST
+from gridfm_datakit.utils.idx_gen import GEN_BUS, PMAX, PMIN, QMAX, QMIN
+from gridfm_datakit.utils.random_seed import custom_seed
 
 
 def init_julia(
@@ -843,7 +842,7 @@ def process_scenario_pf_mode(
     pf_fast: bool,
     dcpf_fast: bool,
     jl: Any,
-    pf_solver: str = 'powermodel',
+    pf_solver: str = "powermodel",
     *,
     meta: Optional[Dict] = None,
 ) -> List[np.ndarray]:
@@ -938,19 +937,19 @@ def process_scenario_pf_mode(
     # Generate perturbed topologies
     perturbations = topology_generator.generate(net_pf)
 
-    if pf_solver == 'powsybl':
-        check_powsybl_available()
+    if pf_solver == "powsybl":
+        powsybl.check_powsybl_available()
         if meta is None or "pp_net" not in meta or "mapping_p2g" not in meta:
             raise ValueError("Network seems to not be initialized for PowSyBl solver")
         pp_net = meta["pp_net"]
         mapping_p2g = meta["mapping_p2g"]
         base_variant_id = pp_net.get_working_variant_id()
-        lf_params = get_default_lf_params()
+        lf_params = powsybl.get_default_lf_params()
 
     # to get PF points that can violate some OPF inequality constraints (to train PF solvers that can handle points outside of normal operating limits), we apply the topology perturbation after OPF.
     # The setpoints are then no longer adapted to the new topology, and might lead to e.g. abranch overload or a voltage magnitude violation once we drop an element.
     for pert_index, perturbation in enumerate(perturbations):
-        if pf_solver == 'powermodel':
+        if pf_solver == "powermodel":
             res_dcpf = None
             if include_dc_res:
                 try:
@@ -970,21 +969,29 @@ def process_scenario_pf_mode(
                     )
                 continue
 
-        if pf_solver == 'powsybl':
+        if pf_solver == "powsybl":
             variant_id = f"scenario_{scenario_index}_perturbation_{pert_index}"
             pp_net.clone_variant(base_variant_id, variant_id)
             pp_net.set_working_variant(variant_id)
             try:
-                update_powsybl(pp_net, perturbation, mapping_p2g)
+                powsybl.update_powsybl(pp_net, perturbation, mapping_p2g)
 
                 res_dcpf = None
                 if include_dc_res:
                     try:
                         start_time = time.perf_counter()
-                        dcpf_metadata = pp.loadflow.run_dc(pp_net, lf_params)
+                        dcpf_metadata = powsybl.pypowsybl.loadflow.run_dc(
+                            pp_net,
+                            lf_params,
+                        )
                         end_time = time.perf_counter()
                         solve_time = end_time - start_time
-                        res_dcpf = preprocess_pp_pf_res(pp_net, solve_time, dcpf_metadata, mapping_p2g)
+                        res_dcpf = powsybl.get_pf_res(
+                            pp_net,
+                            solve_time,
+                            dcpf_metadata,
+                            mapping_p2g,
+                        )
 
                     except Exception as e:
                         with open(error_log_file, "a") as f:
@@ -993,10 +1000,15 @@ def process_scenario_pf_mode(
                             )
                 try:
                     start_time = time.perf_counter()
-                    pf_metadata = pp.loadflow.run_ac(pp_net, lf_params)
+                    pf_metadata = powsybl.pypowsybl.loadflow.run_ac(pp_net, lf_params)
                     end_time = time.perf_counter()
                     solve_time = end_time - start_time
-                    res = preprocess_pp_pf_res(pp_net, solve_time, pf_metadata, mapping_p2g)
+                    res = powsybl.get_pf_res(
+                        pp_net,
+                        solve_time,
+                        pf_metadata,
+                        mapping_p2g,
+                    )
                 except Exception as e:
                     with open(error_log_file, "a") as f:
                         f.write(
@@ -1044,7 +1056,7 @@ def process_scenario_chunk(
     solver_log_dir: str,
     max_iter: int,
     seed: int,
-    pf_solver: str = 'powermodel',
+    pf_solver: str = "powermodel",
     meta: Optional[Dict] = None,
 ) -> Tuple[
     Union[None, Exception],
@@ -1089,8 +1101,14 @@ def process_scenario_chunk(
         jl = init_julia(max_iter, solver_log_dir)
 
         # In distributed (spawn) workers pp_net is not passed; reload it here.
-        if pf_solver == "powsybl" and meta and "network_path" in meta and "pp_net" not in meta:
+        if (
+            pf_solver == "powsybl"
+            and meta
+            and "network_path" in meta
+            and "pp_net" not in meta
+        ):
             import gridfm_datakit.powsybl as _powsybl
+
             loaded_net = _powsybl.load_net(meta["network_path"])
             meta = dict(meta)
             meta["pp_net"] = loaded_net.pp_net

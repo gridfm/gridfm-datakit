@@ -1,45 +1,48 @@
 """Main data generation module for gridfm_datakit."""
 
-import numpy as np
+import gc
+import multiprocessing
 import os
-from gridfm_datakit.save import (
-    save_node_edge_data,
-)
-from gridfm_datakit.process.process_network import (
-    process_scenario_opf_mode,
-    process_scenario_pf_mode,
-    process_scenario_chunk,
-)
-from gridfm_datakit.utils.param_handler import (
-    NestedNamespace,
-    get_load_scenario_generator,
-    initialize_topology_generator,
-    initialize_generation_generator,
-    initialize_admittance_generator,
-)
+import shutil
+import sys
+from datetime import datetime
+from multiprocessing import Manager
+from typing import Any, Dict, List, Tuple, Union
+
+import numpy as np
+import yaml
+from tqdm import tqdm
+
+import gridfm_datakit.powsybl as powsybl
 from gridfm_datakit.network import (
+    Network,
+    get_pglib_file_path,
     load_net_from_file,
     load_net_from_pglib,
-    get_pglib_file_path,
 )
 from gridfm_datakit.perturbations.load_perturbation import (
     load_scenarios_to_df,
     plot_load_scenarios_combined,
 )
-import gridfm_datakit.powsybl as powsybl
-import gc
-from datetime import datetime
-from tqdm import tqdm
-from multiprocessing import Manager
-import multiprocessing
-import shutil
-from gridfm_datakit.utils.utils import write_ram_usage_distributed, Tee
-import yaml
-from typing import List, Tuple, Any, Dict, Union
-import sys
-from gridfm_datakit.network import Network
-from gridfm_datakit.process.process_network import init_julia
+from gridfm_datakit.process.process_network import (
+    init_julia,
+    process_scenario_chunk,
+    process_scenario_opf_mode,
+    process_scenario_pf_mode,
+)
+from gridfm_datakit.save import (
+    save_node_edge_data,
+)
+from gridfm_datakit.utils.param_handler import (
+    NestedNamespace,
+    get_load_scenario_generator,
+    initialize_admittance_generator,
+    initialize_generation_generator,
+    initialize_topology_generator,
+)
 from gridfm_datakit.utils.random_seed import custom_seed
+from gridfm_datakit.utils.utils import Tee, write_ram_usage_distributed
+
 
 def _setup_environment(
     config: Union[str, Dict[str, Any], NestedNamespace],
@@ -92,7 +95,7 @@ def _setup_environment(
     reader = getattr(args.network, "reader", "native")
     if reader not in ("native", "powsybl"):
         raise ValueError(
-            f"network.reader must be 'native' or 'powsybl', got {reader!r}"
+            f"network.reader must be 'native' or 'powsybl', got {reader!r}",
         )
     args.network.reader = reader
 
@@ -107,7 +110,7 @@ def _setup_environment(
     pf_solver = getattr(args.settings, "pf_solver", "powermodel")
     if pf_solver not in ("powermodel", "powsybl"):
         raise ValueError(
-            f"settings.pf_solver must be 'powermodel' or 'powsybl', got {pf_solver!r}"
+            f"settings.pf_solver must be 'powermodel' or 'powsybl', got {pf_solver!r}",
         )
     args.settings.pf_solver = pf_solver
 
@@ -211,7 +214,9 @@ def _prepare_network_and_scenarios(
                 os.path.join(args.network.network_dir, args.network.name) + ".m",
             )
     else:
-        raise ValueError(f"network.source must be 'pglib' or 'file', got {args.network.source!r}")
+        raise ValueError(
+            f"network.source must be 'pglib' or 'file', got {args.network.source!r}",
+        )
 
     # Generate load scenarios
     load_scenario_generator = get_load_scenario_generator(args.load)

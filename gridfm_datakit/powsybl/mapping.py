@@ -29,6 +29,7 @@ class MappingP2G:
 # Public functions
 # ---------------------------------------------------------------------------
 
+
 def build_p2g_maps(
     network: Network,
     pp_net,
@@ -83,8 +84,7 @@ def build_p2g_maps(
     # 0. Bus map - direct enumeration (row order is preserved by pypowsybl)
     # -------------------------------------------------------------------------
     map_bus_p2g: Dict[str, float] = {
-        pp_bus_id: gfm_row
-        for gfm_row, pp_bus_id in enumerate(pp_net.get_buses().index)
+        pp_bus_id: gfm_row for gfm_row, pp_bus_id in enumerate(pp_net.get_buses().index)
     }
 
     # -------------------------------------------------------------------------

@@ -38,16 +38,16 @@ them from metadata and persist them externally before handing the pp_net off
 to a pypowsybl solver or exporter.
 """
 
-import pytest
 from pathlib import Path
 
 import numpy as np
+import pytest
 
-from gridfm_datakit.powsybl.api import is_powsybl_available
-from gridfm_datakit.utils.idx_cost import MODEL, NCOST, COST, POLYNOMIAL
+import gridfm_datakit.powsybl as powsybl
+from gridfm_datakit.utils.idx_cost import COST, MODEL, NCOST, POLYNOMIAL
 
 pytestmark = pytest.mark.skipif(
-    not is_powsybl_available(),
+    not powsybl.is_powsybl_available(),
     reason="pypowsybl is not installed. Install with: pip install gridfm-datakit[powsybl]",
 )
 
@@ -55,6 +55,7 @@ pytestmark = pytest.mark.skipif(
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="module")
 def xiidm_case14_path(tmp_path_factory):
@@ -64,10 +65,9 @@ def xiidm_case14_path(tmp_path_factory):
     XIIDM is the native XML format for pypowsybl.  Using create_ieee14()
     keeps this fixture self-contained — no external files required.
     """
-    import pypowsybl as pp
     tmp = tmp_path_factory.mktemp("workflow_xiidm")
     path = tmp / "ieee14.xiidm"
-    pp.network.create_ieee14().save(str(path))
+    powsybl.pypowsybl.network.create_ieee14().save(str(path))
     return str(path)
 
 
@@ -86,6 +86,7 @@ def matpower_case14_path():
 # ---------------------------------------------------------------------------
 # Helper
 # ---------------------------------------------------------------------------
+
 
 def _assert_gencost_matrix_is_valid(gencosts, n_gens):
     """
@@ -106,12 +107,15 @@ def _assert_gencost_matrix_is_valid(gencosts, n_gens):
         "Every generator must have MODEL == POLYNOMIAL (2)"
     )
     ncosts = gencosts[:, NCOST].astype(int)
-    assert np.all(ncosts >= 1), "Every generator must have at least one cost coefficient"
+    assert np.all(ncosts >= 1), (
+        "Every generator must have at least one cost coefficient"
+    )
 
 
 # ---------------------------------------------------------------------------
 # Workflow tests: XIIDM source
 # ---------------------------------------------------------------------------
+
 
 class TestWorkflowXiidm:
     """Full load_net → convert_net cycle starting from an XIIDM file."""
@@ -121,14 +125,12 @@ class TestWorkflowXiidm:
         load_net must return a LoadedNetwork with a live pypowsybl network, a
         valid gridfm Network, and an empty-costs metadata object.
         """
-        from gridfm_datakit.powsybl import load_net, LoadedNetwork, NetworkMetadata
+        loaded = powsybl.load_net(xiidm_case14_path)
 
-        loaded = load_net(xiidm_case14_path)
-
-        assert isinstance(loaded, LoadedNetwork)
+        assert isinstance(loaded, powsybl.LoadedNetwork)
         assert hasattr(loaded.pp_net, "get_buses"), "pp_net must be a pypowsybl network"
         assert loaded.gfm_net is not None
-        assert isinstance(loaded.metadata, NetworkMetadata)
+        assert isinstance(loaded.metadata, powsybl.NetworkMetadata)
 
     def test_load_net_metadata_gen_costs_empty(self, xiidm_case14_path):
         """
@@ -138,9 +140,7 @@ class TestWorkflowXiidm:
         caller receives an empty dict and must supply costs separately if
         needed.
         """
-        from gridfm_datakit.powsybl import load_net
-
-        loaded = load_net(xiidm_case14_path)
+        loaded = powsybl.load_net(xiidm_case14_path)
 
         assert loaded.metadata.gen_costs == {}
 
@@ -152,9 +152,7 @@ class TestWorkflowXiidm:
         is valid for OPF/PF runs without requiring the caller to supply costs
         first.
         """
-        from gridfm_datakit.powsybl import load_net
-
-        loaded = load_net(xiidm_case14_path)
+        loaded = powsybl.load_net(xiidm_case14_path)
         n_gens = loaded.gfm_net.gens.shape[0]
 
         _assert_gencost_matrix_is_valid(loaded.gfm_net.gencosts, n_gens)
@@ -167,10 +165,8 @@ class TestWorkflowXiidm:
         contains the defaults from load_net) and places them in metadata so
         the caller can persist them independently of the pypowsybl network.
         """
-        from gridfm_datakit.powsybl import load_net, convert_net
-
-        loaded = load_net(xiidm_case14_path)
-        result = convert_net(loaded.gfm_net)
+        loaded = powsybl.load_net(xiidm_case14_path)
+        result = powsybl.convert_net(loaded.gfm_net)
 
         n_gens = loaded.gfm_net.gens.shape[0]
         assert len(result.metadata.gen_costs) == n_gens, (
@@ -182,10 +178,8 @@ class TestWorkflowXiidm:
         The coefficients in metadata.gen_costs must exactly match those in
         gfm_net.gencosts — convert_net must not alter or re-order them.
         """
-        from gridfm_datakit.powsybl import load_net, convert_net
-
-        loaded = load_net(xiidm_case14_path)
-        result = convert_net(loaded.gfm_net)
+        loaded = powsybl.load_net(xiidm_case14_path)
+        result = powsybl.convert_net(loaded.gfm_net)
 
         gencosts = loaded.gfm_net.gencosts
         for gen_idx_str, coeffs in result.metadata.gen_costs.items():
@@ -202,10 +196,8 @@ class TestWorkflowXiidm:
         The pp_net produced by convert_net must have the same element counts
         as the gfm_net it was built from.
         """
-        from gridfm_datakit.powsybl import load_net, convert_net
-
-        loaded = load_net(xiidm_case14_path)
-        result = convert_net(loaded.gfm_net)
+        loaded = powsybl.load_net(xiidm_case14_path)
+        result = powsybl.convert_net(loaded.gfm_net)
 
         gfm = loaded.gfm_net
         assert len(result.pp_net.get_buses()) == gfm.buses.shape[0]
@@ -216,10 +208,8 @@ class TestWorkflowXiidm:
         convert_net must store the original gfm_net as a reference (not a
         copy) so the caller can verify it came from the expected source.
         """
-        from gridfm_datakit.powsybl import load_net, convert_net
-
-        loaded = load_net(xiidm_case14_path)
-        result = convert_net(loaded.gfm_net)
+        loaded = powsybl.load_net(xiidm_case14_path)
+        result = powsybl.convert_net(loaded.gfm_net)
 
         assert result.gfm_net is loaded.gfm_net
 
@@ -227,6 +217,7 @@ class TestWorkflowXiidm:
 # ---------------------------------------------------------------------------
 # Workflow tests: MATPOWER .m source
 # ---------------------------------------------------------------------------
+
 
 class TestWorkflowMatpower:
     """
@@ -239,11 +230,9 @@ class TestWorkflowMatpower:
 
     def test_load_net_returns_valid_loaded_network(self, matpower_case14_path):
         """load_net must succeed on a .m file and return a valid LoadedNetwork."""
-        from gridfm_datakit.powsybl import load_net, LoadedNetwork
+        loaded = powsybl.load_net(matpower_case14_path)
 
-        loaded = load_net(matpower_case14_path)
-
-        assert isinstance(loaded, LoadedNetwork)
+        assert isinstance(loaded, powsybl.LoadedNetwork)
         assert loaded.pp_net is not None
         assert loaded.gfm_net is not None
 
@@ -256,27 +245,21 @@ class TestWorkflowMatpower:
         order.  Rather than silently misassign costs, load_net always returns
         empty metadata.gen_costs.
         """
-        from gridfm_datakit.powsybl import load_net
-
-        loaded = load_net(matpower_case14_path)
+        loaded = powsybl.load_net(matpower_case14_path)
 
         assert loaded.metadata.gen_costs == {}
 
     def test_load_net_gfm_net_has_default_gencosts(self, matpower_case14_path):
         """gfm_net must have a valid gencost matrix with default coefficients."""
-        from gridfm_datakit.powsybl import load_net
-
-        loaded = load_net(matpower_case14_path)
+        loaded = powsybl.load_net(matpower_case14_path)
         n_gens = loaded.gfm_net.gens.shape[0]
 
         _assert_gencost_matrix_is_valid(loaded.gfm_net.gencosts, n_gens)
 
     def test_convert_net_metadata_has_gen_costs(self, matpower_case14_path):
         """After convert_net, metadata.gen_costs must have one entry per generator."""
-        from gridfm_datakit.powsybl import load_net, convert_net
-
-        loaded = load_net(matpower_case14_path)
-        result = convert_net(loaded.gfm_net)
+        loaded = powsybl.load_net(matpower_case14_path)
+        result = powsybl.convert_net(loaded.gfm_net)
 
         n_gens = loaded.gfm_net.gens.shape[0]
         assert len(result.metadata.gen_costs) == n_gens
@@ -289,10 +272,8 @@ class TestWorkflowMatpower:
         This test specifically verifies that _extract_gen_costs in __init__.py
         reads the correct columns and does not truncate or reorder them.
         """
-        from gridfm_datakit.powsybl import load_net, convert_net
-
-        loaded = load_net(matpower_case14_path)
-        result = convert_net(loaded.gfm_net)
+        loaded = powsybl.load_net(matpower_case14_path)
+        result = powsybl.convert_net(loaded.gfm_net)
 
         gencosts = loaded.gfm_net.gencosts
         for gen_idx_str, coeffs in result.metadata.gen_costs.items():
@@ -309,9 +290,7 @@ class TestWorkflowMatpower:
         The network_id argument must be forwarded to pypowsybl so the
         caller can identify the created network object.
         """
-        from gridfm_datakit.powsybl import load_net, convert_net
-
-        loaded = load_net(matpower_case14_path)
-        result = convert_net(loaded.gfm_net, network_id="case14_roundtrip")
+        loaded = powsybl.load_net(matpower_case14_path)
+        result = powsybl.convert_net(loaded.gfm_net, network_id="case14_roundtrip")
 
         assert result.pp_net.id == "case14_roundtrip"

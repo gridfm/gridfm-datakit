@@ -1,8 +1,11 @@
 """Tests for gridfm_datakit.generate using PowSyBl's Open Load Flow."""
 
-import pytest
+import copy
 from pathlib import Path
 
+import pytest
+
+from gridfm_datakit import generate_power_flow_data
 from gridfm_datakit.powsybl.api import is_powsybl_available
 
 pytestmark = pytest.mark.skipif(
@@ -64,7 +67,6 @@ def _make_config(
     filename: str | None = None,
     source: str | None = None,
 ) -> dict:
-    import copy
     config = copy.deepcopy(_BASE_CONFIG)
     config["settings"]["data_dir"] = str(data_dir)
     config["network"]["source"] = source if source is not None else "file"
@@ -79,6 +81,7 @@ def _make_config(
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="module")
 def tmp_data_dir(tmp_path_factory):
@@ -114,52 +117,43 @@ def config_ieee14_cgmes(tmp_data_dir):
 def case24_ieee_rts(tmp_data_dir):
     return _make_config("case24_ieee_rts", tmp_data_dir, source="pglib")
 
+
 # ---------------------------------------------------------------------------
 # 1. Format tests
 # ---------------------------------------------------------------------------
+
 
 class TestFormats:
     """
     Tests the ability to handle MATPOWER (.m and .mat extensions), PSS/E, XIIDM and CGMES formats.
     """
+
     def test_ieee14_m(self, config_ieee14_m):
         "Test handling of MATPOWER format (.m extension)"
-        from gridfm_datakit import generate_power_flow_data
-
         generate_power_flow_data(config_ieee14_m)
         assert True
 
     def test_ieee14_mat(self, config_ieee14_mat):
         """Test handling of MATPOWER format (.mat extension)."""
-        from gridfm_datakit import generate_power_flow_data
-
         generate_power_flow_data(config_ieee14_mat)
         assert True
 
     def test_ieee14_raw(self, config_ieee14_raw):
         """Test handling of PSS/E format (.raw extension)."""
-        from gridfm_datakit import generate_power_flow_data
-
         generate_power_flow_data(config_ieee14_raw)
         assert True
 
     def test_ieee14_xiidm(self, config_ieee14_xiidm):
         """Test handling of XIIDM format (.xiidm extension)."""
-        from gridfm_datakit import generate_power_flow_data
-
         generate_power_flow_data(config_ieee14_xiidm)
         assert True
 
     def test_ieee14_cgmes(self, config_ieee14_cgmes):
         """Test handling of CGMES format (.zip extension)."""
-        from gridfm_datakit import generate_power_flow_data
-
         generate_power_flow_data(config_ieee14_cgmes)
         assert True
 
     def test_case24_ieee_rts(self, case24_ieee_rts):
         """Test handling of PGLIB format (source='pglib')."""
-        from gridfm_datakit import generate_power_flow_data
-
         generate_power_flow_data(case24_ieee_rts)
         assert True
