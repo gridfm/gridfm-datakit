@@ -635,6 +635,29 @@ def load_net_from_file(network_path: str) -> Network:
     return Network(mpc)
 
 
+def get_pglib_file_path(grid_name: str) -> str:
+    """Return the local path to a PGLib network file, downloading it if necessary.
+
+    Args:
+        grid_name: Name of the grid file without the prefix 'pglib_opf_'
+                  (e.g., 'case14_ieee', 'case118_ieee').
+
+    Returns:
+        Absolute path to the (corrected) local .m file.
+    """
+    file_path = str(
+        resources.files("gridfm_datakit.grids").joinpath(f"pglib_opf_{grid_name}.m"),
+    )
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    if not os.path.exists(file_path):
+        url = f"https://raw.githubusercontent.com/power-grid-lib/pglib-opf/master/pglib_opf_{grid_name}.m"
+        response = requests.get(url)
+        response.raise_for_status()
+        with open(file_path, "wb") as f:
+            f.write(response.content)
+    return correct_network(file_path)
+
+
 def load_net_from_pglib(grid_name: str) -> Network:
     """Load a power grid network from PGLib using matpowercaseframes.
 
@@ -652,25 +675,7 @@ def load_net_from_pglib(grid_name: str) -> Network:
         FileNotFoundError: If the file cannot be found after download.
         ValueError: If the file format is invalid.
     """
-
-    # Construct file paths
-    file_path = str(
-        resources.files("gridfm_datakit.grids").joinpath(f"pglib_opf_{grid_name}.m"),
-    )
-
-    # Create directory if it doesn't exist
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
-
-    # Download file if not exists
-    if not os.path.exists(file_path):
-        url = f"https://raw.githubusercontent.com/power-grid-lib/pglib-opf/master/pglib_opf_{grid_name}.m"
-        response = requests.get(url)
-        response.raise_for_status()
-
-        with open(file_path, "wb") as f:
-            f.write(response.content)
-
-    file_path = correct_network(file_path)
+    file_path = get_pglib_file_path(grid_name)
 
     # Load network using matpowercaseframes
     mpc_frames = CaseFrames(file_path)

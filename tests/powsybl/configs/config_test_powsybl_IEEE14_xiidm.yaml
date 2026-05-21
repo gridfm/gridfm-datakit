@@ -1,9 +1,10 @@
 network:
   name: "IEEE14_xiidm" # Name of the power grid network (without extension)
-  source: "powsybl" # Data source for the grid; options: pglib, file
+  source: "file" # Data source for the grid; options: pglib, file
+  reader: "powsybl" # How to parse the network file; options: native, powsybl
   # WARNING: the following parameter is only used if source is "file"
   network_dir: "scripts/grids" # if using source "file", this is the directory containing the network file (relative to the project root)
-  file: "./tests/powsybl/grids/ieee14.xiidm" # 
+  file: "./tests/powsybl/grids/ieee14.xiidm" #
 
 load:
   generator: "agg_load_profile" # Name of the load generator; options: agg_load_profile, powergraph

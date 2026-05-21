@@ -1075,7 +1075,8 @@ def process_scenario_chunk(
         seed: Global random seed for reproducibility.
         pf_solver: PF solver to use in pf mode; either 'powermodel' or 'powsybl'.
             OPF is always solved by PowerModels regardless of this value.
-        meta: metadata dict with key 'pp_net' (required when pf_solver='powsybl').
+        meta: metadata dict; when pf_solver='powsybl', must contain 'network_path'
+            and 'mapping_p2g'. 'pp_net' is loaded fresh per worker from 'network_path'.
 
     Returns:
         Tuple containing:
@@ -1086,6 +1087,14 @@ def process_scenario_chunk(
 
     try:
         jl = init_julia(max_iter, solver_log_dir)
+
+        # In distributed (spawn) workers pp_net is not passed; reload it here.
+        if pf_solver == "powsybl" and meta and "network_path" in meta and "pp_net" not in meta:
+            import gridfm_datakit.powsybl as _powsybl
+            loaded_net = _powsybl.load_net(meta["network_path"])
+            meta = dict(meta)
+            meta["pp_net"] = loaded_net.pp_net
+
         local_processed_data = []
 
         # Use custom_seed to set seed based on start_idx for this chunk

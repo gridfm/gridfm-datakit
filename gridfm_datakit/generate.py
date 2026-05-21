@@ -20,6 +20,7 @@ from gridfm_datakit.utils.param_handler import (
 from gridfm_datakit.network import (
     load_net_from_file,
     load_net_from_pglib,
+    get_pglib_file_path,
 )
 from gridfm_datakit.perturbations.load_perturbation import (
     load_scenarios_to_df,
@@ -29,7 +30,8 @@ import gridfm_datakit.powsybl as powsybl
 import gc
 from datetime import datetime
 from tqdm import tqdm
-from multiprocessing import Pool, Manager
+from multiprocessing import Manager
+import multiprocessing
 import shutil
 from gridfm_datakit.utils.utils import write_ram_usage_distributed, Tee
 import yaml
@@ -83,11 +85,21 @@ def _setup_environment(
         # seed < (2,147,483,647 - n_scenarios) / 20,000 ~= 100_000 so taking 50_000 to be safe
         print(f"No seed provided. Using seed={seed}")
 
+    # Resolve and validate the network reader.
+    #
+    # reader controls HOW the network file is parsed (independent of pf_solver).
+    # source controls WHERE to get the file: 'pglib' (download) or 'file' (local).
+    reader = getattr(args.network, "reader", "native")
+    if reader not in ("native", "powsybl"):
+        raise ValueError(
+            f"network.reader must be 'native' or 'powsybl', got {reader!r}"
+        )
+    args.network.reader = reader
+
     # Resolve and validate the PF solver setting.
     #
     # pf_solver controls which engine is used to solve the power flow equations
-    # in PF mode.  It is completely independent of network.source: you can load
-    # a network from any source and solve it with either engine.
+    # in PF mode.  It is completely independent of network.source/reader.
     #
     # OPF is always solved by PowerModels (Julia) regardless of this setting.
     # In OPF mode the value is read and stored on args but is never consulted
@@ -170,19 +182,36 @@ def _prepare_network_and_scenarios(
         Tuple of (network, scenarios)
     """
     meta = {}
+    reader = args.network.reader  # already validated in _setup_environment
+
     if args.network.source == "pglib":
-        net = load_net_from_pglib(args.network.name)
+        if reader == "powsybl":
+            network_path = get_pglib_file_path(args.network.name)
+            loaded_net = powsybl.load_net(network_path)
+            meta["pp_net"] = loaded_net.pp_net
+            meta["network_path"] = network_path
+            meta["mapping_p2g"] = loaded_net.mapping_p2g
+            net = loaded_net.gfm_net
+        else:
+            net = load_net_from_pglib(args.network.name)
     elif args.network.source == "file":
-        net = load_net_from_file(
-            os.path.join(args.network.network_dir, args.network.name) + ".m",
-        )
-    elif args.network.source == "powsybl":
-        loaded_net = powsybl.load_net(args.network.file)
-        meta["pp_net"] = loaded_net.pp_net
-        meta["mapping_p2g"] = loaded_net.mapping_p2g
-        net = loaded_net.gfm_net
+        if reader == "powsybl":
+            network_path = (
+                args.network.file
+                if getattr(args.network, "file", None)
+                else os.path.join(args.network.network_dir, args.network.name) + ".m"
+            )
+            loaded_net = powsybl.load_net(network_path)
+            meta["pp_net"] = loaded_net.pp_net
+            meta["network_path"] = network_path
+            meta["mapping_p2g"] = loaded_net.mapping_p2g
+            net = loaded_net.gfm_net
+        else:
+            net = load_net_from_file(
+                os.path.join(args.network.network_dir, args.network.name) + ".m",
+            )
     else:
-        raise ValueError("Invalid grid source!")
+        raise ValueError(f"network.source must be 'pglib' or 'file', got {args.network.source!r}")
 
     # Generate load scenarios
     load_scenario_generator = get_load_scenario_generator(args.load)
@@ -437,6 +466,10 @@ def generate_power_flow_data_distributed(
                     min(args.settings.num_processes, chunk_size),
                 )
 
+                # pp_net wraps JVM state and cannot cross process boundaries;
+                # workers reload it themselves from network_path.
+                worker_meta = {k: v for k, v in meta.items() if k != "pp_net"}
+
                 tasks = [
                     (
                         args.settings.mode,
@@ -456,13 +489,14 @@ def generate_power_flow_data_distributed(
                         args.settings.max_iter,
                         seed,
                         args.settings.pf_solver,
-                        meta,
+                        worker_meta,
                     )
                     for chunk in scenario_chunks
                 ]
 
                 # Run parallel processing
-                with Pool(processes=args.settings.num_processes) as pool:
+                _mp_ctx = multiprocessing.get_context("fork")
+                with _mp_ctx.Pool(processes=args.settings.num_processes) as pool:
                     results = [
                         pool.apply_async(process_scenario_chunk, task) for task in tasks
                     ]
