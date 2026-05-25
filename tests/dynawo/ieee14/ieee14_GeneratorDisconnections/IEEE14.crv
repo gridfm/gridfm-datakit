@@ -1,0 +1,48 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!--
+    Copyright (c) 2015-2020, RTE (http://www.rte-france.com)
+    See AUTHORS.txt
+    All rights reserved.
+    This Source Code Form is subject to the terms of the Mozilla Public
+    License, v. 2.0. If a copy of the MPL was not distributed with this
+    file, you can obtain one at http://mozilla.org/MPL/2.0/.
+    SPDX-License-Identifier: MPL-2.0
+
+    This file is part of Dynawo, an hybrid C++/Modelica open source time domain
+    simulation tool for power systems.
+-->
+<curvesInput xmlns="http://www.rte-france.com/dynawo">
+  <!--Curves for scenario-->
+  <curve model="NETWORK" variable="_BUS____1_TN_U_value"/>
+  <curve model="NETWORK" variable="_BUS____2_TN_U_value"/>
+  <curve model="NETWORK" variable="_BUS____3_TN_U_value"/>
+  <curve model="NETWORK" variable="_BUS____4_TN_U_value"/>
+  <curve model="NETWORK" variable="_BUS____5_TN_U_value"/>
+  <curve model="NETWORK" variable="_BUS____6_TN_U_value"/>
+  <curve model="NETWORK" variable="_BUS____7_TN_U_value"/>
+  <curve model="NETWORK" variable="_BUS____8_TN_U_value"/>
+  <curve model="NETWORK" variable="_BUS____9_TN_U_value"/>
+  <curve model="NETWORK" variable="_BUS___10_TN_U_value"/>
+  <curve model="NETWORK" variable="_BUS___11_TN_U_value"/>
+  <curve model="NETWORK" variable="_BUS___12_TN_U_value"/>
+  <curve model="NETWORK" variable="_BUS___13_TN_U_value"/>
+  <curve model="NETWORK" variable="_BUS___14_TN_U_value"/>
+  <curve model="GEN____3_SM" variable="generator_UPu"/>
+  <curve model="UVA" variable="underVoltageAutomaton_UMinPu"/>
+  <curve model="GEN____1_SM" variable="generator_efdPu_value"/>
+  <curve model="GEN____1_SM" variable="voltageRegulator_EfdMaxPu"/>
+  <curve model="GEN____3_SM" variable="generator_efdPu_value"/>
+  <curve model="GEN____3_SM" variable="voltageRegulator_EfdMaxPu"/>
+  <curve model="_LOAD___2_EC" variable="tapChangerT_UTarget"/>
+  <curve model="_LOAD___2_EC" variable="tapChangerT_UMonitored_value"/>
+  <curve model="_LOAD___2_EC" variable="tapChangerT_tap_value"/>
+  <curve model="_LOAD___2_EC" variable="tapChangerT_tapMax"/>
+  <curve model="_LOAD___2_EC" variable="tapChangerT_tapMin"/>
+  <curve model="_LOAD___9_EC" variable="tapChanger_UTarget"/>
+  <curve model="_LOAD___9_EC" variable="tapChanger_UMonitored_value"/>
+  <curve model="_LOAD___9_EC" variable="tapChanger_tap_value"/>
+  <curve model="_LOAD___9_EC" variable="tapChanger_tapMax"/>
+  <curve model="_LOAD___9_EC" variable="tapChanger_tapMin"/>
+  <curve model="_LOAD___9_EC" variable="load_PPu"/>
+  <curve model="_LOAD___9_EC" variable="load_QPu"/>
+</curvesInput>
