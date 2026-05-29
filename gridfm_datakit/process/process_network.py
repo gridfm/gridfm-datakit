@@ -6,58 +6,63 @@ running power flow calculations, and generating perturbed scenarios
 for data generation purposes.
 """
 
-import numpy as np
-from importlib import resources
-from gridfm_datakit.utils.column_names import (
-    GEN_COLUMNS,
-    DC_GEN_COLUMNS,
-    BUS_COLUMNS,
-    DC_BUS_COLUMNS,
-    BRANCH_COLUMNS,
-    DC_BRANCH_COLUMNS,
-    RUNTIME_COLUMNS,
-    DC_RUNTIME_COLUMNS,
-)
-import os
-from typing import Tuple, List, Union, Dict, Any, Optional
-from gridfm_datakit.network import makeYbus, branch_vectors
 import copy
-from gridfm_datakit.process.solvers import run_opf, run_pf, run_dcpf, run_dcopf
-from gridfm_datakit.utils.random_seed import custom_seed
+import multiprocessing
+import os
+import time
+import traceback
+from importlib import resources
+from queue import Queue
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import numpy as np
+
+import gridfm_datakit.powsybl as powsybl
+from gridfm_datakit.network import Network, branch_vectors, makeYbus
+from gridfm_datakit.perturbations.admittance_perturbation import AdmittanceGenerator
+from gridfm_datakit.perturbations.generator_perturbation import GenerationGenerator
+from gridfm_datakit.perturbations.topology_perturbation import TopologyGenerator
+from gridfm_datakit.process.solvers import run_dcopf, run_dcpf, run_opf, run_pf
+from gridfm_datakit.utils.column_names import (
+    BRANCH_COLUMNS,
+    BUS_COLUMNS,
+    DC_BRANCH_COLUMNS,
+    DC_BUS_COLUMNS,
+    DC_GEN_COLUMNS,
+    DC_RUNTIME_COLUMNS,
+    GEN_COLUMNS,
+    RUNTIME_COLUMNS,
+)
+from gridfm_datakit.utils.idx_brch import (
+    ANGMAX,
+    ANGMIN,
+    BR_B,
+    BR_R,
+    BR_STATUS,
+    BR_X,
+    F_BUS,
+    RATE_A,
+    SHIFT,
+    T_BUS,
+    TAP,
+)
 from gridfm_datakit.utils.idx_bus import (
-    GS,
-    BS,
-    BUS_TYPE,
     BASE_KV,
-    VMIN,
-    VMAX,
+    BS,
+    BUS_I,
+    BUS_TYPE,
+    GS,
+    PD,
     PQ,
     PV,
+    QD,
     REF,
+    VMAX,
+    VMIN,
 )
-from gridfm_datakit.utils.idx_brch import SHIFT
-from gridfm_datakit.utils.idx_gen import GEN_BUS, PMIN, PMAX, QMIN, QMAX
-from gridfm_datakit.utils.idx_cost import NCOST, COST
-from gridfm_datakit.utils.idx_brch import (
-    F_BUS,
-    T_BUS,
-    RATE_A,
-    BR_STATUS,
-    TAP,
-    ANGMIN,
-    ANGMAX,
-    BR_R,
-    BR_X,
-    BR_B,
-)
-from queue import Queue
-from gridfm_datakit.perturbations.topology_perturbation import TopologyGenerator
-from gridfm_datakit.perturbations.generator_perturbation import GenerationGenerator
-from gridfm_datakit.perturbations.admittance_perturbation import AdmittanceGenerator
-import traceback
-from gridfm_datakit.network import Network
-from gridfm_datakit.utils.idx_bus import BUS_I, PD, QD
-import multiprocessing
+from gridfm_datakit.utils.idx_cost import COST, NCOST
+from gridfm_datakit.utils.idx_gen import GEN_BUS, PMAX, PMIN, QMAX, QMIN
+from gridfm_datakit.utils.random_seed import custom_seed
 
 
 def init_julia(
@@ -650,8 +655,14 @@ def pf_post_processing(
     Pg_bus = np.bincount(gen_bus, weights=pg_gen, minlength=n_buses)
     Qg_bus = np.bincount(gen_bus, weights=qg_gen, minlength=n_buses)
 
-    assert np.all(Pg_bus[net.buses[:, BUS_TYPE] == PQ] == 0)
-    assert np.all(Qg_bus[net.buses[:, BUS_TYPE] == PQ] == 0)
+    # Pg_bus / Qg_bus are indexed by 0-based bus INDEX; net.buses rows may be
+    # in a different order (pypowsybl does not guarantee sorted bus export).
+    # Build a bus-type array indexed by bus index so the mask aligns correctly.
+    bus_type_by_idx = np.zeros(n_buses)
+    bus_type_by_idx[net.buses[:, BUS_I].astype(int)] = net.buses[:, BUS_TYPE]
+
+    assert np.all(Pg_bus[bus_type_by_idx == PQ] == 0)
+    assert np.all(Qg_bus[bus_type_by_idx == PQ] == 0)
 
     if include_dc_res:
         if res_dc is not None:
@@ -666,10 +677,12 @@ def pf_post_processing(
             else:
                 pg_gen_dc = apply_slack_single_gen(net, pg_gen, Pg_bus, pf_dc, pt_dc)
             Pg_bus_dc = np.bincount(gen_bus, weights=pg_gen_dc, minlength=n_buses)
-            assert np.all(Pg_bus_dc[net.buses[:, BUS_TYPE] == PQ] == 0)
+            assert np.all(Pg_bus_dc[bus_type_by_idx == PQ] == 0)
 
-    X_bus[:, 4] = Pg_bus
-    X_bus[:, 5] = Qg_bus
+    # Reindex Pg/Qg from bus-index order to bus-row order for X_bus assignment.
+    bus_row_idx = net.buses[:, BUS_I].astype(int)
+    X_bus[:, 4] = Pg_bus[bus_row_idx]
+    X_bus[:, 5] = Qg_bus[bus_row_idx]
 
     # Voltage
     assert set([int(k) for k in res["solution"]["bus"].keys()]) == set(
@@ -721,7 +734,7 @@ def pf_post_processing(
             # convert to range [-180, 180]
             va = (va + 180) % 360 - 180
             X_bus[:, 16] = va
-            X_bus[:, 17] = Pg_bus_dc
+            X_bus[:, 17] = Pg_bus_dc[bus_row_idx]
         else:
             X_bus[:, 16] = np.nan
             X_bus[:, 17] = np.nan
@@ -829,32 +842,70 @@ def process_scenario_pf_mode(
     pf_fast: bool,
     dcpf_fast: bool,
     jl: Any,
+    pf_solver: str = "powermodel",
+    *,
+    meta: Optional[Dict] = None,
 ) -> List[np.ndarray]:
-    """Processes a load scenario in PF mode
+    """Processes a load scenario in PF mode.
 
     In PF mode, OPF is run first to get generator setpoints, then topology
     perturbations are applied. This can lead to constraint violations (overloads,
     voltage violations) since the setpoints are not re-optimized for the new topology.
 
-    Args:
-        net: The power network.
-        scenarios: Array of load scenarios with shape (n_loads, n_scenarios, 2).
-        scenario_index: Index of the current scenario to process.
-        topology_generator: Generator for topology perturbations (line/transformer outages).
-        generation_generator: Generator for generation cost perturbations.
-        admittance_generator: Generator for line admittance perturbations.
-        local_processed_data: List to accumulate processed data tuples.
-        error_log_file: Path to error log file for recording failures.
-        include_dc_res: Whether to include DC power flow results in output.
-        pf_fast: Whether to use fast AC PF solver.
-        dcpf_fast: Whether to use fast DC PF solver.
-        jl: Julia interface object for running power flow calculations.
+    Parameters
+    ----------
+    net:
+        The base power network (deep-copied internally before mutation).
+    scenarios:
+        Array of load scenarios with shape ``(n_loads, n_scenarios, 2)``.
+    scenario_index:
+        Index of the current scenario to process.
+    topology_generator:
+        Generator for topology perturbations (line/transformer outages).
+    generation_generator:
+        Generator for generation cost perturbations.
+    admittance_generator:
+        Generator for line admittance perturbations.
+    local_processed_data:
+        List to accumulate processed data tuples.
+    error_log_file:
+        Path to error log file for recording failures.
+    include_dc_res:
+        Whether to include DC power flow results in output.
+    pf_fast:
+        Whether to use the fast AC PF solver (``compute_ac_pf`` from
+        PowerModels.jl).  Only consulted when ``pf_solver='powermodel'``.
+    dcpf_fast:
+        Whether to use the fast DC PF solver (``compute_dc_pf`` from
+        PowerModels.jl).  Only consulted when ``pf_solver='powermodel'``.
+    jl:
+        Julia interface object.  Always required — even when
+        ``pf_solver='powsybl'`` Julia is used for the OPF step that
+        produces the generator set-points before topology perturbation.
+    pf_solver:
+        Which engine to use for the power flow solve after topology
+        perturbation.  Must be ``'powermodel'`` (default) or
+        ``'powsybl'``.  OPF is always solved by PowerModels regardless
+        of this value.
 
-    Returns:
-        Updated list of processed data (bus, gen, branch, Y_bus arrays)
+    Keyword-only arguments (only required when ``pf_solver='powsybl'``)
+    -------------------------------------------------------------------
+    meta:
+    Optional dictionary containing metadata for PowSyBl processing, with keys:
+        - pp_net: the PowSyBl network.
+        - mapping_p2g: dictionary mapping from PowSyBl to GFM.
 
-    Note:
-        Random seed is controlled by the calling context (process_scenario_chunk).
+    Returns
+    -------
+    List[np.ndarray]
+        Updated ``local_processed_data`` list with one tuple
+        ``(bus, gen, branch, Y_bus, runtime)`` appended per successfully
+        solved perturbation.
+
+    Note
+    ----
+    Random seed is controlled by the calling context
+    (``process_scenario_chunk`` or ``generate_power_flow_data``).
     """
     net = copy.deepcopy(net)
 
@@ -886,28 +937,87 @@ def process_scenario_pf_mode(
     # Generate perturbed topologies
     perturbations = topology_generator.generate(net_pf)
 
+    if pf_solver == "powsybl":
+        powsybl.check_powsybl_available()
+        if meta is None or "pp_net" not in meta or "mapping_p2g" not in meta:
+            raise ValueError("Network seems to not be initialized for PowSyBl solver")
+        pp_net = meta["pp_net"]
+        mapping_p2g = meta["mapping_p2g"]
+        base_variant_id = pp_net.get_working_variant_id()
+        lf_params = powsybl.get_default_lf_params()
+
     # to get PF points that can violate some OPF inequality constraints (to train PF solvers that can handle points outside of normal operating limits), we apply the topology perturbation after OPF.
     # The setpoints are then no longer adapted to the new topology, and might lead to e.g. abranch overload or a voltage magnitude violation once we drop an element.
-    for perturbation in perturbations:
-        res_dcpf = None
-        if include_dc_res:
-            try:
-                res_dcpf = run_dcpf(perturbation, jl, fast=dcpf_fast)
+    for pert_index, perturbation in enumerate(perturbations):
+        if pf_solver == "powermodel":
+            res_dcpf = None
+            if include_dc_res:
+                try:
+                    res_dcpf = run_dcpf(perturbation, jl, fast=dcpf_fast)
 
+                except Exception as e:
+                    with open(error_log_file, "a") as f:
+                        f.write(
+                            f"Caught an exception at scenario {scenario_index} when solving dcpf function: {e}\n",
+                        )
+            try:
+                res = run_pf(perturbation, jl, fast=pf_fast)
             except Exception as e:
                 with open(error_log_file, "a") as f:
                     f.write(
-                        f"Caught an exception at scenario {scenario_index} when solving dcpf function: {e}\n",
+                        f"Caught an exception at scenario {scenario_index} when solving in run_pf function: {e}\n",
                     )
+                continue
 
-        try:
-            res = run_pf(perturbation, jl, fast=pf_fast)
-        except Exception as e:
-            with open(error_log_file, "a") as f:
-                f.write(
-                    f"Caught an exception at scenario {scenario_index} when solving in run_pf function: {e}\n",
-                )
-            continue
+        if pf_solver == "powsybl":
+            variant_id = f"scenario_{scenario_index}_perturbation_{pert_index}"
+            pp_net.clone_variant(base_variant_id, variant_id)
+            pp_net.set_working_variant(variant_id)
+            try:
+                powsybl.update_powsybl(pp_net, perturbation, mapping_p2g)
+
+                res_dcpf = None
+                if include_dc_res:
+                    try:
+                        start_time = time.perf_counter()
+                        dcpf_metadata = powsybl.pypowsybl.loadflow.run_dc(
+                            pp_net,
+                            lf_params,
+                        )
+                        end_time = time.perf_counter()
+                        solve_time = end_time - start_time
+                        res_dcpf = powsybl.get_pf_res(
+                            pp_net,
+                            solve_time,
+                            dcpf_metadata,
+                            mapping_p2g,
+                        )
+
+                    except Exception as e:
+                        with open(error_log_file, "a") as f:
+                            f.write(
+                                f"Caught an exception at scenario {scenario_index} when solving dcpf function with PowSyBl solver: {e}\n",
+                            )
+                try:
+                    start_time = time.perf_counter()
+                    pf_metadata = powsybl.pypowsybl.loadflow.run_ac(pp_net, lf_params)
+                    end_time = time.perf_counter()
+                    solve_time = end_time - start_time
+                    res = powsybl.get_pf_res(
+                        pp_net,
+                        solve_time,
+                        pf_metadata,
+                        mapping_p2g,
+                    )
+                except Exception as e:
+                    with open(error_log_file, "a") as f:
+                        f.write(
+                            f"Caught an exception at scenario {scenario_index} when solving in run_pf function with PowSyBl solver: {e}\n",
+                        )
+                    continue
+            finally:
+                pp_net.set_working_variant(base_variant_id)
+                pp_net.remove_variant(variant_id)
 
         # Append processed power flow data
         pf_data = pf_post_processing(
@@ -946,6 +1056,8 @@ def process_scenario_chunk(
     solver_log_dir: str,
     max_iter: int,
     seed: int,
+    pf_solver: str = "powermodel",
+    meta: Optional[Dict] = None,
 ) -> Tuple[
     Union[None, Exception],
     Union[None, str],
@@ -973,6 +1085,10 @@ def process_scenario_chunk(
         solver_log_dir: Directory for solver logs.
         max_iter: Maximum iterations for the solver.
         seed: Global random seed for reproducibility.
+        pf_solver: PF solver to use in pf mode; either 'powermodel' or 'powsybl'.
+            OPF is always solved by PowerModels regardless of this value.
+        meta: metadata dict; when pf_solver='powsybl', must contain 'network_path'
+            and 'mapping_p2g'. 'pp_net' is loaded fresh per worker from 'network_path'.
 
     Returns:
         Tuple containing:
@@ -983,6 +1099,20 @@ def process_scenario_chunk(
 
     try:
         jl = init_julia(max_iter, solver_log_dir)
+
+        # In distributed (spawn) workers pp_net is not passed; reload it here.
+        if (
+            pf_solver == "powsybl"
+            and meta
+            and "network_path" in meta
+            and "pp_net" not in meta
+        ):
+            import gridfm_datakit.powsybl as _powsybl
+
+            loaded_net = _powsybl.load_net(meta["network_path"])
+            meta = dict(meta)
+            meta["pp_net"] = loaded_net.pp_net
+
         local_processed_data = []
 
         # Use custom_seed to set seed based on start_idx for this chunk
@@ -1022,6 +1152,8 @@ def process_scenario_chunk(
                         pf_fast,
                         dcpf_fast,
                         jl,
+                        pf_solver,
+                        meta=meta,
                     )
 
                 progress_queue.put(1)  # update queue

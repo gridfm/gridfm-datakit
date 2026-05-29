@@ -1,0 +1,159 @@
+"""Tests for gridfm_datakit.generate using PowSyBl's Open Load Flow."""
+
+import copy
+from pathlib import Path
+
+import pytest
+
+from gridfm_datakit import generate_power_flow_data
+from gridfm_datakit.powsybl.api import is_powsybl_available
+
+pytestmark = pytest.mark.skipif(
+    not is_powsybl_available(),
+    reason="pypowsybl is not installed. Install with: pip install gridfm-datakit[powsybl]",
+)
+
+_GRIDS_DIR = Path(__file__).parent / "grids"
+
+_BASE_CONFIG = {
+    "network": {
+        "reader": "powsybl",
+    },
+    "load": {
+        "generator": "agg_load_profile",
+        "agg_profile": "default",
+        "scenarios": 5,
+        "sigma": 0.2,
+        "change_reactive_power": True,
+        "global_range": 0.4,
+        "max_scaling_factor": 4.0,
+        "step_size": 0.05,
+        "start_scaling_factor": 0.8,
+    },
+    "topology_perturbation": {
+        "type": "none",
+        "k": 2,
+        "n_topology_variants": 2,
+        "elements": ["branch", "gen"],
+    },
+    "generation_perturbation": {
+        "type": "cost_permutation",
+        "sigma": 1.0,
+    },
+    "admittance_perturbation": {
+        "type": "random_perturbation",
+        "sigma": 0.2,
+    },
+    "settings": {
+        "num_processes": 1,
+        "large_chunk_size": 5,
+        "overwrite": True,
+        "mode": "pf",
+        "include_dc_res": True,
+        "enable_solver_logs": False,
+        "pf_fast": False,
+        "dcpf_fast": False,
+        "max_iter": 200,
+        "pf_solver": "powsybl",
+        "seed": 49455,
+    },
+}
+
+
+def _make_config(
+    name: str,
+    data_dir: Path,
+    *,
+    filename: str | None = None,
+    source: str | None = None,
+) -> dict:
+    config = copy.deepcopy(_BASE_CONFIG)
+    config["settings"]["data_dir"] = str(data_dir)
+    config["network"]["source"] = source if source is not None else "file"
+    config["network"]["name"] = name
+    if filename is not None:
+        config["network"]["file"] = str(_GRIDS_DIR / filename)
+    else:
+        config["network"]["network_dir"] = str(_GRIDS_DIR)
+    return config
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def tmp_data_dir(tmp_path_factory):
+    return tmp_path_factory.mktemp("data")
+
+
+@pytest.fixture(scope="module")
+def config_ieee14_m(tmp_data_dir):
+    return _make_config("IEEE14_m", tmp_data_dir, filename="ieee14.m")
+
+
+@pytest.fixture(scope="module")
+def config_ieee14_mat(tmp_data_dir):
+    return _make_config("IEEE14_mat", tmp_data_dir, filename="ieee14.mat")
+
+
+@pytest.fixture(scope="module")
+def config_ieee14_raw(tmp_data_dir):
+    return _make_config("IEEE14_raw", tmp_data_dir, filename="ieee14.raw")
+
+
+@pytest.fixture(scope="module")
+def config_ieee14_xiidm(tmp_data_dir):
+    return _make_config("IEEE14_xiidm", tmp_data_dir, filename="ieee14.xiidm")
+
+
+@pytest.fixture(scope="module")
+def config_ieee14_cgmes(tmp_data_dir):
+    return _make_config("IEEE14_cgmes", tmp_data_dir, filename="ieee14.zip")
+
+
+@pytest.fixture(scope="module")
+def case24_ieee_rts(tmp_data_dir):
+    return _make_config("case24_ieee_rts", tmp_data_dir, source="pglib")
+
+
+# ---------------------------------------------------------------------------
+# 1. Format tests
+# ---------------------------------------------------------------------------
+
+
+class TestFormats:
+    """
+    Tests the ability to handle MATPOWER (.m and .mat extensions), PSS/E, XIIDM and CGMES formats.
+    """
+
+    def test_ieee14_m(self, config_ieee14_m):
+        "Test handling of MATPOWER format (.m extension)"
+        generate_power_flow_data(config_ieee14_m)
+        assert True
+
+    def test_ieee14_mat(self, config_ieee14_mat):
+        """Test handling of MATPOWER format (.mat extension)."""
+        generate_power_flow_data(config_ieee14_mat)
+        assert True
+
+    def test_ieee14_raw(self, config_ieee14_raw):
+        """Test handling of PSS/E format (.raw extension)."""
+        generate_power_flow_data(config_ieee14_raw)
+        assert True
+
+    def test_ieee14_xiidm(self, config_ieee14_xiidm):
+        """Test handling of XIIDM format (.xiidm extension)."""
+        generate_power_flow_data(config_ieee14_xiidm)
+        assert True
+
+    def test_ieee14_cgmes(self, config_ieee14_cgmes):
+        """Test handling of CGMES format (.zip extension)."""
+        generate_power_flow_data(config_ieee14_cgmes)
+        assert True
+
+    def test_case24_ieee_rts(self, case24_ieee_rts):
+        """Test handling of PGLIB format (source='pglib')."""
+        generate_power_flow_data(case24_ieee_rts)
+        assert True

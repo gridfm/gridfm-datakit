@@ -78,7 +78,7 @@ def test_prepare_network_and_scenarios(conf):
     """
     # Ensure the configuration is valid
     args, base_path, file_paths, seed = _setup_environment(conf)
-    net, scenarios = _prepare_network_and_scenarios(args, file_paths, seed)
+    net, scenarios, _ = _prepare_network_and_scenarios(args, file_paths, seed)
 
     assert isinstance(net, Network), "Network should be a Network object"
     assert len(scenarios) > 0, "There should be at least one scenario"
@@ -92,7 +92,7 @@ def test_fail_prepare_network_and_scenarios():
     config = "scripts/config/non_existent_config.yaml"
     with pytest.raises(FileNotFoundError):
         args, base_path, file_paths, seed = _setup_environment(config)
-        net, scenarios = _prepare_network_and_scenarios(args, file_paths, seed)
+        net, scenarios, _ = _prepare_network_and_scenarios(args, file_paths, seed)
 
 
 def test_fail_prepare_network_and_scenarios_config(conf):
@@ -102,7 +102,7 @@ def test_fail_prepare_network_and_scenarios_config(conf):
     args, base_path, file_paths, seed = _setup_environment(conf)
     conf.network.source = "invalid_source"  # Set invalid source
     with pytest.raises(ValueError, match="Invalid grid source!"):
-        net, scenarios = _prepare_network_and_scenarios(conf, file_paths, seed)
+        net, scenarios, _ = _prepare_network_and_scenarios(conf, file_paths, seed)
 
 
 # Test save network function

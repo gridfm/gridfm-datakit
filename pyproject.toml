@@ -80,3 +80,7 @@ test = [
   "pyinstrument",
   "pytest-xdist"
 ]
+
+powsybl = [
+  "pypowsybl"
+]
