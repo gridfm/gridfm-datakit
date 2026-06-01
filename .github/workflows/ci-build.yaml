@@ -65,7 +65,7 @@ jobs:
         with:
           path: |
             ~/.julia
-          key: julia-packages-${{ runner.os }}-${{ hashFiles('**/Project.toml') }}
+          key: julia-packages-${{ runner.os }}-${{ hashFiles('**/juliapkg.json') }}
           restore-keys: |
             julia-packages-${{ runner.os }}-
 
