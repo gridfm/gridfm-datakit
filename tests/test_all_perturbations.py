@@ -151,7 +151,6 @@ def test_all_perturbation_combinations():
 
     # Assert all tests passed
     if failed_tests:
-        print(f"\nFailed tests: {len(failed_tests)}")
-        for test_name, error in failed_tests:
-            print(f"  - {test_name}: {error}")
-        assert False, f"{len(failed_tests)} perturbation combinations failed"
+        failure_details = "\n".join(f"  - {n}: {e}" for n, e in failed_tests)
+        print(f"\nFailed tests:\n{failure_details}")
+        assert False, f"{len(failed_tests)} perturbation combinations failed:\n{failure_details}"

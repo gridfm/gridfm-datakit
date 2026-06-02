@@ -101,7 +101,7 @@ def test_fail_prepare_network_and_scenarios_config(conf):
     """
     args, base_path, file_paths, seed = _setup_environment(conf)
     conf.network.source = "invalid_source"  # Set invalid source
-    with pytest.raises(ValueError, match="network.source must be 'pglib' or 'file', got 'invalid_source'"):
+    with pytest.raises(ValueError, match="Invalid grid source!"):
         net, scenarios = _prepare_network_and_scenarios(conf, file_paths, seed)
 
 
