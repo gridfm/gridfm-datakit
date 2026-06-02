@@ -133,8 +133,9 @@ def test_all_perturbation_combinations():
 
     print(f"Testing {len(test_configs)} perturbation combinations...")
 
-    # Run tests in parallel
-    with ProcessPoolExecutor(max_workers=15) as executor:
+    # Run tests in parallel - limit workers to avoid resource starvation on CI
+    max_workers = min(15, (os.cpu_count() or 2))
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
         results = list(executor.map(run_generation, test_configs))
 
     # Check results
