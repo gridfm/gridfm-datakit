@@ -181,8 +181,8 @@ def update_powsybl(
     gfm_bus_idx = np.array([int(mapping_p2g.bus[i]) for i in bus_id])
     pp_net.update_loads(
         id=load_id,
-        p=gfm_net.buses[gfm_bus_idx, PD].tolist(),
-        q=gfm_net.buses[gfm_bus_idx, QD].tolist(),
+        p0=gfm_net.buses[gfm_bus_idx, PD].tolist(),
+        q0=gfm_net.buses[gfm_bus_idx, QD].tolist(),
     )
 
     pp_net.per_unit = True
