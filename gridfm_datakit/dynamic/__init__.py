@@ -9,7 +9,12 @@ from gridfm_datakit.utils.param_handler import NestedNamespace
 @dataclass
 class DynamicInputs:
     """
-    Data class for dynamic inputs.
+    Solver-agnostic container for dynamic simulation inputs.
+
+    Attributes are kept as pandas DataFrames to remain compatible
+    with pypowsybl.dynamic's native input format and ease
+    manipulation and inspection.
+
     3 categories of inputs:
         - dynamic models
         - events
@@ -23,53 +28,35 @@ class DynamicInputs:
 @dataclass
 class DynamicResults:
     """
-    Data class for dynamic simulation results:
-        - dynamic output
-        - reporting
-    Currently just a wrapper of the pipeline based on Dynawo.
+    Solver-agnostic container for dynamic simulation outputs.
+
+    - dynamic_results: time-series data stored as a Zarr array or group,
+      shaped (n_variables, n_timesteps) per scenario.
+    - report: solver convergence / status report string.
     """
-    dynamic_results: Any
+    dynamic_results: Any # zarr.Array or zarr.Group — (n_variables, n_timesteps)
     report: Any
 
 
 def load_raw_inputs(
           args: NestedNamespace,
-          input_format='dynawo'
+          input_format='csv'
           ) -> DynamicInputs:
     """Load dynamic inputs into a DynamicInputs object."""
-    if input_format == 'dynawo':
+    
+    if input_format == 'csv':
         # TODO: recuperate the data from csv files.
-        dynamic_models = [_load_dynamic_models(args.dynamic.input_paths.dynamic_models), 
-                          _load_automation_systems(args.input_paths.automation_systems)
+        dynamic_models = [pd.read_csv(args.dynamic.input_files.dynamic_models_file), 
+                          pd.read_csv(args.dynamic.input_files.automation_systems_file)
                           ]
-        events = _load_events(args.input_paths.events)
-        variables = _load_variables(args.input_paths.variables)
+        events = pd.read_csv(args.dynamic.input_files.events_file)
+        variables = pd.read_csv(args.dynamic.input_files.variables_file)
 
     return DynamicInputs(
             dynamic_models=dynamic_models,
             events=events,
             variables=variables
     )
-
-def _load_dynamic_models(
-        path_dynamic_models
-        ) -> pd.DataFrame:
-    return pd.read_csv(path_dynamic_models)
-
-def _load_automation_systems(
-        path_automation_systems
-        ) -> pd.DataFrame:
-    return pd.read_csv(path_automation_systems)
-
-def _load_events(
-        path_events
-        ) -> pd.DataFrame:
-    return pd.read_csv(path_events)
-
-def _load_variables(
-        path_variables
-        ) -> pd.DataFrame:
-    return pd.read_csv(path_variables)
 
 __all__ = [
     # Primary entry points
