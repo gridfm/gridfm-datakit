@@ -36,11 +36,21 @@ admittance_perturbation:
   sigma: 0.2 # Size of range used for sampling scaling factor
 
 dynamic:
-  input_paths:
-    dynamic_models: "tests/dynawo/ieee14/ieee14_GeneratorDisconnections/model_mapping.csv"
-    automation_systems: "tests/dynawo/ieee14/ieee14_GeneratorDisconnections/automation_systems.csv"
-    events: "tests/dynawo/ieee14/ieee14_GeneratorDisconnections/event_mapping.csv"
-    variables: "tests/dynawo/ieee14/ieee14_GeneratorDisconnections/variable_mapping.csv"
+  dynamic_solver: "dynawo"
+  # TODO: change to relative path
+  input_files:
+    dynamic_models_file: "/home/tren/Path2GridFM/gridfm-datakit/tests/dynawo/ieee14/ieee14_GeneratorDisconnections/model_mapping.csv"
+    automation_systems_file: "/home/tren/Path2GridFM/gridfm-datakit/tests/dynawo/ieee14/ieee14_GeneratorDisconnections/automation_systems.csv"
+    events_file: "/home/tren/Path2GridFM/gridfm-datakit/tests/dynawo/ieee14/ieee14_GeneratorDisconnections/event_mapping.csv"
+    variables_file: "/home/tren/Path2GridFM/gridfm-datakit/tests/dynawo/ieee14/ieee14_GeneratorDisconnections/variable_mapping.csv"
+  
+  solver_parameters: # Dynawo / pypowsybl.dynamic solver parameters
+    solver_type: "SIM" # SIM (simplified) or IDA.
+    start_time: 0.0
+    stop_time: 10.0
+    precision: 1.0e-6
+
+  output_dir: "./data_out/dynamic"
 
 settings:
   num_processes: 1 # Number of parallel processes to use

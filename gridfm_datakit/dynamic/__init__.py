@@ -1,5 +1,6 @@
 """General module for dynamic simulations."""
 
+import csv
 from dataclasses import dataclass
 import pandas as pd
 from typing import Any
@@ -45,18 +46,26 @@ def load_raw_inputs(
     """Load dynamic inputs into a DynamicInputs object."""
     
     if input_format == 'csv':
-        # TODO: recuperate the data from csv files.
-        dynamic_models = [pd.read_csv(args.dynamic.input_files.dynamic_models_file), 
-                          pd.read_csv(args.dynamic.input_files.automation_systems_file)
+        with open(args.dynamic.input_files.dynamic_models_file) as f:
+            dialect = csv.Sniffer().sniff(f.read(1024))
+
+        dynamic_models = [_load_csv_inputs(args.dynamic.input_files.dynamic_models_file), 
+                          _load_csv_inputs(args.dynamic.input_files.automation_systems_file)
                           ]
-        events = pd.read_csv(args.dynamic.input_files.events_file)
-        variables = pd.read_csv(args.dynamic.input_files.variables_file)
+        events = _load_csv_inputs(args.dynamic.input_files.events_file)
+        variables = _load_csv_inputs(args.dynamic.input_files.variables_file)
 
     return DynamicInputs(
             dynamic_models=dynamic_models,
             events=events,
             variables=variables
     )
+
+def _load_csv_inputs(file_path) -> pd.DataFrame:
+    """Detect the csv format and convert it into pandas dataframe."""
+    with open(file_path) as f:
+        dialect = csv.Sniffer().sniff(f.read(1024))
+    return pd.read_csv(file_path, sep=dialect.delimiter)
 
 __all__ = [
     # Primary entry points
