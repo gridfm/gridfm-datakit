@@ -101,7 +101,10 @@ def test_fail_prepare_network_and_scenarios_config(conf):
     """
     args, base_path, file_paths, seed = _setup_environment(conf)
     conf.network.source = "invalid_source"  # Set invalid source
-    with pytest.raises(ValueError, match="Invalid grid source!"):
+    with pytest.raises(
+        ValueError,
+        match=f"network.source must be 'pglib' or 'file', got {conf.network.source!r}",
+    ):
         net, scenarios, _ = _prepare_network_and_scenarios(conf, file_paths, seed)
 
 
@@ -132,19 +135,16 @@ def test_save_generated_data():
     )
     assert os.path.exists(file_paths["y_bus_data"]), "Y-bus data CSV should be created"
 
-    # Verify files have content (not empty)
-    assert os.path.getsize(file_paths["bus_data"]) > 0, (
-        "Bus data CSV should not be empty"
-    )
-    assert os.path.getsize(file_paths["branch_data"]) > 0, (
-        "Branch data CSV should not be empty"
-    )
-    assert os.path.getsize(file_paths["gen_data"]) > 0, (
-        "Generator data CSV should not be empty"
-    )
-    assert os.path.getsize(file_paths["y_bus_data"]) > 0, (
-        "Y-bus data CSV should not be empty"
-    )
+    # Verify partitioned parquet datasets contain rows.
+    df_bus = pd.read_parquet(file_paths["bus_data"], engine="pyarrow")
+    df_branch = pd.read_parquet(file_paths["branch_data"], engine="pyarrow")
+    df_gen = pd.read_parquet(file_paths["gen_data"], engine="pyarrow")
+    df_ybus = pd.read_parquet(file_paths["y_bus_data"], engine="pyarrow")
+
+    assert len(df_bus) > 0, "Bus data parquet dataset should not be empty"
+    assert len(df_branch) > 0, "Branch data parquet dataset should not be empty"
+    assert len(df_gen) > 0, "Generator data parquet dataset should not be empty"
+    assert len(df_ybus) > 0, "Y-bus data parquet dataset should not be empty"
 
 
 # Test generate pf data function
