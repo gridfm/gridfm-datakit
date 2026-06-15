@@ -89,6 +89,17 @@ def init_julia(
     Raises:
         RuntimeError: If Julia initialization fails.
     """
+    # Ensure spawned workers use the same Julia project so package resolution is consistent.
+    julia_project = None
+    try:
+        from juliapkg.state import STATE
+
+        julia_project = STATE.get("project")
+        if julia_project:
+            os.environ.setdefault("JULIA_PROJECT", julia_project)
+    except Exception:
+        julia_project = None
+
     from juliacall import Main as jl
 
     # Decide log paths and Ipopt print levels
@@ -130,15 +141,44 @@ def init_julia(
         print_level = print_level
 
     try:
+        if julia_project:
+            jl_project = julia_project.replace("\\", "/")
+            jl.seval(
+                f'''
+                using Pkg
+                Pkg.activate(raw"{jl_project}")
+                Pkg.instantiate()
+                ''',
+            )
+
         # If dc_max_iter not provided, use 1000
         dc_iter = 1000 if dc_max_iter is None else dc_max_iter
         # Base imports and logging config in Julia
-        jl.seval("""
-        using PowerModels
-        using Ipopt
-        using Memento
-        Memento.config!("not_set")
-        """)
+        try:
+            jl.seval("""
+            using PowerModels
+            using Ipopt
+            using Memento
+            Memento.config!("not_set")
+            """)
+        except Exception as e:
+            msg = str(e)
+            missing_pm = "Package PowerModels not found" in msg
+            missing_ipopt = "Package Ipopt not found" in msg
+            missing_memento = "Package Memento not found" in msg
+            if missing_pm or missing_ipopt or missing_memento:
+                jl.seval("""
+                using Pkg
+                Pkg.add("Ipopt")
+                Pkg.add("PowerModels")
+                Pkg.add("Memento")
+                using PowerModels
+                using Ipopt
+                using Memento
+                Memento.config!("not_set")
+                """)
+            else:
+                raise
 
         # ----- AC-OPF core -----
         jl.seval(
