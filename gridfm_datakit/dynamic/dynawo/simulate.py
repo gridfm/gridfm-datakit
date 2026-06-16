@@ -7,7 +7,7 @@ from typing import Any
 from gridfm_datakit.dynamic import DynamicResults
 from gridfm_datakit.dynamic.dynawo import DynawoMappings
 from gridfm_datakit.network import Network
-from gridfm_datakit.powsybl import to_powsybl, update_powsybl, get_default_lf_params, get_pf_res, MappingP2G
+from gridfm_datakit.powsybl import update_powsybl, get_default_lf_params, get_pf_res, MappingP2G
 from gridfm_datakit.process.solvers import run_opf
 from gridfm_datakit.process.process_network import pf_preprocessing
 
