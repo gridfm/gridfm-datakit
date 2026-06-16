@@ -9,200 +9,110 @@ pytestmark = pytest.mark.skipif(
 import pandas as pd
 from pathlib import Path
 import pypowsybl as pp
-from gridfm_datakit.powsybl import load_net
 
-# Test data
-# simulation parameters
 
-PARAM = pp.dynamic.Parameters(
-    start_time=0,
-    stop_time=500,
-    provider_parameters={
-    'parametersFile': str(Path(__file__).parent/'ieee14/ieee14_GeneratorDisconnections/IEEE14.par'),
-    'network.parametersFile': str(Path(__file__).parent/'ieee14/ieee14_GeneratorDisconnections/IEEE14.par'),
-    'network.parametersId': 'Network',
-    'solver.type': 'SIM',
-    'solver.parametersFile': str(Path(__file__).parent/'ieee14/ieee14_GeneratorDisconnections/IEEE14.par'),
-    'solver.parametersId': 'SimplifiedSolver',
-})
-
-# Dynamic models
-DF_GENERATOR_MAPPING= pd.DataFrame.from_records(
-    index='static_id',
-    columns=['static_id', 'parameter_set_id', 'model_name'],
-    data=[
-        ('_GEN____1_SM', 'Generator1', 'GeneratorSynchronousFourWindingsProportionalRegulations'),
-        ('_GEN____2_SM', 'Generator2', 'GeneratorSynchronousFourWindingsProportionalRegulations'),
-        ('_GEN____3_SM', 'Generator3', 'GeneratorSynchronousFourWindingsProportionalRegulations'),
-        ('_GEN____6_SM', 'Generator6', 'GeneratorSynchronousThreeWindingsProportionalRegulations'),
-        ('_GEN____8_SM', 'Generator8', 'GeneratorSynchronousThreeWindingsProportionalRegulations'),
-        ]
-)
-
-DF_LOAD_ONE_TRANSFO_MAPPING = pd.DataFrame.from_records(
-    index='static_id',
-    columns=['static_id', 'parameter_set_id', 'model_name'],
-    data=[
-        ('_LOAD___6_EC', 'GenericLoadOneTransfo', 'LoadOneTransformerTapChanger'),
-        ('_LOAD___9_EC', 'GenericLoadOneTransfo', 'LoadOneTransformerTapChanger'),
-        ('_LOAD__10_EC', 'GenericLoadOneTransfo', 'LoadOneTransformerTapChanger'),
-        ('_LOAD__11_EC', 'GenericLoadOneTransfo', 'LoadOneTransformerTapChanger'),
-        ('_LOAD__12_EC', 'GenericLoadOneTransfo', 'LoadOneTransformerTapChanger'),
-        ('_LOAD__13_EC', 'GenericLoadOneTransfo', 'LoadOneTransformerTapChanger'),
-        ('_LOAD__14_EC', 'GenericLoadOneTransfo', 'LoadOneTransformerTapChanger'),
-        ]
-)
-
-DF_LOAD_TWO_TRANSFO_MAPPING = pd.DataFrame.from_records(
-    index='static_id',
-    columns=['static_id', 'parameter_set_id', 'model_name'],
-    data=[
-        ('_LOAD___2_EC', 'GenericLoadTwoTransfos', 'LoadTwoTransformersTapChangers'),
-        ('_LOAD___3_EC', 'GenericLoadTwoTransfos', 'LoadTwoTransformersTapChangers'),
-        ('_LOAD___4_EC', 'GenericLoadTwoTransfos', 'LoadTwoTransformersTapChangers'),
-        ('_LOAD___5_EC', 'GenericLoadTwoTransfos', 'LoadTwoTransformersTapChangers'),
-        ]
-)
-
-# Automation systems
-DF_AUTOMATION_SYSTEMS_MAPPING = pd.DataFrame.from_records(
-    index='dynamic_model_id',
-    columns=['dynamic_model_id', 'parameter_set_id', 'generator', 'model_name'],
-    data=[
-        ('UVA', 'UnderVoltageAutomatonGenerator3', '_GEN____3_SM', 'UnderVoltage'),
-        ]
-)
-
-# Events
-DF_EVENT_MAPPING = pd.DataFrame.from_records(
-    index='static_id',
-    columns=['static_id', 'start_time'],
-    data=[
-        ('_GEN____2_SM', 50),
-        ]
-)
-
-# Benchmark data
-DF_REF_CURVES = pd.read_csv(
-    Path(__file__).parent/'ieee14/ieee14_GeneratorDisconnections/ref_output_curves.csv',
-    sep=';'
-)
-
-# Fixtures 
-
-@pytest.fixture(scope="function")
-def pp_net():
-    loaded_net = load_net(str(Path(__file__).parent/'ieee14/ieee14_GeneratorDisconnections/IEEE14.iidm'))
-    return loaded_net.pp_net
-
-@pytest.fixture(scope="module")
-def model_mapping():
-    model_mapping = pp.dynamic.ModelMapping()
-    model_mapping.add_dynamic_model(category_name='SynchronousGenerator', df=DF_GENERATOR_MAPPING)
-    model_mapping.add_dynamic_model(category_name='LoadOneTransformerTapChanger', df=DF_LOAD_ONE_TRANSFO_MAPPING)
-    model_mapping.add_dynamic_model(category_name='LoadTwoTransformersTapChangers', df=DF_LOAD_TWO_TRANSFO_MAPPING)
-    model_mapping.add_under_voltage_automation_system(df=DF_AUTOMATION_SYSTEMS_MAPPING)
-    return model_mapping
-
-@pytest.fixture(scope="module")
-def event_mapping():
-    event_mapping = pp.dynamic.EventMapping()
-    event_mapping.add_event_model(event_name='Disconnect', df=DF_EVENT_MAPPING)
-    return event_mapping
-
-@pytest.fixture(scope="module")
-def variable_mapping():
-    variable_mapping = pp.dynamic.OutputVariableMapping()
-    variable_mapping.add_curves(model_id='_BUS____2_TN', variables='U_value')
-    variable_mapping.add_curves(model_id='_GEN____3_SM', variables='generator_UPu')
-    return variable_mapping
+STATIC_ELEMENT_MODELS_PATH = Path(__file__).parent/'data/ieee14/ieee14_GeneratorDisconnections/model_mapping.csv'
+AUTOMATION_SYSTEMS_PATH = Path(__file__).parent/'data/ieee14/ieee14_GeneratorDisconnections/automation_systems.csv'
+EVENTS_PATH = Path(__file__).parent/'data/ieee14/ieee14_GeneratorDisconnections/event_mapping.csv'
+VARIABLES_PATH = Path(__file__).parent/'data/ieee14/ieee14_GeneratorDisconnections/variable_mapping.csv'
 
 # Tests
 
-def test_baseline(pp_net,
-                  model_mapping,
-                  event_mapping,
-                  variable_mapping,
+def test_baseline(pp_net_ieee14,
+                  model_mapping_ieee14,
+                  event_mapping_ieee14,
+                  variable_mapping_ieee14,
+                  param_ieee14,
+                  df_ref_curves_ieee14,
                   ):
     sim = pp.dynamic.Simulation()
     report_node = pp.report.ReportNode()
     res = sim.run(
-        network=pp_net,
-        model_mapping=model_mapping,
-        event_mapping=event_mapping,
-        timeseries_mapping=variable_mapping,
-        parameters=PARAM,
+        network=pp_net_ieee14,
+        model_mapping=model_mapping_ieee14,
+        event_mapping=event_mapping_ieee14,
+        timeseries_mapping=variable_mapping_ieee14,
+        parameters=param_ieee14,
         report_node=report_node
     )
-    assert validate_output_curves_against_ref(res)
+    assert _validate_output_curves_against_ref(res, df_ref_curves_ieee14)
 
-def test_model_mapping(pp_net,
-                       event_mapping,
-                       variable_mapping):
+def test_model_mapping(pp_net_ieee14,
+                       event_mapping_ieee14,
+                       variable_mapping_ieee14,
+                       param_ieee14,
+                       df_ref_curves_ieee14):
     from gridfm_datakit.dynamic.dynawo import _map_dynamic_models_dynawo
 
     sim = pp.dynamic.Simulation()
     report_node = pp.report.ReportNode()
 
-    static_element_models = pd.read_csv(Path(__file__).parent/'ieee14/ieee14_GeneratorDisconnections/model_mapping.csv', sep=';')
-    automation_systems = pd.read_csv(Path(__file__).parent/'ieee14/ieee14_GeneratorDisconnections/automation_systems.csv', sep=';')
+    static_element_models = pd.read_csv(STATIC_ELEMENT_MODELS_PATH, sep=';')
+    automation_systems = pd.read_csv(AUTOMATION_SYSTEMS_PATH, sep=';')
     model_mapping = _map_dynamic_models_dynawo(dynamic_models=[static_element_models, automation_systems])
         
     res = sim.run(
-        network=pp_net,
+        network=pp_net_ieee14,
         model_mapping=model_mapping,
-        event_mapping=event_mapping,
-        timeseries_mapping=variable_mapping,
-        parameters=PARAM,
+        event_mapping=event_mapping_ieee14,
+        timeseries_mapping=variable_mapping_ieee14,
+        parameters=param_ieee14,
         report_node=report_node
         )
-    assert validate_output_curves_against_ref(res)
+    assert _validate_output_curves_against_ref(res, df_ref_curves_ieee14)
 
-def test_event_mapping(pp_net,
-                       model_mapping,
-                       variable_mapping):
+def test_event_mapping(pp_net_ieee14,
+                       model_mapping_ieee14,
+                       variable_mapping_ieee14,
+                       param_ieee14,
+                       df_ref_curves_ieee14
+                       ):
     from gridfm_datakit.dynamic.dynawo import _map_events_dynawo
 
-    events = pd.read_csv(Path(__file__).parent/'ieee14/ieee14_GeneratorDisconnections/event_mapping.csv', sep=';')
+    events = pd.read_csv(EVENTS_PATH, sep=';')
     event_mapping = _map_events_dynawo(events)
 
     sim = pp.dynamic.Simulation()
     report_node = pp.report.ReportNode()
 
     res = sim.run(
-        network=pp_net,
-        model_mapping=model_mapping,
+        network=pp_net_ieee14,
+        model_mapping=model_mapping_ieee14,
         event_mapping=event_mapping,
-        timeseries_mapping=variable_mapping,
-        parameters=PARAM,
+        timeseries_mapping=variable_mapping_ieee14,
+        parameters=param_ieee14,
         report_node=report_node
         )
     
-    assert validate_output_curves_against_ref(res)
+    assert _validate_output_curves_against_ref(res, df_ref_curves_ieee14)
 
-def test_variable_mapping(pp_net,
-                          model_mapping,
-                          event_mapping):
+def test_variable_mapping(pp_net_ieee14,
+                          model_mapping_ieee14,
+                          event_mapping_ieee14,
+                          param_ieee14,
+                          df_ref_curves_ieee14):
     from gridfm_datakit.dynamic.dynawo import _map_variables_dynawo
 
-    variables = pd.read_csv(Path(__file__).parent/'ieee14/ieee14_GeneratorDisconnections/variable_mapping.csv', sep=';')
+    variables = pd.read_csv(VARIABLES_PATH, sep=';')
     variable_mapping = _map_variables_dynawo(variables)
 
     sim = pp.dynamic.Simulation()
     report_node = pp.report.ReportNode()
 
     res = sim.run(
-        network=pp_net,
-        model_mapping=model_mapping,
-        event_mapping=event_mapping,
+        network=pp_net_ieee14,
+        model_mapping=model_mapping_ieee14,
+        event_mapping=event_mapping_ieee14,
         timeseries_mapping=variable_mapping,
-        parameters=PARAM,
+        parameters=param_ieee14,
         report_node=report_node
         )
     
-    assert validate_output_curves_against_ref(res)
+    assert _validate_output_curves_against_ref(res, df_ref_curves_ieee14)
 
-def test_generate_dynawo_mapping(pp_net):
+def test_generate_dynawo_mapping(pp_net_ieee14,
+                                 param_ieee14,
+                                 df_ref_curves_ieee14):
     
     from gridfm_datakit.dynamic import DynamicInputs
     from gridfm_datakit.dynamic.dynawo import generate_dynawo_mappings
@@ -210,33 +120,33 @@ def test_generate_dynawo_mapping(pp_net):
     sim = pp.dynamic.Simulation()
     report_node = pp.report.ReportNode()
     dynamic_inputs = DynamicInputs(
-        dynamic_models=[pd.read_csv(Path(__file__).parent/'ieee14/ieee14_GeneratorDisconnections/model_mapping.csv', sep=';'),
-                        pd.read_csv(Path(__file__).parent/'ieee14/ieee14_GeneratorDisconnections/automation_systems.csv', sep=';')
+        dynamic_models=[pd.read_csv(STATIC_ELEMENT_MODELS_PATH, sep=';'),
+                        pd.read_csv(AUTOMATION_SYSTEMS_PATH, sep=';')
                         ],
-        events=pd.read_csv(Path(__file__).parent/'ieee14/ieee14_GeneratorDisconnections/event_mapping.csv', sep=';'),
-        variables=pd.read_csv(Path(__file__).parent/'ieee14/ieee14_GeneratorDisconnections/variable_mapping.csv', sep=';')
+        events=pd.read_csv(EVENTS_PATH, sep=';'),
+        variables=pd.read_csv(VARIABLES_PATH, sep=';')
     )
     dynawo_mapping = generate_dynawo_mappings(dynamic_inputs)
 
     res = sim.run(
-        network=pp_net,
+        network=pp_net_ieee14,
         model_mapping=dynawo_mapping.dynamic_model_mapping,
         event_mapping=dynawo_mapping.event_mapping,
         timeseries_mapping=dynawo_mapping.variable_mapping,
-        parameters=PARAM,
+        parameters=param_ieee14,
         report_node=report_node
         )
-    assert validate_output_curves_against_ref(res)
+    assert _validate_output_curves_against_ref(res, df_ref_curves_ieee14)
 
 # utils
 
-def validate_output_curves_against_ref(res):
+def _validate_output_curves_against_ref(res, df_ref_curves_ieee14):
     df_res = res.curves().reset_index(drop=True).rename(columns={'_GEN____1_SM_generator_efdPu_value': 'GEN____1_SM_generator_efdPu_value',
                                                                 '_GEN____1_SM_voltageRegulator_EfdMaxPu': 'GEN____1_SM_voltageRegulator_EfdMaxPu',
                                                                 '_GEN____3_SM_generator_UPu':'GEN____3_SM_generator_UPu',
                                                                 '_GEN____3_SM_generator_efdPu_value': 'GEN____3_SM_generator_efdPu_value',
                                                                 '_GEN____3_SM_voltageRegulator_EfdMaxPu': 'GEN____3_SM_voltageRegulator_EfdMaxPu'
                                                                 })
-    df_ref = DF_REF_CURVES.reset_index(drop=True)
+    df_ref = df_ref_curves_ieee14.reset_index(drop=True)
     df_ref = df_ref[df_res.columns]
     return df_res.equals(df_ref)

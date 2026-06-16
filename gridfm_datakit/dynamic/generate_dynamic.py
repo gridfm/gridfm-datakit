@@ -7,7 +7,7 @@ from gridfm_datakit.dynamic import(
 )
 
 from gridfm_datakit.dynamic.dynawo import(
-    prepare_dynawo_parameters,
+    get_dynawo_simulation_parameters,
     generate_dynawo_mappings,
 )
 
@@ -118,7 +118,7 @@ def _prepare_network_and_scenarios_dynamic(
 def _load_and_prep_dynamic_mappings(args: NestedNamespace):
     """Loads and converts raw inputs into dynamic mappings."""
     dynamic_inputs = load_raw_inputs(args)
-    if args.dynamic.solver == 'dynawo':
+    if args.dynamic.dynamic_solver == 'dynawo':
         return generate_dynawo_mappings(dynamic_inputs)
     else:
         raise ValueError(
@@ -128,7 +128,7 @@ def _load_and_prep_dynamic_mappings(args: NestedNamespace):
 def _get_simulation_parameters(args: NestedNamespace):
     """Prepares dynamic simulation parameters."""
     if args.dynamic.solver == 'dynawo':
-        return prepare_dynawo_parameters(args)
+        return get_dynawo_simulation_parameters(args)
     else:
         raise ValueError(
             f"Dynawo is the only supported dynamic solver for now, got {args.dynamic.solver!r} "

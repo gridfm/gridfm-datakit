@@ -5,7 +5,7 @@ import pypowsybl as pp
 from typing import Any
 
 from gridfm_datakit.utils.param_handler import NestedNamespace
-from gridfm_datakit.dynamic.dynawo.utils import AUTOMATION_SYSTEM_PARAMS, EVENT_MAPPING_PARAM
+from gridfm_datakit.dynamic.dynawo.utils import AUTOMATION_SYSTEM_PARAMS_MAPPING, EVENT_PARAM_MAPPING, SIMULATION_PARAMETERS_MAPPING
 
 # from gridfm_datakit.dynamic import DynamicInputs
 
@@ -63,7 +63,7 @@ def _map_dynamic_models_dynawo(dynamic_models):
     df_grp_as = df_as.groupby('category_name')
     for cat in cats_as:
         df_cat = df_grp_as.get_group(cat)[['dynamic_model_id', 'parameter_set_id', 'params', 'model_name']].reset_index(drop=True).set_index('dynamic_model_id') # TODO: same as above
-        param_keywords = AUTOMATION_SYSTEM_PARAMS[cat]
+        param_keywords = AUTOMATION_SYSTEM_PARAMS_MAPPING[cat]
         for keyword in param_keywords:
             df_cat[keyword] = df_cat['params'].map(lambda x: _get_param_value(x, keyword))
         df_cat = df_cat[['parameter_set_id'] + param_keywords + ['model_name']]
@@ -80,7 +80,7 @@ def _map_events_dynawo(events):
     for type_t in event_types:
         df_event_type_t = df_grp_event.get_group(type_t)
         df_event_type_t = df_event_type_t[['static_id', 'start_time', 'params']].reset_index(drop=True).set_index('static_id') # TODO: same above
-        param_keywords = EVENT_MAPPING_PARAM[type_t]
+        param_keywords = EVENT_PARAM_MAPPING[type_t]
         for k in param_keywords:
             df_event_type_t[k] = df_event_type_t['params'].map(lambda x: _get_param_value(x, k))
         
@@ -121,26 +121,26 @@ def _get_param_value(params, keyword):
         return np.nan
     return pairs.get(keyword)
 
-def prepare_dynawo_parameters(args:NestedNamespace):
+def get_dynawo_simulation_parameters(args:NestedNamespace):
     """Prepares the parameters for Dynawo simulation."""
-    params = pp.dynamic.Parameters(
-        start_time=args.dynamic.start_time,
-        stop_time=args.dynamic.stop_time,
-        provider_parameters={
-            'parametersFile': args.dynamic.param_path,
-            'network.parametersFile': args.dynamic.network_param_path,
-            'network.parametersId': args.dynamic.network_param_id,
-            'solver.type': args.dynamic.solver_type,
-            'solver.parametersFile': args.dynamic.solver_param_path,
-            'solver.parametersId': args.dynamic.solver_param_id
-            }
+    # TODO: add validation or validate at loading config
+    dict_parameters = args.dynamic.solver_parameters.to_dict()
+
+    # provider_parameters only accept strings
+    provider_parameters = {SIMULATION_PARAMETERS_MAPPING[key]: str(value)
+                           for key, value in dict_parameters.items() if 
+                           (key not in ['start_time', 'stop_time'] and value not in ["none", ""])}
+
+    return pp.dynamic.Parameters(
+        start_time=dict_parameters['start_time'],
+        stop_time=dict_parameters['stop_time'],
+        provider_parameters=provider_parameters,
         )
-    return params
 
 __all__ = [
     # primary entry points 
     "generate_dynawo_mappings",
-    "prepare_dynawo_parameters",
+    "get_dynawo_simulation_parameters",
     # data class
     "DynawoMappings"
 ]

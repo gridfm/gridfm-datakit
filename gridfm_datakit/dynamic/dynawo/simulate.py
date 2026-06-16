@@ -7,16 +7,14 @@ from typing import Any
 from gridfm_datakit.dynamic import DynamicResults
 from gridfm_datakit.dynamic.dynawo import DynawoMappings
 from gridfm_datakit.network import Network
-from gridfm_datakit.powsybl import to_powsybl
-from gridfm_datakit.powsybl.preprocess_pf_res import preprocess_pp_pf_res
-from gridfm_datakit.powsybl.utils.lf_parameters import get_default_lf_parameters
+from gridfm_datakit.powsybl import to_powsybl, update_powsybl, get_default_lf_params, get_pf_res, MappingP2G
 from gridfm_datakit.process.solvers import run_opf
 from gridfm_datakit.process.process_network import pf_preprocessing
 
 
 def run_dynawo_simulation(
         pp_net: pp.network.Network,
-        dynamic_mappings: DynawoMappings,
+        dynawo_mapping: DynawoMappings,
         parameters: Any, #TODO assign pypowsybl.dynamic.Parameters() ?
         ):
     """
@@ -31,12 +29,12 @@ def run_dynawo_simulation(
         report_node
     """
     sim = pp.dynamic.Simulation()
-    report_node = pp.report.Reporter()
+    report_node = pp.report.ReportNode()
     dyn_res = sim.run(
         pp_net,
-        dynamic_mappings.dynamic_model_mapping,
-        dynamic_mappings.event_mapping,
-        dynamic_mappings.variable_mapping,
+        dynawo_mapping.dynamic_model_mapping,
+        dynawo_mapping.event_mapping,
+        dynawo_mapping.variable_mapping,
         parameters=parameters,
         report_node=report_node)
     formated_dyn_res = _format_dynamic_res(dyn_res)
@@ -50,6 +48,7 @@ def _format_dynamic_res(dyn_res):
 def compute_balanced_static_state_dynawo(
         pp_net: pp.network.Network,
         perturbed_network: Network,
+        mapping_p2g: MappingP2G,
         jl):
     
     res = run_opf(perturbed_network, jl)
@@ -60,24 +59,19 @@ def compute_balanced_static_state_dynawo(
 
     # convert to powsybl network, keep the mapping for formatting purpose
     # TODO: replace by update_powsybl
-    pp_net = update_powsybl(pp_net, perturbed_network)
-    _conv = to_powsybl(net_pf)
-    
-    # get the mappings
-    _, map_bus_p2g, map_branch_p2g, map_gen_p2g = _conv.pp_net, _conv.map_bus_p2g, _conv.map_branch_p2g, _conv.map_gen_p2g
+    update_powsybl(pp_net, perturbed_network, mapping_p2g)
     
     # a powsybl network is necessary to run dynawo
     # run powsybl pf to reach a new balanced state after conversion
-    lf_param = get_default_lf_parameters()
+    lf_param = get_default_lf_params()
     start_time = time.perf_counter()
     pf_metadata = pp.loadflow.run_ac(pp_net, lf_param)
     end_time = time.perf_counter()
     solve_time = end_time - start_time
-    res = preprocess_pp_pf_res(
+    res = get_pf_res(
         pp_net,
         solve_time,
         pf_metadata,
-        map_bus_p2g,
-        map_branch_p2g,
-        map_gen_p2g)
+        mapping_p2g
+        )
     return pp_net, res
