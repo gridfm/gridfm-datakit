@@ -9,7 +9,7 @@ AUTOMATION_SYSTEM_PARAMS_MAPPING = {
     'UnderVoltageAutomationSystem': ['generator'],
 }
 
-EVENT_PARAM_MAPPING = {
+EVENT_PARAMS_MAPPING = {
     'ActivePowerVariation': ['delta_p'],
     'Disconnect': ['disconnect_only'],
     'NodeFault': ['fault_time', 'r_pu', 'x_pu'],

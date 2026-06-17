@@ -6,6 +6,23 @@ pytestmark = pytest.mark.skipif(
     reason="pypowsybl is not installed. Install with: pip install gridfm-datakit[powsybl]",
 )
 
+import pypowsybl as pp
+
+@pytest.fixture(scope='session')
+def julia():
+    from gridfm_datakit.generate import init_julia
+    return init_julia(200)
+
+
+def test_compute_balanced_static_state_dynawo_output_formatas(
+        pp_net_ieee14,
+        julia
+        ):
+    from gridfm_datakit.dynamic.dynawo.simulate import compute_balanced_static_state_dynawo
+    from gridfm_datakit.powsybl import from_powsybl
+    breakpoint()
+    pp_net, pf_data = compute_balanced_static_state_dynawo(pp_net_ieee14, from_powsybl(pp_net_ieee14), julia)
+    assert type(pp_net) == pp.network.Network and type(pf_data) == dict
 
 def test_benchmark_ieee14_run_dynawo_simulation(pp_net_ieee14,
                                                 model_mapping_ieee14,

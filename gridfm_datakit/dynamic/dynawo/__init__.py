@@ -1,31 +1,68 @@
-# TODO: same as for PowSyBl
+"""
+Dynaωo-specific submodule for gridfm_datakit dynamic simulation.
+
+Exposes:
+- DynawoMappings : dataclass holding the three DataFrames that map directly
+  onto pypowsybl.dynamic's add_all_dynamic_mappings / event / curve APIs.
+- generate_dynawo_mappings : convert a DynamicInputs into DynawoMappings.
+- prepare_dynawo_parameters : build a pypowsybl.dynamic.Parameters object
+  from the config's dynamic.solver_parameters block.
+"""
+
+
+from __future__ import annotations
+
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
 import numpy as np
+import pandas as pd
 import pypowsybl as pp
-from typing import Any
 
 from gridfm_datakit.utils.param_handler import NestedNamespace
-from gridfm_datakit.dynamic.dynawo.utils import AUTOMATION_SYSTEM_PARAMS_MAPPING, EVENT_PARAM_MAPPING, SIMULATION_PARAMETERS_MAPPING
+from gridfm_datakit.dynamic import DynamicInputs
+from gridfm_datakit.dynamic.dynawo.utils import AUTOMATION_SYSTEM_PARAMS_MAPPING, EVENT_PARAMS_MAPPING, SIMULATION_PARAMETERS_MAPPING
 
-# from gridfm_datakit.dynamic import DynamicInputs
+from .api import _get_pypowsybl_dynamic, check_pypowsybl_dynamic_available
+
+if TYPE_CHECKING:
+    pass
+
 
 @dataclass
 class DynawoMappings:
     """
-    Data class for the mappings of the dynamic inputs for Dynawo.
-    3 mappings are needed:
-        - dynamic model mapping
-        - event mapping
-        - variable mapping
+    Dynawo-ready simulation inputs derived from DynamicInputs.
+    3 mappings:
+        - dynamic model mapping -> for both static equipments and automation systems 
+        - event mapping -> for events
+        - variable mapping -> for the output variables
+    
+    Attributes
+    ----------
+    dynamic_model_mapping : pypowsybl.dynamic.ModelMapping
+    event_mapping : pypowsybl.dynamic.EventMapping
+    variable_mapping : pypowsybl.dynamic.OutputVariableMapping
     """
-    dynamic_model_mapping: Any # TODO: change to Dynawo's mapping 
-    event_mapping: Any
-    variable_mapping: Any
+    dynamic_model_mapping: pp.dynamic.ModelMapping # TODO: change to Dynawo's mapping 
+    event_mapping: pp.dynamic.EventMapping
+    variable_mapping: pp.dynamic.OutputVariableMapping
 
-## Public API
 
-def generate_dynawo_mappings(dynamic_inputs) -> DynawoMappings:
-    """Prepares dynamic mappings for Dynawo, using a DynamicInputs object."""
+## Public functions
+
+def generate_dynawo_mappings(dynamic_inputs: DynamicInputs) -> DynawoMappings:
+    """Convert generic DynamicInputs into Dynawo-compatible DynawoMappings.
+    
+    The conversion builds the Dynawo-specific mapping objects by parsing the generic
+    DynamicInputs dataframes.
+
+    Args
+        dynamic_inputs: DynamicInputs, generic inputs loaded by load_raw_inputs().
+    
+    Returns
+        DynawoMappings: simulation-ready Dynawo mappings
+    """
     
     dynamic_model_mapping = _map_dynamic_models_dynawo(dynamic_inputs.dynamic_models)
     event_mapping = _map_events_dynawo(dynamic_inputs.events)
@@ -37,8 +74,8 @@ def generate_dynawo_mappings(dynamic_inputs) -> DynawoMappings:
         variable_mapping=variable_mapping
     )
 
-def _map_dynamic_models_dynawo(dynamic_models):
-    """Maps dynamic models inputs to Dynawo format."""
+def _map_dynamic_models_dynawo(dynamic_models: list[pd.DataFrame]) -> pp.dynamic.ModelMapping:
+    """Maps dynamic models from DynamicInputs to pypowsybl.dynamic.ModelMapping."""
     # initialize a dynamic model mapping instance
     dynamic_model_mapping = pp.dynamic.ModelMapping()
     
@@ -70,7 +107,7 @@ def _map_dynamic_models_dynawo(dynamic_models):
         dynamic_model_mapping.add_dynamic_model(category_name=cat, df=df_cat)
     return dynamic_model_mapping
 
-def _map_events_dynawo(events):
+def _map_events_dynawo(events: pd.DataFrame) -> pp.dynamic.EventMapping:
     """Maps the event inputs to Dynawo format."""
     # TODO: validate the inputs events
     # map the events
@@ -80,7 +117,7 @@ def _map_events_dynawo(events):
     for type_t in event_types:
         df_event_type_t = df_grp_event.get_group(type_t)
         df_event_type_t = df_event_type_t[['static_id', 'start_time', 'params']].reset_index(drop=True).set_index('static_id') # TODO: same above
-        param_keywords = EVENT_PARAM_MAPPING[type_t]
+        param_keywords = EVENT_PARAMS_MAPPING[type_t]
         for k in param_keywords:
             df_event_type_t[k] = df_event_type_t['params'].map(lambda x: _get_param_value(x, k))
         
@@ -98,7 +135,7 @@ def _map_events_dynawo(events):
             event_mapping.add_event_model(event_name=type_t, df=df_event_type_t)
     return event_mapping
 
-def _map_variables_dynawo (variables):
+def _map_variables_dynawo (variables: pd.DataFrame) -> pp.dynamic.OutputVariableMapping:
     """Map variable inputs to Dynawo format."""
     # TODO: add input validation test
     variable_mapping = pp.dynamic.OutputVariableMapping()
@@ -115,13 +152,19 @@ def _map_variables_dynawo (variables):
 
 
 def _get_param_value(params, keyword):
-    """Gets the value associated to a keyword from the params."""
+    """Gets the value associated to a keyword from the parameters.
+    
+    This helper is necessary to handle automation system mapping and event mapping,
+    which have different parameters depending on the category of system/event.
+    Check gridfm_datakit.dynamic.dynawo.utils for the accepted parameters.
+    """
+
     pairs = dict(pair.split("=") for pair in params.split(";") if "=" in pair)
     if keyword == 'disconnect_only' and pairs.get(keyword)=='':
         return np.nan
     return pairs.get(keyword)
 
-def get_dynawo_simulation_parameters(args:NestedNamespace):
+def get_dynawo_simulation_parameters(args:NestedNamespace) -> pp.dynamic.Parameters:
     """Prepares the parameters for Dynawo simulation."""
     # TODO: add validation or validate at loading config
     dict_parameters = args.dynamic.solver_parameters.to_dict()
