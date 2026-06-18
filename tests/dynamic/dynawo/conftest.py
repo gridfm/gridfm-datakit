@@ -1,3 +1,7 @@
+"""
+Shared fixtures for dynawo module tests.
+"""
+
 import pytest
 from gridfm_datakit.powsybl.api import is_powsybl_available
 
