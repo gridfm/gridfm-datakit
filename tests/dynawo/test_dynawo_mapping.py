@@ -11,10 +11,10 @@ from pathlib import Path
 import pypowsybl as pp
 
 
-STATIC_ELEMENT_MODELS_PATH = Path(__file__).parent/'data/ieee14/ieee14_GeneratorDisconnections/model_mapping.csv'
+STATIC_ELEMENT_MODELS_PATH = Path(__file__).parent/'data/ieee14/ieee14_GeneratorDisconnections/static_element_dynamic_models.csv'
 AUTOMATION_SYSTEMS_PATH = Path(__file__).parent/'data/ieee14/ieee14_GeneratorDisconnections/automation_systems.csv'
-EVENTS_PATH = Path(__file__).parent/'data/ieee14/ieee14_GeneratorDisconnections/event_mapping.csv'
-VARIABLES_PATH = Path(__file__).parent/'data/ieee14/ieee14_GeneratorDisconnections/variable_mapping.csv'
+EVENTS_PATH = Path(__file__).parent/'data/ieee14/ieee14_GeneratorDisconnections/events.csv'
+VARIABLES_PATH = Path(__file__).parent/'data/ieee14/ieee14_GeneratorDisconnections/variables.csv'
 
 # Tests
 
