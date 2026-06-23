@@ -17,10 +17,10 @@ from gridfm_datakit.powsybl import load_net
 
 
 # File paths
-PATH_NETWORK_IEEE14 = Path(__file__).parent/'data/ieee14/ieee14_GeneratorDisconnections/IEEE14.iidm'
-PATH_CONFIG_IEEE14 = Path(__file__).parent/'data/config/config_test_dynawo_IEEE14.yaml'
+PATH_NETWORK_IEEE14 = Path(__file__).parent/'dynawo/data/ieee14/ieee14_GeneratorDisconnections/IEEE14.iidm'
+PATH_CONFIG_IEEE14 = Path(__file__).parent/'dynawo/data/config/config_test_dynawo_IEEE14.yaml'
 PARAMETERS_PATH = Path(__file__).parent/'data/ieee14/ieee14_GeneratorDisconnections/IEEE14.par'
-REF_OUTPUT_CURVES_PATH = Path(__file__).parent/'data/ieee14/ieee14_GeneratorDisconnections/ref_output_curves.csv'
+REF_OUTPUT_CURVES_PATH = Path(__file__).parent/'dynawo/data/ieee14/ieee14_GeneratorDisconnections/ref_output_curves.csv'
 
 
 @pytest.fixture(scope="module")

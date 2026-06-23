@@ -34,6 +34,7 @@ def compute_balanced_static_state_dynawo(
         pp_net: pp.network.Network,
         gfm_net: Network,
         julia: Any,
+        p2g_maps,
         scenario_index: int = 0,
 ) -> Tuple[Any, Dict[str, Any]]:
     """Compute the balanced initial conditions for a dynamic siulation.
@@ -90,17 +91,26 @@ def compute_balanced_static_state_dynawo(
     gfm_net_pf = copy.deepcopy(gfm_net)
     gfm_net_pf = pf_preprocessing(gfm_net_pf, opf_res)
 
-    mapping_p2g = powsybl.build_p2g_maps(gfm_net_pf, pp_net)
-    powsybl.update_powsybl(pp_net, gfm_net_pf, mapping_p2g)
+    # mapping_p2g = powsybl.build_p2g_maps(gfm_net_pf, pp_net); received as args to avoid repeated computation
+    powsybl.update_powsybl(pp_net, gfm_net_pf, p2g_maps)
     
     # Step 3: run AC-PF via pypowsybl OpenLoadFlow
     lf_params = powsybl.get_default_lf_params()
+    # TODO: delete once the fix merged
+    ##############
+    lf_params = pp.loadflow.Parameters(distributed_slack=False,
+                                  read_slack_bus=True,
+                                  write_slack_bus=True,
+                                  provider_parameters={
+                                      'slackBusSelectionMode': 'LARGEST_GENERATOR' # default: MOST_MESHED
+                                  })
+    ##############
     t0 = time.perf_counter()
     pf_metadata = powsybl.pypowsybl.loadflow.run_ac(pp_net, lf_params)
     solve_time = time.perf_counter() - t0
 
     # Step 4: format results in gridfm column schema (ID-based bus assignment)
-    pf_res = powsybl.get_pf_res(pp_net, solve_time, pf_metadata, mapping_p2g)
+    pf_res = powsybl.get_pf_res(pp_net, solve_time, pf_metadata, p2g_maps)
     pf_data = pf_post_processing(
         scenario_index,
         gfm_net_pf,
@@ -119,17 +129,20 @@ def run_dynawo_simulation(
         pp_net: pp.network.Network,
         dynawo_mapping: DynawoMappings,
         parameters: pp.dynamic.Parameters,
+        drop_duplicate_timestep=True,
         ):
     """Apply Dynawo mappings to a balanced pypowsybl network and run the simulation.
 
-    Parameters
-    ----------
+    Args
+    ----
     pp_net :
         Balanced pypowsybl network (output of ``compute_balanced_static_state_dynawo``).
     dynamic_mappings : DynawoMappings
         Validated Dynawo-ready mapping DataFrames (models, events, variables).
     parameters :
         ``pypowsybl.dynamic.Parameters`` object (from ``get_dynawo_simulation_parameters``).
+    drop_duplicate_timestep :
+        Whether drop duplicate timestep or not in the output timeseries, True by default.
 
     Returns
     -------
@@ -151,9 +164,9 @@ def run_dynawo_simulation(
         report_node=report_node)
     
     # Format results
-    formated_dyn_res = _format_dynamic_res(dyn_res)
+    formated_dyn_res = _format_dynamic_res(dyn_res, drop_duplicate_timestep)
 
-    return DynamicResults(formated_dyn_res, report_node)
+    return DynamicResults(formated_dyn_res, report_node.to_json())
 
 
 # ---------------------------------------------------------------------------
@@ -161,7 +174,7 @@ def run_dynawo_simulation(
 # ---------------------------------------------------------------------------
 
 
-def _format_dynamic_res(dyn_res: Any):
+def _format_dynamic_res(dyn_res: Any, drop_duplicate_timestpe):
     """Convert raw pypowsybl.dynamic simulation output into DynamicResults.
 
     Args
@@ -200,4 +213,7 @@ def _format_dynamic_res(dyn_res: Any):
     # )
 
     # return root['curves']
-    return dyn_res
+    df = dyn_res.curves()
+    if drop_duplicate_timestpe:
+        return df[~df.index.duplicated(keep='last')]
+    return df

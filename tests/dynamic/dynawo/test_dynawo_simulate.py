@@ -22,8 +22,10 @@ def test_compute_balanced_static_state_dynawo_output_formats(
         julia
         ):
     from gridfm_datakit.dynamic.dynawo.simulate import compute_balanced_static_state_dynawo
-    from gridfm_datakit.powsybl import from_powsybl
-    pp_net, pf_data = compute_balanced_static_state_dynawo(pp_net_ieee9, from_powsybl(pp_net_ieee9), julia)
+    from gridfm_datakit.powsybl import from_powsybl, build_p2g_maps
+    gfm_net = from_powsybl(pp_net_ieee9)
+    p2g_maps = build_p2g_maps(gfm_net, pp_net_ieee9)
+    pp_net, pf_data = compute_balanced_static_state_dynawo(pp_net_ieee9, from_powsybl(pp_net_ieee9), julia, p2g_maps,)
     assert type(pp_net) == pp.network.Network and type(pf_data) == dict
 
 # Test run_dynawo_simulation using ieee14 benchmark
@@ -47,10 +49,10 @@ def test_benchmark_ieee14_run_dynawo_simulation(pp_net_ieee14,
             ),
         parameters=param_ieee14
         )
-    assert _validate_output_curves_against_ref(dynamic_results.dynamic_results, df_ref_curves_ieee14)
+    assert _validate_res_against_ref(dynamic_results, df_ref_curves_ieee14)
 
-def _validate_output_curves_against_ref(res, df_ref):
-    df_res = res.curves().reset_index(drop=True).rename(columns={'_GEN____1_SM_generator_efdPu_value': 'GEN____1_SM_generator_efdPu_value',
+def _validate_res_against_ref(res, df_ref):
+    df_res = res.dynamic_results.reset_index(drop=True).rename(columns={'_GEN____1_SM_generator_efdPu_value': 'GEN____1_SM_generator_efdPu_value',
                                                             '_GEN____1_SM_voltageRegulator_EfdMaxPu': 'GEN____1_SM_voltageRegulator_EfdMaxPu',
                                                             '_GEN____3_SM_generator_UPu':'GEN____3_SM_generator_UPu',
                                                             '_GEN____3_SM_generator_efdPu_value': 'GEN____3_SM_generator_efdPu_value',

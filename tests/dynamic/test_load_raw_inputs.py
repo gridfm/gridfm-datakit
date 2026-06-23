@@ -29,8 +29,9 @@ def _write_csv(path: str, df: pd.DataFrame) -> None:
     df.to_csv(path, index=False)
 
 
-def _make_config(tmp_dir: str, dataset
-                 ) -> NestedNamespace:
+def _make_config(tmp_dir: str, 
+                 dataset
+) -> NestedNamespace:
     """Build a valid config pointing at CSVs in tmp_dir."""
 
     df_static_element_dynamic_models = dataset['df_static_element_dynamic_models']
