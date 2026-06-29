@@ -888,8 +888,16 @@ def validate_branch_angle_difference_opf_mode(
 
     # Check limits with tolerance
     tolerance = 1e-6
-    min_violations = delta < (merged["ang_min"].to_numpy() - tolerance)
-    max_violations = delta > (merged["ang_max"].to_numpy() + tolerance)
+    ang_min = merged["ang_min"].to_numpy()
+    ang_max = merged["ang_max"].to_numpy()
+
+    # MATPOWER/PYPOWER convention: angmin == angmax == 0 means the branch angle
+    # difference is unbounded, so skip those branches instead of treating 0 as a
+    # hard limit.
+    unbounded = (ang_min == 0) & (ang_max == 0)
+
+    min_violations = (delta < (ang_min - tolerance)) & ~unbounded
+    max_violations = (delta > (ang_max + tolerance)) & ~unbounded
 
     violations = min_violations | max_violations
 
