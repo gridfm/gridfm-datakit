@@ -224,13 +224,13 @@ def _save_generated_data(
     zarr_path = str(output_dir / "dynamic_results.zarr")
     if dyn_arrays:
         n_scenarios = len(dyn_arrays)
-        n_variables, n_timesteps = dyn_arrays[0].shape
+        n_timesteps, n_variables = dyn_arrays[0].shape
         store = zarr.open(zarr_path, mode="w")
         z = store.create_array( # create_dataset is deprecated in v3
             "curves",
-            shape=(n_scenarios, n_variables, n_timesteps),
+            shape=(n_scenarios, n_timesteps, n_variables),
             dtype="float64",
-            chunks=(1, n_variables, min(n_timesteps, 1000)),
+            chunks=(1, n_timesteps, n_variables),
             compressors=zarr.codecs.BloscCodec(cname="zstd", clevel=3)
         )
         for i, arr in enumerate(dyn_arrays):
@@ -244,10 +244,11 @@ def _save_generated_data(
     for r in all_results:
         dr = r.get("dynamic_results")
         if dr and dr.dynamic_results is not None:
-            variable_names = list(
-                getattr(dr, "variable_names", [])
-                or [f"var_{i}" for i in range(np.array(dr.dynamic_results).shape[0])],
-            )
+            variable_names = list(dr.dynamic_results.columns)
+            # variable_names = list(
+            #     getattr(dr, "variable_names", [])
+            #     or [f"var_{i}" for i in range(np.array(dr.dynamic_results).shape[0])],
+            # )
             break
 
     config_hash = hashlib.md5(
