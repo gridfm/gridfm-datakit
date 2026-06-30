@@ -40,6 +40,7 @@ def test_benchmark_ieee14_run_dynawo_simulation(pp_net_ieee14,
     from gridfm_datakit.dynamic.dynawo.simulate import run_dynawo_simulation
     from gridfm_datakit.dynamic.dynawo import DynawoMappings
 
+    drop_duplicate_timestep = True
     dynamic_results = run_dynawo_simulation(
         pp_net=pp_net_ieee14,
         dynawo_mapping=DynawoMappings(
@@ -47,17 +48,21 @@ def test_benchmark_ieee14_run_dynawo_simulation(pp_net_ieee14,
             event_mapping=event_mapping_ieee14,
             variable_mapping=variable_mapping_ieee14,
             ),
-        parameters=param_ieee14
+        parameters=param_ieee14,
+        drop_duplicate_timestep=drop_duplicate_timestep,
         )
-    assert _validate_res_against_ref(dynamic_results, df_ref_curves_ieee14)
+    assert _validate_res_against_ref(dynamic_results, df_ref_curves_ieee14, drop_duplicate_timestep)
 
-def _validate_res_against_ref(res, df_ref):
+def _validate_res_against_ref(res, df_ref, drop_duplicate_timestep):
     df_res = res.dynamic_results.reset_index(drop=True).rename(columns={'_GEN____1_SM_generator_efdPu_value': 'GEN____1_SM_generator_efdPu_value',
                                                             '_GEN____1_SM_voltageRegulator_EfdMaxPu': 'GEN____1_SM_voltageRegulator_EfdMaxPu',
                                                             '_GEN____3_SM_generator_UPu':'GEN____3_SM_generator_UPu',
                                                             '_GEN____3_SM_generator_efdPu_value': 'GEN____3_SM_generator_efdPu_value',
                                                             '_GEN____3_SM_voltageRegulator_EfdMaxPu': 'GEN____3_SM_voltageRegulator_EfdMaxPu'
                                                             })
+    if drop_duplicate_timestep:
+        df_ref = df_ref.set_index('time')
+        df_ref = df_ref[~df_ref.index.duplicated(keep='last')]
     df_ref = df_ref.reset_index(drop=True)
     df_ref = df_ref[df_res.columns]
     return df_res.equals(df_ref)

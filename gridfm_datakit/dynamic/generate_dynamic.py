@@ -36,9 +36,10 @@ def generate_dynamic_data(
         config: Union[str, Dict[str, Any], NestedNamespace]
         ) -> Dict[str, str]:
     """Generate dynamic simulation data from a YAML config.
+    Accepted format includes: a string for the path, a dictionnary or a NestedNamespace.
 
     Runs the full pipeline:
-    1. Validate config (source must be "powsybl", dynamic_solver must be set).
+    1. Validate config.
     2. Prepare network + load scenarios.
     3. Load and prepare Dynawo mappings.
     4. Build solver parameters.
@@ -79,7 +80,9 @@ def generate_dynamic_data(
 
 
     # --- Step 2: network + scenarios (reuse generate.py logic) ---
-    net, scenarios, meta = _prepare_network_and_scenarios(args, file_paths, seed) # TODO: discuss: just a function to prep load scenarios and the path? 
+    # TODO: discuss with YE: just a function to prep load scenarios and the path
+    # we don't need the net, since we'll pass the path instead of the net along the pipeline
+    net, scenarios, meta = _prepare_network_and_scenarios(args, file_paths, seed) 
 
     # --- Step 3: dynamic inputs ---
     dynamic_inputs = load_raw_inputs(args)
@@ -163,7 +166,7 @@ def _save_generated_data(
       bus_data.parquet
       branch_data.parquet
       gen_data.parquet
-      dynamic_results.zarr/   ← shape (n_scenarios, n_variables, n_timesteps)
+      dynamic_results.zarr/   ← shape (n_scenarios, n_timestep, n_variables)
       metadata.json
 
     Args
@@ -202,7 +205,7 @@ def _save_generated_data(
     branch_path = str(output_dir / "branch_data.parquet")
     gen_path = str(output_dir / "gen_data.parquet")
 
-    # TODO: this path is not the same as the path for the logs
+    # TODO: this path is not the same as the path for the logs. Fix
     _to_parquet(bus_rows, BUS_COLUMNS, bus_path)
     _to_parquet(gen_rows, GEN_COLUMNS, gen_path)
     _to_parquet(branch_rows, BRANCH_COLUMNS, branch_path)
@@ -212,13 +215,13 @@ def _save_generated_data(
     file_paths["gen_data"] = gen_path
 
     # ---- Dynamic time-series → Zarr -----------------------------------------
-    # Collect per-scenario arrays (n_variables, n_timesteps)
+    # Collect per-scenario arrays (n_timesteps, n_variables)
     dyn_arrays = []
     for r in all_results:
         dr: Optional[DynamicResults] = r.get("dynamic_results")
         if dr is None or dr.dynamic_results is None:
             continue
-        arr = np.array(dr.dynamic_results)  # (n_variables, n_timesteps)
+        arr = np.array(dr.dynamic_results)  # (n_timesteps, n_variables)
         dyn_arrays.append(arr)
 
     zarr_path = str(output_dir / "dynamic_results.zarr")
@@ -226,7 +229,7 @@ def _save_generated_data(
         n_scenarios = len(dyn_arrays)
         n_timesteps, n_variables = dyn_arrays[0].shape
         store = zarr.open(zarr_path, mode="w")
-        z = store.create_array( # create_dataset is deprecated in v3
+        z = store.create_array( # create_dataset is deprecated in zarr v3
             "curves",
             shape=(n_scenarios, n_timesteps, n_variables),
             dtype="float64",

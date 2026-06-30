@@ -5,7 +5,7 @@ Exposes:
 - DynawoMappings : dataclass holding the three DataFrames that map directly
   onto pypowsybl.dynamic's add_all_dynamic_mappings / event / curve APIs.
 - generate_dynawo_mappings : convert a DynamicInputs into DynawoMappings.
-- prepare_dynawo_parameters : build a pypowsybl.dynamic.Parameters object
+- get_dynawo_simulation_parameters : build a pypowsybl.dynamic.Parameters object
   from the config's dynamic.solver_parameters block.
 """
 
@@ -44,12 +44,14 @@ class DynawoMappings:
     event_mapping : pypowsybl.dynamic.EventMapping
     variable_mapping : pypowsybl.dynamic.OutputVariableMapping
     """
-    dynamic_model_mapping: pp.dynamic.ModelMapping # TODO: change to Dynawo's mapping 
+    dynamic_model_mapping: pp.dynamic.ModelMapping
     event_mapping: pp.dynamic.EventMapping
     variable_mapping: pp.dynamic.OutputVariableMapping
 
 
-## Public functions
+# ---------------------------------------------------------------------------
+# Public: generate mappings compatibles with Dynawo through PyPowSyBl 
+# ---------------------------------------------------------------------------  
 
 def generate_dynawo_mappings(dynamic_inputs: DynamicInputs) -> DynawoMappings:
     """Convert generic DynamicInputs into Dynawo-compatible DynawoMappings.
@@ -73,6 +75,34 @@ def generate_dynawo_mappings(dynamic_inputs: DynamicInputs) -> DynawoMappings:
         event_mapping=event_mapping,
         variable_mapping=variable_mapping
     )
+
+
+# ---------------------------------------------------------------------------
+# Public: get simulation parameters for Dynawo
+# ---------------------------------------------------------------------------  
+
+
+def get_dynawo_simulation_parameters(args:NestedNamespace) -> pp.dynamic.Parameters:
+    """Prepares the parameters for Dynawo simulation."""
+    # TODO: add validation or validate at loading config
+    dict_parameters = args.dynamic.solver_parameters.to_dict()
+
+    # provider_parameters only accept strings
+    provider_parameters = {SIMULATION_PARAMETERS_MAPPING[key]: str(value)
+                           for key, value in dict_parameters.items() if 
+                           (key not in ['start_time', 'stop_time'] and value not in ["none", ""])}
+
+    return pp.dynamic.Parameters(
+        start_time=dict_parameters['start_time'],
+        stop_time=dict_parameters['stop_time'],
+        provider_parameters=provider_parameters,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Private: mappers
+# ---------------------------------------------------------------------------
+
 
 def _map_dynamic_models_dynawo(dynamic_models: list[pd.DataFrame]) -> pp.dynamic.ModelMapping:
     """Maps dynamic models from DynamicInputs to pypowsybl.dynamic.ModelMapping."""
@@ -151,34 +181,27 @@ def _map_variables_dynawo (variables: pd.DataFrame) -> pp.dynamic.OutputVariable
     return variable_mapping
 
 
+# ---------------------------------------------------------------------------
+# Private: parse the string for the "param" columns of some dynamic inputs: automation systems and events
+# ---------------------------------------------------------------------------
+
+
 def _get_param_value(params, keyword):
     """Gets the value associated to a keyword from the parameters.
     
     This helper is necessary to handle automation system mapping and event mapping,
     which have different parameters depending on the category of system/event.
     Check gridfm_datakit.dynamic.dynawo.utils for the accepted parameters.
+
+    Pattern: "key1=value1;key2=value2;..."
     """
 
     pairs = dict(pair.split("=") for pair in params.split(";") if "=" in pair)
+    # specific case for the "Disconnect" event, the sole one to have an optional parameter
     if keyword == 'disconnect_only' and pairs.get(keyword)=='':
         return np.nan
     return pairs.get(keyword)
 
-def get_dynawo_simulation_parameters(args:NestedNamespace) -> pp.dynamic.Parameters:
-    """Prepares the parameters for Dynawo simulation."""
-    # TODO: add validation or validate at loading config
-    dict_parameters = args.dynamic.solver_parameters.to_dict()
-
-    # provider_parameters only accept strings
-    provider_parameters = {SIMULATION_PARAMETERS_MAPPING[key]: str(value)
-                           for key, value in dict_parameters.items() if 
-                           (key not in ['start_time', 'stop_time'] and value not in ["none", ""])}
-
-    return pp.dynamic.Parameters(
-        start_time=dict_parameters['start_time'],
-        stop_time=dict_parameters['stop_time'],
-        provider_parameters=provider_parameters,
-        )
 
 __all__ = [
     # primary entry points 

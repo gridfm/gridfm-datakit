@@ -12,11 +12,9 @@ Contains a helper function _format_dynamic_res that formats the raw Dynawo outpu
 from __future__ import annotations
 
 import copy
-import numpy as np
 import pypowsybl as pp
 import time
 from typing import Any, Dict, Tuple
-import zarr
 
 from gridfm_datakit.dynamic import DynamicResults
 from gridfm_datakit.dynamic.dynawo import DynawoMappings
@@ -96,7 +94,7 @@ def compute_balanced_static_state_dynawo(
     
     # Step 3: run AC-PF via pypowsybl OpenLoadFlow
     lf_params = powsybl.get_default_lf_params()
-    # TODO: delete once the fix merged
+    # TODO: delete once the fix merged and replace with default lf parameters
     ##############
     lf_params = pp.loadflow.Parameters(distributed_slack=False,
                                   read_slack_bus=True,
@@ -142,7 +140,7 @@ def run_dynawo_simulation(
     parameters :
         ``pypowsybl.dynamic.Parameters`` object (from ``get_dynawo_simulation_parameters``).
     drop_duplicate_timestep :
-        Whether drop duplicate timestep or not in the output timeseries, True by default.
+        Whether drop duplicate timestep in the output timeseries, True by default.
 
     Returns
     -------
@@ -177,6 +175,10 @@ def run_dynawo_simulation(
 def _format_dynamic_res(dyn_res: Any, drop_duplicate_timestpe):
     """Convert raw pypowsybl.dynamic simulation output into DynamicResults.
 
+    Dynawo would compute a timestep several times upon system changes 
+    and keeps tracks of values that it associates to the same timestep.
+    By toggling drop_duplicate_timestep only the last timestep is kept.
+    
     Args
     ----
     sim_result :
@@ -188,7 +190,7 @@ def _format_dynamic_res(dyn_res: Any, drop_duplicate_timestpe):
     -------
     DynamicResults
     """
-    # TODO: validate with Youssouf
+    # TODO: validate with Youssouf, following code didn't run on my side
     # curves = dyn_res.curves()
 
     # if curves is None or (hasattr(curves, "empty") and curves.empty):

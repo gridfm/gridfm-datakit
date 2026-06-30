@@ -37,6 +37,7 @@ if TYPE_CHECKING:
 # The user can check the successful model build-up by reading report_node, included in the DynamicOutputs
 # Advanced usage: it is possible to adjust report verbosity through simulation parameter "log.levelFilter"
 
+# dynamic_models (divided into two dataframes static_element_dynamic_models and automation_systems )
 
 STATIC_ELEMENT_DYNAMIC_MODELS_REQUIRED_COLS = {
     "category_name", # str; category of the dynamic model
@@ -53,12 +54,16 @@ AUTOMATION_SYSTEMS_REQUIRED_COLS = {
     "model_name", # str; Dynawo model name (e.g. "UnderVoltage") 
 }
 
+# events
+
 EVENTS_REQUIRED_COLS = {
     "event_name", # str; specificy the type of event, options = ['ActivePowerVariation', 'Disconnect', 'NodeFault', 'ReactivePowerVariation', 'ReferenceVoltageVariation']
     "static_id",  # str; pypowsybl element ID to which the event applies
     "start_time",  # str or float; event start time
     "params",  # str; parameters that vary according to event type. Given as a single string with pattern: "<parameter1>=<value1>;<parameter2>=<value2>;..."
 }
+
+# variables
 
 VARIABLES_REQUIRED_COLS = {
     "type", # str; either "Curve" for timeseries or "FinalStateValue" for the final state value only
@@ -85,11 +90,11 @@ class DynamicInputs:
     ----------
     dynamic_models : list[pd.DataFrame]
         List of 2 pandas DataFrames. 
-        One for the dynamic models that equip static elements:
+        First one is for the dynamic models that equip static elements:
             One row per network element to be equipped with a dynamic model.
             Required columns: category_name, static_id, parameter_set_id, model_name
             Note: unequipped static element will be given a default model
-        One for the dynamic models that are automation systems:
+        Second one is for the automation systems:
             One row per automation system
             Required columns: category_name, dynamic_model_id, parameter_set_id, params, model_name 
     events : pd.DataFrame
@@ -115,11 +120,11 @@ class DynamicResults:
         Time-series output shaped (n_variables, n_timesteps) per scenario.
         Stored as an in-memory Zarr array during per-scenario processing;
         written to a persistent Zarr store by _save_generated_data.
-    report : Any (pypowsybl.report.ReportNode for Dynawo Implementation)
+    report : Any
         Dynamic simulation report including model build-up and problem resolution.
     """
     dynamic_results: Any # zarr.Array or zarr.Group — (n_variables, n_timesteps)
-    report: Any # 
+    report: Any
 
 
 # ---------------------------------------------------------------------------
@@ -132,7 +137,7 @@ def load_raw_inputs(
           ) -> DynamicInputs:
     """Load dynamic simulation inputs from CSV files declared in the config.
 
-    Reads the three CSV (or Parquet) files listed under config.dynamic and
+    Reads the four CSV (or Parquet) files listed under config.dynamic and
     returns a DynamicInputs instance. When dynamic_solver == "dynawo", the
     minimum required columns for each DataFrame are validated.
 
@@ -166,8 +171,8 @@ def load_raw_inputs(
         _load_table(dyn_input_cfg.automation_systems_file)
     ]
 
-    events = _load_csv_inputs(dyn_input_cfg.events_file)
-    variables = _load_csv_inputs(dyn_input_cfg.variables_file)
+    events = _load_table(dyn_input_cfg.events_file)
+    variables = _load_table(dyn_input_cfg.variables_file)
 
     solver = getattr(args.dynamic, "dynamic_solver", "dynawo")
     if solver == "dynawo":
@@ -219,18 +224,13 @@ def _load_table(path: str) -> pd.DataFrame:
         raise FileNotFoundError(f"Dynamic input file not found: {path}")
     if p.suffix.lower() == ".parquet":
         return pd.read_parquet(p)
-    elif p.suffix.lower() == ".csv": # TODO: validate with Youssouf. To handle convention difference for CSV between North America and Europe
+    elif p.suffix.lower() == ".csv": # TODO: validate with Youssouf. To handle convention difference for CSV between North America and Europe, use sniffer
         with open(p) as f:
             dialect = csv.Sniffer().sniff(f.read(1024))
         return pd.read_csv(p, sep=dialect.delimiter)
     else:
         raise TypeError(f"A csv or parquet file is expected, instead received {p}")
 
-def _load_csv_inputs(file_path) -> pd.DataFrame:
-    """Detect the csv format and convert it into pandas dataframe."""
-    with open(file_path) as f:
-        dialect = csv.Sniffer().sniff(f.read(1024))
-    return pd.read_csv(file_path, sep=dialect.delimiter)
 
 __all__ = [
     "DynamicInputs",

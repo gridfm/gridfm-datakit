@@ -44,7 +44,6 @@ def process_dynamic_simulations(
     error_log_file: str,
     seed: int,
 ) -> List[Dict[str, Any]]:
-    # TODO: update doc
     """Distributed outer loop for dynamic simulation data generation.
 
     Splits scenarios into chunks and dispatches each chunk to a worker
@@ -53,21 +52,15 @@ def process_dynamic_simulations(
 
     Args
     ----
-    pp_net :
-        Base pypowsybl network (read-only; workers deep-copy before mutating).
-    gfm_net : Network
-        Base gridfm network.
+    network_path : str
+        Path to the network.
     scenarios : np.ndarray
         Load scenarios array, shape (n_loads, n_scenarios, 2).
-    p2g_maps :
-        MappingP2G built from the base network.
-    dynamic_mappings :
-        DynawoMappings (or future solver-equivalent).
-    solver_params :
-        pypowsybl.dynamic.Parameters.
+    dynamic_inputs: DynamicInputs
+        Dynamics inputs.
     dynamic_solver : str
         Solver name ("dynawo" or future alternatives).
-    args :
+    config :
         Full NestedNamespace config.
     error_log_file : str
         Path to error log.
@@ -169,6 +162,10 @@ def _process_dynamic_chunk(args: Tuple) -> Union[List[Dict[str, Any]], List[Exce
             # to_powsybl cannot work since gfm_network representation erases the original IDs
             # thus the dynamic model mappings would bug
             net = load_net(network_path)
+
+            # TODO: discuss with YE
+            # Generate DynawoMappings and the solver parameters: pypowsybl.dynamic.Parameters
+            # These objects cannot be pickled neither
             dynamic_mappings = generate_dynawo_mappings(dynamic_inputs)
             dynamic_solver_params = get_dynawo_simulation_parameters(config)
             ##
@@ -228,20 +225,21 @@ def process_single_dynamic_simulation(
         dynamic_solver: str,
         julia: Any,
         ) -> Dict[str, Any]:
-    
+    """Process a single scenario"""
 
     # Apply load scenario
     gfm_net.Pd = scenarios[:, scenario_index, 0]
     gfm_net.Qd = scenarios[:, scenario_index, 1]
 
     # TODO: add pertubations to scenario here, then work on a new clone for each perturbation
+    # So the perturbation generators have to be pass along the pipeline before.
+
     base_variant_id = pp_net.get_working_variant_id()
     variant_id = f"scenario_{scenario_index}"
     pp_net.clone_variant(base_variant_id, variant_id)
     pp_net.set_working_variant(variant_id)
 
     # Step 1+2: balanced static state
-    # (with PowSyBl, the clone is directly altered by the computation of the balanced static state)
     pp_net, pf_data = _compute_balanced_static_state(
         pp_net=pp_net,
         gfm_net=gfm_net,
@@ -321,8 +319,8 @@ def _combine_pf_and_dyn_res(pf_data: Dict[str, Any],
     Question #2). This function currently packages both outputs side-by-side
     so they can be saved independently by ``_save_generated_data``.
 
-    Parameters
-    ----------
+    Args
+    ----
     pf_data : dict
         Keys: ``"bus"``, ``"gen"``, ``"branch"``, ``"Y_bus"``, ``"runtime"``.
     dynamic_results : DynamicResults
