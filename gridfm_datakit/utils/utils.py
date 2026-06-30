@@ -50,19 +50,25 @@ def _retry_on_eagain(func, retries: int = 50, delay: float = 0.01):
     the file descriptor can be non-blocking and a write/flush may raise
     ``BlockingIOError`` ([Errno 11]). Retry briefly instead of propagating the
     error, which would otherwise fail data generation.
+
+    The common (no-error) path is a single ``try`` with no loop or allocation,
+    so this adds negligible overhead; the retry loop only runs after a failure.
     """
-    for attempt in range(retries):
+    try:
+        return func()
+    except OSError as e:
+        if not (isinstance(e, BlockingIOError) or e.errno == errno.EAGAIN):
+            raise
+    # Slow path: only reached when the first attempt hit EAGAIN.
+    for _ in range(retries - 1):
+        time.sleep(delay)
         try:
             return func()
-        except BlockingIOError:
-            if attempt == retries - 1:
-                raise
-            time.sleep(delay)
         except OSError as e:
-            if e.errno == errno.EAGAIN and attempt < retries - 1:
-                time.sleep(delay)
-            else:
+            if not (isinstance(e, BlockingIOError) or e.errno == errno.EAGAIN):
                 raise
+    # Final attempt; let a persistent failure propagate.
+    return func()
 
 
 def _blocking_write(stream, data) -> None:
