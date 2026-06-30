@@ -59,19 +59,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache Julia packages
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.julia
-          key: julia-packages-${{ runner.os }}-${{ hashFiles('**/Project.toml') }}
-          restore-keys: |
-            julia-packages-${{ runner.os }}-
-
       - name: Install Julia 1.12
         uses: julia-actions/setup-julia@v1
         with:
           version: '1.12'
+
+      # Cache the whole Julia depot (downloaded packages, artifacts and, most
+      # importantly, the precompile cache). Keyed on the pinned solver versions
+      # so it only rebuilds when juliapkg.json changes.
+      - name: Cache Julia depot
+        uses: actions/cache@v4
+        with:
+          path: ~/.julia
+          key: julia-depot-${{ runner.os }}-julia1.12-${{ hashFiles('gridfm_datakit/juliapkg.json') }}
+          restore-keys: |
+            julia-depot-${{ runner.os }}-julia1.12-
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v4
@@ -79,7 +81,7 @@ jobs:
           python-version: '3.12'
 
       - name: Cache pip
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: pip-${{ runner.os }}-${{ hashFiles('**/requirements*.txt') }}
@@ -97,12 +99,13 @@ jobs:
           python -m pip install --upgrade pip wheel
           pip install -e ".[test]"
 
-      - name: Run Julia setup (PowerModels)
-        env:
-          JULIA_PKG_SERVER: ""
+      # Resolve and precompile the pinned Julia packages from juliapkg.json.
+      # On a cache hit this is near-instant; on a miss it populates the depot
+      # cache for subsequent runs.
+      - name: Set up Julia packages (PowerModels)
         run: |
           source .venv/bin/activate
-          gridfm_datakit setup_pm
+          python -c "import juliacall"
 
       - name: Unit tests
         run: |
