@@ -5,49 +5,51 @@ This module provides functionality for loading, processing, and saving power sys
 networks in MATPOWER format, with support for non-continuous bus indexing.
 """
 
+import copy
 import os
 import shutil
-import requests
-from importlib import resources
-import pandas as pd
-from numpy import ones, conj, nonzero, any, exp, pi, hstack, real, int64
-from scipy.sparse import csr_matrix
-from matpowercaseframes import CaseFrames
-from gridfm_datakit.utils.idx_bus import (
-    BUS_I,
-    BUS_TYPE,
-    PD,
-    QD,
-    GS,
-    BS,
-    VM,
-    VA,
-    REF,
-    PV,
-    PQ,
-)
-from gridfm_datakit.utils.idx_gen import GEN_BUS, GEN_STATUS, PG, QG
-from gridfm_datakit.utils.idx_brch import (
-    F_BUS,
-    T_BUS,
-    BR_STATUS,
-    BR_R,
-    BR_X,
-    BR_B,
-    TAP,
-    SHIFT,
-    BR_R_ASYM,
-    BR_X_ASYM,
-)
-from gridfm_datakit.utils.idx_cost import NCOST, MODEL, POLYNOMIAL
+import tempfile
 import warnings
+from importlib import resources
+from typing import Any, Dict, Tuple
+
 import networkx as nx
 import numpy as np
-import copy
-from typing import Dict, Tuple, Any
-import tempfile
+import pandas as pd
+import requests
+from juliapkg.deps import executable, run_julia
 from juliapkg.state import STATE
-from juliapkg.deps import run_julia, executable
+from matpowercaseframes import CaseFrames
+from numpy import any, conj, exp, hstack, int64, nonzero, ones, pi, real
+from scipy.sparse import csr_matrix
+
+from gridfm_datakit.utils.idx_brch import (
+    BR_B,
+    BR_R,
+    BR_R_ASYM,
+    BR_STATUS,
+    BR_X,
+    BR_X_ASYM,
+    F_BUS,
+    SHIFT,
+    T_BUS,
+    TAP,
+)
+from gridfm_datakit.utils.idx_bus import (
+    BS,
+    BUS_I,
+    BUS_TYPE,
+    GS,
+    PD,
+    PQ,
+    PV,
+    QD,
+    REF,
+    VA,
+    VM,
+)
+from gridfm_datakit.utils.idx_cost import MODEL, NCOST, POLYNOMIAL
+from gridfm_datakit.utils.idx_gen import GEN_BUS, GEN_STATUS, PG, QG
 
 
 def correct_network(network_path: str, force: bool = False) -> str:
@@ -637,6 +639,29 @@ def load_net_from_file(network_path: str) -> Network:
     return Network(mpc)
 
 
+def get_pglib_file_path(grid_name: str) -> str:
+    """Return the local path to a PGLib network file, downloading it if necessary.
+
+    Args:
+        grid_name: Name of the grid file without the prefix 'pglib_opf_'
+                  (e.g., 'case14_ieee', 'case118_ieee').
+
+    Returns:
+        Absolute path to the (corrected) local .m file.
+    """
+    file_path = str(
+        resources.files("gridfm_datakit.grids").joinpath(f"pglib_opf_{grid_name}.m"),
+    )
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    if not os.path.exists(file_path):
+        url = f"https://raw.githubusercontent.com/power-grid-lib/pglib-opf/master/pglib_opf_{grid_name}.m"
+        response = requests.get(url)
+        response.raise_for_status()
+        with open(file_path, "wb") as f:
+            f.write(response.content)
+    return correct_network(file_path)
+
+
 def load_net_from_pglib(grid_name: str) -> Network:
     """Load a power grid network from PGLib using matpowercaseframes.
 
@@ -654,25 +679,7 @@ def load_net_from_pglib(grid_name: str) -> Network:
         FileNotFoundError: If the file cannot be found after download.
         ValueError: If the file format is invalid.
     """
-
-    # Construct file paths
-    file_path = str(
-        resources.files("gridfm_datakit.grids").joinpath(f"pglib_opf_{grid_name}.m"),
-    )
-
-    # Create directory if it doesn't exist
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
-
-    # Download file if not exists
-    if not os.path.exists(file_path):
-        url = f"https://raw.githubusercontent.com/power-grid-lib/pglib-opf/master/pglib_opf_{grid_name}.m"
-        response = requests.get(url)
-        response.raise_for_status()
-
-        with open(file_path, "wb") as f:
-            f.write(response.content)
-
-    file_path = correct_network(file_path)
+    file_path = get_pglib_file_path(grid_name)
 
     # Load network using matpowercaseframes
     mpc_frames = CaseFrames(file_path)

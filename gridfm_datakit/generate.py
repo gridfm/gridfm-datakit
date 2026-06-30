@@ -1,23 +1,22 @@
 """Main data generation module for gridfm_datakit."""
 
-import numpy as np
+import gc
+import multiprocessing
 import os
-from gridfm_datakit.save import (
-    save_node_edge_data,
-)
-from gridfm_datakit.process.process_network import (
-    process_scenario_opf_mode,
-    process_scenario_pf_mode,
-    process_scenario_chunk,
-)
-from gridfm_datakit.utils.param_handler import (
-    NestedNamespace,
-    get_load_scenario_generator,
-    initialize_topology_generator,
-    initialize_generation_generator,
-    initialize_admittance_generator,
-)
+import shutil
+import sys
+from datetime import datetime
+from multiprocessing import Manager
+from typing import Any, Dict, List, Tuple, Union
+
+import numpy as np
+import yaml
+from tqdm import tqdm
+
+import gridfm_datakit.powsybl as powsybl
 from gridfm_datakit.network import (
+    Network,
+    get_pglib_file_path,
     load_net_from_file,
     load_net_from_pglib,
 )
@@ -25,18 +24,24 @@ from gridfm_datakit.perturbations.load_perturbation import (
     load_scenarios_to_df,
     plot_load_scenarios_combined,
 )
-import gc
-from datetime import datetime
-from tqdm import tqdm
-from multiprocessing import Pool, Manager
-import shutil
-from gridfm_datakit.utils.utils import write_ram_usage_distributed, Tee
-import yaml
-from typing import List, Tuple, Any, Dict, Union
-import sys
-from gridfm_datakit.network import Network
-from gridfm_datakit.process.process_network import init_julia
+from gridfm_datakit.process.process_network import (
+    init_julia,
+    process_scenario_chunk,
+    process_scenario_opf_mode,
+    process_scenario_pf_mode,
+)
+from gridfm_datakit.save import (
+    save_node_edge_data,
+)
+from gridfm_datakit.utils.param_handler import (
+    NestedNamespace,
+    get_load_scenario_generator,
+    initialize_admittance_generator,
+    initialize_generation_generator,
+    initialize_topology_generator,
+)
 from gridfm_datakit.utils.random_seed import custom_seed
+from gridfm_datakit.utils.utils import Tee, write_ram_usage_distributed
 
 
 def _setup_environment(
@@ -82,6 +87,32 @@ def _setup_environment(
         # chunk_seed = seed * 20000 + start_idx + 1 < 2^31 - 1
         # seed < (2,147,483,647 - n_scenarios) / 20,000 ~= 100_000 so taking 50_000 to be safe
         print(f"No seed provided. Using seed={seed}")
+
+    # Resolve and validate the network reader.
+    #
+    # reader controls HOW the network file is parsed (independent of pf_solver).
+    # source controls WHERE to get the file: 'pglib' (download) or 'file' (local).
+    reader = getattr(args.network, "reader", "native")
+    if reader not in ("native", "powsybl"):
+        raise ValueError(
+            f"network.reader must be 'native' or 'powsybl', got {reader!r}",
+        )
+    args.network.reader = reader
+
+    # Resolve and validate the PF solver setting.
+    #
+    # pf_solver controls which engine is used to solve the power flow equations
+    # in PF mode.  It is completely independent of network.source/reader.
+    #
+    # OPF is always solved by PowerModels (Julia) regardless of this setting.
+    # In OPF mode the value is read and stored on args but is never consulted
+    # during execution — it is kept here purely for consistency and logging.
+    pf_solver = getattr(args.settings, "pf_solver", "powermodel")
+    if pf_solver not in ("powermodel", "powsybl"):
+        raise ValueError(
+            f"settings.pf_solver must be 'powermodel' or 'powsybl', got {pf_solver!r}",
+        )
+    args.settings.pf_solver = pf_solver
 
     # Setup output directory
     base_path = os.path.join(args.settings.data_dir, args.network.name, "raw")
@@ -142,7 +173,7 @@ def _prepare_network_and_scenarios(
     args: NestedNamespace,
     file_paths: Dict[str, str],
     seed: int,
-) -> Tuple[Network, np.ndarray]:
+) -> Tuple[Network, np.ndarray, Dict[str, Any]]:
     """Prepare the network and generate load scenarios.
 
     Args:
@@ -153,14 +184,39 @@ def _prepare_network_and_scenarios(
     Returns:
         Tuple of (network, scenarios)
     """
+    meta = {}
+    reader = args.network.reader  # already validated in _setup_environment
+
     if args.network.source == "pglib":
-        net = load_net_from_pglib(args.network.name)
+        if reader == "powsybl":
+            network_path = get_pglib_file_path(args.network.name)
+            loaded_net = powsybl.load_net(network_path)
+            meta["pp_net"] = loaded_net.pp_net
+            meta["network_path"] = network_path
+            meta["mapping_p2g"] = loaded_net.mapping_p2g
+            net = loaded_net.gfm_net
+        else:
+            net = load_net_from_pglib(args.network.name)
     elif args.network.source == "file":
-        net = load_net_from_file(
-            os.path.join(args.network.network_dir, args.network.name) + ".m",
-        )
+        if reader == "powsybl":
+            network_path = (
+                args.network.file
+                if getattr(args.network, "file", None)
+                else os.path.join(args.network.network_dir, args.network.name) + ".m"
+            )
+            loaded_net = powsybl.load_net(network_path)
+            meta["pp_net"] = loaded_net.pp_net
+            meta["network_path"] = network_path
+            meta["mapping_p2g"] = loaded_net.mapping_p2g
+            net = loaded_net.gfm_net
+        else:
+            net = load_net_from_file(
+                os.path.join(args.network.network_dir, args.network.name) + ".m",
+            )
     else:
-        raise ValueError("Invalid grid source!")
+        raise ValueError(
+            f"network.source must be 'pglib' or 'file', got {args.network.source!r}",
+        )
 
     # Generate load scenarios
     load_scenario_generator = get_load_scenario_generator(args.load)
@@ -178,7 +234,7 @@ def _prepare_network_and_scenarios(
     else:
         print("Skipping plot of scenarios for large networks (number of buses > 100)")
 
-    return net, scenarios
+    return net, scenarios, meta
 
 
 def _save_generated_data(
@@ -256,7 +312,7 @@ def generate_power_flow_data(
     args, base_path, file_paths, seed = _setup_environment(config)
 
     # Prepare network and scenarios
-    net, scenarios = _prepare_network_and_scenarios(args, file_paths, seed)
+    net, scenarios, meta = _prepare_network_and_scenarios(args, file_paths, seed)
 
     # Initialize topology generator
     topology_generator = initialize_topology_generator(args.topology_perturbation, net)
@@ -316,6 +372,8 @@ def generate_power_flow_data(
                             args.settings.pf_fast,
                             args.settings.dcpf_fast,
                             jl,
+                            args.settings.pf_solver,
+                            meta=meta,
                         )
                     else:
                         raise ValueError("Invalid mode!")
@@ -371,7 +429,7 @@ def generate_power_flow_data_distributed(
         raise ValueError("Invalid mode!")
 
     # Prepare network and scenarios
-    net, scenarios = _prepare_network_and_scenarios(args, file_paths, seed)
+    net, scenarios, meta = _prepare_network_and_scenarios(args, file_paths, seed)
 
     # Initialize topology generator
     topology_generator = initialize_topology_generator(args.topology_perturbation, net)
@@ -413,6 +471,10 @@ def generate_power_flow_data_distributed(
                     min(args.settings.num_processes, chunk_size),
                 )
 
+                # pp_net wraps JVM state and cannot cross process boundaries;
+                # workers reload it themselves from network_path.
+                worker_meta = {k: v for k, v in meta.items() if k != "pp_net"}
+
                 tasks = [
                     (
                         args.settings.mode,
@@ -431,12 +493,15 @@ def generate_power_flow_data_distributed(
                         file_paths["solver_log_dir"],
                         args.settings.max_iter,
                         seed,
+                        args.settings.pf_solver,
+                        worker_meta,
                     )
                     for chunk in scenario_chunks
                 ]
 
                 # Run parallel processing
-                with Pool(processes=args.settings.num_processes) as pool:
+                _mp_ctx = multiprocessing.get_context("spawn")
+                with _mp_ctx.Pool(processes=args.settings.num_processes) as pool:
                     results = [
                         pool.apply_async(process_scenario_chunk, task) for task in tasks
                     ]
