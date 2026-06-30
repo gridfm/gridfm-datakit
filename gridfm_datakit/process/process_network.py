@@ -7,10 +7,10 @@ for data generation purposes.
 """
 
 import copy
-import multiprocessing
 import os
 import time
 import traceback
+from contextlib import nullcontext
 from importlib import resources
 from queue import Queue
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -63,6 +63,7 @@ from gridfm_datakit.utils.idx_bus import (
 from gridfm_datakit.utils.idx_cost import COST, NCOST
 from gridfm_datakit.utils.idx_gen import GEN_BUS, PMAX, PMIN, QMAX, QMIN
 from gridfm_datakit.utils.random_seed import custom_seed
+from gridfm_datakit.process.solver_output import SolverOutputConfig, redirect_c_stdio
 
 
 def init_julia(
@@ -70,18 +71,23 @@ def init_julia(
     solver_log_dir: str = None,
     dc_max_iter: Optional[int] = None,
     print_level: Optional[int] = None,
+    output: Optional[SolverOutputConfig] = None,
 ) -> Any:
     """Initialize Julia interface with PowerModels.jl.
 
     Sets up Julia environment and defines AC OPF/PF/DCPF entrypoints.
 
+    Solver output is governed by a single :class:`SolverOutputConfig`. Pass
+    ``output`` directly, or rely on the legacy ``solver_log_dir`` /
+    ``print_level`` arguments, which are folded into an equivalent config.
+
     Args:
         max_iter: Maximum number of iterations for AC OPF solver.
-        solver_log_dir: If provided, enable OPF/PF logging to files under this
-            directory using per-process names (opf_<proc>.log, pf_<proc>.log).
-            If None, logging is disabled.
-        dc_max_iter: Maximum number of iterations for DC OPF solver. If None, uses 1000.
-        print_level: Ipopt print level. If None, uses 0 when solver_log_dir is None, else 5.
+        solver_log_dir: Legacy. Enables solver logging to files under this
+            directory when ``output`` is None.
+        dc_max_iter: Maximum number of iterations for DC OPF solver (default 1000).
+        print_level: Legacy. Explicit Ipopt print level override.
+        output: Solver-output config; takes precedence over the legacy args.
 
     Returns:
         Julia interface object for running power flow calculations.
@@ -89,6 +95,13 @@ def init_julia(
     Raises:
         RuntimeError: If Julia initialization fails.
     """
+    if output is None:
+        output = SolverOutputConfig.from_settings(
+            log_dir=solver_log_dir,
+            enable_solver_logs=solver_log_dir is not None,
+        )
+    # An explicit legacy print_level still wins over the verbosity-derived one.
+    ipopt_print_level = output.ipopt_print_level if print_level is None else print_level
     # Ensure spawned workers use the same Julia project so package resolution is consistent.
     julia_project = None
     try:
@@ -102,43 +115,13 @@ def init_julia(
 
     from juliacall import Main as jl
 
-    # Decide log paths and Ipopt print levels
-    proc = multiprocessing.current_process().name
+    # Per-solver log paths; "" means Julia aliases the solver without redirection.
+    opf_solver_log_file = output.log_file("opf") or ""
+    pf_solver_log_file = output.log_file("pf") or ""
+    dcpf_solver_log_file = output.log_file("dcpf") or ""
+    dcopf_solver_log_file = output.log_file("dcopf") or ""
 
-    opf_solver_log_file = (
-        ""
-        if solver_log_dir is None
-        else os.path.join(solver_log_dir, "opf_" + str(proc) + ".log").replace(
-            "\\",
-            "/",
-        )
-    )
-    pf_solver_log_file = (
-        ""
-        if solver_log_dir is None
-        else os.path.join(solver_log_dir, "pf_" + str(proc) + ".log").replace("\\", "/")
-    )
-    dcpf_solver_log_file = (
-        ""
-        if solver_log_dir is None
-        else os.path.join(solver_log_dir, "dcpf_" + str(proc) + ".log").replace(
-            "\\",
-            "/",
-        )
-    )
-    dcopf_solver_log_file = (
-        ""
-        if solver_log_dir is None
-        else os.path.join(solver_log_dir, "dcopf_" + str(proc) + ".log").replace(
-            "\\",
-            "/",
-        )
-    )
-
-    if print_level is None:
-        print_level = 0 if solver_log_dir is None else 5
-    else:
-        print_level = print_level
+    print_level = ipopt_print_level
 
     try:
         if julia_project:
@@ -153,13 +136,18 @@ def init_julia(
 
         # If dc_max_iter not provided, use 1000
         dc_iter = 1000 if dc_max_iter is None else dc_max_iter
+        # Memento.config! sets the root logger; PowerModels.silence() is what
+        # actually quiets PowerModels' own Info/Warn (see SolverOutputConfig).
+        memento_level = output.memento_level
+        silence_pm = "PowerModels.silence()" if output.silence_powermodels else ""
         # Base imports and logging config in Julia
         try:
-            jl.seval("""
+            jl.seval(f"""
             using PowerModels
             using Ipopt
             using Memento
-            Memento.config!("not_set")
+            Memento.config!("{memento_level}")
+            {silence_pm}
             """)
         except Exception as e:
             msg = str(e)
@@ -167,7 +155,7 @@ def init_julia(
             missing_ipopt = "Package Ipopt not found" in msg
             missing_memento = "Package Memento not found" in msg
             if missing_pm or missing_ipopt or missing_memento:
-                jl.seval("""
+                jl.seval(f"""
                 using Pkg
                 Pkg.add("Ipopt")
                 Pkg.add("PowerModels")
@@ -175,7 +163,8 @@ def init_julia(
                 using PowerModels
                 using Ipopt
                 using Memento
-                Memento.config!("not_set")
+                Memento.config!("{memento_level}")
+                {silence_pm}
                 """)
             else:
                 raise
@@ -404,47 +393,45 @@ def init_julia(
             """.format(dcpf_solver_log_file),
             )
 
-        # warm start all functions by running a dummy case
+        # Warm start all functions on a dummy case. Ipopt prints its one-time
+        # license banner here at the C level; when nothing should reach the
+        # console and we're not logging to files, discard it.
         dummy_case_file = str(
             resources.files("gridfm_datakit.process").joinpath("dummy.m"),
         )
-        if print_level > 0 and solver_log_dir is None:
-            print("\n ======= warm starting Julia interface =======\n", flush=True)
-        if opf_solver_log_file:
-            with open(opf_solver_log_file, "a") as f:
-                f.write(" ======= warm starting Julia interface opf function =======\n")
-        jl.run_opf(dummy_case_file)
+        discard_banner = not output.to_console and output.log_dir is None
+        with redirect_c_stdio(None) if discard_banner else nullcontext():
+            if output.to_console:
+                print("\n ======= warm starting Julia interface =======\n", flush=True)
+            if opf_solver_log_file:
+                with open(opf_solver_log_file, "a") as f:
+                    f.write(" ======= warm starting opf function =======\n")
+            jl.run_opf(dummy_case_file)
 
-        if dcopf_solver_log_file:
-            with open(dcopf_solver_log_file, "a") as f:
-                f.write(
-                    " ======= warm starting Julia interface dcopf function =======\n",
+            if dcopf_solver_log_file:
+                with open(dcopf_solver_log_file, "a") as f:
+                    f.write(" ======= warm starting dcopf function =======\n")
+            jl.run_dcopf(dummy_case_file)
+
+            jl.run_pf_fast(dummy_case_file)  # no log file
+
+            if pf_solver_log_file:
+                with open(pf_solver_log_file, "a") as f:
+                    f.write(" ======= warm starting pf function =======\n")
+            jl.run_pf(dummy_case_file)
+
+            if dcpf_solver_log_file:
+                with open(dcpf_solver_log_file, "a") as f:
+                    f.write(" ======= warm starting dcpf function =======\n")
+            jl.run_dcpf(dummy_case_file)
+
+            jl.run_dcpf_fast(dummy_case_file)  # no log file
+
+            if output.to_console:
+                print(
+                    "\n ======= warm starting completed =======\n",
+                    flush=True,
                 )
-        jl.run_dcopf(dummy_case_file)
-
-        # run_pf_fast has no log file
-        jl.run_pf_fast(dummy_case_file)
-
-        if pf_solver_log_file:
-            with open(pf_solver_log_file, "a") as f:
-                f.write(" ======= warm starting Julia interface pf function =======\n")
-        jl.run_pf(dummy_case_file)
-
-        if dcpf_solver_log_file:
-            with open(dcpf_solver_log_file, "a") as f:
-                f.write(
-                    " ======= warm starting Julia interface dcpf function =======\n",
-                )
-        jl.run_dcpf(dummy_case_file)
-
-        # run_dcpf_fast has no log file
-        jl.run_dcpf_fast(dummy_case_file)
-
-        if print_level > 0 and solver_log_dir is None:
-            print(
-                "\n ======= warm starting Julia interface completed =======\n",
-                flush=True,
-            )
 
     except Exception as e:
         raise RuntimeError("Error initializing Julia: {}".format(e))
