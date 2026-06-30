@@ -107,14 +107,17 @@ class SolverOutputConfig:
         return _MEMENTO_LEVEL[self.verbosity]
 
     @property
+    def to_console(self) -> bool:
+        return self.log_dir is None and self.verbosity > SolverVerbosity.SILENT
+
+    @property
     def silence_powermodels(self) -> bool:
         # PowerModels logs through its own Memento logger, which ignores the
         # root level, so silence() is the only thing that quiets its Info/Warn.
-        return self.verbosity < SolverVerbosity.INFO
-
-    @property
-    def to_console(self) -> bool:
-        return self.log_dir is None and self.verbosity > SolverVerbosity.SILENT
+        # Silence it unless output is explicitly headed for the console -- when
+        # logging to files, its chatter still leaks to stdout from the fast
+        # (non-redirected) solver paths.
+        return not self.to_console
 
     def log_file(self, name: str) -> Optional[str]:
         """Per-process log path for solver ``name`` (e.g. "opf"), or None."""

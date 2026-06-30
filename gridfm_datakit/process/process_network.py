@@ -126,11 +126,13 @@ def init_julia(
     try:
         if julia_project:
             jl_project = julia_project.replace("\\", "/")
+            # io=devnull silences the "Activating project at ..." banner that
+            # Pkg prints once per worker.
             jl.seval(
                 f'''
                 using Pkg
-                Pkg.activate(raw"{jl_project}")
-                Pkg.instantiate()
+                Pkg.activate(raw"{jl_project}"; io=devnull)
+                Pkg.instantiate(; io=devnull)
                 ''',
             )
 

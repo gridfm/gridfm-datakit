@@ -44,6 +44,18 @@ class TestSolverOutputConfig:
             SolverOutputConfig(SolverVerbosity.INFO, log_dir="/tmp").to_console is False
         )
 
+    def test_silence_powermodels_unless_console(self):
+        # Silenced when SILENT or when logging to files; shown only on console.
+        assert SolverOutputConfig(SolverVerbosity.SILENT).silence_powermodels is True
+        assert (
+            SolverOutputConfig(
+                SolverVerbosity.DEBUG,
+                log_dir="/tmp",
+            ).silence_powermodels
+            is True
+        )
+        assert SolverOutputConfig(SolverVerbosity.INFO).silence_powermodels is False
+
     def test_log_file_none_without_log_dir(self):
         assert SolverOutputConfig(SolverVerbosity.DEBUG).log_file("opf") is None
 
