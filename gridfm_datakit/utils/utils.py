@@ -1,4 +1,6 @@
 import os
+import time
+import errno
 import psutil
 from typing import TextIO
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -41,6 +43,33 @@ def get_num_scenarios(data_dir: str) -> int:
         )
 
 
+def _retry_on_eagain(func, retries: int = 50, delay: float = 0.01):
+    """Call ``func`` retrying on ``EAGAIN``/``BlockingIOError``.
+
+    When many worker processes share a stdout/pipe (e.g. heavy multiprocessing),
+    the file descriptor can be non-blocking and a write/flush may raise
+    ``BlockingIOError`` ([Errno 11]). Retry briefly instead of propagating the
+    error, which would otherwise fail data generation.
+    """
+    for attempt in range(retries):
+        try:
+            return func()
+        except BlockingIOError:
+            if attempt == retries - 1:
+                raise
+            time.sleep(delay)
+        except OSError as e:
+            if e.errno == errno.EAGAIN and attempt < retries - 1:
+                time.sleep(delay)
+            else:
+                raise
+
+
+def _blocking_write(stream, data) -> None:
+    """Write to a stream, tolerating ``EAGAIN``/``BlockingIOError``."""
+    _retry_on_eagain(lambda: stream.write(data))
+
+
 def write_ram_usage_distributed(tqdm_log: TextIO) -> None:
     process = psutil.Process(os.getpid())  # Parent process
     mem_usage = process.memory_info().rss / 1024**2  # Parent memory in MB
@@ -49,7 +78,10 @@ def write_ram_usage_distributed(tqdm_log: TextIO) -> None:
     for child in process.children(recursive=True):
         mem_usage += child.memory_info().rss / 1024**2
 
-    tqdm_log.write(f"Total RAM usage (Parent + Children): {mem_usage:.2f} MB\n")
+    _blocking_write(
+        tqdm_log,
+        f"Total RAM usage (Parent + Children): {mem_usage:.2f} MB\n",
+    )
 
 
 class Tee:
@@ -58,12 +90,12 @@ class Tee:
 
     def write(self, data):
         for s in self.streams:
-            s.write(data)
-            s.flush()
+            _blocking_write(s, data)
+            _retry_on_eagain(s.flush)
 
     def flush(self):
         for s in self.streams:
-            s.flush()
+            _retry_on_eagain(s.flush)
 
 
 def read_partitions(
