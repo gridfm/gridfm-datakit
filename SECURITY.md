@@ -58,8 +58,8 @@ Users are strongly encouraged to upgrade to the latest release to receive securi
 
 We aim to follow these response targets:
 
-- **Initial acknowledgment**: within 72 hours  
-- **Status update**: within 7 days  
+- **Initial acknowledgment**: within 72 hours
+- **Status update**: within 7 days
 - **Resolution target**: within 90 days (depending on severity)
 
 These are targets, not guarantees.
@@ -79,10 +79,10 @@ These are targets, not guarantees.
 
 We follow a **coordinated vulnerability disclosure (CVD)** process:
 
-- We work with reporters to agree on a disclosure timeline  
-- Public disclosure occurs after a fix is available or mitigation exists  
-- Contributors are credited unless anonymity is requested  
-- CVE identifiers will be requested when appropriate  
+- We work with reporters to agree on a disclosure timeline
+- Public disclosure occurs after a fix is available or mitigation exists
+- Contributors are credited unless anonymity is requested
+- CVE identifiers will be requested when appropriate
 
 ---
 
