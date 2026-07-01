@@ -752,7 +752,9 @@ def makeYbus(
     # Yt = spdiags(Ytf, 0, nl, nl) * Cf + spdiags(Ytt, 0, nl, nl) * Ct
 
     # build Ybus
-    Ybus = Cf.T * Yf + Ct.T * Yt + csr_matrix((Ysh, (range(nb), range(nb))), (nb, nb))
+    # fix for network with unsorted indexes
+    Ybus = Cf.T * Yf + Ct.T * Yt + csr_matrix((Ysh, (bus[:, 0], bus[:, 0])), (nb, nb))
+    # Ybus = Cf.T * Yf + Ct.T * Yt + csr_matrix((Ysh, (range(nb), range(nb))), (nb, nb))
     Ybus.sort_indices()
     Ybus.eliminate_zeros()
 
