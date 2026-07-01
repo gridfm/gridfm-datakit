@@ -6,23 +6,40 @@ pytestmark = pytest.mark.skipif(
     reason="pypowsybl is not installed. Install with: pip install gridfm-datakit[powsybl]",
 )
 
+from pathlib import Path
 import pypowsybl as pp
+from gridfm_datakit.utils.param_handler import NestedNamespace
 
 # TODO: add basic tests on top of the benchmarking 
 
-def test_benchmark_get_dynawo_simulation_parameters(config_ieee14,
+@pytest.fixture(scope='module')
+def config():
+    parameter_file_path = Path(__file__).parent/'benchmark_data/ieee14/ieee14_GeneratorDisconnections/IEEE14.par'
+    return NestedNamespace(
+        dynamic=NestedNamespace(
+            solver_parameters=NestedNamespace(
+                start_time=0.0,
+                stop_time=500.0,
+                parameters_file=parameter_file_path,
+                network_parameters_file=parameter_file_path,
+                network_parameters_id='Network',
+                solver_type='SIM',
+                solver_parameters_file=parameter_file_path,
+                solver_parameters_id='SimplifiedSolver',
+            ),
+        ),
+    )
+
+def test_benchmark_get_dynawo_simulation_parameters(config,
                                                     pp_net_ieee14,
                                                     model_mapping_ieee14,
                                                     event_mapping_ieee14,
                                                     variable_mapping_ieee14,
                                                     df_ref_curves_ieee14,
                                                     ):
-    from gridfm_datakit.generate import _setup_environment
     from gridfm_datakit.dynamic.dynawo import get_dynawo_simulation_parameters
 
-    args, _, _, _ = _setup_environment(config_ieee14)
-
-    simulation_parameters = get_dynawo_simulation_parameters(args)
+    simulation_parameters = get_dynawo_simulation_parameters(config)
     
     sim = pp.dynamic.Simulation()
     report_node = pp.report.ReportNode()

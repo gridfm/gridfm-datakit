@@ -10,18 +10,106 @@ pytestmark = pytest.mark.skipif(
     reason="pypowsybl is not installed. Install with: pip install gridfm-datakit[powsybl]",
 )
 
+import os
 import pandas as pd
 from pathlib import Path
 import pypowsybl as pp
 from gridfm_datakit.powsybl import load_net
+from gridfm_datakit.utils.param_handler import NestedNamespace
 
 
 # File paths
-PATH_NETWORK_IEEE14 = Path(__file__).parent/'dynawo/data/ieee14/ieee14_GeneratorDisconnections/IEEE14.iidm'
-PATH_CONFIG_IEEE14 = Path(__file__).parent/'dynawo/data/config/config_test_dynawo_IEEE14.yaml'
-PARAMETERS_PATH = Path(__file__).parent/'data/ieee14/ieee14_GeneratorDisconnections/IEEE14.par'
-REF_OUTPUT_CURVES_PATH = Path(__file__).parent/'dynawo/data/ieee14/ieee14_GeneratorDisconnections/ref_output_curves.csv'
+PATH_NETWORK_IEEE14 = str(Path(__file__).parent/'dynawo/benchmark_data/ieee14/ieee14_GeneratorDisconnections/IEEE14.iidm')
+PARAMETERS_PATH = str(Path(__file__).parent/'dynawo'/'benchmark_data/ieee14/ieee14_GeneratorDisconnections/IEEE14.par')
+REF_OUTPUT_CURVES_PATH = str(Path(__file__).parent/'dynawo/benchmark_data/ieee14/ieee14_GeneratorDisconnections/ref_output_curves.csv')
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _write_csv(path: str, df: pd.DataFrame) -> None:
+    df.to_csv(path, index=False)
+
+
+def _make_config(tmp_dir: str, 
+                 dataset
+) -> NestedNamespace:
+    """Build a valid config pointing at CSVs in tmp_dir."""
+
+    df_static_element_dynamic_models = dataset['df_static_element_dynamic_models']
+    df_automation_systems = dataset['df_automation_systems']
+    df_events = dataset['df_events']
+    df_variables = dataset['df_variables']
+
+    static_element_dynamic_models_path = os.path.join(tmp_dir, "static_element_dynamic_models.csv")
+    automation_systems_path = os.path.join(tmp_dir, "automation_systems.csv")
+    events_path = os.path.join(tmp_dir, "events.csv")
+    variables_path = os.path.join(tmp_dir, "variables.csv")
+
+    _write_csv(static_element_dynamic_models_path, df_static_element_dynamic_models)
+    _write_csv(automation_systems_path, df_automation_systems)
+    _write_csv(events_path, df_events)
+    _write_csv(variables_path, df_variables)
+
+    output_dir = os.path.join(tmp_dir)
+
+    return NestedNamespace(
+        network=NestedNamespace(
+            name='IEEE14',
+            reader='powsybl',
+            source='file',
+            file=PATH_NETWORK_IEEE14,
+        ),
+        load=NestedNamespace(
+            generator='agg_load_profile',
+            agg_profile='default',
+            scenarios=1,
+            sigma=0.2,
+            change_reactive_power='true',
+            global_range=0.4,
+            max_scaling_factor=4.0,
+            step_size=0.05,
+            start_scaling_factor=0.8,
+        ),
+        dynamic=NestedNamespace(
+            dynamic_solver="dynawo",
+            input_files=NestedNamespace(
+                static_element_dynamic_models_file=static_element_dynamic_models_path,
+                automation_systems_file=automation_systems_path,
+                events_file=events_path,
+                variables_file=variables_path,
+            ),
+            solver_parameters=NestedNamespace(
+                start_time=0.0,
+                stop_time=500.0,
+                parameters_file=PARAMETERS_PATH,
+                network_parameters_file=PARAMETERS_PATH,
+                network_parameters_id='Network',
+                solver_type='SIM',
+                solver_parameters_file=PARAMETERS_PATH,
+                solver_parameters_id='SimplifiedSolver',
+            ),
+            output_dir=output_dir,
+        ),
+        settings=NestedNamespace(
+            num_processes=1,
+            data_dir=output_dir,
+            large_chunk_size=5,
+            overwrite='true',
+            mode='pf',
+            include_dc_res='false',
+            enable_solver_logs='false',
+            pf_fast='false',
+            dcpf_fast='false',
+            max_iter=200,
+            pf_solver='powsybl',
+            seed=49455
+        )
+    )
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="module")
 def benchmark_dataset():
@@ -56,9 +144,9 @@ def benchmark_dataset():
         ),
 
         "df_events": pd.DataFrame.from_records(
-            columns=['event_nmae', 'static_id', 'start_time', 'params'],
+            columns=['event_name', 'static_id', 'start_time', 'params'],
             data=[
-                ('Disconnect', '_GEN____2_SM', 50, ''),
+                ('Disconnect', '_GEN____2_SM', 50, 'disconnect_only=;'),
             ]   
         ),
 
@@ -95,7 +183,7 @@ def minimal_dataset():
         "df_events": pd.DataFrame.from_records(
             columns=['event_name', 'static_id', 'start_time', 'params'],
             data=[
-                ('Disconnect', '_GEN____2_SM', 50, ''),
+                ('Disconnect', '_GEN____2_SM', 50, 'disconnect_only=;'),
             ]   
         ),
 
@@ -109,14 +197,9 @@ def minimal_dataset():
         )
     }
 
-@pytest.fixture(scope="module")
-def config_ieee14():
-    import yaml
-
-    with open(PATH_CONFIG_IEEE14) as f:
-        config = yaml.safe_load(f)
-    return config
-
+@pytest.fixture(scope='function')
+def config_ieee14(tmp_path, benchmark_dataset):
+    return _make_config(tmp_path, benchmark_dataset)
 
 @pytest.fixture(scope="module")
 def param_ieee14():
