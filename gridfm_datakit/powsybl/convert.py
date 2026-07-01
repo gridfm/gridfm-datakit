@@ -44,7 +44,15 @@ import numpy as np
 import scipy.io
 
 from gridfm_datakit.network import Network
-from gridfm_datakit.utils.idx_brch import BR_R, BR_STATUS, BR_X, F_BUS, T_BUS
+from gridfm_datakit.utils.idx_brch import (
+    ANGMAX,
+    ANGMIN,
+    BR_R,
+    BR_STATUS,
+    BR_X,
+    F_BUS,
+    T_BUS,
+)
 from gridfm_datakit.utils.idx_bus import BUS_I, PD, QD, VM, VMAX, VMIN
 from gridfm_datakit.utils.idx_cost import (
     COST,
@@ -181,8 +189,8 @@ def update_powsybl(
     gfm_bus_idx = np.array([int(mapping_p2g.bus[i]) for i in bus_id])
     pp_net.update_loads(
         id=load_id,
-        p=gfm_net.buses[gfm_bus_idx, PD].tolist(),
-        q=gfm_net.buses[gfm_bus_idx, QD].tolist(),
+        p0=gfm_net.buses[gfm_bus_idx, PD].tolist(),
+        q0=gfm_net.buses[gfm_bus_idx, QD].tolist(),
     )
 
     pp_net.per_unit = True
@@ -291,6 +299,16 @@ def from_powsybl(
             bus_matrix[i, VMAX] = 1.1
         if bus_matrix[i, VMIN] <= 0:
             bus_matrix[i, VMIN] = 0.9
+
+    # PowSyBl's MATPOWER export does not carry branch angle difference limits,
+    # so they come out as 0. In MATPOWER/PYPOWER convention angmin == angmax == 0
+    # means the angle difference is unbounded; encode that explicitly as the
+    # standard +/-360 degree default so downstream consumers don't treat 0 as a
+    # hard limit.
+    for i in range(branch_matrix.shape[0]):
+        if branch_matrix[i, ANGMIN] == 0 and branch_matrix[i, ANGMAX] == 0:
+            branch_matrix[i, ANGMIN] = -360.0
+            branch_matrix[i, ANGMAX] = 360.0
 
     n_generators = gen_matrix.shape[0]
     gencost_matrix = _build_gencost_matrix(n_generators, options.gen_costs)
