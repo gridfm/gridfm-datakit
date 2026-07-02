@@ -176,7 +176,7 @@ def process_grid(grid_root: Path):
 ###############################################################################
 
 
-def main(base_dir="/dccstor/gridfm/powermodels_data/v3/finetuning"):
+def main(base_dir="/dccstor/gridfm/powermodels_data/v4/pretraining"):
     base = Path(base_dir)
     rows = []
 
