@@ -9,9 +9,12 @@ import os
 import pytest
 
 from gridfm_datakit.process.solver_output import (
+    LogChannel,
+    LogRouter,
     SolverOutputConfig,
     SolverVerbosity,
-    redirect_c_stdio,
+    build_router,
+    redirect_fds,
 )
 
 
@@ -31,7 +34,9 @@ class TestSolverOutputConfig:
     def test_ipopt_and_memento_mapping(self):
         silent = SolverOutputConfig(SolverVerbosity.SILENT)
         assert silent.ipopt_print_level == 0
-        assert silent.memento_level == "not_set"
+        # "not_set" means "inherit" in Memento (i.e. not silent); SILENT must map
+        # to a level that actually suppresses everything.
+        assert silent.memento_level == "emergency"
 
         debug = SolverOutputConfig(SolverVerbosity.DEBUG)
         assert debug.ipopt_print_level == 5
@@ -44,27 +49,19 @@ class TestSolverOutputConfig:
             SolverOutputConfig(SolverVerbosity.INFO, log_dir="/tmp").to_console is False
         )
 
-    def test_silence_powermodels_unless_console(self):
-        # Silenced when SILENT or when logging to files; shown only on console.
+    def test_silence_powermodels_driven_by_level_only(self):
+        # Silenced below INFO, regardless of console vs file destination -- so
+        # DEBUG file logs genuinely contain PowerModels output.
         assert SolverOutputConfig(SolverVerbosity.SILENT).silence_powermodels is True
+        assert SolverOutputConfig(SolverVerbosity.WARNING).silence_powermodels is True
         assert (
             SolverOutputConfig(
                 SolverVerbosity.DEBUG,
                 log_dir="/tmp",
             ).silence_powermodels
-            is True
+            is False
         )
         assert SolverOutputConfig(SolverVerbosity.INFO).silence_powermodels is False
-
-    def test_log_file_none_without_log_dir(self):
-        assert SolverOutputConfig(SolverVerbosity.DEBUG).log_file("opf") is None
-
-    def test_log_file_is_per_process(self, tmp_path):
-        cfg = SolverOutputConfig(SolverVerbosity.DEBUG, log_dir=str(tmp_path))
-        path = cfg.log_file("opf")
-        assert path is not None
-        assert path.startswith(str(tmp_path).replace("\\", "/"))
-        assert os.path.basename(path).startswith("opf_")
 
     def test_from_settings_backcompat_defaults(self):
         # logs disabled -> silent, no dir
@@ -94,7 +91,7 @@ class TestRedirectCStdio:
         libc = ctypes.CDLL(None)
         log = tmp_path / "out.log"
 
-        with redirect_c_stdio(str(log)):
+        with redirect_fds(str(log)):
             os.write(1, b"fd-level stdout line\n")
             os.write(2, b"fd-level stderr line\n")
             libc.puts(b"c-level line")
@@ -108,13 +105,13 @@ class TestRedirectCStdio:
         assert captured.out == "" and captured.err == ""
 
     def test_discard_to_devnull(self, capfd):
-        with redirect_c_stdio(None):
+        with redirect_fds(None):
             os.write(1, b"should be discarded\n")
         assert capfd.readouterr().out == ""
 
     def test_restores_fds_afterwards(self, tmp_path, capfd):
         log = tmp_path / "out.log"
-        with redirect_c_stdio(str(log)):
+        with redirect_fds(str(log)):
             os.write(1, b"inside\n")
         os.write(1, b"outside\n")
         # 'outside' reaches the real stdout again; 'inside' went to the file.
@@ -124,7 +121,75 @@ class TestRedirectCStdio:
     def test_appends_rather_than_truncates(self, tmp_path):
         log = tmp_path / "out.log"
         log.write_text("preexisting\n")
-        with redirect_c_stdio(str(log)):
+        with redirect_fds(str(log)):
             os.write(1, b"added\n")
         text = log.read_text()
         assert "preexisting" in text and "added" in text
+
+    def test_nested_capture_restores_correctly(self, tmp_path, capfd):
+        inner = tmp_path / "inner.log"
+        with redirect_fds(str(tmp_path / "outer.log")):
+            with redirect_fds(str(inner)):
+                os.write(1, b"deep\n")
+            os.write(1, b"middle\n")
+        os.write(1, b"surface\n")
+        assert "deep" in inner.read_text()
+        assert "middle" in (tmp_path / "outer.log").read_text()
+        assert capfd.readouterr().out.strip() == "surface"
+
+
+class TestLogChannel:
+    def test_console_channel_passes_through(self, tmp_path, capfd):
+        ch = LogChannel("opf", to_console=True)
+        with ch.capture():
+            os.write(1, b"visible\n")
+        assert "visible" in capfd.readouterr().out
+
+    def test_file_channel_captures_to_path(self, tmp_path, capfd):
+        log = tmp_path / "opf.log"
+        ch = LogChannel("opf", path=str(log))
+        with ch.capture():
+            os.write(1, b"to file\n")
+        assert "to file" in log.read_text()
+        assert capfd.readouterr().out == ""
+
+    def test_discard_channel_swallows_output(self, capfd):
+        ch = LogChannel("opf")  # no path, not console -> discard
+        with ch.capture():
+            os.write(1, b"gone\n")
+        assert capfd.readouterr().out == ""
+
+    def test_write_header_routes_with_capture(self, tmp_path, capfd):
+        log = tmp_path / "opf.log"
+        LogChannel("opf", path=str(log)).write_header("== warm ==")
+        assert "== warm ==" in log.read_text()
+        # Discard channel writes its header nowhere.
+        LogChannel("opf").write_header("== warm ==")
+        assert capfd.readouterr().out == ""
+
+
+class TestLogRouter:
+    def test_build_router_files_when_log_dir_set(self, tmp_path, capfd):
+        cfg = SolverOutputConfig(SolverVerbosity.DEBUG, log_dir=str(tmp_path))
+        router = build_router(cfg)
+        with router.capture("opf"):
+            os.write(1, b"opf output\n")
+        # A file named opf_<process>.log holds it; nothing hit the console.
+        opf_files = list(tmp_path.glob("opf_*.log"))
+        assert opf_files and "opf output" in opf_files[0].read_text()
+        assert capfd.readouterr().out == ""
+
+    def test_build_router_discards_when_silent(self, capfd):
+        router = build_router(SolverOutputConfig(SolverVerbosity.SILENT))
+        with router.capture("pf"):
+            os.write(1, b"noise\n")
+        assert capfd.readouterr().out == ""
+
+    def test_unknown_channel_discards(self, capfd):
+        router = build_router(SolverOutputConfig(SolverVerbosity.INFO))
+        # INFO with no log_dir -> known channels pass through to console, but an
+        # unknown name defaults to discard rather than leaking.
+        assert isinstance(router, LogRouter)
+        with router.capture("mystery"):
+            os.write(1, b"secret\n")
+        assert capfd.readouterr().out == ""

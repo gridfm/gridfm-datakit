@@ -10,7 +10,6 @@ import copy
 import os
 import time
 import traceback
-from contextlib import nullcontext
 from importlib import resources
 from queue import Queue
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -63,7 +62,11 @@ from gridfm_datakit.utils.idx_bus import (
 from gridfm_datakit.utils.idx_cost import COST, NCOST
 from gridfm_datakit.utils.idx_gen import GEN_BUS, PMAX, PMIN, QMAX, QMIN
 from gridfm_datakit.utils.random_seed import custom_seed
-from gridfm_datakit.process.solver_output import SolverOutputConfig, redirect_c_stdio
+from gridfm_datakit.process.solver_output import (
+    SolverOutputConfig,
+    build_router,
+    set_active_router,
+)
 
 
 def init_julia(
@@ -115,11 +118,11 @@ def init_julia(
 
     from juliacall import Main as jl
 
-    # Per-solver log paths; "" means Julia aliases the solver without redirection.
-    opf_solver_log_file = output.log_file("opf") or ""
-    pf_solver_log_file = output.log_file("pf") or ""
-    dcpf_solver_log_file = output.log_file("dcpf") or ""
-    dcopf_solver_log_file = output.log_file("dcopf") or ""
+    # Route every sub-system's output through one process-wide policy. The
+    # solver entrypoints below are plain aliases to their cores; capture happens
+    # in Python around each call (see process.solvers), not baked into Julia.
+    router = build_router(output)
+    set_active_router(router)
 
     print_level = ipopt_print_level
 
@@ -193,26 +196,9 @@ def init_julia(
         """.format(print_level, max_iter),
         )
 
-        # run_opf: either alias to core (no logging) or wrap with redirection (logging)
-        if opf_solver_log_file == "":
-            jl.seval("""
-            const run_opf = _run_opf_core
-            """)
-        else:
-            jl.seval(
-                """
-            function run_opf(case_file)
-                open("{}", "a") do io
-
-                    redirect_stdout(io) do
-                        redirect_stderr(io) do
-                            return _run_opf_core(case_file)
-                        end
-                    end
-                end
-            end
-            """.format(opf_solver_log_file),
-            )
+        # Output routing is handled in Python (fd-level capture around the call),
+        # so the entrypoint is a plain alias to its core.
+        jl.seval("const run_opf = _run_opf_core")
 
         # ----- DC-OPF core -----
         jl.seval(
@@ -236,26 +222,7 @@ def init_julia(
         """.format(print_level, dc_iter),
         )
 
-        # run_dcopf: either alias to core (no logging) or wrap with redirection (logging)
-        if dcopf_solver_log_file == "":
-            jl.seval("""
-            const run_dcopf = _run_dcopf_core
-            """)
-        else:
-            jl.seval(
-                """
-            function run_dcopf(case_file)
-                open("{}", "a") do io
-
-                    redirect_stdout(io) do
-                        redirect_stderr(io) do
-                            return _run_dcopf_core(case_file)
-                        end
-                    end
-                end
-            end
-            """.format(dcopf_solver_log_file),
-            )
+        jl.seval("const run_dcopf = _run_dcopf_core")
 
         # ----- Fast PF (direct computation) -----
         jl.seval("""
@@ -324,26 +291,7 @@ def init_julia(
         """.format(print_level, max_iter),
         )
 
-        # run_pf: either alias to core (no logging) or wrap with redirection (logging)
-        if pf_solver_log_file == "":
-            jl.seval("""
-            const run_pf = _run_pf_core
-            """)
-        else:
-            jl.seval(
-                """
-            function run_pf(case_file)
-                open("{}", "a") do io
-
-                    redirect_stdout(io) do
-                        redirect_stderr(io) do
-                            return _run_pf_core(case_file)
-                        end
-                    end
-                end
-            end
-            """.format(pf_solver_log_file),
-            )
+        jl.seval("const run_pf = _run_pf_core")
 
         # ----- DC-PF core -----
         jl.seval(
@@ -374,66 +322,36 @@ def init_julia(
         """.format(print_level, dc_iter),
         )
 
-        # run_dcpf: either alias to core (no logging) or wrap with redirection (logging)
-        if dcpf_solver_log_file == "":
-            jl.seval("""
-            const run_dcpf = _run_dcpf_core
-            """)
-        else:
-            jl.seval(
-                """
-            function run_dcpf(case_file)
-                open("{}", "a") do io
-
-                    redirect_stdout(io) do
-                        redirect_stderr(io) do
-                            return _run_dcpf_core(case_file)
-                        end
-                    end
-                end
-            end
-            """.format(dcpf_solver_log_file),
-            )
+        jl.seval("const run_dcpf = _run_dcpf_core")
 
         # Warm start all functions on a dummy case. Ipopt prints its one-time
-        # license banner here at the C level; when nothing should reach the
-        # console and we're not logging to files, discard it.
+        # license banner here at the C level; each warm-up runs inside its
+        # channel's capture, so the banner lands wherever that channel points
+        # (a file, or /dev/null when silent) instead of leaking to the console.
         dummy_case_file = str(
             resources.files("gridfm_datakit.process").joinpath("dummy.m"),
         )
-        discard_banner = not output.to_console and output.log_dir is None
-        with redirect_c_stdio(None) if discard_banner else nullcontext():
-            if output.to_console:
-                print("\n ======= warm starting Julia interface =======\n", flush=True)
-            if opf_solver_log_file:
-                with open(opf_solver_log_file, "a") as f:
-                    f.write(" ======= warm starting opf function =======\n")
-            jl.run_opf(dummy_case_file)
+        if output.to_console:
+            print("\n ======= warm starting Julia interface =======\n", flush=True)
 
-            if dcopf_solver_log_file:
-                with open(dcopf_solver_log_file, "a") as f:
-                    f.write(" ======= warm starting dcopf function =======\n")
-            jl.run_dcopf(dummy_case_file)
+        # (channel name, Julia entrypoint). Fast paths share their channel with
+        # the optimizer-based one; they warm up under the same capture.
+        warmups = [
+            ("opf", jl.run_opf),
+            ("dcopf", jl.run_dcopf),
+            ("pf", jl.run_pf_fast),
+            ("pf", jl.run_pf),
+            ("dcpf", jl.run_dcpf),
+            ("dcpf", jl.run_dcpf_fast),
+        ]
+        for name, fn in warmups:
+            channel = router.channel(name)
+            channel.write_header(f" ======= warm starting {name} function =======")
+            with channel.capture():
+                fn(dummy_case_file)
 
-            jl.run_pf_fast(dummy_case_file)  # no log file
-
-            if pf_solver_log_file:
-                with open(pf_solver_log_file, "a") as f:
-                    f.write(" ======= warm starting pf function =======\n")
-            jl.run_pf(dummy_case_file)
-
-            if dcpf_solver_log_file:
-                with open(dcpf_solver_log_file, "a") as f:
-                    f.write(" ======= warm starting dcpf function =======\n")
-            jl.run_dcpf(dummy_case_file)
-
-            jl.run_dcpf_fast(dummy_case_file)  # no log file
-
-            if output.to_console:
-                print(
-                    "\n ======= warm starting completed =======\n",
-                    flush=True,
-                )
+        if output.to_console:
+            print("\n ======= warm starting completed =======\n", flush=True)
 
     except Exception as e:
         raise RuntimeError("Error initializing Julia: {}".format(e))

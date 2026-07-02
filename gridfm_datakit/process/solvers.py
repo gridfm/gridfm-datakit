@@ -12,6 +12,7 @@ import tempfile
 import os
 from typing import Any, Dict
 from gridfm_datakit.network import Network
+from gridfm_datakit.process.solver_output import solver_capture
 from typing import Union
 
 
@@ -36,7 +37,8 @@ def run_opf(net: Network, jl: Any) -> Dict[str, Any]:
         # Save network to temporary file
         net.to_mpc(temp_filename)
 
-        result = jl.run_opf(temp_filename)
+        with solver_capture("opf"):
+            result = jl.run_opf(temp_filename)
 
         if str(result["termination_status"]) != "LOCALLY_SOLVED":
             raise RuntimeError(f"OPF did not converge: {result['termination_status']}")
@@ -79,7 +81,8 @@ def run_pf(net: Network, jl: Any, fast: Union[bool, None] = None) -> Dict[str, A
         net.to_mpc(temp_filename)
 
         # Run PF
-        result = jl.run_pf_fast(temp_filename) if fast else jl.run_pf(temp_filename)
+        with solver_capture("pf"):
+            result = jl.run_pf_fast(temp_filename) if fast else jl.run_pf(temp_filename)
         if (
             fast
             and str(result["termination_status"]) != "True"
@@ -126,7 +129,10 @@ def run_dcpf(net: Network, jl: Any, fast: Union[bool, None] = None) -> Dict[str,
         net.to_mpc(temp_filename)
 
         # Run DCPF (fast or standard)
-        result = jl.run_dcpf_fast(temp_filename) if fast else jl.run_dcpf(temp_filename)
+        with solver_capture("dcpf"):
+            result = (
+                jl.run_dcpf_fast(temp_filename) if fast else jl.run_dcpf(temp_filename)
+            )
 
         if (
             fast
@@ -172,7 +178,8 @@ def run_dcopf(net: Network, jl: Any) -> Dict[str, Any]:
         net.to_mpc(temp_filename)
 
         # Run DC OPF
-        result = jl.run_dcopf(temp_filename)
+        with solver_capture("dcopf"):
+            result = jl.run_dcopf(temp_filename)
 
         if str(result["termination_status"]) != "LOCALLY_SOLVED":
             raise RuntimeError(
