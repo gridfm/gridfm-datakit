@@ -1,3 +1,4 @@
 recursive-include gridfm_datakit/load_profiles *.csv
 recursive-include gridfm_datakit/grids *.m
 recursive-include gridfm_datakit/process *.m
+include gridfm_datakit/juliapkg.json
