@@ -100,13 +100,15 @@ jobs:
           python -m pip install --upgrade pip wheel
           pip install -e ".[test]"
 
-      # Resolve and precompile the pinned Julia packages from juliapkg.json.
-      # On a cache hit this is near-instant; on a miss it populates the depot
-      # cache for subsequent runs.
+      # Resolve, install and precompile the pinned Julia packages from
+      # juliapkg.json. Forcing `using` (not just `import juliacall`) precompiles
+      # PowerModels/Ipopt/Memento into the depot so the cache captures it and the
+      # first test doesn't pay for it; it also fails fast here if the pinned
+      # versions don't resolve together. Near-instant on a cache hit.
       - name: Set up Julia packages (PowerModels)
         run: |
           source .venv/bin/activate
-          python -c "import juliacall"
+          python -c "from juliacall import Main as jl; jl.seval('using PowerModels, Ipopt, Memento')"
 
       - name: Unit tests
         run: |
