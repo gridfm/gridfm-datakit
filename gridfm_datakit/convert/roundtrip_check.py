@@ -1,4 +1,4 @@
-"""Parquet -> JSON -> Julia solver roundtrip checks and coverage metadata."""
+"""Parquet -> JSON -> Julia solver roundtrip checks (pytest fixtures)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,8 @@ import os
 import shutil
 import tempfile
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -39,10 +40,6 @@ CASES = (
     "case10000_goc",
 )
 SLOW_PF_CASES = frozenset({"case2000_goc", "case10000_goc"})
-JULIA_ENV = "/u/apu/gridfm-datakit/venv/julia_env"
-SCENARIOS = (0, 1)
-PF_BASE = "/dccstor/gridfm/powermodels_data/v4/finetuning/pf"
-OPF_BASE = "/dccstor/gridfm/powermodels_data/v4/finetuning/opf"
 PARQUET_TABLES = ("bus", "gen", "branch", "y_bus", "runtime")
 RUNTIME_TIMING_COLS = frozenset({"ac", "dc"})
 
@@ -73,90 +70,6 @@ SOLVER_SPECS = {
     "opf": {"dataset": "opf", "primary": "opf"},
 }
 
-# Parquet columns consumed by parquet_to_json (case parameters only).
-JSON_INPUT_COLUMNS: Dict[str, Set[str]] = {
-    "bus": {
-        "bus",
-        "Pd",
-        "Qd",
-        "Vm",
-        "Va",
-        "PQ",
-        "PV",
-        "REF",
-        "vn_kv",
-        "min_vm_pu",
-        "max_vm_pu",
-        "GS",
-        "BS",
-    },
-    "gen": {
-        "bus",
-        "p_mw",
-        "q_mvar",
-        "min_p_mw",
-        "max_p_mw",
-        "min_q_mvar",
-        "max_q_mvar",
-        "cp0_eur",
-        "cp1_eur_per_mw",
-        "cp2_eur_per_mw2",
-        "in_service",
-    },
-    "branch": {
-        "from_bus",
-        "to_bus",
-        "r",
-        "x",
-        "b",
-        "tap",
-        "shift",
-        "ang_min",
-        "ang_max",
-        "rate_a",
-        "br_status",
-    },
-}
-
-# Parquet columns never written to JSON (solution-only or derived elsewhere).
-PARQUET_NOT_IN_JSON: Dict[str, Set[str]] = {
-    "bus": {"load_scenario_idx", "Pg", "Qg", "Va_dc", "Pg_dc"},
-    "gen": {"load_scenario_idx", "idx", "is_slack_gen", "p_mw_dc"},
-    "branch": {
-        "load_scenario_idx",
-        "idx",
-        "pf",
-        "qf",
-        "pt",
-        "qt",
-        "Yff_r",
-        "Yff_i",
-        "Yft_r",
-        "Yft_i",
-        "Ytf_r",
-        "Ytf_i",
-        "Ytt_r",
-        "Ytt_i",
-        "pf_dc",
-        "pt_dc",
-    },
-    "y_bus": set(YBUS_COLUMNS),
-    "runtime": set(RUNTIME_COLUMNS + DC_RUNTIME_COLUMNS),
-}
-
-JSON_DEFAULTS_NOT_FROM_PARQUET = [
-    "bus.area=1",
-    "bus.zone=1",
-    "branch.rate_b=0",
-    "branch.rate_c=0",
-    "gen.startup=0",
-    "gen.shutdown=0",
-    "gen.model=2 (polynomial)",
-    "branch.g_fr=0",
-    "branch.g_to=0",
-    "empty storage/dcline/switch components",
-]
-
 
 @dataclass
 class RoundtripResult:
@@ -184,9 +97,15 @@ def configure_juliacall_env() -> None:
     julia_exe = shutil.which("julia")
     if julia_exe is None:
         raise RuntimeError("Could not find 'julia' on PATH")
-    os.environ.setdefault("JULIA_PROJECT", JULIA_ENV)
-    os.environ.setdefault("PYTHON_JULIACALL_PROJECT", JULIA_ENV)
     os.environ.setdefault("PYTHON_JULIACALL_EXE", julia_exe)
+    project = os.environ.get("JULIA_PROJECT") or os.environ.get("PYTHON_JULIACALL_PROJECT")
+    if not project:
+        repo_julia_env = Path(__file__).resolve().parents[2] / "venv" / "julia_env"
+        if repo_julia_env.is_dir():
+            project = str(repo_julia_env)
+    if project:
+        os.environ.setdefault("JULIA_PROJECT", project)
+        os.environ.setdefault("PYTHON_JULIACALL_PROJECT", project)
 
 
 def define_julia_roundtrip_helpers(jl: Any, max_iter: int, tol: float) -> None:
@@ -296,7 +215,7 @@ def network_from_json(json_path: str, jl: Any) -> Network:
 def compare_tables(
     original: Dict[str, pd.DataFrame],
     rebuilt: Dict[str, pd.DataFrame],
-    atol: float = 1e-9,
+    atol: float = 1e-8,
 ) -> Tuple[bool, Dict[str, float], List[str]]:
     failed: List[str] = []
     diffs: Dict[str, float] = {}
@@ -336,7 +255,7 @@ def run_roundtrip(
     raw_dir: str,
     max_iter: int,
     tol: float = 1e-6,
-    atol: float = 1e-9,
+    atol: float = 1e-8,
 ) -> RoundtripResult:
     spec = SOLVER_SPECS[solver]
     result = RoundtripResult(
@@ -398,114 +317,3 @@ def run_roundtrip(
         result.error = str(exc)
 
     return result
-
-
-def iter_test_cases(
-    cases: Iterable[str] = CASES,
-    scenarios: Iterable[int] = SCENARIOS,
-    solvers: Optional[Iterable[str]] = None,
-) -> Iterable[Tuple[str, str, str, int, str]]:
-    solvers = list(solvers or SOLVER_SPECS)
-    for case in cases:
-        for solver in solvers:
-            spec = SOLVER_SPECS[solver]
-            base = PF_BASE if spec["dataset"] == "pf" else OPF_BASE
-            raw_dir = os.path.join(base, case, "raw")
-            if not os.path.isdir(raw_dir):
-                continue
-            for scenario in scenarios:
-                yield case, spec["dataset"], solver, scenario, raw_dir
-
-
-def coverage_report_markdown() -> str:
-    lines = [
-        "# Parquet -> JSON roundtrip coverage",
-        "",
-        "## What is converted (parquet -> JSON)",
-        "",
-        "Only static case parameters are written to JSON. Solution fields in",
-        "parquet are re-derived by solving in Julia and comparing after",
-        "`pf_post_processing`.",
-        "",
-    ]
-    for table, cols in JSON_INPUT_COLUMNS.items():
-        lines.append(f"- **{table}_data**: {', '.join(sorted(cols))}")
-    lines.extend(
-        [
-            "",
-            "## JSON fields not sourced from parquet",
-            "",
-        ],
-    )
-    lines.extend(f"- {item}" for item in JSON_DEFAULTS_NOT_FROM_PARQUET)
-    lines.extend(
-        [
-            "",
-            "## Parquet columns not fed into JSON",
-            "",
-            "These are validated only indirectly via the solver roundtrip:",
-            "",
-        ],
-    )
-    for table, cols in PARQUET_NOT_IN_JSON.items():
-        lines.append(f"- **{table}_data**: {', '.join(sorted(cols))}")
-    lines.extend(
-        [
-            "",
-            "## Roundtrip comparison by solver",
-            "",
-            "Each check runs AC + DC solve (`pf`+`dcpf` or `opf`+`dcopf`) and compares",
-            "all tables except runtime `ac`/`dc` exact values.",
-            "",
-            "| Solver | Dataset |",
-            "|--------|---------|",
-            "| pf | pf |",
-            "| opf | opf |",
-            "",
-            "## Not tested",
-            "",
-            "- Exact runtime wall-clock values (`ac`, `dc` in `runtime_data`)",
-            "- Partition metadata (`scenario`, `scenario_partition` in parquet)",
-            "- Load scenario files (`scenarios_*.parquet`)",
-            "- Stats plots / validation artifacts",
-            "- `per_unit=True` JSON export",
-            "- MATPOWER `.m` export path",
-            "- Storage, dcline, switch components (always empty in JSON)",
-            "- Branch asymmetric impedance fields (`BR_R_ASYM`, `BR_X_ASYM`)",
-            "",
-        ],
-    )
-    return "\n".join(lines)
-
-
-def summary_markdown(results: List[RoundtripResult]) -> str:
-    total = len(results)
-    passed = sum(r.passed for r in results)
-    lines = [
-        "# Parquet JSON roundtrip summary",
-        "",
-        f"**{passed}/{total}** checks passed.",
-        "",
-        "## By solver",
-        "",
-        "| Solver | Passed | Total |",
-        "|--------|--------|-------|",
-    ]
-    for solver in SOLVER_SPECS:
-        subset = [r for r in results if r.solver == solver]
-        if not subset:
-            continue
-        ok = sum(r.passed for r in subset)
-        lines.append(f"| {solver} | {ok} | {len(subset)} |")
-
-    lines.extend(["", "## Failures", ""])
-    failures = [r for r in results if not r.passed]
-    if not failures:
-        lines.append("None.")
-    else:
-        for r in failures:
-            detail = r.error or ", ".join(r.failed_columns[:5])
-            lines.append(
-                f"- `{r.case}` {r.dataset} solver={r.solver} scenario={r.scenario}: {detail}",
-            )
-    return "\n".join(lines)

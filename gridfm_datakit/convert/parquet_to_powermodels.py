@@ -40,14 +40,14 @@ def _gencost(row: pd.Series) -> tuple[int, list[float]]:
     return 2, [row["cp1_eur_per_mw"], row["cp0_eur"]]
 
 
-def parquet_to_json(
-    data_dir: str,
-    scenario: int,
+def frames_to_json(
+    bus_df: pd.DataFrame,
+    gen_df: pd.DataFrame,
+    branch_df: pd.DataFrame,
     output_path: str,
     base_mva: float = 100.0,
 ) -> str:
-    """Write one parquet scenario as mixed-units PowerModels JSON."""
-    bus_df, gen_df, branch_df = _load_frames(data_dir, scenario).values()
+    """Write pre-loaded bus/gen/branch frames as mixed-units PowerModels JSON."""
     vm = {int(r.bus): float(r.Vm) for r in bus_df.itertuples()}
 
     data: Dict[str, Any] = {
@@ -148,3 +148,14 @@ def parquet_to_json(
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
     return output_path
+
+
+def parquet_to_json(
+    data_dir: str,
+    scenario: int,
+    output_path: str,
+    base_mva: float = 100.0,
+) -> str:
+    """Write one parquet scenario as mixed-units PowerModels JSON."""
+    bus_df, gen_df, branch_df = _load_frames(data_dir, scenario).values()
+    return frames_to_json(bus_df, gen_df, branch_df, output_path, base_mva=base_mva)

@@ -1,0 +1,40 @@
+
+New generation started at 2026-01-21 09:16:36
+admittance_perturbation:
+  sigma: 0.2
+  type: random_perturbation
+generation_perturbation:
+  sigma: 1.0
+  type: cost_permutation
+load:
+  agg_profile: default
+  change_reactive_power: true
+  generator: agg_load_profile
+  global_range: 0.4
+  max_scaling_factor: 4.0
+  scenarios: 10000
+  sigma: 0.2
+  start_scaling_factor: 1.0
+  step_size: 0.1
+network:
+  name: case30_ieee
+  network_dir: scripts/grids
+  source: pglib
+settings:
+  data_dir: /dccstor/gridfm/powermodels_data/v4/finetuning/opf
+  dcpf_fast: true
+  enable_solver_logs: true
+  include_dc_res: true
+  large_chunk_size: 1000
+  max_iter: 140
+  mode: opf
+  num_processes: 40
+  overwrite: true
+  pf_fast: true
+topology_perturbation:
+  elements:
+  - branch
+  - gen
+  k: 5
+  n_topology_variants: 29
+  type: random

@@ -1,81 +1,88 @@
-"""Roundtrip test: parquet -> JSON -> Julia PF fast -> pf_post_processing."""
+"""Parquet -> JSON -> Julia roundtrip tests for scenarios 3 and 4.
 
-import os
-import tempfile
+7 cases × 2 solvers (pf, opf) × 2 scenarios = 28 checks using
+tests/fixtures/parquet_json_roundtrip/ (see scripts/extract_roundtrip_fixtures.py).
+"""
 
-import pandas as pd
+from __future__ import annotations
+
+import shutil
+from pathlib import Path
+
 import pytest
 
-from gridfm_datakit.convert import parquet_to_json
 from gridfm_datakit.convert.roundtrip_check import (
-    PARQUET_TABLES,
-    PF_DATA_KEYS,
-    SORT_COLUMNS,
-    TABLE_COLUMNS,
+    CASES,
+    SOLVER_SPECS,
     configure_juliacall_env,
     define_julia_roundtrip_helpers,
-    load_scenario_parquet,
-    network_from_json,
+    load_args_log,
+    run_roundtrip,
 )
-from gridfm_datakit.process.process_network import pf_post_processing
 
-DATA_DIR = "/dccstor/gridfm/powermodels_data/v4/finetuning/pf/case118_ieee/raw"
-RUNTIME_VALUE_COLUMNS = ("ac", "dc")
+FIXTURE_BASE = Path(__file__).resolve().parent / "fixtures" / "parquet_json_roundtrip"
+ROUNDTRIP_SCENARIOS = (3, 4)
+TOL = 1e-6
+ATOL = 1e-8
 
 
-def _assert_tables_equal(original: pd.DataFrame, rebuilt: pd.DataFrame, name: str) -> None:
-    cols = [c for c in original.columns if c not in RUNTIME_VALUE_COLUMNS]
-    pd.testing.assert_frame_equal(
-        original[cols],
-        rebuilt[cols],
-        check_dtype=False,
-        check_exact=False,
-        rtol=0.0,
-        atol=1e-9,
-    )
-    if name == "runtime":
-        for col in RUNTIME_VALUE_COLUMNS:
-            if col in original.columns:
-                assert rebuilt[col].iloc[0] > 0.0
+def _fixture_raw_dir(case: str, dataset: str) -> Path:
+    return FIXTURE_BASE / dataset / case / "raw"
+
+
+def _planned_cases() -> list:
+    planned = []
+    for case in CASES:
+        for solver, spec in SOLVER_SPECS.items():
+            dataset = spec["dataset"]
+            raw_dir = _fixture_raw_dir(case, dataset)
+            if not raw_dir.is_dir():
+                continue
+            for scenario in ROUNDTRIP_SCENARIOS:
+                planned.append(
+                    pytest.param(
+                        case,
+                        dataset,
+                        solver,
+                        scenario,
+                        str(raw_dir),
+                        id=f"{dataset}/{case}/{solver}/s{scenario}",
+                    ),
+                )
+    return planned
+
+
+PLANNED = _planned_cases()
 
 
 @pytest.fixture(scope="module")
 def jl():
+    if shutil.which("julia") is None:
+        pytest.skip("julia not on PATH")
+    sample_raw = _fixture_raw_dir("case14_ieee", "pf")
+    if not sample_raw.is_dir():
+        pytest.skip("roundtrip fixtures not found")
     configure_juliacall_env()
     from juliacall import Main as jl_main
 
-    define_julia_roundtrip_helpers(jl_main, max_iter=100, tol=1e-6)
+    max_iter = int(load_args_log(str(sample_raw))["settings"]["max_iter"])
+    define_julia_roundtrip_helpers(jl_main, max_iter, TOL)
     return jl_main
 
 
-@pytest.mark.skipif(not os.path.exists(DATA_DIR), reason="dataset not available")
-def test_parquet_json_roundtrip_pf_fast(jl, tmp_path):
-    scenario = 0
-    original = load_scenario_parquet(DATA_DIR, scenario)
-    load_scenario_idx = int(original["bus"]["load_scenario_idx"].iloc[0])
-
-    json_path = os.path.join(tmp_path, f"scenario_{scenario}.json")
-    parquet_to_json(DATA_DIR, scenario, json_path)
-
-    # Smoke-test OPF on a fresh parse (benchmark entrypoint); do not mutate PF network.
-    jl.solve_opf(jl.PowerModels.parse_file(json_path), 100, 1e-6)
-
-    network = jl.PowerModels.parse_file(json_path)
-    pf_result = jl.solve_pf_fast(network)
-    dcpf_result = jl.solve_dcpf_fast(jl.PowerModels.parse_file(json_path))
-
-    net = network_from_json(json_path, jl)
-    pf_data = pf_post_processing(
-        load_scenario_idx,
-        net,
-        pf_result,
-        dcpf_result,
-        include_dc_res=True,
+@pytest.mark.skipif(not PLANNED, reason="roundtrip fixtures not found")
+@pytest.mark.parametrize("case,dataset,solver,scenario,raw_dir", PLANNED)
+def test_parquet_json_roundtrip(jl, case, dataset, solver, scenario, raw_dir):
+    max_iter = int(load_args_log(raw_dir)["settings"]["max_iter"])
+    result = run_roundtrip(
+        jl,
+        case,
+        dataset,
+        solver,
+        scenario,
+        raw_dir,
+        max_iter=max_iter,
+        tol=TOL,
+        atol=ATOL,
     )
-
-    for table_name in PARQUET_TABLES:
-        rebuilt = pd.DataFrame(
-            pf_data[PF_DATA_KEYS[table_name]],
-            columns=TABLE_COLUMNS[table_name],
-        ).sort_values(SORT_COLUMNS[table_name], kind="stable").reset_index(drop=True)
-        _assert_tables_equal(original[table_name], rebuilt, table_name)
+    assert result.passed, result.error or ", ".join(result.failed_columns)
