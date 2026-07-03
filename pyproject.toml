@@ -32,9 +32,9 @@ dependencies = [
     "ipywidgets",
     "ipyfilechooser",
     "scipy",
-    # Pinned: juliacall 0.9.35 caps Julia at <=1.11, which conflicts with the
-    # Julia 1.12 used here. 0.9.34 supports Julia 1.12.
-    "juliacall==0.9.34",
+    # Floor, not exact pin: 0.9.34+ supports Julia >=1.10.3 (incl. 1.12). The
+    # reproducible Julia environment is pinned in gridfm_datakit/juliapkg.json.
+    "juliacall>=0.9.34",
     "networkx",
     "tqdm",
     "pyarrow",
