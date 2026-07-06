@@ -401,6 +401,40 @@ def init_julia(
             end
             return d
         end
+
+        function _gfm_pack(result, branch_ids, gen_ids, bus_ids)
+            sol = result["solution"]
+            B = fill(NaN, length(branch_ids), 4)
+            if haskey(sol, "branch")
+                sb = sol["branch"]
+                for (r, i) in enumerate(branch_ids)
+                    br = sb[string(Int(i))]
+                    B[r, 1] = br["pf"]
+                    B[r, 2] = get(br, "qf", NaN)
+                    B[r, 3] = br["pt"]
+                    B[r, 4] = get(br, "qt", NaN)
+                end
+            end
+            G = fill(NaN, length(gen_ids), 2)
+            if haskey(sol, "gen")
+                sg = sol["gen"]
+                for (r, i) in enumerate(gen_ids)
+                    g = sg[string(Int(i))]
+                    G[r, 1] = g["pg"]
+                    G[r, 2] = get(g, "qg", NaN)
+                end
+            end
+            V = fill(NaN, length(bus_ids), 2)
+            if haskey(sol, "bus")
+                sbus = sol["bus"]
+                for (r, i) in enumerate(bus_ids)
+                    b = sbus[string(Int(i))]
+                    V[r, 1] = get(b, "vm", NaN)
+                    V[r, 2] = b["va"]
+                end
+            end
+            return B, G, V
+        end
         """)
 
         # Warm start all functions on a dummy case. Ipopt prints its one-time
@@ -438,6 +472,72 @@ def init_julia(
     return jl
 
 
+def _solution_arrays(
+    res: Dict[str, Any],
+    net: Network,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Extract solver solution values into dense arrays.
+
+    Returns (all values exactly as the solver reported them — per-unit,
+    radians; missing fields are NaN):
+
+    - branch_flows: ``(n_branches_in_service, 4)`` — pf, qf, pt, qt
+    - gen_pq: ``(n_gens_in_service, 2)`` — pg, qg (NaN-filled if the solution
+      has no "gen" entry, e.g. fast DC-PF)
+    - bus_vmva: ``(n_buses, 2)`` — vm, va, ordered by continuous bus index
+
+    Julia results are packed in a single Julia-side pass (_gfm_pack) because
+    each element access on a juliacall dict crosses the Python<->Julia
+    boundary; plain-dict results (powsybl) use Python loops.
+    """
+    sol = res["solution"]
+    ids_branch = net.idx_branches_in_service
+    ids_gen = net.idx_gens_in_service
+    n_buses = net.buses.shape[0]
+
+    if isinstance(sol, dict):
+        branch_flows = np.array(
+            [
+                (b["pf"], b.get("qf", np.nan), b["pt"], b.get("qt", np.nan))
+                for b in (sol["branch"][str(i + 1)] for i in ids_branch)
+            ],
+        ).reshape(-1, 4)
+        if "gen" in sol:
+            gen_pq = np.array(
+                [
+                    (g["pg"], g.get("qg", np.nan))
+                    for g in (sol["gen"][str(i + 1)] for i in ids_gen)
+                ],
+            ).reshape(-1, 2)
+        else:
+            gen_pq = np.full((len(ids_gen), 2), np.nan)
+        bus_vmva = np.array(
+            [
+                (b.get("vm", np.nan), b["va"])
+                for b in (
+                    sol["bus"][str(net.reverse_bus_index_mapping[i])]
+                    for i in range(n_buses)
+                )
+            ],
+        ).reshape(-1, 2)
+        return branch_flows, gen_pq, bus_vmva
+
+    # Julia result: Julia is necessarily up already; importing Main here (not
+    # at module level) keeps `import gridfm_datakit` from booting Julia.
+    from juliacall import Main as jl
+
+    rev = np.empty(n_buses, dtype=np.int64)
+    for new_idx, orig_idx in net.reverse_bus_index_mapping.items():
+        rev[new_idx] = orig_idx
+    branch_flows, gen_pq, bus_vmva = jl._gfm_pack(
+        res,
+        (ids_branch + 1).astype(np.int64),
+        (ids_gen + 1).astype(np.int64),
+        rev,
+    )
+    return np.asarray(branch_flows), np.asarray(gen_pq), np.asarray(bus_vmva)
+
+
 def pf_preprocessing(net: Network, res: Dict[str, Any]) -> Network:
     """Set variables to the results of OPF.
 
@@ -453,16 +553,10 @@ def pf_preprocessing(net: Network, res: Dict[str, Any]) -> Network:
     Returns:
         Updated network with OPF results applied.
     """
-    sol_gen = res["solution"]["gen"]
-    sol_bus = res["solution"]["bus"]
-    pg = [sol_gen[str(i + 1)]["pg"] * net.baseMVA for i in net.idx_gens_in_service]
-    vm = [
-        sol_bus[str(net.reverse_bus_index_mapping[i])]["vm"]
-        for i in range(net.buses.shape[0])
-    ]
+    _, gen_pq, bus_vmva = _solution_arrays(res, net)
 
-    net.Pg_gen = pg
-    net.Vm = vm
+    net.Pg_gen = gen_pq[:, 0] * net.baseMVA
+    net.Vm = bus_vmva[:, 0]
 
     return net
 
@@ -577,17 +671,8 @@ def pf_post_processing(
             "Number of branches in solution should match number of branches in network"
         )
 
-    # Single pass over the solution dict: with juliacall results every element
-    # access crosses the Python<->Julia boundary, so fetch each branch entry
-    # once and read all four fields from it.
-    sol_branch = res["solution"]["branch"]
+    branch_flows, gen_pq, bus_vmva = _solution_arrays(res, net)
     if len(net.idx_branches_in_service) > 0:
-        branch_flows = np.array(
-            [
-                (b["pf"], b["qf"], b["pt"], b["qt"])
-                for b in (sol_branch[str(i + 1)] for i in net.idx_branches_in_service)
-            ],
-        )
         X_branch[net.idx_branches_in_service, 4:8] = branch_flows * net.baseMVA
 
     X_branch[:, 8] = net.branches[:, BR_R]
@@ -617,21 +702,10 @@ def pf_post_processing(
 
     if include_dc_res:
         if res_dc is not None:
-            sol_branch_dc = res_dc["solution"]["branch"]
-            dc_flows = (
-                np.array(
-                    [
-                        (b["pf"], b["pt"])
-                        for b in (
-                            sol_branch_dc[str(i + 1)]
-                            for i in net.idx_branches_in_service
-                        )
-                    ],
-                ).reshape(-1, 2)
-                * net.baseMVA
-            )
+            dc_flows, gen_pq_dc, bus_vmva_dc = _solution_arrays(res_dc, net)
+            dc_flows = dc_flows * net.baseMVA
             pf_dc = dc_flows[:, 0]
-            pt_dc = dc_flows[:, 1]
+            pt_dc = dc_flows[:, 2]
             X_branch[net.idx_branches_in_service, 25] = pf_dc
             X_branch[net.idx_branches_in_service, 26] = pt_dc
         else:
@@ -652,19 +726,10 @@ def pf_post_processing(
     X_bus[:, 3] = net.buses[:, QD]
 
     # --- Generator injections
-    sol_gen = res["solution"]["gen"]
-    assert len(sol_gen) == len(net.idx_gens_in_service), (
+    assert len(res["solution"]["gen"]) == len(net.idx_gens_in_service), (
         "Number of generators in solution should match number of generators in network"
     )
-    gen_pq = (
-        np.array(
-            [
-                (g["pg"], g["qg"])
-                for g in (sol_gen[str(i + 1)] for i in net.idx_gens_in_service)
-            ],
-        ).reshape(-1, 2)
-        * net.baseMVA
-    )
+    gen_pq = gen_pq * net.baseMVA
     pg_gen = gen_pq[:, 0]
     qg_gen = gen_pq[:, 1]
     gen_bus = net.gens[net.idx_gens_in_service, GEN_BUS].astype(int)
@@ -684,13 +749,7 @@ def pf_post_processing(
         if res_dc is not None:
             # check if "gen" key is in res_dc["solution"]
             if "gen" in res_dc["solution"]:
-                sol_gen_dc = res_dc["solution"]["gen"]
-                pg_gen_dc = np.array(
-                    [
-                        sol_gen_dc[str(i + 1)]["pg"] * net.baseMVA
-                        for i in net.idx_gens_in_service
-                    ],
-                )
+                pg_gen_dc = gen_pq_dc[:, 0] * net.baseMVA
             else:
                 pg_gen_dc = apply_slack_single_gen(net, pg_gen, Pg_bus, pf_dc, pt_dc)
             Pg_bus_dc = np.bincount(gen_bus, weights=pg_gen_dc, minlength=n_buses)
@@ -701,20 +760,12 @@ def pf_post_processing(
     X_bus[:, 4] = Pg_bus[bus_row_idx]
     X_bus[:, 5] = Qg_bus[bus_row_idx]
 
-    # Voltage
-    sol_bus = res["solution"]["bus"]
-    assert set([int(k) for k in sol_bus.keys()]) == set(
-        net.reverse_bus_index_mapping.values(),
-    ), "Buses in solution should match buses in network"
-
-    bus_vmva = np.array(
-        [
-            (b["vm"], b["va"])
-            for b in (
-                sol_bus[str(net.reverse_bus_index_mapping[i])] for i in range(n_buses)
-            )
-        ],
+    # Voltage. Extraction (_solution_arrays) raises on any missing expected
+    # bus key, so together with this length check the key sets must match.
+    assert len(res["solution"]["bus"]) == n_buses, (
+        "Buses in solution should match buses in network"
     )
+
     X_bus[:, 6] = bus_vmva[:, 0]
     va = np.rad2deg(bus_vmva[:, 1])
 
@@ -741,13 +792,7 @@ def pf_post_processing(
 
     if include_dc_res:
         if res_dc is not None:
-            sol_bus_dc = res_dc["solution"]["bus"]
-            va = np.rad2deg(
-                [
-                    sol_bus_dc[str(net.reverse_bus_index_mapping[i])]["va"]
-                    for i in range(n_buses)
-                ],
-            )
+            va = np.rad2deg(bus_vmva_dc[:, 1])
             # convert to range [-180, 180]
             va = (va + 180) % 360 - 180
             X_bus[:, 16] = va
