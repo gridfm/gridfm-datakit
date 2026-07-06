@@ -24,6 +24,59 @@ from gridfm_datakit.utils.column_names import (
 from gridfm_datakit.network import Network
 from gridfm_datakit.utils.utils import n_scenario_per_partition, write_parquet
 
+# Integer-valued columns that the solver post-processing produces as float64
+# (arrays are built with np.zeros). Cast to real integer dtypes before writing:
+# 0/1 flags become int8, indices int64 (matching the pre-existing bus/scenario
+# convention). Values are exactly integral by construction, so the cast is
+# lossless; _cast_int_columns asserts this instead of truncating silently.
+INT_COLUMNS = {
+    "bus": {
+        "load_scenario_idx": "int64",
+        "bus": "int64",
+        "PQ": "int8",
+        "PV": "int8",
+        "REF": "int8",
+    },
+    "gen": {
+        "load_scenario_idx": "int64",
+        "idx": "int64",
+        "bus": "int64",
+        "in_service": "int8",
+        "is_slack_gen": "int8",
+    },
+    "branch": {
+        "load_scenario_idx": "int64",
+        "idx": "int64",
+        "from_bus": "int64",
+        "to_bus": "int64",
+        "br_status": "int8",
+    },
+    "y_bus": {
+        "load_scenario_idx": "int64",
+        "index1": "int64",
+        "index2": "int64",
+    },
+    "runtime": {
+        "load_scenario_idx": "int64",
+    },
+}
+
+
+def _cast_int_columns(df: pd.DataFrame, casts: dict) -> None:
+    """Cast integer-valued float columns to integer dtypes, in place.
+
+    Raises:
+        ValueError: If a column contains non-integral values (including NaN),
+            so a lossy cast fails loud instead of truncating silently.
+    """
+    for col, dtype in casts.items():
+        values = df[col]
+        if not (values % 1 == 0).all():
+            raise ValueError(
+                f"Column {col!r} contains non-integral values; refusing to cast to {dtype}",
+            )
+        df[col] = values.astype(dtype)
+
 
 def _process_and_save(args: Tuple[str, List[np.ndarray], str, int, int, bool]) -> None:
     """Worker function for processing and saving one dataset type (bus/gen/branch/y_bus).
@@ -43,7 +96,6 @@ def _process_and_save(args: Tuple[str, List[np.ndarray], str, int, int, bool]) -
         bus_columns = BUS_COLUMNS + DC_BUS_COLUMNS if include_dc_res else BUS_COLUMNS
         bus_data = np.concatenate([item[0] for item in processed_data], axis=0)
         df = pd.DataFrame(bus_data, columns=bus_columns)
-        df["bus"] = df["bus"].astype("int64")
         scenario_indices = np.repeat(
             range(last_scenario + 1, last_scenario + 1 + (df.shape[0] // n_buses)),
             n_buses,
@@ -56,7 +108,6 @@ def _process_and_save(args: Tuple[str, List[np.ndarray], str, int, int, bool]) -
             gen_data,
             columns=GEN_COLUMNS + DC_GEN_COLUMNS if include_dc_res else GEN_COLUMNS,
         )
-        df["bus"] = df["bus"].astype("int64")
         scenario_indices = np.concatenate(
             [
                 np.full(item[1].shape[0], last_scenario + 1 + i, dtype="int64")
@@ -73,7 +124,6 @@ def _process_and_save(args: Tuple[str, List[np.ndarray], str, int, int, bool]) -
             if include_dc_res
             else BRANCH_COLUMNS,
         )
-        df[["from_bus", "to_bus"]] = df[["from_bus", "to_bus"]].astype("int64")
         scenario_indices = np.concatenate(
             [
                 np.full(item[2].shape[0], last_scenario + 1 + i, dtype="int64")
@@ -85,7 +135,6 @@ def _process_and_save(args: Tuple[str, List[np.ndarray], str, int, int, bool]) -
     elif data_type == "y_bus":
         y_bus_data = np.concatenate([item[3] for item in processed_data])
         df = pd.DataFrame(y_bus_data, columns=YBUS_COLUMNS)
-        df[["index1", "index2"]] = df[["index1", "index2"]].astype("int64")
         scenario_indices = np.concatenate(
             [
                 np.full(item[3].shape[0], last_scenario + 1 + i, dtype="int64")
@@ -111,6 +160,8 @@ def _process_and_save(args: Tuple[str, List[np.ndarray], str, int, int, bool]) -
         df.insert(0, "scenario", scenario_indices)
     else:
         raise ValueError(f"Unknown data type: {data_type}")
+
+    _cast_int_columns(df, INT_COLUMNS[data_type])
 
     # Add partition column for scenario-based partitioning (n_scenario_per_partition scenarios per partition)
     df["scenario_partition"] = (df["scenario"] // n_scenario_per_partition).astype(
