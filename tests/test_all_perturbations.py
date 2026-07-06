@@ -133,8 +133,12 @@ def test_all_perturbation_combinations():
 
     print(f"Testing {len(test_configs)} perturbation combinations...")
 
-    # Run tests in parallel
-    with ProcessPoolExecutor(max_workers=15) as executor:
+    # Run tests in parallel. Each generation internally spawns its own pool of
+    # Julia worker processes (num_processes=2), so the outer pool must stay small
+    # to avoid oversubscribing CI runners (which caused BlockingIOError/[Errno 11]
+    # write failures). Cap outer workers to roughly half the cores.
+    max_workers = max(1, (os.cpu_count() or 2) // 2)
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
         results = list(executor.map(run_generation, test_configs))
 
     # Check results

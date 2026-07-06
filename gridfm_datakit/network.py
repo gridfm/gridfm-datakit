@@ -85,9 +85,11 @@ def correct_network(network_path: str, force: bool = False) -> str:
         project = STATE["project"]
         jl_exe = executable()
 
-        # Julia script as a list of lines
+        # Julia script as a list of lines. silence() suppresses PowerModels'
+        # Info/Warn chatter from parse_file/export_matpower.
         julia_code = [
             "using PowerModels",
+            "PowerModels.silence()",
             f'data = PowerModels.parse_file("{network_path}")',
             f'PowerModels.export_matpower("{tmp_path}", data)',
         ]

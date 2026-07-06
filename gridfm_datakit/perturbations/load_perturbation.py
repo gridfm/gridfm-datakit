@@ -31,7 +31,7 @@ def _find_largest_scaling_factor_worker(
     import tempfile
     import os
 
-    jl = init_julia(max_iter=max_iter, solver_log_dir=None, print_level=5)
+    jl = init_julia(max_iter=max_iter, solver_log_dir=None)
 
     while (u <= max_scaling) and converged:
         # Update load values in the Network using properties
