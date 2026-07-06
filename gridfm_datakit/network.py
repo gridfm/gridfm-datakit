@@ -5,7 +5,7 @@ This module provides functionality for loading, processing, and saving power sys
 networks in MATPOWER format, with support for non-continuous bus indexing.
 """
 
-import copy
+import io
 import os
 import shutil
 import tempfile
@@ -120,12 +120,20 @@ def numpy_to_matlab_matrix(array: np.ndarray, name: str) -> str:
     Returns:
         String containing the MATLAB matrix assignment code.
     """
-    lines = [f"mpc.{name} = ["]
-    for row in array:
-        formatted_row = "  ".join(f"{int(v) if v == int(v) else v}" for v in row)
-        lines.append(f"    {formatted_row};")
-    lines.append("];\n")
-    return "\n".join(lines)
+    buf = io.StringIO()
+    buf.write(f"mpc.{name} = [\n")
+    # %.17g round-trips float64 exactly and renders integral values without a
+    # decimal point (bus indices must stay integer-looking for the parser).
+    # `+ 0.0` normalizes -0.0 to 0.0 so output matches the previous formatter.
+    np.savetxt(
+        buf,
+        np.atleast_2d(array) + 0.0,
+        fmt="%.17g",
+        delimiter="  ",
+        newline=";\n",
+    )
+    buf.write("];\n")
+    return buf.getvalue()
 
 
 class Network:
@@ -536,79 +544,74 @@ class Network:
             AssertionError: If bus, gen, or branch matrices don't have the required number of columns.
         """
 
-        to_save = copy.deepcopy(self)
-        # Restore original bus indices (1-based for MATPOWER)
-        to_save.buses[:, BUS_I] = np.array(
-            [self.reverse_bus_index_mapping[idx] for idx in to_save.buses[:, BUS_I]],
-            dtype=int,
-        )
-        to_save.gens[:, GEN_BUS] = np.array(
-            [self.reverse_bus_index_mapping[idx] for idx in to_save.gens[:, GEN_BUS]],
-            dtype=int,
-        )
-        to_save.branches[:, F_BUS] = np.array(
-            [self.reverse_bus_index_mapping[idx] for idx in to_save.branches[:, F_BUS]],
-            dtype=int,
-        )
-        to_save.branches[:, T_BUS] = np.array(
-            [self.reverse_bus_index_mapping[idx] for idx in to_save.branches[:, T_BUS]],
-            dtype=int,
-        )
+        # Restore original bus indices (1-based for MATPOWER) on array copies;
+        # vectorized lookup instead of deep-copying the whole object and
+        # remapping element by element.
+        rev = np.empty(self.buses.shape[0], dtype=np.int64)
+        for new_idx, orig_idx in self.reverse_bus_index_mapping.items():
+            rev[new_idx] = orig_idx
+        buses = self.buses.copy()
+        gens = self.gens.copy()
+        branches = self.branches.copy()
+        buses[:, BUS_I] = rev[buses[:, BUS_I].astype(int)]
+        gens[:, GEN_BUS] = rev[gens[:, GEN_BUS].astype(int)]
+        branches[:, F_BUS] = rev[branches[:, F_BUS].astype(int)]
+        branches[:, T_BUS] = rev[branches[:, T_BUS].astype(int)]
 
         with open(filename, "w") as f:
             f.write("function mpc = case_from_dict\n")
             f.write("% Automatically generated MATPOWER case file\n\n")
 
             # version and baseMVA
-            f.write(f"mpc.version = '{to_save.version()}';\n")
-            f.write(f"mpc.baseMVA = {to_save.baseMVA};\n\n")
+            f.write(f"mpc.version = '{self.version()}';\n")
+            f.write(f"mpc.baseMVA = {self.baseMVA};\n\n")
 
             # -------------------------
             # BUS matrix
             # -------------------------
-            assert to_save.buses.ndim == 2, "mpc['bus'] must be a 2D array"
-            assert to_save.buses.shape[1] >= 13, (
-                f"mpc['bus'] has {to_save.buses.shape[1]} columns, expected ≥13"
+            assert buses.ndim == 2, "mpc['bus'] must be a 2D array"
+            assert buses.shape[1] >= 13, (
+                f"mpc['bus'] has {buses.shape[1]} columns, expected ≥13"
             )
             f.write(
                 "% Columns: BUS_I  BUS_TYPE  PD  QD  GS  BS  BUS_AREA  VM  VA  BASE_KV  ZONE  VMAX  VMIN\n",
             )
-            f.write(numpy_to_matlab_matrix(to_save.buses, "bus"))
+            f.write(numpy_to_matlab_matrix(buses, "bus"))
 
             # -------------------------
             # GEN matrix
             # -------------------------
-            assert to_save.gens.ndim == 2, "mpc['gen'] must be a 2D array"
-            assert to_save.gens.shape[1] >= 10, (
-                f"mpc['gen'] has {to_save.gens.shape[1]} columns, expected minimum ≥10"
+            assert gens.ndim == 2, "mpc['gen'] must be a 2D array"
+            assert gens.shape[1] >= 10, (
+                f"mpc['gen'] has {gens.shape[1]} columns, expected minimum ≥10"
             )
             f.write(
                 "% Columns: GEN_BUS  PG  QG  QMAX  QMIN  VG  MBASE  GEN_STATUS  PMAX  PMIN  "
                 "PC1  PC2  QC1MIN  QC1MAX  QC2MIN  QC2MAX  RAMP_AGC  RAMP_10  RAMP_30  RAMP_Q  APF\n",
             )
-            f.write(numpy_to_matlab_matrix(to_save.gens, "gen"))
+            f.write(numpy_to_matlab_matrix(gens, "gen"))
 
             # -------------------------
             # BRANCH matrix (always 13 columns)
             # -------------------------
-            assert to_save.branches.ndim == 2, "mpc['branch'] must be a 2D array"
-            assert to_save.branches.shape[1] >= 13, (
-                f"mpc['branch'] has {to_save.branches.shape[1]} columns, expected ≥13"
+            assert branches.ndim == 2, "mpc['branch'] must be a 2D array"
+            assert branches.shape[1] >= 13, (
+                f"mpc['branch'] has {branches.shape[1]} columns, expected ≥13"
             )
             f.write(
                 "% Columns: F_BUS  T_BUS  BR_R  BR_X  BR_B  RATE_A  RATE_B  RATE_C  TAP  SHIFT  BR_STATUS  ANGMIN  ANGMAX\n",
             )
-            f.write(numpy_to_matlab_matrix(to_save.branches, "branch"))
+            f.write(numpy_to_matlab_matrix(branches, "branch"))
 
             # -------------------------
             # GENCOST matrix
             # -------------------------
-            if to_save.gencosts is not None:
-                assert to_save.gencosts.ndim == 2, "mpc['gencost'] must be a 2D array"
+            if self.gencosts is not None:
+                assert self.gencosts.ndim == 2, "mpc['gencost'] must be a 2D array"
                 f.write(
                     "% Columns: MODEL  STARTUP  SHUTDOWN  NCOST  COST (coefficients or x-y pairs)\n",
                 )
-                f.write(numpy_to_matlab_matrix(to_save.gencosts, "gencost"))
+                f.write(numpy_to_matlab_matrix(self.gencosts, "gencost"))
 
         # print(f"MATPOWER case file saved as {filename}")
 
