@@ -14,7 +14,7 @@ EVENT_PARAMS_MAPPING = {
     'Disconnect': ['disconnect_only'],
     'NodeFault': ['fault_time', 'r_pu', 'x_pu'],
     'ReactivePowerVariation': ['delta_q'],
-    'ReferenceVoltageVariation': ['dekta_u']
+    'ReferenceVoltageVariation': ['delta_u']
 }
 
 SIMULATION_PARAMETERS_MAPPING = {
