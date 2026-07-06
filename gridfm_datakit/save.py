@@ -22,7 +22,7 @@ from gridfm_datakit.utils.column_names import (
     YBUS_COLUMNS,
 )
 from gridfm_datakit.network import Network
-from gridfm_datakit.utils.utils import n_scenario_per_partition
+from gridfm_datakit.utils.utils import n_scenario_per_partition, write_parquet
 
 
 def _process_and_save(args: Tuple[str, List[np.ndarray], str, int, int, bool]) -> None:
@@ -117,12 +117,7 @@ def _process_and_save(args: Tuple[str, List[np.ndarray], str, int, int, bool]) -
         "int64",
     )
 
-    df.to_parquet(
-        path,
-        partition_cols=["scenario_partition"],
-        engine="pyarrow",
-        index=False,
-    )
+    write_parquet(df, path, partition_cols=["scenario_partition"])
 
 
 def save_node_edge_data(
