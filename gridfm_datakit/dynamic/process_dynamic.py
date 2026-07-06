@@ -117,10 +117,18 @@ def process_dynamic_simulations(
             results = pool.map(_process_dynamic_chunk, tasks)
 
         for chunk_results in results:
+            # A worker that dies before its per-scenario loop returns [exception]
+            # (see _process_dynamic_chunk). Detect both a bare exception and the
+            # list-wrapped form so a failed chunk never poisons all_results with
+            # non-result objects (which would later crash _save_generated_data).
             if isinstance(chunk_results, Exception):
                 print(f"Error in dynamic chunk: {chunk_results}")
             else:
-                all_results.extend(chunk_results)
+                for scenario_result in chunk_results:
+                    if isinstance(scenario_result, Exception):
+                        print(f"Error in dynamic chunk: {scenario_result}")
+                    else:
+                        all_results.append(scenario_result)
 
     return all_results
 
@@ -194,11 +202,17 @@ def _process_dynamic_chunk(args: Tuple) -> Union[List[Dict[str, Any]], List[Exce
                         )
                         chunk_results.append(result)
                     except Exception as e:
+                        # A single scenario failing must not abort the rest of the
+                        # chunk. Guard the logging itself: if error_log_file is not
+                        # writable, fall back to stderr rather than escalating the
+                        # failure to a whole-chunk crash.
                         tb = traceback.format_exc()
-                        with open(error_log_file, "a") as f:
-                            f.write(
-                                f"[dynamic] scenario {scenario_index} failed: {e}\n{tb}\n",
-                            )
+                        msg = f"[dynamic] scenario {scenario_index} failed: {e}\n{tb}\n"
+                        try:
+                            with open(error_log_file, "a") as f:
+                                f.write(msg)
+                        except OSError:
+                            print(msg)
 
             return chunk_results
 
