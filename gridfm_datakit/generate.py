@@ -41,7 +41,7 @@ from gridfm_datakit.utils.param_handler import (
     initialize_topology_generator,
 )
 from gridfm_datakit.utils.random_seed import custom_seed
-from gridfm_datakit.utils.utils import Tee, write_ram_usage_distributed
+from gridfm_datakit.utils.utils import Tee, write_parquet, write_ram_usage_distributed
 
 
 def _setup_environment(
@@ -228,7 +228,7 @@ def _prepare_network_and_scenarios(
         seed=seed,
     )
     scenarios_df = load_scenarios_to_df(scenarios)
-    scenarios_df.to_parquet(file_paths["scenarios"], index=False, engine="pyarrow")
+    write_parquet(scenarios_df, file_paths["scenarios"])
     if net.buses.shape[0] <= 100:
         plot_load_scenarios_combined(scenarios_df, file_paths["scenarios_plot"])
     else:
@@ -332,6 +332,10 @@ def generate_power_flow_data(
     jl = init_julia(args.settings.max_iter, file_paths["solver_log_dir"])
 
     processed_data = []
+    # Flush results to disk periodically so memory stays bounded, mirroring
+    # the distributed path. Configs without large_chunk_size keep the old
+    # save-once-at-the-end behavior.
+    flush_every = getattr(args.settings, "large_chunk_size", None)
 
     # Process scenarios sequentially with deterministic seed
     # Use custom_seed to control randomness for reproducibility
@@ -379,6 +383,16 @@ def generate_power_flow_data(
                         raise ValueError("Invalid mode!")
 
                     pbar.update(1)
+
+                    if flush_every and (scenario_index + 1) % flush_every == 0:
+                        _save_generated_data(
+                            net,
+                            processed_data,
+                            file_paths,
+                            base_path,
+                            args,
+                        )
+                        processed_data = []
 
     # Save final data
     _save_generated_data(
@@ -463,45 +477,47 @@ def generate_power_flow_data_distributed(
             file=Tee(sys.stdout, f),
             miniters=5,
         ) as pbar:
-            for large_chunk_index, large_chunk in enumerate(large_chunks):
-                write_ram_usage_distributed(f)
-                chunk_size = len(large_chunk)
-                scenario_chunks = np.array_split(
-                    large_chunk,
-                    min(args.settings.num_processes, chunk_size),
-                )
-
-                # pp_net wraps JVM state and cannot cross process boundaries;
-                # workers reload it themselves from network_path.
-                worker_meta = {k: v for k, v in meta.items() if k != "pp_net"}
-
-                tasks = [
-                    (
-                        args.settings.mode,
-                        chunk[0],
-                        chunk[-1] + 1,
-                        scenarios,
-                        net,
-                        progress_queue,
-                        topology_generator,
-                        generation_generator,
-                        admittance_generator,
-                        file_paths["error_log"],
-                        args.settings.include_dc_res,
-                        args.settings.pf_fast,
-                        args.settings.dcpf_fast,
-                        file_paths["solver_log_dir"],
-                        args.settings.max_iter,
-                        seed,
-                        args.settings.pf_solver,
-                        worker_meta,
+            # One pool for the whole run: workers persist across large chunks,
+            # so each worker pays the expensive Julia startup once instead of
+            # once per chunk (process_scenario_chunk caches the handle).
+            _mp_ctx = multiprocessing.get_context("spawn")
+            with _mp_ctx.Pool(processes=args.settings.num_processes) as pool:
+                for large_chunk_index, large_chunk in enumerate(large_chunks):
+                    write_ram_usage_distributed(f)
+                    chunk_size = len(large_chunk)
+                    scenario_chunks = np.array_split(
+                        large_chunk,
+                        min(args.settings.num_processes, chunk_size),
                     )
-                    for chunk in scenario_chunks
-                ]
 
-                # Run parallel processing
-                _mp_ctx = multiprocessing.get_context("spawn")
-                with _mp_ctx.Pool(processes=args.settings.num_processes) as pool:
+                    # pp_net wraps JVM state and cannot cross process boundaries;
+                    # workers reload it themselves from network_path.
+                    worker_meta = {k: v for k, v in meta.items() if k != "pp_net"}
+
+                    tasks = [
+                        (
+                            args.settings.mode,
+                            chunk[0],
+                            chunk[-1] + 1,
+                            scenarios,
+                            net,
+                            progress_queue,
+                            topology_generator,
+                            generation_generator,
+                            admittance_generator,
+                            file_paths["error_log"],
+                            args.settings.include_dc_res,
+                            args.settings.pf_fast,
+                            args.settings.dcpf_fast,
+                            file_paths["solver_log_dir"],
+                            args.settings.max_iter,
+                            seed,
+                            args.settings.pf_solver,
+                            worker_meta,
+                        )
+                        for chunk in scenario_chunks
+                    ]
+
                     results = [
                         pool.apply_async(process_scenario_chunk, task) for task in tasks
                     ]
@@ -528,19 +544,16 @@ def generate_power_flow_data_distributed(
                             sys.exit(e)
                         processed_data.extend(local_processed_data)
 
-                    pool.close()
-                    pool.join()
+                    # Save processed data
+                    _save_generated_data(
+                        net,
+                        processed_data,
+                        file_paths,
+                        base_path,
+                        args,
+                    )
 
-                # Save processed data
-                _save_generated_data(
-                    net,
-                    processed_data,
-                    file_paths,
-                    base_path,
-                    args,
-                )
-
-                del processed_data
-                gc.collect()
+                    del processed_data
+                    gc.collect()
 
     return file_paths

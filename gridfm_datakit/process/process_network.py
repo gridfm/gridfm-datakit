@@ -986,6 +986,12 @@ def process_scenario_pf_mode(
     return local_processed_data
 
 
+# Per-worker Julia handle, initialized on the first chunk and reused for the
+# rest of the worker's lifetime. Safe to key on nothing: within one run every
+# chunk passes the same (max_iter, solver_log_dir) to init_julia.
+_worker_jl = None
+
+
 def process_scenario_chunk(
     mode: str,
     start_idx: int,
@@ -1044,8 +1050,11 @@ def process_scenario_chunk(
             - List of processed data tuples (bus, gen, branch, Y_bus arrays)
     """
 
+    global _worker_jl
     try:
-        jl = init_julia(max_iter, solver_log_dir)
+        if _worker_jl is None:
+            _worker_jl = init_julia(max_iter, solver_log_dir)
+        jl = _worker_jl
 
         # In distributed (spawn) workers pp_net is not passed; reload it here.
         if (
