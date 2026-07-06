@@ -172,50 +172,26 @@ def run_dynawo_simulation(
 # ---------------------------------------------------------------------------
 
 
-def _format_dynamic_res(dyn_res: Any, drop_duplicate_timestpe):
-    """Convert raw pypowsybl.dynamic simulation output into DynamicResults.
+def _format_dynamic_res(dyn_res: Any, drop_duplicate_timestep):
+    """Convert raw pypowsybl.dynamic simulation output into a curves DataFrame.
 
-    Dynawo would compute a timestep several times upon system changes 
-    and keeps tracks of values that it associates to the same timestep.
-    By toggling drop_duplicate_timestep only the last timestep is kept.
-    
+    Dynawo may compute a given timestep several times upon system changes and
+    keeps track of every value it associates to that same timestep. When
+    ``drop_duplicate_timestep`` is True only the last value per timestep is kept.
+
     Args
     ----
-    sim_result :
-        Raw object returned by ``pypowsybl.dynamic.run_simulation``.
-    dynamic_mappings : DynawoMappings
-        Used to determine expected variable order.
+    dyn_res :
+        Raw object returned by ``pypowsybl.dynamic.Simulation.run``.
+    drop_duplicate_timestep : bool
+        Whether to keep only the last value for each duplicated timestep.
 
     Returns
     -------
-    DynamicResults
+    pandas.DataFrame
+        Curves indexed by time, shape (n_timesteps, n_variables).
     """
-    # TODO: validate with Youssouf, following code didn't run on my side
-    # curves = dyn_res.curves()
-
-    # if curves is None or (hasattr(curves, "empty") and curves.empty):
-    #    # No time-series data (simulation failed or no variables requested)
-    #    data_array = np.empty((0, 0), dtype=np.float64)
-
-    # variable_cols = list(curves.columns)
-    # data_array = curves[variable_cols].to_numpy(dtype=np.float64).T
-    # shape: (n_variables, n_timesteps)
-
-    # # Wrap in a Zarr in-memory array so the caller can write it to a store
-    # store = zarr.MemoryStore()
-    # root = zarr.open_group(store, mode="w")
-    # root.create_dataset(
-    #     "curves",
-    #     data=data_array,
-    #     chunks=(data_array.shape[0], min(data_array.shape[1], 1000))
-    #     if data_array.size > 0
-    #     else True,
-    #     dtype="float64",
-    #     compressor=None,  # compression applied when writing to persistent store
-    # )
-
-    # return root['curves']
     df = dyn_res.curves()
-    if drop_duplicate_timestpe:
+    if drop_duplicate_timestep:
         return df[~df.index.duplicated(keep='last')]
     return df
