@@ -177,6 +177,7 @@ def _map_variables_dynawo (variables: pd.DataFrame) -> pp.dynamic.OutputVariable
             for _, row in df_var_type_t.iterrows():
                 variable_mapping.add_curves(model_id=row['model_id'], variables=row['variables'])
         elif type_t == 'FinalStateValue':
+            for _, row in df_var_type_t.iterrows():
                 variable_mapping.add_final_state_values(model_id=row['model_id'], variables=row['variables'])
     return variable_mapping
 
