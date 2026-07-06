@@ -225,9 +225,12 @@ def init_julia(
         jl.seval("const run_dcopf = _run_dcopf_core")
 
         # ----- Fast PF (direct computation) -----
+        # *_data variants take a PowerModels data dict (built by _gfm_state);
+        # the file entrypoints wrap them for warmups and direct file solves.
+        # The _data variants mutate their argument (update_data!), so callers
+        # must pass a per-solve copy — _gfm_state returns a fresh one.
         jl.seval("""
-        function run_pf_fast(case_file)
-            network = PowerModels.parse_file(case_file)
+        function run_pf_fast_data(network)
             result = compute_ac_pf(network)
 
             if result["termination_status"] == false
@@ -241,12 +244,12 @@ def init_julia(
             result["solution"]["pf"] = true
             return result
         end
+        run_pf_fast(case_file) = run_pf_fast_data(PowerModels.parse_file(case_file))
         """)
 
         # ----- Fast DC-PF (direct computation) -----
         jl.seval("""
-        function run_dcpf_fast(case_file)
-            network = PowerModels.parse_file(case_file)
+        function run_dcpf_fast_data(network)
             result = compute_dc_pf(network)
 
             if result["termination_status"] == false
@@ -260,13 +263,13 @@ def init_julia(
             result["solution"]["pf"] = true
             return result
         end
+        run_dcpf_fast(case_file) = run_dcpf_fast_data(PowerModels.parse_file(case_file))
         """)
 
         # ----- AC-PF core -----
         jl.seval(
             """
-        function _run_pf_core(case_file)
-            network = PowerModels.parse_file(case_file)
+        function run_pf_data(network)
             result = solve_ac_pf(
                 network,
                 optimizer_with_attributes(
@@ -288,6 +291,7 @@ def init_julia(
             result["solution"]["pf"] = true
             return result
         end
+        _run_pf_core(case_file) = run_pf_data(PowerModels.parse_file(case_file))
         """.format(print_level, max_iter),
         )
 
@@ -296,8 +300,7 @@ def init_julia(
         # ----- DC-PF core -----
         jl.seval(
             """
-        function _run_dcpf_core(case_file)
-            network = PowerModels.parse_file(case_file)
+        function run_dcpf_data(network)
             result = solve_dc_pf(
                 network,
                 optimizer_with_attributes(
@@ -319,10 +322,86 @@ def init_julia(
             result["solution"]["pf"] = true
             return result
         end
+        _run_dcpf_core(case_file) = run_dcpf_data(PowerModels.parse_file(case_file))
         """.format(print_level, dc_iter),
         )
 
         jl.seval("const run_dcpf = _run_dcpf_core")
+
+        # ----- In-memory data path -----
+        # Parse the MATPOWER case once per process (_gfm_init_base), then per
+        # solve push only the fields the pipeline mutates (_gfm_state). The
+        # transforms mirror PowerModels.parse_file bit-for-bit: make_per_unit!
+        # (÷baseMVA, deg2rad on va), _rescale_cost_model! (cost[k]·mva^(n-k))
+        # followed by _simplify_cost_terms! (leading zero coefficients
+        # trimmed). Every other step of correct_network_data! only reads or
+        # mutates fields the pipeline never changes between solves, so the
+        # base parse covers them (verified in tests/test_pm_data_path.py).
+        # A zero-pd load component is materialized for every bus so any load
+        # scenario can be applied without re-parsing.
+        jl.seval("""
+        function _gfm_init_base(case_file)
+            data = PowerModels.parse_file(case_file)
+            bus_load = Dict{Int,String}()
+            for (k, l) in data["load"]
+                bus_load[l["load_bus"]] = k
+            end
+            next = isempty(data["load"]) ? 1 : maximum(parse(Int, k) for k in keys(data["load"])) + 1
+            for (_, b) in data["bus"]
+                bi = b["index"]
+                if !haskey(bus_load, bi)
+                    data["load"][string(next)] = Dict{String,Any}(
+                        "source_id" => Any["bus", bi], "load_bus" => bi,
+                        "status" => 1, "pd" => 0.0, "qd" => 0.0, "index" => next)
+                    bus_load[bi] = string(next)
+                    next += 1
+                end
+            end
+            global _GFM_BASE = data
+            global _GFM_BUS_LOAD = bus_load
+            return nothing
+        end
+
+        function _gfm_state(bus_ids, bus_type, pd, qd, vm, va_deg,
+                            pg, qg, vg, gen_status, cost,
+                            br_status, br_r, br_x, br_b)
+            d = deepcopy(_GFM_BASE)
+            mva = d["baseMVA"]
+            for r in eachindex(bus_ids)
+                bi = Int(bus_ids[r])
+                b = d["bus"][string(bi)]
+                b["bus_type"] = Int(bus_type[r])
+                b["vm"] = Float64(vm[r])
+                b["va"] = deg2rad(Float64(va_deg[r]))
+                l = d["load"][_GFM_BUS_LOAD[bi]]
+                l["pd"] = Float64(pd[r]) / mva
+                l["qd"] = Float64(qd[r]) / mva
+            end
+            ncost = size(cost, 2)
+            for i in axes(cost, 1)
+                g = d["gen"][string(i)]
+                g["pg"] = Float64(pg[i]) / mva
+                g["qg"] = Float64(qg[i]) / mva
+                g["vg"] = Float64(vg[i])
+                g["gen_status"] = Int(gen_status[i])
+                c = [Float64(cost[i, k]) * Float64(mva)^(ncost - k) for k in 1:ncost]
+                while !isempty(c) && c[1] == 0.0
+                    popfirst!(c)
+                end
+                g["cost"] = c
+                g["ncost"] = length(c)
+            end
+            for i in eachindex(br_status)
+                br = d["branch"][string(i)]
+                br["br_status"] = Int(br_status[i])
+                br["br_r"] = Float64(br_r[i])
+                br["br_x"] = Float64(br_x[i])
+                br["b_fr"] = Float64(br_b[i]) / 2
+                br["b_to"] = Float64(br_b[i]) / 2
+            end
+            return d
+        end
+        """)
 
         # Warm start all functions on a dummy case. Ipopt prints its one-time
         # license banner here at the C level; each warm-up runs inside its
