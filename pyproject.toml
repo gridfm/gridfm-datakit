@@ -38,6 +38,7 @@ dependencies = [
     "networkx",
     "tqdm",
     "pyarrow",
+    "zarr",  # dynamic time-series output store (dynamic module)
 ]
 
 authors = [
