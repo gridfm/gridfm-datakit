@@ -228,14 +228,29 @@ def _save_generated_data(
     if dyn_arrays:
         n_scenarios = len(dyn_arrays)
         n_timesteps, n_variables = dyn_arrays[0].shape
+        shape = (n_scenarios, n_timesteps, n_variables)
+        chunks = (1, n_timesteps, n_variables)
         store = zarr.open(zarr_path, mode="w")
-        z = store.create_array(  # create_dataset is deprecated in zarr v3
-            "curves",
-            shape=(n_scenarios, n_timesteps, n_variables),
-            dtype="float64",
-            chunks=(1, n_timesteps, n_variables),
-            compressors=zarr.codecs.BloscCodec(cname="zstd", clevel=3),
-        )
+        # The Zarr array-creation API differs between v2 and v3; support both so
+        # the pipeline works regardless of which major version is installed.
+        if hasattr(store, "create_array"):  # zarr v3
+            z = store.create_array(
+                "curves",
+                shape=shape,
+                dtype="float64",
+                chunks=chunks,
+                compressors=zarr.codecs.BloscCodec(cname="zstd", clevel=3),
+            )
+        else:  # zarr v2
+            import numcodecs
+
+            z = store.create_dataset(
+                "curves",
+                shape=shape,
+                dtype="float64",
+                chunks=chunks,
+                compressor=numcodecs.Blosc(cname="zstd", clevel=3),
+            )
         for i, arr in enumerate(dyn_arrays):
             z[i] = arr
 
