@@ -11,7 +11,6 @@ its own copy of the pypowsybl network at chunk start, then reuses them for
 all scenarios in that chunk.
 """
 
-
 from __future__ import annotations
 
 import multiprocessing
@@ -21,9 +20,15 @@ from typing import Any, Dict, List, Tuple, Union
 import numpy as np
 
 from gridfm_datakit.network import Network
-from gridfm_datakit.dynamic.dynawo.simulate import run_dynawo_simulation, compute_balanced_static_state_dynawo
+from gridfm_datakit.dynamic.dynawo.simulate import (
+    run_dynawo_simulation,
+    compute_balanced_static_state_dynawo,
+)
 from gridfm_datakit.dynamic import DynamicResults
-from gridfm_datakit.dynamic.dynawo import get_dynawo_simulation_parameters, generate_dynawo_mappings
+from gridfm_datakit.dynamic.dynawo import (
+    get_dynawo_simulation_parameters,
+    generate_dynawo_mappings,
+)
 from gridfm_datakit.process.process_network import init_julia
 from gridfm_datakit.powsybl import load_net
 from gridfm_datakit.utils.random_seed import custom_seed
@@ -132,6 +137,7 @@ def process_dynamic_simulations(
 
     return all_results
 
+
 # ---------------------------------------------------------------------------
 # Public: chunk worker
 # ---------------------------------------------------------------------------
@@ -157,10 +163,10 @@ def _process_dynamic_chunk(args: Tuple) -> Union[List[Dict[str, Any]], List[Exce
         max_iter,
         solver_log_dir,
         seed,
-        config
+        config,
     ) = args
 
-    if dynamic_solver=='dynawo':
+    if dynamic_solver == "dynawo":
         try:
             # Initialise Julia once per worker — avoids repeated JIT compilation
             julia = init_julia(max_iter, solver_log_dir)
@@ -226,19 +232,20 @@ def _process_dynamic_chunk(args: Tuple) -> Union[List[Dict[str, Any]], List[Exce
 
 # ---------------------------------------------------------------------------
 # Public: single scenario
-# ---------------------------------------------------------------------------    
+# ---------------------------------------------------------------------------
+
 
 def process_single_dynamic_simulation(
-        pp_net: Any,
-        gfm_net: Network,
-        scenarios: np.ndarray,
-        scenario_index: int,
-        p2g_maps,
-        dynamic_mappings: Any,
-        dynamic_solver_params: Any,
-        dynamic_solver: str,
-        julia: Any,
-        ) -> Dict[str, Any]:
+    pp_net: Any,
+    gfm_net: Network,
+    scenarios: np.ndarray,
+    scenario_index: int,
+    p2g_maps,
+    dynamic_mappings: Any,
+    dynamic_solver_params: Any,
+    dynamic_solver: str,
+    julia: Any,
+) -> Dict[str, Any]:
     """Process a single scenario"""
 
     # Apply load scenario
@@ -281,52 +288,57 @@ def process_single_dynamic_simulation(
 
     return combined
 
+
 def _compute_balanced_static_state(
-        pp_net,
-        gfm_net: Network,
-        julia,
-        dynamic_solver,
-        p2g_maps,
-        scenario_index,
-        ):
+    pp_net,
+    gfm_net: Network,
+    julia,
+    dynamic_solver,
+    p2g_maps,
+    scenario_index,
+):
     """Wrapper around solver-specific balanced-state computation.
 
     Currently routes to ``compute_balanced_static_state_dynawo``.
     ``dynamic_solver`` is the extension point for future backends.
     """
-    if dynamic_solver == 'dynawo':
-        return compute_balanced_static_state_dynawo(pp_net=pp_net, 
-                                                    gfm_net=gfm_net,
-                                                    julia=julia,
-                                                    p2g_maps=p2g_maps,
-                                                    scenario_index=scenario_index,
-                                                    )
+    if dynamic_solver == "dynawo":
+        return compute_balanced_static_state_dynawo(
+            pp_net=pp_net,
+            gfm_net=gfm_net,
+            julia=julia,
+            p2g_maps=p2g_maps,
+            scenario_index=scenario_index,
+        )
     raise NotImplementedError(
         f"Dynamic solver {dynamic_solver!r} is not implemented. "
         "Supported solvers: 'dynawo'.",
     )
 
+
 def _run_dynamic_simulation(
-        network,
-        dynamic_mappings,
-        solver_parameters,
-        dynamic_solver,
+    network,
+    dynamic_mappings,
+    solver_parameters,
+    dynamic_solver,
 ) -> DynamicResults:
     """Wrapper around solver-specific dynamic simulation run.
 
     Currently routes to ``run_dynawo_simulation``.
     """
-    if dynamic_solver == 'dynawo':
+    if dynamic_solver == "dynawo":
         return run_dynawo_simulation(network, dynamic_mappings, solver_parameters)
     raise NotImplementedError(
         f"Dynamic solver {dynamic_solver!r} is not implemented. "
         "Supported solvers: 'dynawo'.",
     )
 
-def _combine_pf_and_dyn_res(pf_data: Dict[str, Any], 
-                            dynamic_results: DynamicResults,
+
+def _combine_pf_and_dyn_res(
+    pf_data: Dict[str, Any],
+    dynamic_results: DynamicResults,
 ) -> Dict[str, Any]:
-   """Merge static PF snapshot with dynamic time-series into a single output dict.
+    """Merge static PF snapshot with dynamic time-series into a single output dict.
 
     The alignment schema between the per-bus/branch/gen PF snapshot and the
     per-variable dynamic time-series is TBD (see architecture §12, Open
@@ -344,7 +356,7 @@ def _combine_pf_and_dyn_res(pf_data: Dict[str, Any],
     dict
         Keys: ``"pf_data"`` and ``"dynamic_results"``.
     """
-   return {
-       "pf_data": pf_data,
-       "dynamic_results": dynamic_results,
-   }
+    return {
+        "pf_data": pf_data,
+        "dynamic_results": dynamic_results,
+    }

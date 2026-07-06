@@ -40,6 +40,7 @@ def _get_pypowsybl_dynamic():
             ) from exc
     return _pypowsybl_dynamic
 
+
 def is_pypowsybl_dynamic_available() -> bool:
     """Return True if pypowsybl.dynamic can be imported, False otherwise."""
     try:
@@ -47,7 +48,8 @@ def is_pypowsybl_dynamic_available() -> bool:
         return True
     except ImportError:
         return False
-    
+
+
 def check_pypowsybl_dynamic_available() -> None:
     """Raise ImportError with install instructions if pypowsybl.dynamic is absent."""
     _get_pypowsybl_dynamic()

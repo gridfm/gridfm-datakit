@@ -33,8 +33,8 @@ from gridfm_datakit.utils.param_handler import NestedNamespace
 
 
 def generate_dynamic_data(
-        config: Union[str, Dict[str, Any], NestedNamespace]
-        ) -> Dict[str, str]:
+    config: Union[str, Dict[str, Any], NestedNamespace],
+) -> Dict[str, str]:
     """Generate dynamic simulation data from a YAML config.
     Accepted format includes: a string for the path, a dictionnary or a NestedNamespace.
 
@@ -63,7 +63,7 @@ def generate_dynamic_data(
         If ``network.source != "powsybl"`` or ``dynamic.dynamic_solver``
         is not set.
     """
-    
+
     # --- Step 0: load and validate config ---
     if isinstance(config, str):
         with open(config, "r") as f:
@@ -72,22 +72,21 @@ def generate_dynamic_data(
         args = NestedNamespace(**config)
     else:
         args = config
-    
+
     _validate_dynamic_config(args)
 
     # --- Step 1: standard environment setup (reuse generate.py logic) ---
     args, base_path, file_paths, seed = _setup_environment(args)
 
-
     # --- Step 2: network + scenarios (reuse generate.py logic) ---
     # TODO: discuss with YE: just a function to prep load scenarios and the path
     # we don't need the net, since we'll pass the path instead of the net along the pipeline
-    net, scenarios, meta = _prepare_network_and_scenarios(args, file_paths, seed) 
+    net, scenarios, meta = _prepare_network_and_scenarios(args, file_paths, seed)
 
     # --- Step 3: dynamic inputs ---
     dynamic_inputs = load_raw_inputs(args)
 
-     # --- Step 4: output directory ---
+    # --- Step 4: output directory ---
     dynamic_solver = args.dynamic.dynamic_solver
     output_dir = Path(
         getattr(args.dynamic, "output_dir", os.path.join(base_path, "dynamic")),
@@ -104,7 +103,7 @@ def generate_dynamic_data(
     from gridfm_datakit.dynamic.process_dynamic import process_dynamic_simulations
 
     all_results = process_dynamic_simulations(
-        network_path=meta['network_path'],
+        network_path=meta["network_path"],
         scenarios=scenarios,
         dynamic_inputs=dynamic_inputs,
         dynamic_solver=dynamic_solver,
@@ -112,7 +111,7 @@ def generate_dynamic_data(
         error_log_file=file_paths["error_log"],
         seed=seed,
     )
-    
+
     # --- Step 6: save outputs ---
     _save_generated_data(
         all_results=all_results,
@@ -124,11 +123,12 @@ def generate_dynamic_data(
 
     return file_paths
 
+
 def _validate_dynamic_config(args: NestedNamespace) -> None:
     """Raise ValueError for config issues that would cause silent failures."""
 
-    reader = getattr(args.network, 'reader', None)
-    if reader != 'powsybl':
+    reader = getattr(args.network, "reader", None)
+    if reader != "powsybl":
         raise ValueError(
             f"Dynamic simulations require network.reader='powsybl', "
             f"got {reader!r}. Set 'reader: powsybl' in the network block.",
@@ -229,12 +229,12 @@ def _save_generated_data(
         n_scenarios = len(dyn_arrays)
         n_timesteps, n_variables = dyn_arrays[0].shape
         store = zarr.open(zarr_path, mode="w")
-        z = store.create_array( # create_dataset is deprecated in zarr v3
+        z = store.create_array(  # create_dataset is deprecated in zarr v3
             "curves",
             shape=(n_scenarios, n_timesteps, n_variables),
             dtype="float64",
             chunks=(1, n_timesteps, n_variables),
-            compressors=zarr.codecs.BloscCodec(cname="zstd", clevel=3)
+            compressors=zarr.codecs.BloscCodec(cname="zstd", clevel=3),
         )
         for i, arr in enumerate(dyn_arrays):
             z[i] = arr
