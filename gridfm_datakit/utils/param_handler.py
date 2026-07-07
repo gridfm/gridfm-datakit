@@ -231,12 +231,16 @@ def initialize_topology_generator(
             args.k,
             base_net,
             elements,
+            getattr(args, "outage_count_probabilities", None),
         )
         used_args = {
             "n_topology_variants": args.n_topology_variants,
             "k": args.k,
             "base_net": base_net,
             "elements": elements,
+            "outage_count_probabilities": getattr(
+                args, "outage_count_probabilities", None
+            ),
         }
 
     elif args.type == "none":

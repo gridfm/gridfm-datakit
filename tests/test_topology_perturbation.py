@@ -11,6 +11,7 @@ from gridfm_datakit.perturbations.topology_perturbation import (
     NMinusKGenerator,
     RandomComponentDropGenerator,
 )
+from gridfm_datakit.utils.param_handler import NestedNamespace, initialize_topology_generator
 from gridfm_datakit.utils.idx_brch import F_BUS, T_BUS
 
 
@@ -303,6 +304,95 @@ class TestTopologyPerturbation:
             assert network.check_single_connected_component(), (
                 "All generated topologies should be connected"
             )
+
+    def test_random_component_drop_generator_supports_n0_sampling(self):
+        """Test that explicit probabilities can request N-0 topologies."""
+        original_network = load_net_from_pglib("case24_ieee_rts")
+
+        random_generator = RandomComponentDropGenerator(
+            n_topology_variants=3,
+            k=2,
+            base_net=original_network,
+            elements=["branch", "gen"],
+            outage_count_probabilities=[1.0, 0.0, 0.0],
+        )
+
+        perturbed_networks = list(random_generator.generate(original_network))
+
+        assert len(perturbed_networks) == 3
+        for network in perturbed_networks:
+            np.testing.assert_array_equal(
+                network.branches[:, 10],
+                original_network.branches[:, 10],
+                "N-0 sampling should preserve branch statuses",
+            )
+            np.testing.assert_array_equal(
+                network.gens[:, 7],
+                original_network.gens[:, 7],
+                "N-0 sampling should preserve generator statuses",
+            )
+
+    def test_random_component_drop_generator_respects_requested_outage_count(self):
+        """Test that deterministic outage-count probabilities force the sampled count."""
+        original_network = load_net_from_pglib("case24_ieee_rts")
+
+        random_generator = RandomComponentDropGenerator(
+            n_topology_variants=4,
+            k=2,
+            base_net=original_network,
+            elements=["branch", "gen"],
+            outage_count_probabilities=[0.0, 0.0, 1.0],
+        )
+
+        perturbed_networks = list(random_generator.generate(original_network))
+
+        assert len(perturbed_networks) == 4
+        for network in perturbed_networks:
+            branch_outages = int(np.sum(network.branches[:, 10] == 0))
+            gen_outages = int(np.sum(network.gens[:, 7] == 0))
+            assert branch_outages + gen_outages == 2, (
+                "Each sampled topology should contain exactly two outages"
+            )
+
+    def test_random_component_drop_generator_rejects_invalid_probabilities(self):
+        """Test validation for outage-count probabilities."""
+        original_network = load_net_from_pglib("case24_ieee_rts")
+
+        with pytest.raises(ValueError, match="sum to 1.0"):
+            RandomComponentDropGenerator(
+                n_topology_variants=1,
+                k=2,
+                base_net=original_network,
+                outage_count_probabilities=[0.2, 0.2, 0.2],
+            )
+
+        with pytest.raises(ValueError, match=r"length k \+ 1"):
+            RandomComponentDropGenerator(
+                n_topology_variants=1,
+                k=2,
+                base_net=original_network,
+                outage_count_probabilities=[0.5, 0.5],
+            )
+
+    def test_initialize_topology_generator_passes_outage_probabilities(self):
+        """Test config plumbing for outage-count probabilities."""
+        original_network = load_net_from_pglib("case24_ieee_rts")
+        args = NestedNamespace(
+            type="random",
+            n_topology_variants=2,
+            k=2,
+            elements=["branch", "gen"],
+            outage_count_probabilities=[0.1, 0.8, 0.1],
+        )
+
+        generator = initialize_topology_generator(args, original_network)
+
+        assert isinstance(generator, RandomComponentDropGenerator)
+        np.testing.assert_allclose(
+            generator.outage_count_probabilities,
+            np.array([0.1, 0.8, 0.1]),
+        )
+        np.testing.assert_array_equal(generator.outage_count_values, np.array([0, 1, 2]))
 
     def test_topology_generator_preserves_original(self):
         """Test that topology generators preserve the original network"""
