@@ -169,9 +169,7 @@ class RandomComponentDropGenerator(TopologyGenerator):
         # Preserve the current 1..k uniform sampling when no explicit count
         # probabilities are provided, but allow configurable sampling over 0..k.
         self.outage_count_values, self.outage_count_probabilities = (
-            self._normalize_outage_count_probabilities(
-                k, outage_count_probabilities
-            )
+            self._normalize_outage_count_probabilities(k, outage_count_probabilities)
         )
 
     def generate(
@@ -228,7 +226,7 @@ class RandomComponentDropGenerator(TopologyGenerator):
             np.random.choice(
                 self.outage_count_values,
                 p=self.outage_count_probabilities,
-            )
+            ),
         )
 
     @staticmethod
@@ -248,7 +246,7 @@ class RandomComponentDropGenerator(TopologyGenerator):
                 count = int(raw_count)
                 if count < 0 or count > k:
                     raise ValueError(
-                        f"Outage count {count} is outside the supported range 0..{k}."
+                        f"Outage count {count} is outside the supported range 0..{k}.",
                     )
                 probability_values[count] = float(raw_probability)
             return RandomComponentDropGenerator._validate_outage_count_probabilities(
@@ -259,11 +257,11 @@ class RandomComponentDropGenerator(TopologyGenerator):
         probability_values = np.asarray(probabilities, dtype=float)
         if probability_values.ndim != 1:
             raise ValueError(
-                "outage_count_probabilities must be a one-dimensional sequence."
+                "outage_count_probabilities must be a one-dimensional sequence.",
             )
         if len(probability_values) != k + 1:
             raise ValueError(
-                "outage_count_probabilities sequence must have length k + 1 so index i maps to i outages."
+                "outage_count_probabilities sequence must have length k + 1 so index i maps to i outages.",
             )
         allowed_counts = np.arange(k + 1, dtype=int)
         return RandomComponentDropGenerator._validate_outage_count_probabilities(
@@ -281,11 +279,11 @@ class RandomComponentDropGenerator(TopologyGenerator):
         total_probability = float(probability_values.sum())
         if not np.isclose(total_probability, 1.0, atol=1e-8):
             raise ValueError(
-                "outage_count_probabilities must sum to 1.0 within numerical tolerance."
+                "outage_count_probabilities must sum to 1.0 within numerical tolerance.",
             )
         if not np.any(probability_values > 0.0):
             raise ValueError(
-                "outage_count_probabilities must contain at least one positive value."
+                "outage_count_probabilities must contain at least one positive value.",
             )
         return counts.astype(int, copy=True), probability_values.astype(
             float,

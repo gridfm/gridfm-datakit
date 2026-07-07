@@ -101,7 +101,7 @@ def create_config() -> Dict[str, Any]:
         },
     }
     probabilities = _parse_outage_count_probabilities(
-        outage_count_probabilities.value.strip()
+        outage_count_probabilities.value.strip(),
     )
     if probabilities is not None:
         config["topology_perturbation"]["outage_count_probabilities"] = probabilities
@@ -120,7 +120,7 @@ def _parse_outage_count_probabilities(raw_value: str) -> List[float] | None:
         return [float(part) for part in parts]
     except ValueError as exc:
         raise ValueError(
-            "Outage count probabilities must be a comma-separated list of numbers."
+            "Outage count probabilities must be a comma-separated list of numbers.",
         ) from exc
 
 
@@ -354,7 +354,12 @@ def interactive_interface() -> None:
 
     # Topology Perturbation Configuration
 
-    global k, n_topology_variants, perturbation_type, elements, outage_count_probabilities
+    global \
+        k, \
+        n_topology_variants, \
+        perturbation_type, \
+        elements, \
+        outage_count_probabilities
     k = widgets.IntSlider(
         value=1,
         min=1,
@@ -660,7 +665,7 @@ def interactive_interface() -> None:
             elements,
             outage_count_probabilities,
             outage_count_probabilities_help,
-        ]
+        ],
     )
 
     # Function to update topology perturbation component visibility

@@ -239,7 +239,9 @@ def initialize_topology_generator(
             "base_net": base_net,
             "elements": elements,
             "outage_count_probabilities": getattr(
-                args, "outage_count_probabilities", None
+                args,
+                "outage_count_probabilities",
+                None,
             ),
         }
 

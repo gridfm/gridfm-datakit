@@ -11,7 +11,10 @@ from gridfm_datakit.perturbations.topology_perturbation import (
     NMinusKGenerator,
     RandomComponentDropGenerator,
 )
-from gridfm_datakit.utils.param_handler import NestedNamespace, initialize_topology_generator
+from gridfm_datakit.utils.param_handler import (
+    NestedNamespace,
+    initialize_topology_generator,
+)
 from gridfm_datakit.utils.idx_brch import F_BUS, T_BUS
 
 
@@ -392,7 +395,10 @@ class TestTopologyPerturbation:
             generator.outage_count_probabilities,
             np.array([0.1, 0.8, 0.1]),
         )
-        np.testing.assert_array_equal(generator.outage_count_values, np.array([0, 1, 2]))
+        np.testing.assert_array_equal(
+            generator.outage_count_values,
+            np.array([0, 1, 2]),
+        )
 
     def test_topology_generator_preserves_original(self):
         """Test that topology generators preserve the original network"""
