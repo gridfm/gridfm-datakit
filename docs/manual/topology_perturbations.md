@@ -16,11 +16,11 @@ Example:
 
 ```yaml
 topology_perturbation:
-	type: "random"
-	k: 2
-	n_topology_variants: 20
-	elements: [branch, gen]
-	outage_count_probabilities: [0.1, 0.8, 0.1]
+  type: "random"
+  k: 2
+  n_topology_variants: 20
+  elements: [branch, gen]
+  outage_count_probabilities: [0.1, 0.8, 0.1]
 ```
 
 This requests approximately 10% N-0, 80% N-1, and 10% N-2 attempted perturbations. Realized proportions can differ slightly because infeasible sampled topologies are rejected.

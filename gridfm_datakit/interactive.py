@@ -120,7 +120,7 @@ def _parse_outage_count_probabilities(raw_value: str) -> List[float] | None:
         return [float(part) for part in parts]
     except ValueError as exc:
         raise ValueError(
-            "Outage count probabilities must be a comma-separated list of numbers.",
+            "Outage count probabilities must be a comma-separated list of numbers that sum to 1.0.",
         ) from exc
 
 

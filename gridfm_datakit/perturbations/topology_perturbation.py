@@ -138,6 +138,7 @@ class RandomComponentDropGenerator(TopologyGenerator):
         base_net: Network,
         elements: List[str] = ["branch", "gen"],
         outage_count_probabilities: Sequence[float] | Mapping[int, float] | None = None,
+        max_generation_attempts: int | None = None,
     ) -> None:
         """Initialize the random component drop generator.
 
@@ -148,6 +149,10 @@ class RandomComponentDropGenerator(TopologyGenerator):
             elements: List of element types to consider for dropping.
             outage_count_probabilities: Optional probabilities over outage counts.
                 Index or key `i` means probability of sampling `i` outages.
+            max_generation_attempts: Optional cap on sampled topology attempts
+                before failing if too many sampled topologies are infeasible.
+                If not provided, a default limit of
+                ``max(500, 50 * n_topology_variants)`` is used.
         """
         super().__init__()
         self.n_topology_variants = n_topology_variants
@@ -171,6 +176,10 @@ class RandomComponentDropGenerator(TopologyGenerator):
         self.outage_count_values, self.outage_count_probabilities = (
             self._normalize_outage_count_probabilities(k, outage_count_probabilities)
         )
+        self.max_generation_attempts = self._resolve_max_generation_attempts(
+            n_topology_variants,
+            max_generation_attempts,
+        )
 
     def generate(
         self,
@@ -185,9 +194,18 @@ class RandomComponentDropGenerator(TopologyGenerator):
             A perturbed network topology.
         """
         n_generated_topologies = 0
+        n_attempts = 0
 
         # Stop after we generated n_topology_variants
         while n_generated_topologies < self.n_topology_variants:
+            if n_attempts >= self.max_generation_attempts:
+                raise RuntimeError(
+                    "Unable to generate "
+                    f"{self.n_topology_variants} feasible topologies within "
+                    f"{self.max_generation_attempts} attempts. "
+                    "Consider reducing k or relaxing outage_count_probabilities.",
+                )
+            n_attempts += 1
             perturbed_topology = copy.deepcopy(net)
 
             r = self._sample_outage_count()
@@ -228,6 +246,17 @@ class RandomComponentDropGenerator(TopologyGenerator):
                 p=self.outage_count_probabilities,
             ),
         )
+
+    @staticmethod
+    def _resolve_max_generation_attempts(
+        n_topology_variants: int,
+        max_generation_attempts: int | None,
+    ) -> int:
+        if max_generation_attempts is None:
+            return max(500, 50 * max(1, int(n_topology_variants)))
+        if int(max_generation_attempts) <= 0:
+            raise ValueError("max_generation_attempts must be greater than 0.")
+        return int(max_generation_attempts)
 
     @staticmethod
     def _normalize_outage_count_probabilities(

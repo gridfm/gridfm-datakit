@@ -15,7 +15,7 @@ from gridfm_datakit.utils.param_handler import (
     NestedNamespace,
     initialize_topology_generator,
 )
-from gridfm_datakit.utils.idx_brch import F_BUS, T_BUS
+from gridfm_datakit.utils.idx_brch import BR_STATUS, F_BUS, T_BUS
 
 
 class TestTopologyPerturbation:
@@ -41,7 +41,7 @@ class TestTopologyPerturbation:
 
         # Verify original network is unchanged
         np.testing.assert_array_equal(
-            original_network.branches[:, 10],
+            original_network.branches[:, BR_STATUS],
             original_branch_status,
             "Original network branch status should be unchanged",
         )
@@ -79,7 +79,7 @@ class TestTopologyPerturbation:
         network_states = []
         for network in perturbed_networks:
             state = {
-                "branch_status": network.branches[:, 10].copy(),  # BR_STATUS
+                "branch_status": network.branches[:, BR_STATUS].copy(),  # BR_STATUS
                 "gen_status": network.gens[:, 7].copy(),  # GEN_STATUS
             }
             network_states.append(state)
@@ -133,14 +133,14 @@ class TestTopologyPerturbation:
         test_network = load_net_from_pglib("case24_ieee_rts")
 
         # Get original branch status
-        original_branch_status = test_network.branches[:, 10].copy()
+        original_branch_status = test_network.branches[:, BR_STATUS].copy()
 
         # Deactivate some branches
         branches_to_deactivate = np.array([0, 1, 2])
         test_network.deactivate_branches(branches_to_deactivate)
 
         # Verify branches are deactivated
-        assert np.all(test_network.branches[branches_to_deactivate, 10] == 0), (
+        assert np.all(test_network.branches[branches_to_deactivate, BR_STATUS] == 0), (
             "Branches should be deactivated"
         )
 
@@ -150,7 +150,7 @@ class TestTopologyPerturbation:
             branches_to_deactivate,
         )
         np.testing.assert_array_equal(
-            test_network.branches[other_branches, 10],
+            test_network.branches[other_branches, BR_STATUS],
             original_branch_status[other_branches],
             "Other branches should be unchanged",
         )
@@ -232,7 +232,7 @@ class TestTopologyPerturbation:
         copied_network.deactivate_gens([0])
 
         # Verify original is unchanged
-        assert np.all(original_network.branches[:, 10] == 1), (
+        assert np.all(original_network.branches[:, BR_STATUS] == 1), (
             "Original network branches should be in service"
         )
         assert np.all(original_network.gens[:, 7] == 1), (
@@ -240,10 +240,10 @@ class TestTopologyPerturbation:
         )
 
         # Verify copy is modified
-        assert copied_network.branches[0, 10] == 0, (
+        assert copied_network.branches[0, BR_STATUS] == 0, (
             "Copied network branch 0 should be out of service"
         )
-        assert copied_network.branches[1, 10] == 0, (
+        assert copied_network.branches[1, BR_STATUS] == 0, (
             "Copied network branch 1 should be out of service"
         )
         assert copied_network.gens[0, 7] == 0, (
@@ -325,8 +325,8 @@ class TestTopologyPerturbation:
         assert len(perturbed_networks) == 3
         for network in perturbed_networks:
             np.testing.assert_array_equal(
-                network.branches[:, 10],
-                original_network.branches[:, 10],
+                network.branches[:, BR_STATUS],
+                original_network.branches[:, BR_STATUS],
                 "N-0 sampling should preserve branch statuses",
             )
             np.testing.assert_array_equal(
@@ -351,11 +351,39 @@ class TestTopologyPerturbation:
 
         assert len(perturbed_networks) == 4
         for network in perturbed_networks:
-            branch_outages = int(np.sum(network.branches[:, 10] == 0))
+            branch_outages = int(np.sum(network.branches[:, BR_STATUS] == 0))
             gen_outages = int(np.sum(network.gens[:, 7] == 0))
             assert branch_outages + gen_outages == 2, (
                 "Each sampled topology should contain exactly two outages"
             )
+
+    def test_random_component_drop_generator_caps_infeasible_attempts(
+        self,
+        monkeypatch,
+    ):
+        """Test that infeasible sampling does not loop forever."""
+        original_network = load_net_from_pglib("case24_ieee_rts")
+
+        random_generator = RandomComponentDropGenerator(
+            n_topology_variants=1,
+            k=2,
+            base_net=original_network,
+            elements=["branch", "gen"],
+            outage_count_probabilities=[0.0, 0.0, 1.0],
+            max_generation_attempts=3,
+        )
+
+        monkeypatch.setattr(
+            type(original_network),
+            "check_single_connected_component",
+            lambda self: False,
+        )
+
+        with pytest.raises(
+            RuntimeError,
+            match="Unable to generate 1 feasible topologies",
+        ):
+            list(random_generator.generate(original_network))
 
     def test_random_component_drop_generator_rejects_invalid_probabilities(self):
         """Test validation for outage-count probabilities."""
@@ -376,6 +404,44 @@ class TestTopologyPerturbation:
                 base_net=original_network,
                 outage_count_probabilities=[0.5, 0.5],
             )
+
+    def test_random_component_drop_generator_accepts_probability_mapping(self):
+        """Test mapping-based outage-count probability input normalization."""
+        original_network = load_net_from_pglib("case24_ieee_rts")
+
+        random_generator = RandomComponentDropGenerator(
+            n_topology_variants=1,
+            k=2,
+            base_net=original_network,
+            outage_count_probabilities={2: 0.1, 0: 0.2, 1: 0.7},
+        )
+
+        np.testing.assert_array_equal(
+            random_generator.outage_count_values,
+            np.array([0, 1, 2]),
+        )
+        np.testing.assert_allclose(
+            random_generator.outage_count_probabilities,
+            np.array([0.2, 0.7, 0.1]),
+        )
+
+    def test_random_component_drop_generator_uses_default_attempt_cap(self):
+        """Test the default safeguard heuristic for infeasible sampling retries."""
+        original_network = load_net_from_pglib("case24_ieee_rts")
+
+        small_generator = RandomComponentDropGenerator(
+            n_topology_variants=1,
+            k=2,
+            base_net=original_network,
+        )
+        assert small_generator.max_generation_attempts == 500
+
+        larger_generator = RandomComponentDropGenerator(
+            n_topology_variants=20,
+            k=2,
+            base_net=original_network,
+        )
+        assert larger_generator.max_generation_attempts == 1000
 
     def test_initialize_topology_generator_passes_outage_probabilities(self):
         """Test config plumbing for outage-count probabilities."""
@@ -406,7 +472,7 @@ class TestTopologyPerturbation:
         original_network = load_net_from_pglib("case24_ieee_rts")
 
         # Store original state
-        original_branch_status = original_network.branches[:, 10].copy()
+        original_branch_status = original_network.branches[:, BR_STATUS].copy()
         original_gen_status = original_network.gens[:, 7].copy()
 
         # Test with NMinusKGenerator
@@ -415,7 +481,7 @@ class TestTopologyPerturbation:
 
         # Verify original is unchanged
         np.testing.assert_array_equal(
-            original_network.branches[:, 10],
+            original_network.branches[:, BR_STATUS],
             original_branch_status,
             "Original network should be unchanged after NMinusKGenerator",
         )
@@ -436,7 +502,7 @@ class TestTopologyPerturbation:
 
         # Verify original is unchanged
         np.testing.assert_array_equal(
-            original_network.branches[:, 10],
+            original_network.branches[:, BR_STATUS],
             original_branch_status,
             "Original network should be unchanged after RandomComponentDropGenerator",
         )
@@ -480,7 +546,7 @@ class TestTopologyPerturbation:
         test_network.deactivate_branches(np.array(branches_to_bus6))
 
         # Verify branches are deactivated
-        assert np.all(test_network.branches[branches_to_bus6, 10] == 0), (
+        assert np.all(test_network.branches[branches_to_bus6, BR_STATUS] == 0), (
             "All branches to bus 6 should be deactivated"
         )
 
