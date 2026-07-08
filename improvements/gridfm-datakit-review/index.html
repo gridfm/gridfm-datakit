@@ -1,0 +1,2159 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../figs/KIT_logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>gridfm-datakit — Technical Review - gridfm-datakit</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+      <link rel="stylesheet" href="https://unpkg.com/katex@0/dist/katex.min.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="white" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#gridfm-datakit-technical-review" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="gridfm-datakit" class="md-header__button md-logo" aria-label="gridfm-datakit" data-md-component="logo">
+      
+  <img src="../../figs/KIT_logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            gridfm-datakit
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              gridfm-datakit — Technical Review
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/gridfm/gridfm-datakit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="gridfm-datakit" class="md-nav__button md-logo" aria-label="gridfm-datakit" data-md-component="logo">
+      
+  <img src="../../figs/KIT_logo.png" alt="logo">
+
+    </a>
+    gridfm-datakit
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/gridfm/gridfm-datakit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../manual/getting_started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../manual/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../manual/load_scenarios/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Load Scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../manual/topology_perturbations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Topology Perturbations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../manual/generation_perturbations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generation Perturbations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../manual/admittance_perturbations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admittance Perturbations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../manual/outputs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Outputs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Components
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Components
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Perturbations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Perturbations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/load/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Load
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/topology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Topology
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/generator_perturbation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/admittance_perturbation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admittance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Process
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Process
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/process_network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Process Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/solvers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Solvers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/save/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Save
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_5" id="__nav_4_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utils
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utils
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utils
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/stats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/power_balance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Power Balance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/param_handler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Param Handler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/generate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-scope-and-method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Scope and method
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-ci-pipeline-githubworkflowsci-buildyaml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. CI pipeline (.github/workflows/ci-build.yaml)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. CI pipeline (.github/workflows/ci-build.yaml)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-pip-cache-key-references-non-existent-files-p0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Pip cache key references non-existent files — P0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-julia-cache-key-has-the-same-defect-p0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Julia cache key has the same defect — P0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-julia-dependencies-are-unpinned-p0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Julia dependencies are unpinned — P0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-outdated-action-versions-p0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 Outdated action versions — P0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#25-no-concurrency-control-no-job-timeouts-p0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.5 No concurrency control, no job timeouts — P0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#26-tests-run-serially-despite-xdist-being-installed-and-the-suite-being-prepared-for-it-p0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.6 Tests run serially despite xdist being installed and the suite being prepared for it — P0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#27-lint-and-security-jobs-install-the-full-package-unnecessarily-p0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.7 Lint and security jobs install the full package unnecessarily — P0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#28-pglib-cases-are-re-downloaded-and-re-corrected-on-every-run-p0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.8 PGLib cases are re-downloaded and re-corrected on every run — P0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#29-the-suite-requires-tiering-the-exhaustive-pglib-sweep-is-not-a-per-commit-test-p0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.9 The suite requires tiering; the exhaustive PGLib sweep is not a per-commit test — P0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#210-redundant-virtualenv-steps-p1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.10 Redundant virtualenv steps — P1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#211-codeql-autobuild-and-missing-path-filters-p1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.11 CodeQL autobuild and missing path filters — P1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#212-test-configurations-sized-for-a-workstation-rather-than-a-runner-p1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.12 Test configurations sized for a workstation rather than a runner — P1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#213-no-per-test-timeout-p1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.13 No per-test timeout — P1
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-packaging-and-dependencies-pyprojecttoml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Packaging and dependencies (pyproject.toml)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Packaging and dependencies (pyproject.toml)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-downloaded-grids-are-written-into-the-installed-package-directory-p0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Downloaded grids are written into the installed package directory — P0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-pathlib-listed-as-a-dependency-p0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 pathlib listed as a dependency — P0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-unused-and-mis-tiered-dependencies-p1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Unused and mis-tiered dependencies — P1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-release-workflow-installs-the-julia-bindings-to-build-a-wheel-p1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 Release workflow installs the Julia bindings to build a wheel — P1
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-defects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Defects
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Defects">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-the-exhaustive-pglib-test-passes-solver_type-into-the-fast-parameter-p0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 The exhaustive PGLib test passes solver_type into the fast parameter — P0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-the-distributed-progress-loop-can-block-indefinitely-p0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 The distributed progress loop can block indefinitely — P0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-from-numpy-import-any-shadows-the-builtin-p0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 from numpy import any shadows the builtin — P0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-network-download-without-timeout-or-retry-p1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 Network download without timeout or retry — P1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-mutable-default-argument-p1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 Mutable default argument — P1
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-test-suite-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Test suite structure
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Test suite structure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-one-julia-session-per-run-not-per-test-class-p1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 One Julia session per run, not per test class — P1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-production-path-boots-julia-once-per-worker-per-chunk-p1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 Production path boots Julia once per worker per chunk — P1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-test-artifacts-written-into-the-working-tree-p2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Test artifacts written into the working tree — P2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-hardcoded-coverage-badge-p2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 Hardcoded coverage badge — P2
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-maintainability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Maintainability
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Maintainability">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-three-overlapping-lint-tools-p2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 Three overlapping lint tools — P2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-print-based-diagnostics-p2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 Print-based diagnostics — P2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-claimed-python-support-is-untested-p2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 Claimed Python support is untested — P2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-validate-reconstructs-configuration-by-line-offset-p2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 validate reconstructs configuration by line offset — P2
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-recommended-sequencing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Recommended sequencing
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="gridfm-datakit-technical-review">gridfm-datakit — Technical Review<a class="headerlink" href="#gridfm-datakit-technical-review" title="Permanent link">&para;</a></h1>
+<p><strong>Subject:</strong> Code, dependency, and CI pipeline assessment
+<strong>Repository:</strong> gridfm/gridfm-datakit, branch <code>main</code> (v1.0.4)
+<strong>Date:</strong> June 2026</p>
+<hr />
+<h2 id="1-scope-and-method">1. Scope and method<a class="headerlink" href="#1-scope-and-method" title="Permanent link">&para;</a></h2>
+<p>This review covers the full Python package (<code>gridfm_datakit/</code>), the test suite
+(<code>tests/</code>), the GitHub Actions workflows, <code>pyproject.toml</code>, the pre-commit
+configuration, and the coverage configuration. The objectives, as agreed, were to
+identify robustness issues and to determine why CI runs take several hours.</p>
+<p>The assessment was done by direct reading of the source, supplemented by static
+analysis (ruff with the <code>E,F,W,B,UP,SIM</code> rule sets) to confirm and quantify certain
+findings. All findings were re-verified against the current tree before delivery;
+behavioral claims that could be tested cheaply (notably 2.7 and 4.2) were confirmed
+empirically, and the Julia package UUIDs cited in 2.3 were checked against the
+JuliaRegistries General registry. Line references are against the current <code>main</code>.</p>
+<p>The CI duration has three root causes, all addressed below: (a) both dependency caches
+are keyed on files that do not exist in the repository, so they never invalidate
+correctly and the Julia toolchain is repeatedly rebuilt from cold; (b) the Julia runtime
+boot cost is paid far more often than necessary, both in tests and in the production
+code path; (c) two failure modes cause indefinite hangs, which then run until GitHub's
+6-hour job limit terminates them.</p>
+<p>Thirty findings follow, grouped by area. Each is tagged:</p>
+<ul>
+<li><strong>P0</strong> — defect, or a large CI improvement at trivial cost. Recommended immediately.</li>
+<li><strong>P1</strong> — significant robustness or performance improvement, low risk.</li>
+<li><strong>P2</strong> — maintainability and hygiene.</li>
+</ul>
+<p>Findings are deliberately scoped so that each can be implemented and reviewed as an
+independent change. Implementing the P0 set alone is expected to reduce a typical CI
+run from several hours to the 15–25 minute range. A suggested sequencing is given in
+section 7.</p>
+<hr />
+<h2 id="2-ci-pipeline-githubworkflowsci-buildyaml">2. CI pipeline (<code>.github/workflows/ci-build.yaml</code>)<a class="headerlink" href="#2-ci-pipeline-githubworkflowsci-buildyaml" title="Permanent link">&para;</a></h2>
+<h3 id="21-pip-cache-key-references-non-existent-files-p0">2.1 Pip cache key references non-existent files — P0<a class="headerlink" href="#21-pip-cache-key-references-non-existent-files-p0" title="Permanent link">&para;</a></h3>
+<p>All three jobs define:</p>
+<pre><code class="language-yaml">key: pip-${{ runner.os }}-${{ hashFiles('**/requirements*.txt') }}
+</code></pre>
+<p>The repository contains no <code>requirements*.txt</code>; dependencies are declared in
+<code>pyproject.toml</code>. <code>hashFiles</code> therefore evaluates to an empty string and the key is the
+constant <code>pip-Linux-</code>. The cache never invalidates on dependency changes and accumulates
+stale wheels indefinitely. Correct key:</p>
+<pre><code class="language-yaml">key: pip-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
+</code></pre>
+<p>Alternatively, remove the manual cache blocks entirely in favor of <code>setup-python</code>'s
+built-in caching (see 2.4).</p>
+<h3 id="22-julia-cache-key-has-the-same-defect-p0">2.2 Julia cache key has the same defect — P0<a class="headerlink" href="#22-julia-cache-key-has-the-same-defect-p0" title="Permanent link">&para;</a></h3>
+<p>The <code>pytests</code> job caches <code>~/.julia</code> keyed on <code>hashFiles('**/Project.toml')</code>. No
+<code>Project.toml</code> exists in the repository, so this key is also constant. In addition,
+caching the entire <code>~/.julia</code> directory with <code>actions/cache</code> is unreliable for Julia
+workloads (registries, compiled caches, and artifacts require differentiated handling).
+The supported mechanism is:</p>
+<pre><code class="language-yaml">- uses: julia-actions/cache@v2
+</code></pre>
+<p>This finding is significant for run time: precompiling PowerModels and Ipopt from cold
+takes several minutes, and under the current configuration this occurs whenever the
+stale cache is evicted.</p>
+<h3 id="23-julia-dependencies-are-unpinned-p0">2.3 Julia dependencies are unpinned — P0<a class="headerlink" href="#23-julia-dependencies-are-unpinned-p0" title="Permanent link">&para;</a></h3>
+<p><code>gridfm_datakit setup_pm</code> executes <code>Pkg.add("Ipopt")</code>, <code>Pkg.add("PowerModels")</code>,
+<code>Pkg.add("Memento")</code> without version constraints. Consequences: CI is not reproducible
+(an upstream PowerModels release can break <code>main</code> with no code change), and there is no
+file whose hash can serve as a deterministic cache key for the Julia environment.</p>
+<p>Since the project already depends on juliacall, the standard remedy is a <code>juliapkg.json</code>
+shipped with the package, which juliacall resolves automatically:</p>
+<pre><code class="language-json">{
+  &quot;julia&quot;: &quot;1.12&quot;,
+  &quot;packages&quot;: {
+    &quot;PowerModels&quot;: {&quot;uuid&quot;: &quot;c36e90e8-916a-50a6-bd94-075b64ef4655&quot;, &quot;version&quot;: &quot;0.21&quot;},
+    &quot;Ipopt&quot;:       {&quot;uuid&quot;: &quot;b6b21f68-93f8-5de0-b562-5493be1d77c9&quot;, &quot;version&quot;: &quot;1&quot;},
+    &quot;Memento&quot;:     {&quot;uuid&quot;: &quot;f28f55f0-a522-5efc-85c2-fe41dfb9b2d9&quot;, &quot;version&quot;: &quot;1&quot;}
+  }
+}
+</code></pre>
+<p>This also renders most of <code>setup_pm</code> redundant, as juliacall installs the pinned project
+on first import.</p>
+<h3 id="24-outdated-action-versions-p0">2.4 Outdated action versions — P0<a class="headerlink" href="#24-outdated-action-versions-p0" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>actions/cache@v3</code> belongs to a deprecated line: GitHub retired cache v1–v2 and shut
+  down the legacy cache backend in April 2025; only the final patched v3 releases remain
+  functional and v4 is the maintained version. The docs workflow already uses v4; the CI
+  workflow does not.</li>
+<li><code>actions/setup-python@v4</code> should be moved to <code>@v5</code>, which also provides pip caching
+  keyed correctly out of the box:</li>
+</ul>
+<pre><code class="language-yaml">- uses: actions/setup-python@v5
+  with:
+    python-version: '3.12'
+    cache: pip
+    cache-dependency-path: pyproject.toml
+</code></pre>
+<ul>
+<li><code>julia-actions/setup-julia@v1</code> should be moved to <code>@v2</code>.</li>
+</ul>
+<h3 id="25-no-concurrency-control-no-job-timeouts-p0">2.5 No concurrency control, no job timeouts — P0<a class="headerlink" href="#25-no-concurrency-control-no-job-timeouts-p0" title="Permanent link">&para;</a></h3>
+<p>Successive pushes to the same PR currently queue full pipeline runs in parallel, and a
+hung job (a concrete hang mechanism is documented in 4.2) runs until the 6-hour default
+limit. Recommended additions:</p>
+<pre><code class="language-yaml">concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+</code></pre>
+<p>with <code>timeout-minutes: 45</code> on <code>pytests</code> and <code>timeout-minutes: 10</code> on the lint and
+security jobs. This bounds the worst case independently of any other fix.</p>
+<h3 id="26-tests-run-serially-despite-xdist-being-installed-and-the-suite-being-prepared-for-it-p0">2.6 Tests run serially despite xdist being installed and the suite being prepared for it — P0<a class="headerlink" href="#26-tests-run-serially-despite-xdist-being-installed-and-the-suite-being-prepared-for-it-p0" title="Permanent link">&para;</a></h3>
+<p><code>pytest-xdist</code> is declared in the <code>test</code> extra, and <code>tests/test_generate.py</code> already
+isolates output directories per worker via <code>PYTEST_XDIST_WORKER</code>. The CI invocation
+nevertheless runs serially:</p>
+<pre><code>pytest --cov=. tests/ -v -s
+</code></pre>
+<p>Recommended invocation:</p>
+<pre><code>pytest -n auto --dist loadgroup --cov=gridfm_datakit --durations=25 tests/
+</code></pre>
+<p>Rationale: <code>-n auto</code> parallelizes across runner cores and, because each test class boots
+its own Julia session, amortizes that boot cost across cores instead of serializing it.
+<code>--cov=.</code> currently measures the entire checkout including <code>scripts/</code> and <code>tests/</code>;
+<code>--cov=gridfm_datakit</code> reflects the intended target and is cheaper. The <code>-s</code> flag
+disables output capture and floods the log with prints and tqdm output, which has a
+measurable cost on chatty suites. <code>--durations=25</code> surfaces the slowest tests so future
+regressions in CI time are attributable.</p>
+<h3 id="27-lint-and-security-jobs-install-the-full-package-unnecessarily-p0">2.7 Lint and security jobs install the full package unnecessarily — P0<a class="headerlink" href="#27-lint-and-security-jobs-install-the-full-package-unnecessarily-p0" title="Permanent link">&para;</a></h3>
+<p>The <code>pre-commit-run</code> job executes <code>pip install -e ".[dev]"</code>, building and installing
+juliacall, numba, pandas, scipy, plotly, and the Jupyter stack in order to run lint
+hooks. pre-commit manages its own isolated hook environments and requires none of these:</p>
+<pre><code class="language-yaml">- uses: actions/setup-python@v5
+  with: {python-version: '3.12'}
+- uses: pre-commit/action@v3.0.1
+</code></pre>
+<p>The action additionally caches <code>~/.cache/pre-commit</code> keyed on the config file, which the
+current setup does not do.</p>
+<p>The <code>security-test</code> job has the same install pattern, but a more serious problem was
+confirmed during verification: the scan itself is a no-op. The job runs</p>
+<pre><code>bandit --severity-level high .
+</code></pre>
+<p>without the <code>-r</code> flag, and bandit does not recurse into directory targets unless <code>-r</code>
+is given. It emits <code>Skipping directory (.), use -r flag to scan contents</code>, reports
+<strong>"Total lines of code: 0"</strong>, and exits 0. This was reproduced locally against the
+current tree: the security gate has never scanned any code. The corrected invocation:</p>
+<pre><code>bandit -r gridfm_datakit --severity-level high
+</code></pre>
+<p>(verified to scan the package: 0 high-severity findings at present, so the job
+continues to pass once fixed). Combined with the <code>pip install bandit</code>-only setup, both
+jobs also drop from roughly 5–10 minutes to under 2.</p>
+<h3 id="28-pglib-cases-are-re-downloaded-and-re-corrected-on-every-run-p0">2.8 PGLib cases are re-downloaded and re-corrected on every run — P0<a class="headerlink" href="#28-pglib-cases-are-re-downloaded-and-re-corrected-on-every-run-p0" title="Permanent link">&para;</a></h3>
+<p><code>load_net_from_pglib</code> downloads <code>.m</code> files from <code>raw.githubusercontent.com</code> at test
+time and then performs a Julia round-trip (<code>correct_network</code>) to produce the
+<code>_corrected.m</code> variant. Under CI this incurs, per run and per case: network latency,
+exposure to GitHub raw rate limiting (a plausible source of intermittent failures), and
+one Julia process launch per correction.</p>
+<p>Remediation in two steps. First, relocate the download cache out of the installed
+package directory (a defect in its own right, see 3.1) to a user cache directory such as
+<code>~/.cache/gridfm-datakit/grids</code>, overridable by environment variable. Second, cache that
+directory in CI:</p>
+<pre><code class="language-yaml">- uses: actions/cache@v4
+  with:
+    path: ~/.cache/gridfm-datakit
+    key: pglib-${{ hashFiles('tests/**/*.py') }}
+    restore-keys: pglib-
+</code></pre>
+<p>After one warm run, the test suite no longer touches the network.</p>
+<h3 id="29-the-suite-requires-tiering-the-exhaustive-pglib-sweep-is-not-a-per-commit-test-p0">2.9 The suite requires tiering; the exhaustive PGLib sweep is not a per-commit test — P0<a class="headerlink" href="#29-the-suite-requires-tiering-the-exhaustive-pglib-sweep-is-not-a-per-commit-test-p0" title="Permanent link">&para;</a></h3>
+<p>The current controls are an environment variable (<code>SKIP_LARGE_GRIDS</code>) and an opt-in
+(<code>RUN_ALL_PGLIB</code>). These should be replaced with registered pytest markers (<code>julia</code>,
+<code>slow</code>, <code>integration</code>) and the pipeline split accordingly:</p>
+<ul>
+<li><strong>Pull requests:</strong> <code>pytest -n auto -m "not slow and not integration"</code>. The
+  pure-Python tests (perturbations, parsing, parameter handling, seeding) complete in
+  minutes and do not require the Julia setup steps at all.</li>
+<li><strong>Merge to main:</strong> full suite excluding the exhaustive sweep.</li>
+<li><strong>Nightly schedule:</strong> large grids and the all-PGLib comparison (63 cases × 2 solver
+  types, up to <code>case78484_epigrids</code>).</li>
+</ul>
+<p>This is the structural change that keeps CI duration bounded as the suite grows, rather
+than a one-time reduction.</p>
+<h3 id="210-redundant-virtualenv-steps-p1">2.10 Redundant virtualenv steps — P1<a class="headerlink" href="#210-redundant-virtualenv-steps-p1" title="Permanent link">&para;</a></h3>
+<p>The <code>pytests</code> job creates a <code>.venv</code> and re-sources it in each step. <code>setup-python</code>
+already provides an isolated interpreter, and the activation performed in the dedicated
+"Create virtualenv" step does not persist into subsequent steps in any case (each <code>run:</code>
+is a fresh shell). The steps can be removed without functional change.</p>
+<h3 id="211-codeql-autobuild-and-missing-path-filters-p1">2.11 CodeQL autobuild and missing path filters — P1<a class="headerlink" href="#211-codeql-autobuild-and-missing-path-filters-p1" title="Permanent link">&para;</a></h3>
+<p><code>github/codeql-action/autobuild</code> is a no-op for Python and adds time. Additionally, the
+workflow lacks <code>paths-ignore</code> filters (<code>docs/**</code>, <code>**.md</code>), so documentation-only
+changes trigger full pipeline runs.</p>
+<h3 id="212-test-configurations-sized-for-a-workstation-rather-than-a-runner-p1">2.12 Test configurations sized for a workstation rather than a runner — P1<a class="headerlink" href="#212-test-configurations-sized-for-a-workstation-rather-than-a-runner-p1" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>tests/config/consistency_test.yaml</code> sets <code>num_processes: 5</code>. Standard GitHub runners
+  provide 2–4 cores, and under the spawn start method each worker boots its own Julia
+  runtime — for a total of 10 scenarios. A value of 1–2 is appropriate.</li>
+<li>The same file sets <code>enable_solver_logs: true</code>, which raises the Ipopt print level to 5
+  and writes per-process log files; this is pure overhead in CI.</li>
+<li>The <code>data_dir: "./testdelll"</code> value in that file is dead (the fixture overrides it)
+  and appears to be residual debugging; it should be cleaned up.</li>
+</ul>
+<h3 id="213-no-per-test-timeout-p1">2.13 No per-test timeout — P1<a class="headerlink" href="#213-no-per-test-timeout-p1" title="Permanent link">&para;</a></h3>
+<p>A solver stall, a juliacall deadlock, or the hang described in 4.2 currently blocks the
+job until the 6-hour limit. Adding <code>pytest-timeout</code> to the test extra with:</p>
+<pre><code class="language-toml">[tool.pytest.ini_options]
+timeout = 600
+timeout_method = &quot;thread&quot;
+</code></pre>
+<p>converts an unattributed multi-hour stall into a named failure within minutes. Together
+with 2.5, this makes multi-hour CI runs structurally impossible.</p>
+<hr />
+<h2 id="3-packaging-and-dependencies-pyprojecttoml">3. Packaging and dependencies (<code>pyproject.toml</code>)<a class="headerlink" href="#3-packaging-and-dependencies-pyprojecttoml" title="Permanent link">&para;</a></h2>
+<h3 id="31-downloaded-grids-are-written-into-the-installed-package-directory-p0">3.1 Downloaded grids are written into the installed package directory — P0<a class="headerlink" href="#31-downloaded-grids-are-written-into-the-installed-package-directory-p0" title="Permanent link">&para;</a></h3>
+<p><code>get_pglib_file_path</code> (<code>network.py</code>, ~line 650) writes downloaded grid files, and their
+Julia-corrected copies, into <code>resources.files("gridfm_datakit.grids")</code> — that is, into
+site-packages. This fails on read-only installations (system Python, containers, Nix),
+leaves files behind after <code>pip uninstall</code>, would break under zipped distribution, and
+permits a race between concurrent processes sharing one installation — for example
+parallel pytest-xdist workers (directly relevant once 2.6 is adopted) or two generation
+runs started side by side — in which one process reads another's partially written
+download.</p>
+<p>Recommended: <code>platformdirs.user_cache_dir("gridfm-datakit")</code> with an environment-variable
+override; download to a temporary file in the target directory and <code>os.replace</code> into
+place for atomicity. This change is also the prerequisite for the CI caching in 2.8.</p>
+<h3 id="32-pathlib-listed-as-a-dependency-p0">3.2 <code>pathlib</code> listed as a dependency — P0<a class="headerlink" href="#32-pathlib-listed-as-a-dependency-p0" title="Permanent link">&para;</a></h3>
+<p><code>pathlib</code> has been part of the standard library since Python 3.4. The PyPI distribution
+of the same name is an abandoned Python-2 backport which, when installed, can shadow the
+standard-library module and break unrelated packages. Given
+<code>requires-python = "&gt;=3.10"</code>, the entry is at best inert and at worst hazardous. Remove
+it.</p>
+<h3 id="33-unused-and-mis-tiered-dependencies-p1">3.3 Unused and mis-tiered dependencies — P1<a class="headerlink" href="#33-unused-and-mis-tiered-dependencies-p1" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>numba</code> is declared but not imported anywhere in the package (verified by search). It
+  pulls in llvmlite and constrains the permissible numpy range, imposing a cost on every
+  install for no benefit. Remove.</li>
+<li><code>ipykernel</code>, <code>nbformat</code>, <code>ipywidgets</code>, and <code>ipyfilechooser</code> are used only by
+  <code>interactive.py</code>; <code>plotly</code> and <code>matplotlib</code> only by plotting and statistics code. For
+  the primary use case — headless data generation — these are dead weight in every
+  installation, including every CI job. Recommended extras:</li>
+</ul>
+<pre><code class="language-toml">[project.optional-dependencies]
+interactive = [&quot;ipykernel&quot;, &quot;ipywidgets&quot;, &quot;ipyfilechooser&quot;, &quot;nbformat&quot;]
+viz = [&quot;plotly&quot;, &quot;matplotlib&quot;]
+</code></pre>
+<p>with lazy imports and explicit error messages in <code>interactive.py</code> and <code>utils/stats.py</code>.</p>
+<ul>
+<li>The code imports <code>yaml</code>; the declared dependency should therefore be <code>pyyaml</code> rather
+  than <code>pyaml</code> (a wrapper that transitively provides pyyaml). Depend on what is
+  imported.</li>
+</ul>
+<h3 id="34-release-workflow-installs-the-julia-bindings-to-build-a-wheel-p1">3.4 Release workflow installs the Julia bindings to build a wheel — P1<a class="headerlink" href="#34-release-workflow-installs-the-julia-bindings-to-build-a-wheel-p1" title="Permanent link">&para;</a></h3>
+<p><code>release.yaml</code> runs <code>pip install -e .[dev,test]</code> — juliacall, numba, pytest, mkdocs —
+before executing <code>python -m build</code>. The job requires only <code>pip install build</code>. While in
+that file, the <code>dev</code> extra should be split into <code>docs</code> and <code>lint</code> groups so each job
+installs only its own tooling, and <code>twine check dist/*</code> should be added before
+publication.</p>
+<hr />
+<h2 id="4-defects">4. Defects<a class="headerlink" href="#4-defects" title="Permanent link">&para;</a></h2>
+<h3 id="41-the-exhaustive-pglib-test-passes-solver_type-into-the-fast-parameter-p0">4.1 The exhaustive PGLib test passes <code>solver_type</code> into the <code>fast</code> parameter — P0<a class="headerlink" href="#41-the-exhaustive-pglib-test-passes-solver_type-into-the-fast-parameter-p0" title="Permanent link">&para;</a></h3>
+<p>Function signature (<code>process/solvers.py:192</code>):</p>
+<pre><code class="language-python">def compare_pf_results(net, jl, case_name, fast, solver_type=&quot;pf&quot;) -&gt; bool
+</code></pre>
+<p>Call site (<code>tests/test_compare_pf_opf_results_all_pglib.py</code>):</p>
+<pre><code class="language-python">compare_pf_results(net, self.jl, case_name, solver_type)
+</code></pre>
+<p>The fourth positional argument binds to <code>fast</code>, which receives the string <code>"pf"</code> or
+<code>"opf"</code> (both truthy), while <code>solver_type</code> silently takes its default of <code>"pf"</code>. The
+effect is that the exhaustive sweep never tests OPF and always exercises the fast-PF
+path. The small-grid variant of this test passes the arguments correctly, which
+explains why the defect went unnoticed. Beyond fixing the call site, <code>solver_type</code>
+should be made keyword-only so that this class of error raises a <code>TypeError</code>.</p>
+<h3 id="42-the-distributed-progress-loop-can-block-indefinitely-p0">4.2 The distributed progress loop can block indefinitely — P0<a class="headerlink" href="#42-the-distributed-progress-loop-can-block-indefinitely-p0" title="Permanent link">&para;</a></h3>
+<p><code>generate.py</code>, ~line 510:</p>
+<pre><code class="language-python">while completed &lt; chunk_size:
+    progress_queue.get()
+    pbar.update(1)
+    completed += 1
+</code></pre>
+<p><code>Queue.get()</code> is called without a timeout. The worker's exception handler does backfill
+progress ticks for caught Python exceptions (<code>process_network.py</code>, ~line 1171), so those
+do not hang the loop. The hang occurs on hard worker death — an OOM kill by the kernel
+or a native crash inside Julia/Ipopt, both realistic for large grids — where no handler
+runs, no ticks arrive, and <code>multiprocessing.Pool</code> leaves the in-flight <code>AsyncResult</code>
+pending indefinitely. The parent then blocks on <code>get()</code> forever: locally a frozen run,
+in CI a job consuming the full 6-hour limit. The loop should use <code>get(timeout=...)</code> and
+concurrently poll the <code>AsyncResult</code> objects so that worker death raises promptly.</p>
+<p>A secondary defect in the same handler: on a caught mid-chunk exception it backfills
+<code>end_idx - start_idx</code> ticks — the full chunk — on top of the ticks already emitted for
+completed scenarios. The queue is over-filled, the current chunk's loop exits early, and
+the surplus ticks are consumed by the next chunk's loop, corrupting progress accounting
+from that point on (synchronization is rescued only by the blocking <code>result.get()</code>
+calls that follow).</p>
+<p>Related, at line 528: on worker error the code calls <code>sys.exit(e)</code>. Library code must
+not terminate the host interpreter; any caller embedding
+<code>generate_power_flow_data_distributed</code> in a larger pipeline — including pytest — is
+killed along with it. The captured exception and traceback should be re-raised instead.</p>
+<h3 id="43-from-numpy-import-any-shadows-the-builtin-p0">4.3 <code>from numpy import any</code> shadows the builtin — P0<a class="headerlink" href="#43-from-numpy-import-any-shadows-the-builtin-p0" title="Permanent link">&para;</a></h3>
+<p><code>network.py:23</code>:</p>
+<pre><code class="language-python">from numpy import any, conj, exp, hstack, int64, nonzero, ones, pi, real
+</code></pre>
+<p>Throughout this ~800-line module, <code>any(...)</code> resolves to <code>numpy.any</code>, whose semantics
+differ from the builtin (a generator argument is truthy regardless of its contents).
+Even if current call sites are coincidentally safe, the import is a latent defect for
+future edits. Use <code>np.any</code> explicitly.</p>
+<h3 id="44-network-download-without-timeout-or-retry-p1">4.4 Network download without timeout or retry — P1<a class="headerlink" href="#44-network-download-without-timeout-or-retry-p1" title="Permanent link">&para;</a></h3>
+<p><code>network.py:656</code>: <code>requests.get(url)</code>. A stalled connection blocks a worker
+indefinitely, and a single transient 503 from GitHub raw fails the entire generation
+run. Minimum remediation: <code>requests.get(url, timeout=(5, 60))</code>. Preferably, a <code>Session</code>
+with urllib3 <code>Retry</code>, combined with the atomic write described in 3.1.</p>
+<h3 id="45-mutable-default-argument-p1">4.5 Mutable default argument — P1<a class="headerlink" href="#45-mutable-default-argument-p1" title="Permanent link">&para;</a></h3>
+<p><code>perturbations/topology_perturbation.py:139</code>:</p>
+<pre><code class="language-python">elements: List[str] = [&quot;branch&quot;, &quot;gen&quot;]
+</code></pre>
+<p>A shared mutable default: mutation by any caller propagates to all subsequent instances.
+Flagged by ruff B006. Default to <code>None</code> and assign within the function body.</p>
+<hr />
+<h2 id="5-test-suite-structure">5. Test suite structure<a class="headerlink" href="#5-test-suite-structure" title="Permanent link">&para;</a></h2>
+<h3 id="51-one-julia-session-per-run-not-per-test-class-p1">5.1 One Julia session per run, not per test class — P1<a class="headerlink" href="#51-one-julia-session-per-run-not-per-test-class-p1" title="Permanent link">&para;</a></h3>
+<p>Four test classes (<code>test_compare_pf_opf_results</code>, <code>test_compare_pf_opf_results_all_pglib</code>
+— normally skipped — <code>test_solve</code>, <code>test_verify_network</code>) each invoke <code>init_julia</code> in
+<code>setup_class</code>, and each invocation re-evaluates the full PowerModels/Ipopt setup — tens
+of seconds per boot even with warm precompilation. Further sessions are booted inside
+the spawned workers of the generation-pipeline tests. A session-scoped fixture performs
+the test-process boot once (once per xdist worker, which remains a substantial
+improvement):</p>
+<pre><code class="language-python">@pytest.fixture(scope=&quot;session&quot;)
+def jl():
+    from gridfm_datakit.process.process_network import init_julia
+    return init_julia(max_iter=150)
+</code></pre>
+<p>Under xdist, Julia-heavy tests should additionally be grouped with
+<code>@pytest.mark.xdist_group("julia")</code> and <code>--dist loadgroup</code> so they co-locate on workers.</p>
+<h3 id="52-production-path-boots-julia-once-per-worker-per-chunk-p1">5.2 Production path boots Julia once per worker per chunk — P1<a class="headerlink" href="#52-production-path-boots-julia-once-per-worker-per-chunk-p1" title="Permanent link">&para;</a></h3>
+<p><code>generate_power_flow_data_distributed</code> constructs a new <code>Pool</code> for every large chunk,
+and <code>process_scenario_chunk</code> calls <code>init_julia</code> on entry. Total Julia boots therefore
+scale as <code>num_processes × num_chunks</code>; a 100,000-scenario run with
+<code>large_chunk_size: 1000</code> incurs 100 pool teardowns and several hundred Julia startups.
+Restructure: construct the pool once outside the chunk loop, pass a pool <code>initializer=</code>
+that boots Julia and stores the handle in worker-local state, and have the chunk
+function consume that handle. Seeding is applied per chunk via <code>custom_seed</code>, so outputs
+are unchanged; the gain is wall-clock only, benefiting both end users and the
+integration tests.</p>
+<h3 id="53-test-artifacts-written-into-the-working-tree-p2">5.3 Test artifacts written into the working tree — P2<a class="headerlink" href="#53-test-artifacts-written-into-the-working-tree-p2" title="Permanent link">&para;</a></h3>
+<p><code>tests/test_generate.py</code> writes to <code>./tests/test_data_{mode}_{worker}</code> and
+<code>tests/test_data</code>, with cleanup distributed across the tests themselves (lines 182–190,
+367). A mid-test failure leaves directories behind, which subsequently dirty <code>git
+status</code> and are swept up by <code>--cov=.</code>. pytest's <code>tmp_path</code> / <code>tmp_path_factory</code> fixtures
+provide cleanup on all exit paths. Separately, a <code>.coverage</code> binary is committed at the
+repository root; it should be removed and added to <code>.gitignore</code>.</p>
+<h3 id="54-hardcoded-coverage-badge-p2">5.4 Hardcoded coverage badge — P2<a class="headerlink" href="#54-hardcoded-coverage-badge-p2" title="Permanent link">&para;</a></h3>
+<p>The README badge displays a static 76%. Once the test job emits <code>coverage.xml</code>
+(<code>--cov-report=xml</code>), integrating Codecov or an equivalent badge action makes the figure
+verifiable and turns coverage regressions into review signal.</p>
+<hr />
+<h2 id="6-maintainability">6. Maintainability<a class="headerlink" href="#6-maintainability" title="Permanent link">&para;</a></h2>
+<h3 id="61-three-overlapping-lint-tools-p2">6.1 Three overlapping lint tools — P2<a class="headerlink" href="#61-three-overlapping-lint-tools-p2" title="Permanent link">&para;</a></h3>
+<p><code>.pre-commit-config.yaml</code> runs ruff (check and format), flake8, and add-trailing-comma.
+Ruff subsumes flake8's rule set (the <code>--ignore=E501,W503,E203</code> arguments map directly to
+ruff configuration) and <code>ruff format</code> handles trailing commas; the additional hooks add
+environments to provision in CI and introduce formatter-conflict risk. Retain ruff
+alone, with configuration in <code>pyproject.toml</code>. It is also worth widening the rule
+selection: a run with <code>--select E,F,W,B,UP,SIM</code> currently reports approximately 700
+findings, including the defects documented in section 4 (B006, B023, B904 ×27).</p>
+<h3 id="62-print-based-diagnostics-p2">6.2 Print-based diagnostics — P2<a class="headerlink" href="#62-print-based-diagnostics-p2" title="Permanent link">&para;</a></h3>
+<p>The package contains approximately 180 <code>print()</code> calls and no use of the <code>logging</code>
+module. Consumers
+cannot silence the library, CI logs are inflated, and diagnostic context (failing
+scenario, worker identity) is unstructured. The migration is mechanical —
+<code>logging.getLogger(__name__)</code> per module, <code>--verbose/--quiet</code> on the CLI — and can
+proceed module by module. The 42 broad <code>except Exception</code> blocks should be tightened
+opportunistically during the same passes.</p>
+<h3 id="63-claimed-python-support-is-untested-p2">6.3 Claimed Python support is untested — P2<a class="headerlink" href="#63-claimed-python-support-is-untested-p2" title="Permanent link">&para;</a></h3>
+<p><code>requires-python = "&gt;=3.10,&lt;3.13"</code> and the classifiers declare 3.10–3.12, but CI
+exercises only 3.12 (and the release job builds on 3.10). With the fast tier from 2.9 in
+place, a 3.10/3.11/3.12 matrix over that tier alone costs a few minutes and catches
+version drift before users encounter it.</p>
+<h3 id="64-validate-reconstructs-configuration-by-line-offset-p2">6.4 <code>validate</code> reconstructs configuration by line offset — P2<a class="headerlink" href="#64-validate-reconstructs-configuration-by-line-offset-p2" title="Permanent link">&para;</a></h3>
+<p><code>cli.py</code>, ~line 74: the run configuration is recovered by skipping the first two lines
+of <code>args.log</code> and YAML-parsing the remainder. Any change to the log format breaks the
+command. The generation step already serializes the arguments; it should additionally
+write a clean <code>config.yaml</code> alongside the data, which <code>validate</code> reads, with <code>--mode</code> as
+fallback.</p>
+<hr />
+<h2 id="7-recommended-sequencing">7. Recommended sequencing<a class="headerlink" href="#7-recommended-sequencing" title="Permanent link">&para;</a></h2>
+<p><strong>Phase 1 — immediate (all small, independently reviewable):</strong> 2.1, 2.2, 2.4, 2.5, 2.6,
+2.7, 3.2, 4.1, 4.3. These nine changes address the two cheapest defects and are expected
+to bring CI from hours to well under one hour.</p>
+<p><strong>Phase 2:</strong> 2.3, 2.8, 2.9, 2.13 — pinned Julia dependencies, grid caching, test
+tiering, and timeouts. This phase makes the reduction durable as the suite grows.</p>
+<p><strong>Phase 3:</strong> the remaining robustness items (3.1, 3.3, 4.2, 4.4, 4.5, 5.1, 5.2), with
+4.2 and 5.2 prioritized since they affect production users, not only CI. The P2 items
+can be absorbed alongside routine work.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.indexes", "navigation.tracking", "toc.follow", "toc.follow", "search.suggest", "navigation.instant", "navigation.instant.progress"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/katex.js"></script>
+      
+        <script src="https://unpkg.com/katex@0/dist/katex.min.js"></script>
+      
+        <script src="https://unpkg.com/katex@0/dist/contrib/auto-render.min.js"></script>
+      
+    
+  </body>
+</html>
