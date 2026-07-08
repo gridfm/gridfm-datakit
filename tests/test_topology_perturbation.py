@@ -16,6 +16,7 @@ from gridfm_datakit.utils.param_handler import (
     initialize_topology_generator,
 )
 from gridfm_datakit.utils.idx_brch import BR_STATUS, F_BUS, T_BUS
+from gridfm_datakit.utils.idx_gen import GEN_STATUS
 
 
 class TestTopologyPerturbation:
@@ -29,9 +30,9 @@ class TestTopologyPerturbation:
         # Store original state
         original_branch_status = original_network.branches[
             :,
-            10,
+            BR_STATUS,
         ].copy()  # BR_STATUS column
-        original_gen_status = original_network.gens[:, 7].copy()  # GEN_STATUS column
+        original_gen_status = original_network.gens[:, GEN_STATUS].copy()
 
         # Create no perturbation generator
         no_perturbation_generator = NoPerturbationGenerator()
@@ -46,7 +47,7 @@ class TestTopologyPerturbation:
             "Original network branch status should be unchanged",
         )
         np.testing.assert_array_equal(
-            original_network.gens[:, 7],
+            original_network.gens[:, GEN_STATUS],
             original_gen_status,
             "Original network generator status should be unchanged",
         )
@@ -80,7 +81,7 @@ class TestTopologyPerturbation:
         for network in perturbed_networks:
             state = {
                 "branch_status": network.branches[:, BR_STATUS].copy(),  # BR_STATUS
-                "gen_status": network.gens[:, 7].copy(),  # GEN_STATUS
+                "gen_status": network.gens[:, GEN_STATUS].copy(),
             }
             network_states.append(state)
 
@@ -160,21 +161,21 @@ class TestTopologyPerturbation:
         test_network = load_net_from_pglib("case24_ieee_rts")
 
         # Get original generator status
-        original_gen_status = test_network.gens[:, 7].copy()
+        original_gen_status = test_network.gens[:, GEN_STATUS].copy()
 
         # Deactivate some generators
         gens_to_deactivate = np.array([0, 1])
         test_network.deactivate_gens(gens_to_deactivate)
 
         # Verify generators are deactivated
-        assert np.all(test_network.gens[gens_to_deactivate, 7] == 0), (
+        assert np.all(test_network.gens[gens_to_deactivate, GEN_STATUS] == 0), (
             "Generators should be deactivated"
         )
 
         # Verify other generators are unchanged
         other_gens = np.setdiff1d(np.arange(len(test_network.gens)), gens_to_deactivate)
         np.testing.assert_array_equal(
-            test_network.gens[other_gens, 7],
+            test_network.gens[other_gens, GEN_STATUS],
             original_gen_status[other_gens],
             "Other generators should be unchanged",
         )
@@ -235,7 +236,7 @@ class TestTopologyPerturbation:
         assert np.all(original_network.branches[:, BR_STATUS] == 1), (
             "Original network branches should be in service"
         )
-        assert np.all(original_network.gens[:, 7] == 1), (
+        assert np.all(original_network.gens[:, GEN_STATUS] == 1), (
             "Original network generators should be in service"
         )
 
@@ -246,7 +247,7 @@ class TestTopologyPerturbation:
         assert copied_network.branches[1, BR_STATUS] == 0, (
             "Copied network branch 1 should be out of service"
         )
-        assert copied_network.gens[0, 7] == 0, (
+        assert copied_network.gens[0, GEN_STATUS] == 0, (
             "Copied network generator 0 should be out of service"
         )
 
@@ -330,8 +331,8 @@ class TestTopologyPerturbation:
                 "N-0 sampling should preserve branch statuses",
             )
             np.testing.assert_array_equal(
-                network.gens[:, 7],
-                original_network.gens[:, 7],
+                network.gens[:, GEN_STATUS],
+                original_network.gens[:, GEN_STATUS],
                 "N-0 sampling should preserve generator statuses",
             )
 
@@ -352,7 +353,7 @@ class TestTopologyPerturbation:
         assert len(perturbed_networks) == 4
         for network in perturbed_networks:
             branch_outages = int(np.sum(network.branches[:, BR_STATUS] == 0))
-            gen_outages = int(np.sum(network.gens[:, 7] == 0))
+            gen_outages = int(np.sum(network.gens[:, GEN_STATUS] == 0))
             assert branch_outages + gen_outages == 2, (
                 "Each sampled topology should contain exactly two outages"
             )
@@ -473,7 +474,7 @@ class TestTopologyPerturbation:
 
         # Store original state
         original_branch_status = original_network.branches[:, BR_STATUS].copy()
-        original_gen_status = original_network.gens[:, 7].copy()
+        original_gen_status = original_network.gens[:, GEN_STATUS].copy()
 
         # Test with NMinusKGenerator
         n_minus_k_generator = NMinusKGenerator(k=1, base_net=original_network)
@@ -486,7 +487,7 @@ class TestTopologyPerturbation:
             "Original network should be unchanged after NMinusKGenerator",
         )
         np.testing.assert_array_equal(
-            original_network.gens[:, 7],
+            original_network.gens[:, GEN_STATUS],
             original_gen_status,
             "Original network should be unchanged after NMinusKGenerator",
         )
@@ -507,7 +508,7 @@ class TestTopologyPerturbation:
             "Original network should be unchanged after RandomComponentDropGenerator",
         )
         np.testing.assert_array_equal(
-            original_network.gens[:, 7],
+            original_network.gens[:, GEN_STATUS],
             original_gen_status,
             "Original network should be unchanged after RandomComponentDropGenerator",
         )
