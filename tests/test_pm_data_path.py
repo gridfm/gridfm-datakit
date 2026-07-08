@@ -20,7 +20,7 @@ from gridfm_datakit.process.solvers import (
     _julia_pm_data,
     run_opf,
 )
-from gridfm_datakit.utils.idx_brch import BR_B, BR_R, BR_X
+from gridfm_datakit.utils.idx_brch import BR_B, BR_R, BR_X, RATE_A
 from gridfm_datakit.utils.idx_bus import PD, QD, VA, VM
 from gridfm_datakit.utils.idx_cost import COST
 from gridfm_datakit.utils.idx_gen import PG, VG
@@ -193,6 +193,24 @@ def test_solver_results_match_file_path(net, jl):
             rtol=1e-8,
             atol=1e-10,
         )
+
+
+def test_branch_limit_change_forces_reparse(net, jl):
+    """RATE_A changed after a cached solve must not leave PowerModels with the
+    stale limit (regression: only R/X/B/status were pushed per solve, so a
+    same-fingerprint reuse silently kept old ratings/tap/shift/angle limits)."""
+    mutated = copy.deepcopy(net)
+    _julia_pm_data(mutated, jl)  # warm the cache at the original rate_a
+
+    mutated.branches[:, RATE_A] = mutated.branches[:, RATE_A] * 0.5
+    data = _julia_pm_data(mutated, jl)
+    ref = parse_reference(mutated, jl)
+
+    for key in ref["branch"]:
+        assert np.isclose(
+            data["branch"][key]["rate_a"],
+            ref["branch"][key]["rate_a"],
+        ), f"branch[{key}].rate_a stale after RATE_A mutation"
 
 
 def test_base_reinit_on_network_switch(jl):

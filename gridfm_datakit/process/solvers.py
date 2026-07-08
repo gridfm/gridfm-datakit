@@ -14,7 +14,19 @@ import os
 from typing import Any, Dict
 from gridfm_datakit.network import Network
 from gridfm_datakit.process.solver_output import solver_capture
-from gridfm_datakit.utils.idx_brch import BR_B, BR_R, BR_STATUS, BR_X
+from gridfm_datakit.utils.idx_brch import (
+    ANGMAX,
+    ANGMIN,
+    BR_B,
+    BR_R,
+    BR_STATUS,
+    BR_X,
+    RATE_A,
+    RATE_B,
+    RATE_C,
+    SHIFT,
+    TAP,
+)
 from gridfm_datakit.utils.idx_bus import BUS_I, BUS_TYPE, PD, QD, VA, VM
 from gridfm_datakit.utils.idx_cost import COST, NCOST
 from gridfm_datakit.utils.idx_gen import GEN_STATUS, PG, QG, VG
@@ -40,21 +52,42 @@ def _network_fingerprint(net: Network) -> str:
     return h.hexdigest()
 
 
+_LIMIT_COLS = [RATE_A, RATE_B, RATE_C, TAP, SHIFT, ANGMIN, ANGMAX]
+
+
+def _branch_limit_fingerprint(net: Network) -> bytes:
+    """Hash of the branch fields ``_gfm_state`` does NOT push per solve.
+
+    Ratings, tap, shift, and angle limits live on ``net.branches`` just like
+    R/X/B/status, but only R/X/B/status get pushed into a fresh copy of
+    ``_GFM_BASE`` on every call. Unlike ``_network_fingerprint`` this must be
+    recomputed every call (not cached on ``net``), so a change to these
+    fields — e.g. a limit study lowering ``net.branches[:, RATE_A]`` — is
+    detected and forces a reparse instead of silently reusing stale limits.
+    """
+    return np.ascontiguousarray(
+        net.branches[:, _LIMIT_COLS],
+        dtype=np.float64,
+    ).tobytes()
+
+
 def _julia_pm_data(net: Network, jl: Any) -> Any:
     """Build a PowerModels data dict for ``net`` in-memory in Julia.
 
     The MATPOWER case is written to a file and parsed only once per
-    (process, base network); after that each call pushes just the mutable
-    state (loads, setpoints, statuses, admittances, costs) into a fresh copy
-    of the parsed base — field-for-field equivalent to
-    ``PowerModels.parse_file(net.to_mpc(...))`` (see tests/test_pm_data_path.py)
-    without the serialization and parsing cost.
+    (process, base network, branch ratings/tap/shift/angle limits); after
+    that each call pushes just the mutable state (loads, setpoints,
+    statuses, admittances, costs) into a fresh copy of the parsed base —
+    field-for-field equivalent to ``PowerModels.parse_file(net.to_mpc(...))``
+    (see tests/test_pm_data_path.py) without the serialization and parsing
+    cost.
     """
     global _ACTIVE_BASE_KEY
-    key = getattr(net, "_pm_fingerprint", None)
-    if key is None:
-        key = _network_fingerprint(net)
-        net._pm_fingerprint = key
+    mpc_key = getattr(net, "_pm_fingerprint", None)
+    if mpc_key is None:
+        mpc_key = _network_fingerprint(net)
+        net._pm_fingerprint = mpc_key
+    key = (mpc_key, _branch_limit_fingerprint(net))
     if _ACTIVE_BASE_KEY != key:
         with tempfile.NamedTemporaryFile(
             mode="w",
