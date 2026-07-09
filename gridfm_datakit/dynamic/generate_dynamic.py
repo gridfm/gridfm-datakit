@@ -166,7 +166,7 @@ def _save_generated_data(
       bus_data.parquet
       branch_data.parquet
       gen_data.parquet
-      dynamic_results.zarr/   ← shape (n_scenarios, n_timestep, n_variables)
+      dynamic_results.zarr/   ← shape (n_scenarios, n_variables, n_timesteps)
       metadata.json
 
     Args
@@ -225,7 +225,10 @@ def _save_generated_data(
         dr: Optional[DynamicResults] = r.get("dynamic_results")
         if dr is None or dr.dynamic_results is None:
             continue
-        arr = np.asarray(dr.dynamic_results, dtype="float64").T  # (n_variables, n_timesteps)
+        arr = np.asarray(
+            dr.dynamic_results,
+            dtype="float64",
+        ).T  # (n_variables, n_timesteps)
         dyn_arrays.append(arr)
         timesteps_per_scenario.append(arr.shape[1])
 
@@ -269,7 +272,11 @@ def _save_generated_data(
             if n_t == max_n_timesteps:
                 z[i] = arr
             else:
-                padded = np.full((n_variables, max_n_timesteps), np.nan, dtype="float64")
+                padded = np.full(
+                    (n_variables, max_n_timesteps),
+                    np.nan,
+                    dtype="float64",
+                )
                 padded[:, :n_t] = arr
                 z[i] = padded
 
