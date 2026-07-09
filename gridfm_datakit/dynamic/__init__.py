@@ -184,7 +184,9 @@ def load_raw_inputs(
             "static_element_dynamic_models",
         )
         _check_cols(
-            dynamic_models[1], AUTOMATION_SYSTEMS_REQUIRED_COLS, "automation_systems"
+            dynamic_models[1],
+            AUTOMATION_SYSTEMS_REQUIRED_COLS,
+            "automation_systems",
         )
         _check_cols(
             events,
@@ -196,15 +198,51 @@ def load_raw_inputs(
             VARIABLES_REQUIRED_COLS,
             "variables",
         )
+        dynamic_models = [_normalize_dtypes(df) for df in dynamic_models]
+        events = _normalize_dtypes(events)
+        variables = _normalize_dtypes(variables)
 
     return DynamicInputs(
-        dynamic_models=dynamic_models, events=events, variables=variables
+        dynamic_models=dynamic_models,
+        events=events,
+        variables=variables,
     )
 
 
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
+
+
+# Columns whose values are element/model IDs or names, and must be strings:
+# a numeric-looking ID (e.g. a bus named "2") would otherwise be read as int and
+# fail to match pypowsybl's string IDs. ``start_time`` is the only numeric field.
+_STRING_COLS = {
+    "category_name",
+    "static_id",
+    "parameter_set_id",
+    "model_name",
+    "dynamic_model_id",
+    "params",
+    "event_name",
+    "type",
+    "model_id",
+    "variables",
+}
+
+
+def _normalize_dtypes(df: pd.DataFrame) -> pd.DataFrame:
+    """Coerce ID/name columns to str and ``start_time`` to float in place.
+
+    Guards against numeric-looking IDs silently becoming ints (which then fail to
+    match pypowsybl's string element IDs). Missing string values become "".
+    """
+    for col in df.columns:
+        if col in _STRING_COLS:
+            df[col] = df[col].astype("string").fillna("").astype(str)
+        elif col == "start_time":
+            df[col] = pd.to_numeric(df[col], errors="raise").astype(float)
+    return df
 
 
 def _check_cols(df: pd.DataFrame, required: set[str], file_label: str) -> None:
