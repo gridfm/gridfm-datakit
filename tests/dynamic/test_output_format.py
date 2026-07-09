@@ -24,7 +24,15 @@ from gridfm_datakit.utils.param_handler import NestedNamespace
 zarr = pytest.importorskip("zarr")
 
 
-def _result(scenario_index, *, static=True, dynamic=True, n_timesteps=5, n_variables=3):
+def _result(
+    scenario_index,
+    *,
+    perturbation_index=0,
+    static=True,
+    dynamic=True,
+    n_timesteps=5,
+    n_variables=3,
+):
     pf = None
     if static:
         pf = {
@@ -41,7 +49,12 @@ def _result(scenario_index, *, static=True, dynamic=True, n_timesteps=5, n_varia
         )
         df.index.name = "time"
         dr = DynamicResults(dynamic_results=df, report="{}")
-    return {"pf_data": pf, "dynamic_results": dr, "scenario_index": scenario_index}
+    return {
+        "pf_data": pf,
+        "dynamic_results": dr,
+        "scenario_index": scenario_index,
+        "perturbation_index": perturbation_index,
+    }
 
 
 def _save(results, tmp_path):
@@ -88,6 +101,30 @@ def test_parquet_rows_carry_scenario_index(tmp_path):
     assert "scenario_index" in bus.columns
     # 4 bus rows per scenario, tagged with the right scenario
     assert bus["scenario_index"].tolist() == [7, 7, 7, 7, 9, 9, 9, 9]
+
+
+def test_topology_perturbations_labeled_by_composite_key(tmp_path):
+    # one scenario expanded into two topology perturbations
+    results = [
+        _result(0, perturbation_index=0),
+        _result(0, perturbation_index=1),
+    ]
+    out, grp, meta = _save(results, tmp_path)
+
+    bus = pd.read_parquet(out / "bus_data.parquet")
+    assert {"scenario_index", "perturbation_index"} <= set(bus.columns)
+    static_keys = sorted(set(zip(bus["scenario_index"], bus["perturbation_index"])))
+    dyn_keys = sorted(
+        zip(
+            np.asarray(grp["scenario_index"]).tolist(),
+            np.asarray(grp["perturbation_index"]).tolist(),
+        ),
+    )
+    assert static_keys == [(0, 0), (0, 1)]
+    assert dyn_keys == [(0, 0), (0, 1)]
+    assert meta["dynamic_perturbation_index"] == [0, 1]
+    # the two perturbations are distinct slices of the same scenario
+    assert grp["curves"].shape[0] == 2
 
 
 def test_features_and_labels_joinable_when_membership_differs(tmp_path):
