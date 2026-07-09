@@ -182,13 +182,6 @@ def _process_dynamic_chunk(args: Tuple) -> Union[List[Dict[str, Any]], List[Exce
             # These objects cannot be pickled neither
             dynamic_mappings = generate_dynawo_mappings(dynamic_inputs)
             dynamic_solver_params = get_dynawo_simulation_parameters(config)
-            ##
-            # Build per-worker pypowsybl network copy
-            # import gridfm_datakit.powsybl as powsybl
-            ## pp_net cannot cross process boundaries; we reconstruct from gfm_net
-            # converted = powsybl.to_powsybl(gfm_net)
-            # pp_net_worker = converted.pp_net
-            ####
 
             chunk_results: List[Dict[str, Any]] = []
 

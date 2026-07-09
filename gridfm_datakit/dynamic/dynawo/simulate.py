@@ -93,18 +93,16 @@ def compute_balanced_static_state_dynawo(
     powsybl.update_powsybl(pp_net, gfm_net_pf, p2g_maps)
 
     # Step 3: run AC-PF via pypowsybl OpenLoadFlow
-    lf_params = powsybl.get_default_lf_params()
-    # TODO: delete once the fix merged and replace with default lf parameters
-    ##############
+    # TODO: temporary override — restore powsybl.get_default_lf_params() once the
+    # upstream slack-bus fix is merged.
     lf_params = pp.loadflow.Parameters(
         distributed_slack=False,
         read_slack_bus=True,
         write_slack_bus=True,
         provider_parameters={
-            "slackBusSelectionMode": "LARGEST_GENERATOR"  # default: MOST_MESHED
+            "slackBusSelectionMode": "LARGEST_GENERATOR",  # default: MOST_MESHED
         },
     )
-    ##############
     t0 = time.perf_counter()
     pf_metadata = powsybl.pypowsybl.loadflow.run_ac(pp_net, lf_params)
     solve_time = time.perf_counter() - t0
