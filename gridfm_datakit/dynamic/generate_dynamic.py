@@ -215,21 +215,34 @@ def _save_generated_data(
     file_paths["gen_data"] = gen_path
 
     # ---- Dynamic time-series → Zarr -----------------------------------------
-    # Collect per-scenario arrays (n_timesteps, n_variables)
+    # Collect per-scenario arrays as (n_variables, n_timesteps) — the per-scenario
+    # shape declared by the DynamicResults contract (and architecture §8, where the
+    # store is n_scenarios x n_variables x n_timesteps). Dynawo returns curves as a
+    # (n_timesteps, n_variables) DataFrame, so transpose here.
     dyn_arrays = []
+    timesteps_per_scenario: List[int] = []
     for r in all_results:
         dr: Optional[DynamicResults] = r.get("dynamic_results")
         if dr is None or dr.dynamic_results is None:
             continue
-        arr = np.array(dr.dynamic_results)  # (n_timesteps, n_variables)
+        arr = np.asarray(dr.dynamic_results, dtype="float64").T  # (n_variables, n_timesteps)
         dyn_arrays.append(arr)
+        timesteps_per_scenario.append(arr.shape[1])
 
     zarr_path = str(output_dir / "dynamic_results.zarr")
+    n_variables = 0
+    max_n_timesteps = 0
     if dyn_arrays:
         n_scenarios = len(dyn_arrays)
-        n_timesteps, n_variables = dyn_arrays[0].shape
-        shape = (n_scenarios, n_timesteps, n_variables)
-        chunks = (1, n_timesteps, n_variables)
+        n_variables = dyn_arrays[0].shape[0]
+        # Solvers with adaptive time-stepping (e.g. IDA) or unstable trajectories
+        # can emit a different number of timesteps per scenario. Size the store to
+        # the longest run and NaN-pad shorter scenarios along the time axis; the
+        # valid length per scenario is recorded in metadata (timesteps_per_scenario)
+        # so consumers can mask the padding.
+        max_n_timesteps = max(a.shape[1] for a in dyn_arrays)
+        shape = (n_scenarios, n_variables, max_n_timesteps)
+        chunks = (1, n_variables, max_n_timesteps)
         store = zarr.open(zarr_path, mode="w")
         # The Zarr array-creation API differs between v2 and v3; support both so
         # the pipeline works regardless of which major version is installed.
@@ -252,7 +265,13 @@ def _save_generated_data(
                 compressor=numcodecs.Blosc(cname="zstd", clevel=3),
             )
         for i, arr in enumerate(dyn_arrays):
-            z[i] = arr
+            n_t = arr.shape[1]
+            if n_t == max_n_timesteps:
+                z[i] = arr
+            else:
+                padded = np.full((n_variables, max_n_timesteps), np.nan, dtype="float64")
+                padded[:, :n_t] = arr
+                z[i] = padded
 
     file_paths["dynamic_results_zarr"] = zarr_path
 
@@ -263,10 +282,6 @@ def _save_generated_data(
         dr = r.get("dynamic_results")
         if dr and dr.dynamic_results is not None:
             variable_names = list(dr.dynamic_results.columns)
-            # variable_names = list(
-            #     getattr(dr, "variable_names", [])
-            #     or [f"var_{i}" for i in range(np.array(dr.dynamic_results).shape[0])],
-            # )
             break
 
     config_hash = hashlib.md5(
@@ -279,7 +294,12 @@ def _save_generated_data(
         "n_scenarios": len(all_results),
         "n_successful": len(dyn_arrays) if dyn_arrays else 0,
         "variable_names": variable_names,
-        "n_timesteps": n_timesteps if dyn_arrays else 0,
+        "n_variables": n_variables,
+        # Store dimensions: curves is (n_scenarios, n_variables, n_timesteps),
+        # NaN-padded to n_timesteps; timesteps_per_scenario gives each run's
+        # valid (unpadded) length.
+        "n_timesteps": max_n_timesteps,
+        "timesteps_per_scenario": timesteps_per_scenario,
         "config_hash": config_hash,
     }
 
