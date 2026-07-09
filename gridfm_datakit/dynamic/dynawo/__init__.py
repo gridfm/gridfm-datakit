@@ -26,8 +26,6 @@ from gridfm_datakit.dynamic.dynawo.utils import (
     SIMULATION_PARAMETERS_MAPPING,
 )
 
-from .api import _get_pypowsybl_dynamic, check_pypowsybl_dynamic_available
-
 if TYPE_CHECKING:
     pass
 
@@ -152,7 +150,7 @@ def _map_dynamic_models_dynawo(
         param_keywords = AUTOMATION_SYSTEM_PARAMS_MAPPING[cat]
         for keyword in param_keywords:
             df_cat[keyword] = df_cat["params"].map(
-                lambda x: _get_param_value(x, keyword)
+                lambda x: _get_param_value(x, keyword),
             )
         df_cat = df_cat[["parameter_set_id"] + param_keywords + ["model_name"]]
         dynamic_model_mapping.add_dynamic_model(category_name=cat, df=df_cat)
@@ -176,7 +174,7 @@ def _map_events_dynawo(events: pd.DataFrame) -> pp.dynamic.EventMapping:
         param_keywords = EVENT_PARAMS_MAPPING[type_t]
         for k in param_keywords:
             df_event_type_t[k] = df_event_type_t["params"].map(
-                lambda x: _get_param_value(x, k)
+                lambda x: _get_param_value(x, k),
             )
 
         # specific case for Disconnect which accepts its only parameter 'Disconnect' as an option
@@ -207,12 +205,14 @@ def _map_variables_dynawo(variables: pd.DataFrame) -> pp.dynamic.OutputVariableM
         if type_t == "Curve":
             for _, row in df_var_type_t.iterrows():
                 variable_mapping.add_curves(
-                    model_id=row["model_id"], variables=row["variables"]
+                    model_id=row["model_id"],
+                    variables=row["variables"],
                 )
         elif type_t == "FinalStateValue":
             for _, row in df_var_type_t.iterrows():
                 variable_mapping.add_final_state_values(
-                    model_id=row["model_id"], variables=row["variables"]
+                    model_id=row["model_id"],
+                    variables=row["variables"],
                 )
     return variable_mapping
 
