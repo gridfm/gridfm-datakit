@@ -185,30 +185,43 @@ def _save_generated_data(
         return
 
     # ---- Static PF outputs → Parquet ----------------------------------------
+    # Every element row is tagged with its scenario_index so the static snapshot
+    # (features / initial conditions) can be joined back to the dynamic trajectory
+    # (labels) by key rather than by row position. This keeps the two modalities
+    # aligned even when a scenario contributes to only one of them.
     bus_rows, gen_rows, branch_rows = [], [], []
+    static_scenarios = []
     for r in all_results:
         pf = r["pf_data"]
         if pf is None:
             continue
+        static_scenarios.append(r["scenario_index"])
         bus_rows.append(pf["bus"])
         gen_rows.append(pf["gen"])
         branch_rows.append(pf["branch"])
 
-    def _to_parquet(rows, columns, path):
+    def _to_parquet(rows, scen_ids, columns, path):
         if not rows:
             return
-        arr = np.vstack(rows)
-        df = pd.DataFrame(arr, columns=columns[: arr.shape[1]])
-        df.to_parquet(path, index=False, engine="pyarrow")
+        frames = []
+        for scen_id, arr in zip(scen_ids, rows):
+            arr = np.atleast_2d(arr)
+            df = pd.DataFrame(arr, columns=columns[: arr.shape[1]])
+            df.insert(0, "scenario_index", scen_id)
+            frames.append(df)
+        pd.concat(frames, ignore_index=True).to_parquet(
+            path,
+            index=False,
+            engine="pyarrow",
+        )
 
     bus_path = str(output_dir / "bus_data.parquet")
     branch_path = str(output_dir / "branch_data.parquet")
     gen_path = str(output_dir / "gen_data.parquet")
 
-    # TODO: this path is not the same as the path for the logs. Fix
-    _to_parquet(bus_rows, BUS_COLUMNS, bus_path)
-    _to_parquet(gen_rows, GEN_COLUMNS, gen_path)
-    _to_parquet(branch_rows, BRANCH_COLUMNS, branch_path)
+    _to_parquet(bus_rows, static_scenarios, BUS_COLUMNS, bus_path)
+    _to_parquet(gen_rows, static_scenarios, GEN_COLUMNS, gen_path)
+    _to_parquet(branch_rows, static_scenarios, BRANCH_COLUMNS, branch_path)
 
     file_paths["bus_data"] = bus_path
     file_paths["branch_data"] = branch_path
@@ -221,6 +234,7 @@ def _save_generated_data(
     # (n_timesteps, n_variables) DataFrame, so transpose here.
     dyn_arrays = []
     timesteps_per_scenario: List[int] = []
+    dynamic_scenarios: List[int] = []
     for r in all_results:
         dr: Optional[DynamicResults] = r.get("dynamic_results")
         if dr is None or dr.dynamic_results is None:
@@ -231,6 +245,7 @@ def _save_generated_data(
         ).T  # (n_variables, n_timesteps)
         dyn_arrays.append(arr)
         timesteps_per_scenario.append(arr.shape[1])
+        dynamic_scenarios.append(r["scenario_index"])
 
     zarr_path = str(output_dir / "dynamic_results.zarr")
     n_variables = 0
@@ -280,6 +295,24 @@ def _save_generated_data(
                 padded[:, :n_t] = arr
                 z[i] = padded
 
+        # scenario_index coordinate: maps each curves slice (axis 0) back to the
+        # scenario it came from, so the Zarr labels join to the Parquet snapshot.
+        scen_arr = np.asarray(dynamic_scenarios, dtype="int64")
+        if hasattr(store, "create_array"):  # zarr v3
+            zs = store.create_array(
+                "scenario_index",
+                shape=(n_scenarios,),
+                dtype="int64",
+            )
+            zs[:] = scen_arr
+        else:  # zarr v2
+            store.create_dataset(
+                "scenario_index",
+                data=scen_arr,
+                shape=(n_scenarios,),
+                dtype="int64",
+            )
+
     file_paths["dynamic_results_zarr"] = zarr_path
 
     # ---- metadata.json -------------------------------------------------------
@@ -307,6 +340,12 @@ def _save_generated_data(
         # valid (unpadded) length.
         "n_timesteps": max_n_timesteps,
         "timesteps_per_scenario": timesteps_per_scenario,
+        # Join keys: static_scenario_index labels the Parquet rows (also present
+        # as a column), dynamic_scenario_index labels the Zarr curves slices
+        # (also stored as the "scenario_index" array). Join the two modalities on
+        # these, never on row/slice position.
+        "static_scenario_index": static_scenarios,
+        "dynamic_scenario_index": dynamic_scenarios,
         "config_hash": config_hash,
     }
 
