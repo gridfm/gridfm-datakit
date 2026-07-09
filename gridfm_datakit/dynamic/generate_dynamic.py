@@ -185,28 +185,29 @@ def _save_generated_data(
         return
 
     # ---- Static PF outputs → Parquet ----------------------------------------
-    # Every element row is tagged with its scenario_index so the static snapshot
-    # (features / initial conditions) can be joined back to the dynamic trajectory
-    # (labels) by key rather than by row position. This keeps the two modalities
-    # aligned even when a scenario contributes to only one of them.
+    # Every element row is tagged with its (scenario_index, perturbation_index)
+    # so the static snapshot (features / initial conditions) can be joined back to
+    # the dynamic trajectory (labels) by key rather than by row position. This
+    # keeps the two modalities aligned even when a sample contributes to only one.
     bus_rows, gen_rows, branch_rows = [], [], []
-    static_scenarios = []
+    static_keys = []  # list of (scenario_index, perturbation_index)
     for r in all_results:
         pf = r["pf_data"]
         if pf is None:
             continue
-        static_scenarios.append(r["scenario_index"])
+        static_keys.append((r["scenario_index"], r.get("perturbation_index", 0)))
         bus_rows.append(pf["bus"])
         gen_rows.append(pf["gen"])
         branch_rows.append(pf["branch"])
 
-    def _to_parquet(rows, scen_ids, columns, path):
+    def _to_parquet(rows, keys, columns, path):
         if not rows:
             return
         frames = []
-        for scen_id, arr in zip(scen_ids, rows):
+        for (scen_id, pert_id), arr in zip(keys, rows):
             arr = np.atleast_2d(arr)
             df = pd.DataFrame(arr, columns=columns[: arr.shape[1]])
+            df.insert(0, "perturbation_index", pert_id)
             df.insert(0, "scenario_index", scen_id)
             frames.append(df)
         pd.concat(frames, ignore_index=True).to_parquet(
@@ -219,9 +220,9 @@ def _save_generated_data(
     branch_path = str(output_dir / "branch_data.parquet")
     gen_path = str(output_dir / "gen_data.parquet")
 
-    _to_parquet(bus_rows, static_scenarios, BUS_COLUMNS, bus_path)
-    _to_parquet(gen_rows, static_scenarios, GEN_COLUMNS, gen_path)
-    _to_parquet(branch_rows, static_scenarios, BRANCH_COLUMNS, branch_path)
+    _to_parquet(bus_rows, static_keys, BUS_COLUMNS, bus_path)
+    _to_parquet(gen_rows, static_keys, GEN_COLUMNS, gen_path)
+    _to_parquet(branch_rows, static_keys, BRANCH_COLUMNS, branch_path)
 
     file_paths["bus_data"] = bus_path
     file_paths["branch_data"] = branch_path
@@ -235,6 +236,7 @@ def _save_generated_data(
     dyn_arrays = []
     timesteps_per_scenario: List[int] = []
     dynamic_scenarios: List[int] = []
+    dynamic_perturbations: List[int] = []
     for r in all_results:
         dr: Optional[DynamicResults] = r.get("dynamic_results")
         if dr is None or dr.dynamic_results is None:
@@ -246,6 +248,7 @@ def _save_generated_data(
         dyn_arrays.append(arr)
         timesteps_per_scenario.append(arr.shape[1])
         dynamic_scenarios.append(r["scenario_index"])
+        dynamic_perturbations.append(r.get("perturbation_index", 0))
 
     zarr_path = str(output_dir / "dynamic_results.zarr")
     n_variables = 0
@@ -295,23 +298,24 @@ def _save_generated_data(
                 padded[:, :n_t] = arr
                 z[i] = padded
 
-        # scenario_index coordinate: maps each curves slice (axis 0) back to the
-        # scenario it came from, so the Zarr labels join to the Parquet snapshot.
-        scen_arr = np.asarray(dynamic_scenarios, dtype="int64")
-        if hasattr(store, "create_array"):  # zarr v3
-            zs = store.create_array(
-                "scenario_index",
-                shape=(n_scenarios,),
-                dtype="int64",
-            )
-            zs[:] = scen_arr
-        else:  # zarr v2
-            store.create_dataset(
-                "scenario_index",
-                data=scen_arr,
-                shape=(n_scenarios,),
-                dtype="int64",
-            )
+        # (scenario_index, perturbation_index) coordinates: map each curves slice
+        # (axis 0) back to the sample it came from, so the Zarr labels join to the
+        # Parquet snapshot by key.
+        def _write_coord(name, values):
+            data = np.asarray(values, dtype="int64")
+            if hasattr(store, "create_array"):  # zarr v3
+                arr = store.create_array(name, shape=(n_scenarios,), dtype="int64")
+                arr[:] = data
+            else:  # zarr v2
+                store.create_dataset(
+                    name,
+                    data=data,
+                    shape=(n_scenarios,),
+                    dtype="int64",
+                )
+
+        _write_coord("scenario_index", dynamic_scenarios)
+        _write_coord("perturbation_index", dynamic_perturbations)
 
     file_paths["dynamic_results_zarr"] = zarr_path
 
@@ -340,12 +344,14 @@ def _save_generated_data(
         # valid (unpadded) length.
         "n_timesteps": max_n_timesteps,
         "timesteps_per_scenario": timesteps_per_scenario,
-        # Join keys: static_scenario_index labels the Parquet rows (also present
-        # as a column), dynamic_scenario_index labels the Zarr curves slices
-        # (also stored as the "scenario_index" array). Join the two modalities on
-        # these, never on row/slice position.
-        "static_scenario_index": static_scenarios,
+        # Join keys: the Parquet rows are labelled by (scenario_index,
+        # perturbation_index) columns; the Zarr curves slices by the matching
+        # "scenario_index"/"perturbation_index" coordinate arrays. Join the two
+        # modalities on this key pair, never on row/slice position.
+        "static_scenario_index": [k[0] for k in static_keys],
+        "static_perturbation_index": [k[1] for k in static_keys],
         "dynamic_scenario_index": dynamic_scenarios,
+        "dynamic_perturbation_index": dynamic_perturbations,
         "config_hash": config_hash,
     }
 
