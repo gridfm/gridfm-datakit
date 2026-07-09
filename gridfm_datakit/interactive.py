@@ -100,7 +100,28 @@ def create_config() -> Dict[str, Any]:
             "seed": None,  # seed is not used in the interactive interface
         },
     }
+    probabilities = _parse_outage_count_probabilities(
+        outage_count_probabilities.value.strip(),
+    )
+    if probabilities is not None:
+        config["topology_perturbation"]["outage_count_probabilities"] = probabilities
     return config
+
+
+def _parse_outage_count_probabilities(raw_value: str) -> List[float] | None:
+    """Parse a comma-separated outage-count probability vector from the UI."""
+
+    if not raw_value:
+        return None
+    parts = [part.strip() for part in raw_value.split(",") if part.strip()]
+    if not parts:
+        return None
+    try:
+        return [float(part) for part in parts]
+    except ValueError as exc:
+        raise ValueError(
+            "Outage count probabilities must be a comma-separated list of numbers that sum to 1.0.",
+        ) from exc
 
 
 def interactive_interface() -> None:
@@ -333,7 +354,12 @@ def interactive_interface() -> None:
 
     # Topology Perturbation Configuration
 
-    global k, n_topology_variants, perturbation_type, elements
+    global \
+        k, \
+        n_topology_variants, \
+        perturbation_type, \
+        elements, \
+        outage_count_probabilities
     k = widgets.IntSlider(
         value=1,
         min=1,
@@ -377,6 +403,18 @@ def interactive_interface() -> None:
         description="Elements to Drop:",
         style={"description_width": "150px"},
         layout=widgets.Layout(width="550px", height="120px"),
+    )
+
+    outage_count_probabilities = widgets.Text(
+        value="",
+        description="Outage Prob.:",
+        placeholder="e.g. 0.1, 0.8, 0.1 for N-0/N-1/N-2",
+        style={"description_width": "150px"},
+        layout=widgets.Layout(width="550px"),
+    )
+
+    outage_count_probabilities_help = widgets.HTML(
+        "<p style='margin: 0 0 0 150px; color: #666;'>If not included, the default is random between 1 and k.</p>",
     )
 
     # Generation Configuration
@@ -620,7 +658,15 @@ def interactive_interface() -> None:
     )
 
     # Create containers for topology perturbation components
-    topology_components_container = widgets.VBox([k, n_topology_variants, elements])
+    topology_components_container = widgets.VBox(
+        [
+            k,
+            n_topology_variants,
+            elements,
+            outage_count_probabilities,
+            outage_count_probabilities_help,
+        ],
+    )
 
     # Function to update topology perturbation component visibility
     def update_topology_perturbation_visibility(*args):
@@ -632,7 +678,13 @@ def interactive_interface() -> None:
             topology_components_container.layout.display = "block"
         else:
             # For random, show all components
-            topology_components_container.children = [k, n_topology_variants, elements]
+            topology_components_container.children = [
+                k,
+                n_topology_variants,
+                elements,
+                outage_count_probabilities,
+                outage_count_probabilities_help,
+            ]
             topology_components_container.layout.display = "block"
 
     perturbation_type.observe(update_topology_perturbation_visibility, names="value")
