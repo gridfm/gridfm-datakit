@@ -58,7 +58,11 @@ settings:
   overwrite: true
   mode: pf
   include_dc_res: false
-  enable_solver_logs: true # capture OPF/PF/Dynawo native output to out/IEEE14/raw/solver_log/
+  # Keep solver logs OFF so the console shows only pipeline progress. Turning
+  # this on raises solver verbosity to DEBUG, which un-silences PowerModels; its
+  # Julia-level logger is not reliably captured by the file router and can spill
+  # [ PowerModels | Info/Warn ] lines onto the console. See README.
+  enable_solver_logs: false
   pf_fast: false
   dcpf_fast: false
   max_iter: 200

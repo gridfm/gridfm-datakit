@@ -23,7 +23,7 @@ python scripts/dynamic_example/run.py     # from the project root
 python run.py
 ```
 
-Full logging is enabled, so you see advancement as it runs:
+Progress logging streams advancement to the console as it runs:
 
 ```
 HH:MM:SS INFO    gridfm_datakit.dynamic | Dynamic generation: 6 scenarios in 2 chunk(s), 2 worker(s).
@@ -59,9 +59,20 @@ out/
 │       one Dynawo report (JSON) per sample — model build-up + convergence
 ├── metadata.json
 │       variable names, dimensions, join-key index, config hash
-└── IEEE14/raw/solver_log/
-        per-worker capture of OPF / PF / DCPF / Dynawo native output
+└── IEEE14/raw/
+        pipeline logs (scenarios, errors). solver_log/ appears only when
+        settings.enable_solver_logs is on (see note below).
 ```
+
+### A note on `enable_solver_logs`
+
+It is **off by default** here. Turning it on raises the Julia solver verbosity
+to DEBUG, which un-silences PowerModels. PowerModels logs through its own
+Julia-level logger, which the file-based log router does **not** reliably
+capture, so `[ PowerModels | Info/Warn ]` lines can spill onto the console.
+With it off, `init_julia` calls `PowerModels.silence()` at the source, keeping
+the console limited to pipeline progress. The Dynawo per-simulation reports
+(under `reports/`) are saved regardless of this setting.
 
 ## Variations
 
