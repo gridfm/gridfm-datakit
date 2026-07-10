@@ -1,0 +1,65 @@
+# End-to-end dynamic-simulation example (IEEE14 + Dynawo).
+# Paths are RELATIVE to this folder and resolved to absolute by run.py, so the
+# example runs from any working directory. Run it with:  python run.py
+# (or: python scripts/dynamic_example/run.py from the project root).
+
+network:
+  name: IEEE14
+  reader: powsybl          # dynamic simulations require the powsybl reader
+  source: file
+  file: grids/IEEE14.iidm  # xiidm network (element IDs match the input CSVs below)
+
+load:
+  generator: agg_load_profile
+  agg_profile: default
+  scenarios: 6             # a few scenarios so chunk progress is visible
+  sigma: 0.2
+  change_reactive_power: true
+  global_range: 0.4
+  max_scaling_factor: 4.0
+  step_size: 0.05
+  start_scaling_factor: 0.8
+
+# Topology / generation / admittance perturbations are optional. Left at "none"
+# here; enable e.g. topology_perturbation to expand each scenario into several
+# samples (one Dynawo run per perturbed topology).
+topology_perturbation:
+  type: none               # options: random, n_minus_k, none
+  k: 1
+  n_topology_variants: 2
+  elements: [branch, gen]
+
+dynamic:
+  dynamic_solver: dynawo
+  input_files:
+    static_element_dynamic_models_file: inputs/static_element_dynamic_models.csv
+    automation_systems_file: inputs/automation_systems.csv
+    events_file: inputs/events.csv
+    variables_file: inputs/variables.csv
+  solver_parameters:
+    start_time: 0.0
+    stop_time: 500.0
+    parameters_file: grids/IEEE14.par
+    network_parameters_file: grids/IEEE14.par
+    network_parameters_id: Network
+    solver_type: SIM
+    solver_parameters_file: grids/IEEE14.par
+    solver_parameters_id: SimplifiedSolver
+  output_dir: out
+  logging:
+    verbosity: info        # progress logger threshold: silent|error|warning|info|debug
+    save_reports: true     # persist each simulation's Dynawo report under out/reports/
+
+settings:
+  num_processes: 2
+  data_dir: out
+  large_chunk_size: 3      # 6 scenarios / 3 -> 2 chunks -> visible chunk progress
+  overwrite: true
+  mode: pf
+  include_dc_res: false
+  enable_solver_logs: true # capture OPF/PF/Dynawo native output to out/IEEE14/raw/solver_log/
+  pf_fast: false
+  dcpf_fast: false
+  max_iter: 200
+  pf_solver: powsybl
+  seed: 42
