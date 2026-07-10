@@ -59,7 +59,15 @@ def _configure_logging(config: NestedNamespace) -> None:
     except ValueError:
         level = logging.INFO
     logger.setLevel(level)
-    if not any(not isinstance(h, logging.NullHandler) for h in logger.handlers):
+    # Only attach our own handler when nothing else will emit these records —
+    # neither a prior call here nor an application that configured the root
+    # logger (e.g. logging.basicConfig). Otherwise records would print twice
+    # (once via our handler, once via the propagated root handler).
+    root_configured = bool(logging.getLogger().handlers)
+    has_own_handler = any(
+        not isinstance(h, logging.NullHandler) for h in logger.handlers
+    )
+    if not root_configured and not has_own_handler:
         handler = logging.StreamHandler()
         handler.setFormatter(logging.Formatter("[dynamic] %(message)s"))
         logger.addHandler(handler)
