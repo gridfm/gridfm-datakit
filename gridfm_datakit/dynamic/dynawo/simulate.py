@@ -22,6 +22,7 @@ from gridfm_datakit.network import Network
 from gridfm_datakit import powsybl
 from gridfm_datakit.process.solvers import run_opf
 from gridfm_datakit.process.process_network import pf_preprocessing, pf_post_processing
+from gridfm_datakit.process.solver_output import solver_capture
 
 # ---------------------------------------------------------------------------
 # Public: balanced static state
@@ -154,15 +155,19 @@ def run_dynawo_simulation(
     sim = pp.dynamic.Simulation()
     report_node = pp.report.ReportNode()
 
-    # Run simulation
-    dyn_res = sim.run(
-        pp_net,
-        dynawo_mapping.dynamic_model_mapping,
-        dynawo_mapping.event_mapping,
-        dynawo_mapping.variable_mapping,
-        parameters=parameters,
-        report_node=report_node,
-    )
+    # Run simulation. Dynawo writes prolific native output (OpenModelica banners,
+    # solver iterations) straight to fd 1/2; route it through the process-wide
+    # log router's "dynawo" channel so it obeys the same verbosity/file policy as
+    # the OPF/PF solvers. No-op when no router is installed (e.g. ad-hoc scripts).
+    with solver_capture("dynawo"):
+        dyn_res = sim.run(
+            pp_net,
+            dynawo_mapping.dynamic_model_mapping,
+            dynawo_mapping.event_mapping,
+            dynawo_mapping.variable_mapping,
+            parameters=parameters,
+            report_node=report_node,
+        )
 
     # Format results
     formated_dyn_res = _format_dynamic_res(dyn_res, drop_duplicate_timestep)
