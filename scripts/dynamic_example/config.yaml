@@ -25,9 +25,10 @@ load:
 # samples (one Dynawo run per perturbed topology).
 topology_perturbation:
   type: none               # options: random, n_minus_k, none
-  k: 1
-  n_topology_variants: 2
-  elements: [branch, gen]
+  # When type is "random", also set (uncomment) these:
+  # k: 1
+  # n_topology_variants: 2
+  # elements: [branch, gen]
 
 dynamic:
   dynamic_solver: dynawo
