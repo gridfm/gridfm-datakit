@@ -12,9 +12,17 @@ Contains a helper function _format_dynamic_res that formats the raw Dynawo outpu
 from __future__ import annotations
 
 import copy
-import pypowsybl as pp
 import time
 from typing import Any, Dict, Tuple
+
+# pypowsybl is an optional dependency; guard the import so this module loads
+# without it. Type hints are lazy strings (`from __future__ import annotations`)
+# and every runtime use of `pp` is inside a function that runs only with
+# pypowsybl present.
+try:
+    import pypowsybl as pp
+except ImportError:  # pragma: no cover - optional dependency
+    pp = None
 
 from gridfm_datakit.dynamic import DynamicResults
 from gridfm_datakit.dynamic.dynawo import DynawoMappings

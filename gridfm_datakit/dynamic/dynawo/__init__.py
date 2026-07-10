@@ -16,7 +16,16 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
-import pypowsybl as pp
+
+# pypowsybl is an optional dependency. Keep importing this module cheap and
+# safe even when it is absent (see gridfm_datakit.dynamic.dynawo.api): the type
+# hints below are lazy strings (`from __future__ import annotations`) and every
+# runtime use of `pp` lives inside a function that only runs with pypowsybl
+# present. Importing gridfm_datakit.dynamic.dynawo must never raise ImportError.
+try:
+    import pypowsybl as pp
+except ImportError:  # pragma: no cover - optional dependency
+    pp = None
 
 from gridfm_datakit.utils.param_handler import NestedNamespace
 from gridfm_datakit.dynamic import DynamicInputs
