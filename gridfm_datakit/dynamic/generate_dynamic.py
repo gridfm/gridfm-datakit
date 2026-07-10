@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import shutil
 from datetime import datetime
@@ -24,8 +25,45 @@ import yaml
 
 from gridfm_datakit.dynamic import DynamicResults, load_raw_inputs
 from gridfm_datakit.generate import _prepare_network_and_scenarios, _setup_environment
+from gridfm_datakit.process.solver_output import SolverVerbosity
 from gridfm_datakit.utils.column_names import BRANCH_COLUMNS, BUS_COLUMNS, GEN_COLUMNS
 from gridfm_datakit.utils.param_handler import NestedNamespace
+
+# Progress/status logger for the dynamic pipeline. A NullHandler keeps the
+# library quiet unless the application (or _configure_logging below, driven by
+# dynamic.logging.verbosity) attaches a handler.
+logger = logging.getLogger("gridfm_datakit.dynamic")
+logger.addHandler(logging.NullHandler())
+
+# dynamic.logging.verbosity -> progress-logger threshold. Mirrors SolverVerbosity
+# so the dynamic knob shares one vocabulary with the solver-output policy.
+_VERBOSITY_TO_LEVEL = {
+    SolverVerbosity.SILENT: logging.ERROR,
+    SolverVerbosity.ERROR: logging.ERROR,
+    SolverVerbosity.WARNING: logging.WARNING,
+    SolverVerbosity.INFO: logging.INFO,
+    SolverVerbosity.DEBUG: logging.DEBUG,
+}
+
+
+def _configure_logging(config: NestedNamespace) -> None:
+    """Set the dynamic logger level/handler from dynamic.logging.verbosity.
+
+    Idempotent: attaches at most one StreamHandler so the summary stays visible
+    by default (verbosity "info") without duplicating on repeated calls.
+    """
+    logging_cfg = getattr(getattr(config, "dynamic", None), "logging", None)
+    verbosity = getattr(logging_cfg, "verbosity", "info") if logging_cfg else "info"
+    try:
+        level = _VERBOSITY_TO_LEVEL[SolverVerbosity.parse(verbosity)]
+    except ValueError:
+        level = logging.INFO
+    logger.setLevel(level)
+    if not any(not isinstance(h, logging.NullHandler) for h in logger.handlers):
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("[dynamic] %(message)s"))
+        logger.addHandler(handler)
+
 
 # ---------------------------------------------------------------------------
 # Public entry point
@@ -74,9 +112,15 @@ def generate_dynamic_data(
         args = config
 
     _validate_dynamic_config(args)
+    _configure_logging(args)
 
     # --- Step 1: standard environment setup (reuse generate.py logic) ---
     args, base_path, file_paths, seed = _setup_environment(args)
+    # _setup_environment derives solver_log_dir (honouring enable_solver_logs)
+    # into file_paths; publish it on settings so the distributed dynamic loop
+    # (which reads config.settings.solver_log_dir) routes OPF + Dynawo native
+    # output to files instead of dropping it.
+    args.settings.solver_log_dir = file_paths["solver_log_dir"]
 
     # --- Step 2: network + scenarios (reuse generate.py logic) ---
     # TODO: discuss with YE: just a function to prep load scenarios and the path
@@ -87,12 +131,14 @@ def generate_dynamic_data(
     dynamic_inputs = load_raw_inputs(args)
 
     # --- Step 4: output directory ---
+    # Do NOT rmtree the whole output_dir: users may point it at data_dir, so it can
+    # contain base_path (env + solver logs) and even the input files. Each writer
+    # overwrites its own artifact (parquet, zarr mode="w", metadata); stale reports
+    # are cleared in _save_generated_data. This keeps the environment intact.
     dynamic_solver = args.dynamic.dynamic_solver
     output_dir = Path(
         getattr(args.dynamic, "output_dir", os.path.join(base_path, "dynamic")),
     )
-    if output_dir.exists() and getattr(args.settings, "overwrite", False):
-        shutil.rmtree(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     file_paths["dynamic_output_dir"] = str(output_dir)
@@ -181,7 +227,7 @@ def _save_generated_data(
     import zarr
 
     if not all_results:
-        print("[dynamic] No results to save.")
+        logger.warning("No results to save.")
         return
 
     # ---- Static PF outputs → Parquet ----------------------------------------
@@ -319,6 +365,32 @@ def _save_generated_data(
 
     file_paths["dynamic_results_zarr"] = zarr_path
 
+    # ---- Dynawo solver reports → JSON ---------------------------------------
+    # Each simulation's pypowsybl ReportNode (model build-up + convergence) is a
+    # JSON string on DynamicResults.report. It is the documented way to diagnose
+    # a failed/degenerate run, so persist one file per sample, keyed like every
+    # other output. Controlled by dynamic.logging.save_reports (default True).
+    save_reports = getattr(getattr(config, "dynamic", None), "logging", None)
+    save_reports = getattr(save_reports, "save_reports", True) if save_reports else True
+    report_index: List[str] = []
+    if save_reports:
+        reports_dir = output_dir / "reports"
+        # Clear stale reports so a re-run with fewer samples leaves no orphans.
+        if reports_dir.exists():
+            shutil.rmtree(reports_dir)
+        reports_dir.mkdir(parents=True, exist_ok=True)
+        for r in all_results:
+            dr = r.get("dynamic_results")
+            if dr is None or getattr(dr, "report", None) is None:
+                continue
+            name = (
+                f"scenario_{r['scenario_index']}"
+                f"_perturbation_{r.get('perturbation_index', 0)}.json"
+            )
+            (reports_dir / name).write_text(str(dr.report))
+            report_index.append(name)
+        file_paths["dynamic_reports_dir"] = str(reports_dir)
+
     # ---- metadata.json -------------------------------------------------------
     # Determine variable names from the first successful result
     variable_names: List[str] = []
@@ -352,6 +424,8 @@ def _save_generated_data(
         "static_perturbation_index": [k[1] for k in static_keys],
         "dynamic_scenario_index": dynamic_scenarios,
         "dynamic_perturbation_index": dynamic_perturbations,
+        # Per-sample Dynawo solver reports under reports/ (empty if disabled).
+        "reports": report_index,
         "config_hash": config_hash,
     }
 
@@ -361,7 +435,10 @@ def _save_generated_data(
 
     file_paths["metadata_json"] = meta_path
 
-    print(
-        f"[dynamic] Saved {len(all_results)} scenarios to {output_dir} "
-        f"({len(dyn_arrays)} with dynamic results).",
+    logger.info(
+        "Saved %d samples to %s (%d with dynamic results, %d reports).",
+        len(all_results),
+        output_dir,
+        len(dyn_arrays),
+        len(report_index),
     )

@@ -14,6 +14,7 @@ all scenarios in that chunk.
 from __future__ import annotations
 
 import copy
+import logging
 import multiprocessing
 import traceback
 from typing import Any, Dict, List, Tuple, Union
@@ -39,6 +40,10 @@ from gridfm_datakit.utils.param_handler import (
     initialize_generation_generator,
     initialize_topology_generator,
 )
+
+# Shares the pipeline logger configured in generate_dynamic._configure_logging.
+# These call sites run in the parent process, so the parent's handler applies.
+logger = logging.getLogger("gridfm_datakit.dynamic")
 
 
 # ---------------------------------------------------------------------------
@@ -156,11 +161,11 @@ def process_dynamic_simulations(
             # list-wrapped form so a failed chunk never poisons all_results with
             # non-result objects (which would later crash _save_generated_data).
             if isinstance(chunk_results, Exception):
-                print(f"Error in dynamic chunk: {chunk_results}")
+                logger.error("Error in dynamic chunk: %s", chunk_results)
             else:
                 for scenario_result in chunk_results:
                     if isinstance(scenario_result, Exception):
-                        print(f"Error in dynamic chunk: {scenario_result}")
+                        logger.error("Error in dynamic chunk: %s", scenario_result)
                     else:
                         all_results.append(scenario_result)
 
