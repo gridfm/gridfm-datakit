@@ -123,6 +123,13 @@ def process_dynamic_simulations(
 
     all_results: List[Dict[str, Any]] = []
 
+    logger.info(
+        "Dynamic generation: %d scenarios in %d chunk(s), %d worker(s).",
+        n_scenarios,
+        len(large_chunks),
+        num_processes,
+    )
+
     for large_chunk_index, large_chunk in enumerate(large_chunks):
         chunk_size = len(large_chunk)
         scenario_chunks = np.array_split(
@@ -168,6 +175,14 @@ def process_dynamic_simulations(
                         logger.error("Error in dynamic chunk: %s", scenario_result)
                     else:
                         all_results.append(scenario_result)
+
+        logger.info(
+            "Chunk %d/%d done (%d scenarios) — %d samples so far.",
+            large_chunk_index + 1,
+            len(large_chunks),
+            chunk_size,
+            len(all_results),
+        )
 
     return all_results
 
