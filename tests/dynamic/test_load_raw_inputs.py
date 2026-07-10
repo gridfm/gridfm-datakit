@@ -29,17 +29,18 @@ def _write_csv(path: str, df: pd.DataFrame) -> None:
     df.to_csv(path, index=False)
 
 
-def _make_config(tmp_dir: str, 
-                 dataset
-) -> NestedNamespace:
+def _make_config(tmp_dir: str, dataset) -> NestedNamespace:
     """Build a valid config pointing at CSVs in tmp_dir."""
 
-    df_static_element_dynamic_models = dataset['df_static_element_dynamic_models']
-    df_automation_systems = dataset['df_automation_systems']
-    df_events = dataset['df_events']
-    df_variables = dataset['df_variables']
+    df_static_element_dynamic_models = dataset["df_static_element_dynamic_models"]
+    df_automation_systems = dataset["df_automation_systems"]
+    df_events = dataset["df_events"]
+    df_variables = dataset["df_variables"]
 
-    static_element_dynamic_models_path = os.path.join(tmp_dir, "static_element_dynamic_models.csv")
+    static_element_dynamic_models_path = os.path.join(
+        tmp_dir,
+        "static_element_dynamic_models.csv",
+    )
     automation_systems_path = os.path.join(tmp_dir, "automation_systems.csv")
     events_path = os.path.join(tmp_dir, "events.csv")
     variables_path = os.path.join(tmp_dir, "variables.csv")
@@ -157,7 +158,9 @@ class TestLoadRawInputsErrors:
             dynamic=NestedNamespace(
                 dynamic_solver="dynawo",
                 input_files=NestedNamespace(
-                    static_element_dynamic_models_file=str(tmp_path / "nonexistent.csv"),
+                    static_element_dynamic_models_file=str(
+                        tmp_path / "nonexistent.csv",
+                    ),
                     automation_systems_file=str(tmp_path / "automation_systems.csv"),
                     events_file=str(tmp_path / "events.csv"),
                     variables_file=str(tmp_path / "variables.csv"),
@@ -171,35 +174,45 @@ class TestLoadRawInputsErrors:
         """Missing required column must raise ValueError with descriptive message."""
         # models.csv missing 'parameter_set_id'
         static_element_dynamic_models_df = pd.DataFrame(
-            {   
-                "category_name": ['SynchronousGenerator'],
+            {
+                "category_name": ["SynchronousGenerator"],
                 "static_id": ["G1"],
                 # parameter_set_id intentionally missing,
-                "model_name": ['GeneratorSynchronousFourWindingsProportionalRegulations']
+                "model_name": [
+                    "GeneratorSynchronousFourWindingsProportionalRegulations",
+                ],
             },
         )
 
         automation_systems_df = pd.DataFrame(
             {
-                "category_name": ['UnderVoltageAutomationSystem'],
-                "dynamic_model": 'UVA',
+                "category_name": ["UnderVoltageAutomationSystem"],
+                "dynamic_model": "UVA",
                 "parameter_set_id": "G1UVA",
                 "params": "generator=G1;",
                 "model_name": "UnderVoltage",
-            }
-        ) 
+            },
+        )
         events_df = pd.DataFrame(
             {
                 "event_name": ["Disconnect"],
-                "static_id": ['G1'],
+                "static_id": ["G1"],
                 "start_time": ["Ev"],
                 "params": [""],
             },
         )
-        variables_df = pd.DataFrame({"type":"Curve", "model_id": ["G1"], "variables": ["v"]})
+        variables_df = pd.DataFrame(
+            {"type": "Curve", "model_id": ["G1"], "variables": ["v"]},
+        )
 
-        static_element_dynamic_models_df.to_csv(str(tmp_path / "models.csv"), index=False)
-        automation_systems_df.to_csv(str(tmp_path / "automation_systems.csv"), index=False)
+        static_element_dynamic_models_df.to_csv(
+            str(tmp_path / "models.csv"),
+            index=False,
+        )
+        automation_systems_df.to_csv(
+            str(tmp_path / "automation_systems.csv"),
+            index=False,
+        )
         events_df.to_csv(str(tmp_path / "events.csv"), index=False)
         variables_df.to_csv(str(tmp_path / "variables.csv"), index=False)
 

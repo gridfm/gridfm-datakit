@@ -1,7 +1,7 @@
 """Tests for process_dynamic.py"""
 
 import numpy as np
-
+import pytest
 
 from gridfm_datakit.dynamic.dynawo import (
     generate_dynawo_mappings,
@@ -10,6 +10,13 @@ from gridfm_datakit.dynamic.dynawo import (
 from gridfm_datakit.dynamic import load_raw_inputs
 from gridfm_datakit.generate import _setup_environment, _prepare_network_and_scenarios
 from gridfm_datakit.powsybl import load_net
+from gridfm_datakit.powsybl.api import is_powsybl_available
+
+# These end-to-end tests run OPF (Julia) + Dynawo, so they need pypowsybl.
+pytestmark = pytest.mark.skipif(
+    is_powsybl_available() is False,
+    reason="pypowsybl is not installed. Install with: pip install gridfm-datakit[powsybl]",
+)
 
 
 def test_process_single_dynamic_simulation(config_ieee14):

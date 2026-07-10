@@ -3,14 +3,19 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+# pypowsybl is an optional dependency; guard the import so collection never
+# fails when it is absent (the tests below are skipped anyway).
+try:
+    import pypowsybl as pp
+except ImportError:  # pragma: no cover - optional dependency
+    pp = None
+
 from gridfm_datakit.powsybl.api import is_powsybl_available
 
 pytestmark = pytest.mark.skipif(
     is_powsybl_available() is False,
     reason="pypowsybl is not installed. Install with: pip install gridfm-datakit[powsybl]",
 )
-
-import pypowsybl as pp  # noqa: E402  (guarded optional dependency)
 
 # IEEE14 network whose buses are NOT exported in sorted-ID order — the fixture
 # that makes the format-independence test below meaningful.
