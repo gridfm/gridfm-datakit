@@ -78,7 +78,26 @@ def _cast_int_columns(df: pd.DataFrame, casts: dict) -> None:
         df[col] = values.astype(dtype)
 
 
-def _process_and_save(args: Tuple[str, List[np.ndarray], str, int, int, bool]) -> None:
+def _scenario_indices(
+    processed_data: List[np.ndarray],
+    data_index: int,
+    first_scenario: int,
+) -> np.ndarray:
+    """Build repeated scenario indices without allocating one array per scenario."""
+    counts = np.fromiter(
+        (item[data_index].shape[0] for item in processed_data),
+        dtype=np.int64,
+        count=len(processed_data),
+    )
+    scenarios = np.arange(
+        first_scenario,
+        first_scenario + len(processed_data),
+        dtype=np.int64,
+    )
+    return np.repeat(scenarios, counts)
+
+
+def _process_and_save(args: Tuple[str, List[np.ndarray], str, int, bool]) -> None:
     """Worker function for processing and saving one dataset type (bus/gen/branch/y_bus).
 
     Args:
@@ -87,19 +106,16 @@ def _process_and_save(args: Tuple[str, List[np.ndarray], str, int, int, bool]) -
             - processed_data: List of processed data arrays
             - path: Output file path (directory for partitioned parquet)
             - last_scenario: Last scenario index processed
-            - n_buses: Number of buses in the network
             - include_dc_res: Whether DC power flow data is included
     """
-    data_type, processed_data, path, last_scenario, n_buses, include_dc_res = args
+    data_type, processed_data, path, last_scenario, include_dc_res = args
+    first_scenario = last_scenario + 1
 
     if data_type == "bus":
         bus_columns = BUS_COLUMNS + DC_BUS_COLUMNS if include_dc_res else BUS_COLUMNS
         bus_data = np.concatenate([item[0] for item in processed_data], axis=0)
         df = pd.DataFrame(bus_data, columns=bus_columns)
-        scenario_indices = np.repeat(
-            range(last_scenario + 1, last_scenario + 1 + (df.shape[0] // n_buses)),
-            n_buses,
-        )
+        scenario_indices = _scenario_indices(processed_data, 0, first_scenario)
         df.insert(0, "scenario", scenario_indices)
 
     elif data_type == "gen":
@@ -108,12 +124,7 @@ def _process_and_save(args: Tuple[str, List[np.ndarray], str, int, int, bool]) -
             gen_data,
             columns=GEN_COLUMNS + DC_GEN_COLUMNS if include_dc_res else GEN_COLUMNS,
         )
-        scenario_indices = np.concatenate(
-            [
-                np.full(item[1].shape[0], last_scenario + 1 + i, dtype="int64")
-                for i, item in enumerate(processed_data)
-            ],
-        )
+        scenario_indices = _scenario_indices(processed_data, 1, first_scenario)
         df.insert(0, "scenario", scenario_indices)
 
     elif data_type == "branch":
@@ -124,23 +135,13 @@ def _process_and_save(args: Tuple[str, List[np.ndarray], str, int, int, bool]) -
             if include_dc_res
             else BRANCH_COLUMNS,
         )
-        scenario_indices = np.concatenate(
-            [
-                np.full(item[2].shape[0], last_scenario + 1 + i, dtype="int64")
-                for i, item in enumerate(processed_data)
-            ],
-        )
+        scenario_indices = _scenario_indices(processed_data, 2, first_scenario)
         df.insert(0, "scenario", scenario_indices)
 
     elif data_type == "y_bus":
         y_bus_data = np.concatenate([item[3] for item in processed_data])
         df = pd.DataFrame(y_bus_data, columns=YBUS_COLUMNS)
-        scenario_indices = np.concatenate(
-            [
-                np.full(item[3].shape[0], last_scenario + 1 + i, dtype="int64")
-                for i, item in enumerate(processed_data)
-            ],
-        )
+        scenario_indices = _scenario_indices(processed_data, 3, first_scenario)
         df.insert(0, "scenario", scenario_indices)
 
     elif data_type == "runtime":
@@ -151,12 +152,7 @@ def _process_and_save(args: Tuple[str, List[np.ndarray], str, int, int, bool]) -
             if include_dc_res
             else RUNTIME_COLUMNS,
         )
-        scenario_indices = np.concatenate(
-            [
-                np.full(item[4].shape[0], last_scenario + 1 + i, dtype="int64")
-                for i, item in enumerate(processed_data)
-            ],
-        )
+        scenario_indices = _scenario_indices(processed_data, 4, first_scenario)
         df.insert(0, "scenario", scenario_indices)
     else:
         raise ValueError(f"Unknown data type: {data_type}")
@@ -198,8 +194,6 @@ def save_node_edge_data(
         processed_data: List of tuples containing processed data arrays for each scenario.
         include_dc_res: Whether DC power flow data is included in the output.
     """
-    n_buses = net.buses.shape[0]
-
     # Determine last scenario index from n_scenarios metadata file
     last_scenario = -1
     base_path = os.path.dirname(node_path)
@@ -210,16 +204,15 @@ def save_node_edge_data(
 
     # Define arguments per data type
     tasks = [
-        ("bus", processed_data, node_path, last_scenario, n_buses, include_dc_res),
-        ("gen", processed_data, gen_path, last_scenario, n_buses, include_dc_res),
-        ("branch", processed_data, branch_path, last_scenario, n_buses, include_dc_res),
-        ("y_bus", processed_data, y_bus_path, last_scenario, n_buses, include_dc_res),
+        ("bus", processed_data, node_path, last_scenario, include_dc_res),
+        ("gen", processed_data, gen_path, last_scenario, include_dc_res),
+        ("branch", processed_data, branch_path, last_scenario, include_dc_res),
+        ("y_bus", processed_data, y_bus_path, last_scenario, include_dc_res),
         (
             "runtime",
             processed_data,
             runtime_path,
             last_scenario,
-            n_buses,
             include_dc_res,
         ),
     ]

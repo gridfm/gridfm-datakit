@@ -1,13 +1,12 @@
 """Main data generation module for gridfm_datakit."""
 
-import gc
+from concurrent.futures import ProcessPoolExecutor, as_completed
 import multiprocessing
 import os
 import shutil
 import sys
 from datetime import datetime
-from multiprocessing import Manager
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import yaml
@@ -25,8 +24,9 @@ from gridfm_datakit.perturbations.load_perturbation import (
     plot_load_scenarios_combined,
 )
 from gridfm_datakit.process.process_network import (
+    _initialize_scenario_worker,
+    _process_scenario_worker,
     init_julia,
-    process_scenario_chunk,
     process_scenario_opf_mode,
     process_scenario_pf_mode,
 )
@@ -42,6 +42,27 @@ from gridfm_datakit.utils.param_handler import (
 )
 from gridfm_datakit.utils.random_seed import custom_seed
 from gridfm_datakit.utils.utils import Tee, write_parquet, write_ram_usage_distributed
+
+
+def _split_range(start: int, stop: int, n_parts: int) -> List[Tuple[int, int]]:
+    """Split a range into balanced contiguous bounds without materializing indices."""
+    length = stop - start
+    if length < 0:
+        raise ValueError("stop must be greater than or equal to start")
+    if length == 0:
+        return []
+    if n_parts <= 0:
+        raise ValueError("n_parts must be positive")
+
+    n_parts = min(n_parts, length)
+    quotient, remainder = divmod(length, n_parts)
+    bounds = []
+    cursor = start
+    for part_index in range(n_parts):
+        part_size = quotient + (part_index < remainder)
+        bounds.append((cursor, cursor + part_size))
+        cursor += part_size
+    return bounds
 
 
 def _setup_environment(
@@ -113,6 +134,14 @@ def _setup_environment(
             f"settings.pf_solver must be 'powermodel' or 'powsybl', got {pf_solver!r}",
         )
     args.settings.pf_solver = pf_solver
+
+    opf_formulation = getattr(args.settings, "opf_formulation", "polar")
+    if opf_formulation not in ("polar", "rectangular"):
+        raise ValueError(
+            "settings.opf_formulation must be 'polar' or 'rectangular', "
+            f"got {opf_formulation!r}",
+        )
+    args.settings.opf_formulation = opf_formulation
 
     # Setup output directory
     base_path = os.path.join(args.settings.data_dir, args.network.name, "raw")
@@ -329,7 +358,11 @@ def generate_power_flow_data(
         net,
     )
 
-    jl = init_julia(args.settings.max_iter, file_paths["solver_log_dir"])
+    jl = init_julia(
+        args.settings.max_iter,
+        file_paths["solver_log_dir"],
+        opf_formulation=args.settings.opf_formulation,
+    )
 
     processed_data = []
     # Flush results to disk periodically so memory stays bounded, mirroring
@@ -442,6 +475,16 @@ def generate_power_flow_data_distributed(
     if args.settings.mode not in ["opf", "pf"]:
         raise ValueError("Invalid mode!")
 
+    scenario_count = args.load.scenarios
+    large_chunk_size = args.settings.large_chunk_size
+    configured_processes = args.settings.num_processes
+    if scenario_count <= 0:
+        raise ValueError("load.scenarios must be positive")
+    if large_chunk_size <= 0:
+        raise ValueError("settings.large_chunk_size must be positive")
+    if configured_processes <= 0:
+        raise ValueError("settings.num_processes must be positive")
+
     # Prepare network and scenarios
     net, scenarios, meta = _prepare_network_and_scenarios(args, file_paths, seed)
 
@@ -460,88 +503,112 @@ def generate_power_flow_data_distributed(
         net,
     )
 
-    # Setup multiprocessing
-    manager = Manager()
-    progress_queue = manager.Queue()
+    # Match np.array_split's balanced chunk boundaries without first allocating
+    # an int64 array containing every scenario index.
+    n_large_chunks = (scenario_count + large_chunk_size - 1) // large_chunk_size
+    large_chunks = _split_range(0, scenario_count, n_large_chunks)
+    max_large_chunk_size = max(stop - start for start, stop in large_chunks)
+    worker_count = min(configured_processes, max_large_chunk_size)
 
-    # Process scenarios in chunks
-    large_chunks = np.array_split(
-        range(args.load.scenarios),
-        np.ceil(args.load.scenarios / args.settings.large_chunk_size).astype(int),
+    # pp_net wraps JVM state and cannot cross process boundaries. Spawned
+    # workers reload it once from network_path; the in-process path can reuse it.
+    worker_meta = (
+        meta
+        if worker_count == 1
+        else {key: value for key, value in meta.items() if key != "pp_net"}
+    )
+    worker_initargs = (
+        args.settings.mode,
+        net,
+        topology_generator,
+        generation_generator,
+        admittance_generator,
+        file_paths["error_log"],
+        args.settings.include_dc_res,
+        args.settings.pf_fast,
+        args.settings.dcpf_fast,
+        file_paths["solver_log_dir"],
+        args.settings.max_iter,
+        seed,
+        args.settings.pf_solver,
+        worker_meta,
+        args.settings.opf_formulation,
     )
 
     with open(file_paths["tqdm_log"], "a") as f:
         with tqdm(
-            total=args.load.scenarios,
+            total=scenario_count,
             desc="Processing scenarios",
             file=Tee(sys.stdout, f),
             miniters=5,
         ) as pbar:
-            # One pool for the whole run: workers persist across large chunks,
-            # so each worker pays the expensive Julia startup once instead of
-            # once per chunk (process_scenario_chunk caches the handle).
-            _mp_ctx = multiprocessing.get_context("spawn")
-            with _mp_ctx.Pool(processes=args.settings.num_processes) as pool:
-                for large_chunk_index, large_chunk in enumerate(large_chunks):
+
+            def process_large_chunks(
+                executor: Optional[ProcessPoolExecutor] = None,
+            ) -> None:
+                for large_start, large_stop in large_chunks:
                     write_ram_usage_distributed(f)
-                    chunk_size = len(large_chunk)
-                    scenario_chunks = np.array_split(
-                        large_chunk,
-                        min(args.settings.num_processes, chunk_size),
+                    chunk_size = large_stop - large_start
+                    scenario_chunks = _split_range(
+                        large_start,
+                        large_stop,
+                        min(worker_count, chunk_size),
                     )
+                    results_by_start = {}
 
-                    # pp_net wraps JVM state and cannot cross process boundaries;
-                    # workers reload it themselves from network_path.
-                    worker_meta = {k: v for k, v in meta.items() if k != "pp_net"}
+                    if executor is None:
+                        for start, stop in scenario_chunks:
+                            result = _process_scenario_worker(
+                                (start, scenarios[:, start:stop, :]),
+                            )
+                            results_by_start[start] = result
+                    else:
+                        futures = {}
+                        for start, stop in scenario_chunks:
+                            # A contiguous slice is serialized roughly twice as
+                            # fast as a strided view and contains only this task's
+                            # scenarios, not the tensor for the entire run.
+                            scenario_slice = np.ascontiguousarray(
+                                scenarios[:, start:stop, :],
+                            )
+                            future = executor.submit(
+                                _process_scenario_worker,
+                                (start, scenario_slice),
+                            )
+                            futures[future] = (start, stop)
 
-                    tasks = [
-                        (
-                            args.settings.mode,
-                            chunk[0],
-                            chunk[-1] + 1,
-                            scenarios,
-                            net,
-                            progress_queue,
-                            topology_generator,
-                            generation_generator,
-                            admittance_generator,
-                            file_paths["error_log"],
-                            args.settings.include_dc_res,
-                            args.settings.pf_fast,
-                            args.settings.dcpf_fast,
-                            file_paths["solver_log_dir"],
-                            args.settings.max_iter,
-                            seed,
-                            args.settings.pf_solver,
-                            worker_meta,
-                        )
-                        for chunk in scenario_chunks
-                    ]
+                        for future in as_completed(futures):
+                            start, stop = futures[future]
+                            try:
+                                results_by_start[start] = future.result()
+                            except Exception as error:
+                                raise RuntimeError(
+                                    f"Scenario worker failed for [{start}, {stop})",
+                                ) from error
 
-                    results = [
-                        pool.apply_async(process_scenario_chunk, task) for task in tasks
-                    ]
-
-                    # Update progress
-                    completed = 0
-                    while completed < chunk_size:
-                        progress_queue.get()
-                        pbar.update(1)
-                        completed += 1
-
-                    # Gather results
                     processed_data = []
-
-                    for result in results:
+                    for start in sorted(results_by_start):
                         (
-                            e,
-                            traceback,
+                            returned_start,
+                            processed_count,
+                            error,
+                            traceback_text,
                             local_processed_data,
-                        ) = result.get()
-                        if isinstance(e, Exception):
-                            print(f"Error in process_scenario_chunk: {e}")
-                            print(traceback)
-                            sys.exit(e)
+                        ) = results_by_start[start]
+                        if returned_start != start:
+                            raise RuntimeError(
+                                f"Scenario worker returned chunk {returned_start}, expected {start}",
+                            )
+                        if error is not None:
+                            raise RuntimeError(
+                                f"Scenario chunk starting at {start} failed: {error}\n"
+                                f"{traceback_text}",
+                            ) from error
+                        if local_processed_data is None:
+                            raise RuntimeError(
+                                f"Scenario chunk starting at {start} returned no data",
+                            )
+                        pbar.update(processed_count)
                         processed_data.extend(local_processed_data)
 
                     # Save processed data
@@ -553,7 +620,19 @@ def generate_power_flow_data_distributed(
                         args,
                     )
 
-                    del processed_data
-                    gc.collect()
+            if worker_count == 1:
+                # Avoid spawning a process, serializing state, and starting a
+                # second Python interpreter when no parallelism was requested.
+                _initialize_scenario_worker(*worker_initargs)
+                process_large_chunks()
+            else:
+                mp_context = multiprocessing.get_context("spawn")
+                with ProcessPoolExecutor(
+                    max_workers=worker_count,
+                    mp_context=mp_context,
+                    initializer=_initialize_scenario_worker,
+                    initargs=worker_initargs,
+                ) as executor:
+                    process_large_chunks(executor)
 
     return file_paths
