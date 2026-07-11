@@ -59,8 +59,8 @@ def _branch_limit_fingerprint(net: Network) -> bytes:
     """Hash of the branch fields ``_gfm_state`` does NOT push per solve.
 
     Ratings, tap, shift, and angle limits live on ``net.branches`` just like
-    R/X/B/status, but only R/X/B/status get pushed into a fresh copy of
-    ``_GFM_BASE`` on every call. Unlike ``_network_fingerprint`` this must be
+    R/X/B/status, but only R/X/B/status get pushed into the reusable Julia
+    work state on every call. Unlike ``_network_fingerprint`` this must be
     recomputed every call (not cached on ``net``), so a change to these
     fields — e.g. a limit study lowering ``net.branches[:, RATE_A]`` — is
     detected and forces a reparse instead of silently reusing stale limits.
@@ -76,17 +76,26 @@ def _julia_pm_data(net: Network, jl: Any) -> Any:
 
     The MATPOWER case is written to a file and parsed only once per
     (process, base network, branch ratings/tap/shift/angle limits); after
-    that each call pushes just the mutable state (loads, setpoints,
-    statuses, admittances, costs) into a fresh copy of the parsed base —
-    field-for-field equivalent to ``PowerModels.parse_file(net.to_mpc(...))``
-    (see tests/test_pm_data_path.py) without the serialization and parsing
-    cost.
+    that each call resets one process-local work dictionary with the mutable
+    state (loads, setpoints, statuses, admittances, costs). The returned object
+    is valid only until the next call in this worker; solver calls are serial.
+    Its contents are field-for-field equivalent to
+    ``PowerModels.parse_file(net.to_mpc(...))`` (see
+    tests/test_pm_data_path.py), without per-solve copying, serialization, or
+    parsing.
     """
     global _ACTIVE_BASE_KEY
-    mpc_key = getattr(net, "_pm_fingerprint", None)
+    solver_cache = getattr(net, "_solver_cache", None)
+    if solver_cache is None:
+        # Backward compatibility for Network objects deserialized from before
+        # the shared cache was introduced.
+        solver_cache = {}
+        net._solver_cache = solver_cache
+
+    mpc_key = solver_cache.get("base_fingerprint")
     if mpc_key is None:
         mpc_key = _network_fingerprint(net)
-        net._pm_fingerprint = mpc_key
+        solver_cache["base_fingerprint"] = mpc_key
     key = (mpc_key, _branch_limit_fingerprint(net))
     if _ACTIVE_BASE_KEY != key:
         with tempfile.NamedTemporaryFile(
@@ -103,13 +112,23 @@ def _julia_pm_data(net: Network, jl: Any) -> Any:
                 os.unlink(temp_filename)
         _ACTIVE_BASE_KEY = key
 
-    n_buses = net.buses.shape[0]
-    rev = np.empty(n_buses, dtype=np.int64)
-    for new_idx, orig_idx in net.reverse_bus_index_mapping.items():
-        rev[new_idx] = orig_idx
-    ncost = int(net.gencosts[0, NCOST])
+    bus_ids = solver_cache.get("bus_ids")
+    if bus_ids is None:
+        rev = solver_cache.get("reverse_bus_ids")
+        if rev is None:
+            rev = np.empty(net.buses.shape[0], dtype=np.int64)
+            for new_idx, orig_idx in net.reverse_bus_index_mapping.items():
+                rev[new_idx] = orig_idx
+            solver_cache["reverse_bus_ids"] = rev
+        bus_ids = rev[net.buses[:, BUS_I].astype(np.int64)]
+        solver_cache["bus_ids"] = bus_ids
+
+    ncost = solver_cache.get("ncost")
+    if ncost is None:
+        ncost = int(net.gencosts[0, NCOST])
+        solver_cache["ncost"] = ncost
     return jl._gfm_state(
-        rev[net.buses[:, BUS_I].astype(np.int64)],
+        bus_ids,
         net.buses[:, BUS_TYPE].astype(np.int64),
         net.buses[:, PD],
         net.buses[:, QD],

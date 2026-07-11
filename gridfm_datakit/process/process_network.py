@@ -6,12 +6,10 @@ running power flow calculations, and generating perturbed scenarios
 for data generation purposes.
 """
 
-import copy
 import os
 import time
 import traceback
 from importlib import resources
-from queue import Queue
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -75,6 +73,7 @@ def init_julia(
     dc_max_iter: Optional[int] = None,
     print_level: Optional[int] = None,
     output: Optional[SolverOutputConfig] = None,
+    opf_formulation: str = "polar",
 ) -> Any:
     """Initialize Julia interface with PowerModels.jl.
 
@@ -91,6 +90,9 @@ def init_julia(
         dc_max_iter: Maximum number of iterations for DC OPF solver (default 1000).
         print_level: Legacy. Explicit Ipopt print level override.
         output: Solver-output config; takes precedence over the legacy args.
+        opf_formulation: AC OPF coordinate formulation. ``"polar"`` preserves
+            the historical formulation; ``"rectangular"`` uses ACR coordinates
+            with starts from the current network state and is often faster.
 
     Returns:
         Julia interface object for running power flow calculations.
@@ -98,6 +100,12 @@ def init_julia(
     Raises:
         RuntimeError: If Julia initialization fails.
     """
+    if opf_formulation not in ("polar", "rectangular"):
+        raise ValueError(
+            "opf_formulation must be 'polar' or 'rectangular', "
+            f"got {opf_formulation!r}",
+        )
+
     if output is None:
         output = SolverOutputConfig.from_settings(
             log_dir=solver_log_dir,
@@ -118,6 +126,10 @@ def init_julia(
 
     from juliacall import Main as jl
 
+    # Importing juliacall resolves every packaged juliapkg.json against
+    # JULIA_PROJECT before exposing Main. Running Pkg.instantiate again here is
+    # redundant and serializes concurrent workers on the project lock.
+
     # Route every sub-system's output through one process-wide policy. The
     # solver entrypoints below are plain aliases to their cores; capture happens
     # in Python around each call (see process.solvers), not baked into Julia.
@@ -127,18 +139,6 @@ def init_julia(
     print_level = ipopt_print_level
 
     try:
-        if julia_project:
-            jl_project = julia_project.replace("\\", "/")
-            # io=devnull silences the "Activating project at ..." banner that
-            # Pkg prints once per worker.
-            jl.seval(
-                f'''
-                using Pkg
-                Pkg.activate(raw"{jl_project}"; io=devnull)
-                Pkg.instantiate(; io=devnull)
-                ''',
-            )
-
         # If dc_max_iter not provided, use 1000
         dc_iter = 1000 if dc_max_iter is None else dc_max_iter
         # Memento.config! sets the root logger; PowerModels.silence() is what
@@ -174,26 +174,112 @@ def init_julia(
             else:
                 raise
 
-        # ----- AC-OPF core -----
+        # ----- AC-OPF cores -----
+        # ACR is opt-in: it is generally faster on the benchmarked large cases,
+        # but AC OPF is nonconvex and changing coordinates can change which local
+        # optimum Ipopt reaches.  Keep the historical ACP path as the default.
+        jl.seval(f'global _GFM_OPF_FORMULATION = "{opf_formulation}"')
         jl.seval(
-            """
-        function _run_opf_core(case_file)
-            start_time = time()  # record start (seconds since epoch)
+            f"""
+        function _gfm_set_acr_starts!(data)
+            for (_, bus) in data["bus"]
+                vm = bus["vm"]
+                va = bus["va"]
+                bus["vr_start"] = vm * cos(va)
+                bus["vi_start"] = vm * sin(va)
+            end
+            for (_, gen) in data["gen"]
+                gen["pg_start"] = gen["pg"]
+                gen["qg_start"] = gen["qg"]
+            end
+            return data
+        end
+
+        function _gfm_set_acp_starts!(data)
+            for (_, bus) in data["bus"]
+                bus["vm_start"] = bus["vm"]
+                bus["va_start"] = bus["va"]
+            end
+            for (_, gen) in data["gen"]
+                gen["pg_start"] = gen["pg"]
+                gen["qg_start"] = gen["qg"]
+            end
+            return data
+        end
+
+        function _gfm_clear_acr_starts!(data)
+            for (_, bus) in data["bus"]
+                delete!(bus, "vr_start")
+                delete!(bus, "vi_start")
+            end
+            for (_, gen) in data["gen"]
+                delete!(gen, "pg_start")
+                delete!(gen, "qg_start")
+            end
+            return data
+        end
+
+        function _gfm_clear_acp_starts!(data)
+            for (_, bus) in data["bus"]
+                delete!(bus, "vm_start")
+                delete!(bus, "va_start")
+            end
+            for (_, gen) in data["gen"]
+                delete!(gen, "pg_start")
+                delete!(gen, "qg_start")
+            end
+            return data
+        end
+
+        function _run_opf_polar_core(case_or_data)
+            start_time = time()
             result = solve_ac_opf(
-                case_file,
+                case_or_data,
                 optimizer_with_attributes(
                     Ipopt.Optimizer,
                     "tol" => 1e-6,
-                    "print_level" => {},
-                    "max_iter" => {},
+                    "print_level" => {print_level},
+                    "max_iter" => {max_iter},
                 ),
             )
-            end_time = time()  # record end time
-            result["runtime"] = end_time - start_time  # elapsed seconds
+            result["runtime"] = time() - start_time
             result["solution"]["pf"] = false
             return result
         end
-        """.format(print_level, max_iter),
+
+        function _run_opf_rectangular_core(case_or_data)
+            start_time = time()
+            data = case_or_data isa AbstractString ?
+                PowerModels.parse_file(case_or_data) : case_or_data
+            _gfm_set_acr_starts!(data)
+            result = nothing
+            try
+                result = solve_opf(
+                    data,
+                    ACRPowerModel,
+                    optimizer_with_attributes(
+                        Ipopt.Optimizer,
+                        "tol" => 1e-6,
+                        "print_level" => {print_level},
+                        "max_iter" => {max_iter},
+                    );
+                    solution_processors=[sol_data_model!],
+                )
+            finally
+                _gfm_clear_acr_starts!(data)
+            end
+            result["runtime"] = time() - start_time
+            result["solution"]["pf"] = false
+            return result
+        end
+
+        function _run_opf_core(case_or_data)
+            if _GFM_OPF_FORMULATION == "rectangular"
+                return _run_opf_rectangular_core(case_or_data)
+            end
+            return _run_opf_polar_core(case_or_data)
+        end
+        """,
         )
 
         # Output routing is handled in Python (fd-level capture around the call),
@@ -227,11 +313,17 @@ def init_julia(
         # ----- Fast PF (direct computation) -----
         # *_data variants take a PowerModels data dict (built by _gfm_state);
         # the file entrypoints wrap them for warmups and direct file solves.
-        # The _data variants mutate their argument (update_data!), so callers
-        # must pass a per-solve copy — _gfm_state returns a fresh one.
+        # The _data variants mutate their argument (update_data!). The next
+        # _gfm_state call fully resets the worker-local buffer before reuse.
         jl.seval("""
         function run_pf_fast_data(network)
-            result = compute_ac_pf(network)
+            _gfm_set_acp_starts!(network)
+            result = nothing
+            try
+                result = compute_ac_pf(network)
+            finally
+                _gfm_clear_acp_starts!(network)
+            end
 
             if result["termination_status"] == false
                 return result
@@ -270,15 +362,21 @@ def init_julia(
         jl.seval(
             """
         function run_pf_data(network)
-            result = solve_ac_pf(
-                network,
-                optimizer_with_attributes(
-                    Ipopt.Optimizer,
-                    "tol" => 1e-6,
-                    "print_level" => {},
-                    "max_iter" => {},
-                ),
-            )
+            _gfm_set_acp_starts!(network)
+            result = nothing
+            try
+                result = solve_ac_pf(
+                    network,
+                    optimizer_with_attributes(
+                        Ipopt.Optimizer,
+                        "tol" => 1e-6,
+                        "print_level" => {},
+                        "max_iter" => {},
+                    ),
+                )
+            finally
+                _gfm_clear_acp_starts!(network)
+            end
 
             if string(result["termination_status"]) != "LOCALLY_SOLVED"
                 return result
@@ -358,6 +456,7 @@ def init_julia(
                 end
             end
             global _GFM_BASE = data
+            global _GFM_WORK = deepcopy(data)
             global _GFM_BUS_LOAD = bus_load
             return nothing
         end
@@ -365,7 +464,10 @@ def init_julia(
         function _gfm_state(bus_ids, bus_type, pd, qd, vm, va_deg,
                             pg, qg, vg, gen_status, cost,
                             br_status, br_r, br_x, br_b)
-            d = deepcopy(_GFM_BASE)
+            # One worker executes solves serially, so reset and reuse a single
+            # work dictionary instead of deep-copying the full parsed network
+            # for every PF/OPF call.
+            d = _GFM_WORK
             mva = d["baseMVA"]
             for r in eachindex(bus_ids)
                 bi = Int(bus_ids[r])
@@ -526,9 +628,16 @@ def _solution_arrays(
     # at module level) keeps `import gridfm_datakit` from booting Julia.
     from juliacall import Main as jl
 
-    rev = np.empty(n_buses, dtype=np.int64)
-    for new_idx, orig_idx in net.reverse_bus_index_mapping.items():
-        rev[new_idx] = orig_idx
+    solver_cache = getattr(net, "_solver_cache", None)
+    if solver_cache is None:
+        solver_cache = {}
+        net._solver_cache = solver_cache
+    rev = solver_cache.get("reverse_bus_ids")
+    if rev is None:
+        rev = np.empty(n_buses, dtype=np.int64)
+        for new_idx, orig_idx in net.reverse_bus_index_mapping.items():
+            rev[new_idx] = orig_idx
+        solver_cache["reverse_bus_ids"] = rev
     branch_flows, gen_pq, bus_vmva = jl._gfm_pack(
         res,
         (ids_branch + 1).astype(np.int64),
@@ -541,10 +650,8 @@ def _solution_arrays(
 def pf_preprocessing(net: Network, res: Dict[str, Any]) -> Network:
     """Set variables to the results of OPF.
 
-    Updates the following network components with OPF results:
-
-    - sgen.p_mw: active power generation for static generators
-    - gen.p_mw, gen.vm_pu: active power and voltage magnitude for generators
+    Copies the complete OPF operating point needed to initialize PF: active
+    and reactive generator dispatch plus bus voltage magnitude and angle.
 
     Args:
         net: The power network to preprocess.
@@ -556,7 +663,10 @@ def pf_preprocessing(net: Network, res: Dict[str, Any]) -> Network:
     _, gen_pq, bus_vmva = _solution_arrays(res, net)
 
     net.Pg_gen = gen_pq[:, 0] * net.baseMVA
+    net.Qg_gen = gen_pq[:, 1] * net.baseMVA
     net.Vm = bus_vmva[:, 0]
+    # PowerModels reports radians; MATPOWER stores degrees.
+    net.Va = np.rad2deg(bus_vmva[:, 1])
 
     return net
 
@@ -907,6 +1017,7 @@ def process_scenario_pf_mode(
     pf_solver: str = "powermodel",
     *,
     meta: Optional[Dict] = None,
+    scenario_data_index: Optional[int] = None,
 ) -> List[np.ndarray]:
     """Processes a load scenario in PF mode.
 
@@ -917,11 +1028,11 @@ def process_scenario_pf_mode(
     Parameters
     ----------
     net:
-        The base power network (deep-copied internally before mutation).
+        The base power network (copied internally before mutation).
     scenarios:
         Array of load scenarios with shape ``(n_loads, n_scenarios, 2)``.
     scenario_index:
-        Index of the current scenario to process.
+        Global index of the current scenario to process and write.
     topology_generator:
         Generator for topology perturbations (line/transformer outages).
     generation_generator:
@@ -956,6 +1067,9 @@ def process_scenario_pf_mode(
     Optional dictionary containing metadata for PowSyBl processing, with keys:
         - pp_net: the PowSyBl network.
         - mapping_p2g: dictionary mapping from PowSyBl to GFM.
+    scenario_data_index:
+        Optional local index into a sliced ``scenarios`` tensor. Defaults to
+        ``scenario_index`` for callers that pass the full tensor.
 
     Returns
     -------
@@ -969,11 +1083,12 @@ def process_scenario_pf_mode(
     Random seed is controlled by the calling context
     (``process_scenario_chunk`` or ``generate_power_flow_data``).
     """
-    net = copy.deepcopy(net)
+    net = net.copy_for_perturbation()
 
     # apply the load scenario to the network
-    net.Pd = scenarios[:, scenario_index, 0]
-    net.Qd = scenarios[:, scenario_index, 1]
+    data_index = scenario_index if scenario_data_index is None else scenario_data_index
+    net.Pd = scenarios[:, data_index, 0]
+    net.Qd = scenarios[:, data_index, 1]
 
     # Apply generation perturbations before OPF.
     perturbations = generation_generator.generate((x for x in [net]))
@@ -993,8 +1108,7 @@ def process_scenario_pf_mode(
             )
         return local_processed_data
 
-    net_pf = copy.deepcopy(net)
-    net_pf = pf_preprocessing(net_pf, res)
+    net_pf = pf_preprocessing(net, res)
 
     # Generate perturbed topologies
     perturbations = topology_generator.generate(net_pf)
@@ -1101,10 +1215,95 @@ def process_scenario_pf_mode(
     return local_processed_data
 
 
-# Per-worker Julia handle, initialized on the first chunk and reused for the
-# rest of the worker's lifetime. Safe to key on nothing: within one run every
-# chunk passes the same (max_iter, solver_log_dir) to init_julia.
+# Per-worker state. Large, invariant objects are installed once by the process
+# initializer instead of being serialized again with every scenario chunk.
 _worker_jl = None
+_worker_context: Optional[Dict[str, Any]] = None
+
+
+def _initialize_scenario_worker(
+    mode: str,
+    net: Network,
+    topology_generator: TopologyGenerator,
+    generation_generator: GenerationGenerator,
+    admittance_generator: AdmittanceGenerator,
+    error_log_path: str,
+    include_dc_res: bool,
+    pf_fast: bool,
+    dcpf_fast: bool,
+    solver_log_dir: Optional[str],
+    max_iter: int,
+    seed: int,
+    pf_solver: str,
+    meta: Optional[Dict],
+    opf_formulation: str = "polar",
+) -> None:
+    """Install immutable run state once in a spawned scenario worker."""
+    global _worker_context, _worker_jl
+    _worker_jl = None
+    _worker_context = {
+        "mode": mode,
+        "net": net,
+        "topology_generator": topology_generator,
+        "generation_generator": generation_generator,
+        "admittance_generator": admittance_generator,
+        "error_log_path": error_log_path,
+        "include_dc_res": include_dc_res,
+        "pf_fast": pf_fast,
+        "dcpf_fast": dcpf_fast,
+        "solver_log_dir": solver_log_dir,
+        "max_iter": max_iter,
+        "seed": seed,
+        "pf_solver": pf_solver,
+        "meta": meta,
+        "opf_formulation": opf_formulation,
+    }
+
+
+def _process_scenario_worker(
+    task: Tuple[int, np.ndarray],
+) -> Tuple[
+    int,
+    int,
+    Union[None, Exception],
+    Union[None, str],
+    Optional[List[np.ndarray]],
+]:
+    """Process one sliced scenario tensor using process-local run state."""
+    if _worker_context is None:
+        raise RuntimeError("Scenario worker has not been initialized")
+
+    scenario_index_offset, scenarios = task
+    scenario_count = scenarios.shape[1]
+    error, traceback_text, processed_data = process_scenario_chunk(
+        _worker_context["mode"],
+        0,
+        scenario_count,
+        scenarios,
+        _worker_context["net"],
+        None,
+        _worker_context["topology_generator"],
+        _worker_context["generation_generator"],
+        _worker_context["admittance_generator"],
+        _worker_context["error_log_path"],
+        _worker_context["include_dc_res"],
+        _worker_context["pf_fast"],
+        _worker_context["dcpf_fast"],
+        _worker_context["solver_log_dir"],
+        _worker_context["max_iter"],
+        _worker_context["seed"],
+        _worker_context["pf_solver"],
+        _worker_context["meta"],
+        scenario_index_offset=scenario_index_offset,
+        opf_formulation=_worker_context["opf_formulation"],
+    )
+    return (
+        scenario_index_offset,
+        scenario_count,
+        error,
+        traceback_text,
+        processed_data,
+    )
 
 
 def process_scenario_chunk(
@@ -1113,7 +1312,7 @@ def process_scenario_chunk(
     end_idx: int,
     scenarios: np.ndarray,
     net: Network,
-    progress_queue: Queue,
+    progress_queue: Optional[Any],
     topology_generator: TopologyGenerator,
     generation_generator: GenerationGenerator,
     admittance_generator: AdmittanceGenerator,
@@ -1126,6 +1325,9 @@ def process_scenario_chunk(
     seed: int,
     pf_solver: str = "powermodel",
     meta: Optional[Dict] = None,
+    *,
+    scenario_index_offset: int = 0,
+    opf_formulation: str = "polar",
 ) -> Tuple[
     Union[None, Exception],
     Union[None, str],
@@ -1157,6 +1359,8 @@ def process_scenario_chunk(
             OPF is always solved by PowerModels regardless of this value.
         meta: metadata dict; when pf_solver='powsybl', must contain 'network_path'
             and 'mapping_p2g'. 'pp_net' is loaded fresh per worker from 'network_path'.
+        scenario_index_offset: Global index added to local indices when ``scenarios``
+            contains only the current chunk.
 
     Returns:
         Tuple containing:
@@ -1166,9 +1370,14 @@ def process_scenario_chunk(
     """
 
     global _worker_jl
+    completed_scenarios = 0
     try:
         if _worker_jl is None:
-            _worker_jl = init_julia(max_iter, solver_log_dir)
+            _worker_jl = init_julia(
+                max_iter,
+                solver_log_dir,
+                opf_formulation=opf_formulation,
+            )
         jl = _worker_jl
 
         # In distributed (spawn) workers pp_net is not passed; reload it here.
@@ -1181,12 +1390,13 @@ def process_scenario_chunk(
             import gridfm_datakit.powsybl as _powsybl
 
             loaded_net = _powsybl.load_net(meta["network_path"])
-            meta = dict(meta)
             meta["pp_net"] = loaded_net.pp_net
 
         local_processed_data = []
 
-        # Use custom_seed to set seed based on start_idx for this chunk
+        global_start_idx = start_idx + scenario_index_offset
+
+        # Use custom_seed to set seed based on the global start index for this chunk
         # This ensures each chunk gets a unique but deterministic seed
         # we multiply by 20_000 to ensure there is no collision with other runs where the seed would be close to each other
         # example (assuming we have chunks of length 1, hence an increment of 1 between start indices)
@@ -1194,8 +1404,9 @@ def process_scenario_chunk(
         # Run B: base seed = 120 → scenario seeds = 120, 121, 122, …, 10119
         # These sets overlap on seeds 120..10041 (so 9,922 overlapping seeds).
         # we also add 1 in case the seed is 0, to not have collision witht he seed used for the load perturbations
-        with custom_seed(seed * 20_000 + start_idx + 1):
-            for scenario_index in range(start_idx, end_idx):
+        with custom_seed(seed * 20_000 + global_start_idx + 1):
+            for scenario_data_index in range(start_idx, end_idx):
+                scenario_index = scenario_data_index + scenario_index_offset
                 if mode == "opf":
                     local_processed_data = process_scenario_opf_mode(
                         net,
@@ -1208,6 +1419,7 @@ def process_scenario_chunk(
                         error_log_path,
                         include_dc_res,
                         jl,
+                        scenario_data_index=scenario_data_index,
                     )
                 elif mode == "pf":
                     local_processed_data = process_scenario_pf_mode(
@@ -1225,9 +1437,14 @@ def process_scenario_chunk(
                         jl,
                         pf_solver,
                         meta=meta,
+                        scenario_data_index=scenario_data_index,
                     )
+                else:
+                    raise ValueError(f"Invalid mode: {mode!r}")
 
-                progress_queue.put(1)  # update queue
+                completed_scenarios += 1
+                if progress_queue is not None:
+                    progress_queue.put(1)
 
         return (
             None,
@@ -1239,8 +1456,9 @@ def process_scenario_chunk(
             f.write(f"Caught an exception in process_scenario_chunk function: {e}\n")
             f.write(traceback.format_exc())
             f.write("\n")
-        for _ in range(end_idx - start_idx):
-            progress_queue.put(1)
+        if progress_queue is not None:
+            for _ in range(end_idx - start_idx - completed_scenarios):
+                progress_queue.put(1)
         return e, traceback.format_exc(), None
 
 
@@ -1255,6 +1473,8 @@ def process_scenario_opf_mode(
     error_log_file: str,
     include_dc_res: bool,
     jl: Any,
+    *,
+    scenario_data_index: Optional[int] = None,
 ) -> List[np.ndarray]:
     """Processes a load scenario in OPF mode
 
@@ -1273,6 +1493,8 @@ def process_scenario_opf_mode(
         error_log_file: Path to error log file for recording failures.
         include_dc_res: Whether to include DC power flow results in output.
         jl: Julia interface object for running power flow calculations.
+        scenario_data_index: Optional local index into a sliced ``scenarios``
+            tensor. Defaults to ``scenario_index``.
 
     Returns:
         Updated list of processed data (bus, gen, branch, Y_bus arrays)
@@ -1282,8 +1504,9 @@ def process_scenario_opf_mode(
     """
 
     # apply the load scenario to the network
-    net.Pd = scenarios[:, scenario_index, 0]
-    net.Qd = scenarios[:, scenario_index, 1]
+    data_index = scenario_index if scenario_data_index is None else scenario_data_index
+    net.Pd = scenarios[:, data_index, 0]
+    net.Qd = scenarios[:, data_index, 1]
 
     # Generate perturbed topologies
     perturbations = topology_generator.generate(net)

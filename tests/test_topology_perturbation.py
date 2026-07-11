@@ -5,6 +5,7 @@ Tests that perturbations don't modify the original network and work correctly
 
 import pytest
 import numpy as np
+from itertools import islice
 from gridfm_datakit.network import load_net_from_pglib
 from gridfm_datakit.perturbations.topology_perturbation import (
     NoPerturbationGenerator,
@@ -195,6 +196,21 @@ class TestTopologyPerturbation:
         assert len(perturbed_networks) > 0, (
             "Should generate at least one network with k=1"
         )
+
+    def test_n_minus_k_combinations_are_lazy_and_reusable(self):
+        """N-k setup must not materialize its combinatorial search space."""
+        network = load_net_from_pglib("case24_ieee_rts")
+        with pytest.warns(UserWarning, match="k>1"):
+            generator = NMinusKGenerator(k=2, base_net=network)
+
+        n_branches = len(network.idx_branches_in_service)
+        expected_count = 1 + n_branches + n_branches * (n_branches - 1) // 2
+        assert len(generator.component_combinations) == expected_count
+        assert not isinstance(generator.component_combinations, list)
+
+        first_pass = list(islice(generator.component_combinations, 4))
+        second_pass = list(islice(generator.component_combinations, 4))
+        assert first_pass == second_pass
 
     def test_random_component_drop_different_elements(self):
         """Test RandomComponentDropGenerator with different element types"""

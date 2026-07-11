@@ -15,7 +15,11 @@ import numpy as np
 import pytest
 
 from gridfm_datakit.network import load_net_from_file
-from gridfm_datakit.process.process_network import init_julia
+from gridfm_datakit.process.process_network import (
+    _solution_arrays,
+    init_julia,
+    pf_preprocessing,
+)
 from gridfm_datakit.process.solvers import (
     _julia_pm_data,
     run_opf,
@@ -229,3 +233,81 @@ def test_base_reinit_on_network_switch(jl):
     # and back
     res_a2 = run_opf(net_a, jl)
     assert len(res_a2["solution"]["bus"]) == 24
+
+
+def test_state_buffer_is_reused_and_fully_reset(net, jl):
+    """A PF-mutated Julia buffer must be reset before the next scenario.
+
+    The performance contract is one work dictionary per active base case, not
+    one deep copy per solve.  Reuse is safe only if every scenario-controlled
+    field is restored after PowerModels mutates the previous PF input.
+    """
+    opf_result = run_opf(net, jl)
+    pf_net = pf_preprocessing(copy.deepcopy(net), opf_result)
+    target = perturb_richly(copy.deepcopy(net), seed=7)
+    reference = parse_reference(target, jl)
+    for function_name in (
+        "run_pf_fast_data",
+        "run_pf_data",
+        "run_dcpf_fast_data",
+        "run_dcpf_data",
+    ):
+        first = _julia_pm_data(pf_net, jl)
+        first_id = int(jl.objectid(first))
+        result = getattr(jl, function_name)(first)
+        assert str(result["termination_status"]) in ("True", "LOCALLY_SOLVED")
+
+        reused = _julia_pm_data(target, jl)
+        assert int(jl.objectid(reused)) == first_id
+        for component, fields in COMPONENT_FIELDS.items():
+            for key in reference[component]:
+                assert set(reused[component][key].keys()) == set(
+                    reference[component][key].keys(),
+                ), f"extra stale fields after {function_name}"
+                for field in fields:
+                    got = np.asarray(reused[component][key][field], dtype=float)
+                    want = np.asarray(reference[component][key][field], dtype=float)
+                    assert np.allclose(got, want, rtol=1e-12, atol=1e-12), (
+                        f"stale {component}[{key}].{field} after {function_name}: "
+                        f"got {got}, want {want}"
+                    )
+
+
+def test_pf_preprocessing_keeps_complete_opf_operating_point(net, jl):
+    """PF starts need P/Q dispatch and voltage magnitude/angle, with units fixed."""
+    result = run_opf(net, jl)
+    prepared = pf_preprocessing(copy.deepcopy(net), result)
+    _, gen_pq, bus_vmva = _solution_arrays(result, prepared)
+
+    np.testing.assert_allclose(
+        prepared.Pg_gen[prepared.idx_gens_in_service],
+        gen_pq[:, 0] * prepared.baseMVA,
+    )
+    np.testing.assert_allclose(
+        prepared.Qg_gen[prepared.idx_gens_in_service],
+        gen_pq[:, 1] * prepared.baseMVA,
+    )
+    np.testing.assert_allclose(prepared.Vm, bus_vmva[:, 0])
+    np.testing.assert_allclose(prepared.Va, np.rad2deg(bus_vmva[:, 1]))
+
+
+def test_rectangular_opf_matches_polar_objective_and_cleans_starts(net, jl):
+    """The opt-in ACR path must return standard vm/va output and no stale starts."""
+    polar = run_opf(net, jl)
+    jl.seval('global _GFM_OPF_FORMULATION = "rectangular"')
+    try:
+        rectangular = run_opf(net, jl)
+    finally:
+        jl.seval('global _GFM_OPF_FORMULATION = "polar"')
+    data = _julia_pm_data(net, jl)
+
+    assert str(rectangular["termination_status"]) == "LOCALLY_SOLVED"
+    assert np.isclose(
+        float(rectangular["objective"]),
+        float(polar["objective"]),
+        rtol=1e-7,
+    )
+    for bus in data["bus"].values():
+        assert "vr_start" not in bus and "vi_start" not in bus
+    for gen in data["gen"].values():
+        assert "pg_start" not in gen and "qg_start" not in gen

@@ -13,7 +13,6 @@ import warnings
 from importlib import resources
 from typing import Any, Dict, Tuple
 
-import networkx as nx
 import numpy as np
 import pandas as pd
 import requests
@@ -22,6 +21,7 @@ from juliapkg.state import STATE
 from matpowercaseframes import CaseFrames
 from numpy import any, conj, exp, hstack, int64, nonzero, ones, pi, real
 from scipy.sparse import csr_matrix
+from scipy.sparse.csgraph import connected_components
 
 from gridfm_datakit.utils.idx_brch import (
     BR_B,
@@ -222,7 +222,31 @@ class Network:
         )
         self.ref_bus_idx = np.where(self.buses[:, BUS_TYPE] == REF)[0][0]
 
+        # Static solver metadata is computed lazily and shared by the cheap
+        # scenario copies.  The electrical matrices themselves remain isolated.
+        self._solver_cache: Dict[str, Any] = {}
+
         self.check_single_connected_component()
+
+    def copy_for_perturbation(self) -> "Network":
+        """Copy the mutable electrical state without duplicating static metadata.
+
+        Scenario processing only mutates ``buses``, ``gens``, ``branches``, and
+        ``gencosts``. The original MATPOWER data and index mappings are read-only
+        after construction, so deep-copying them for every perturbation wastes
+        both time and memory, especially on large grids.
+
+        Returns:
+            An independent network state whose four mutable matrices do not
+            share memory with this instance.
+        """
+        clone = self.__class__.__new__(self.__class__)
+        clone.__dict__ = self.__dict__.copy()
+        clone.buses = self.buses.copy()
+        clone.gens = self.gens.copy()
+        clone.branches = self.branches.copy()
+        clone.gencosts = self.gencosts.copy()
+        return clone
 
     @property
     def idx_gens_in_service(self) -> np.ndarray:
@@ -443,34 +467,31 @@ class Network:
         """
         Check that the network forms a single connected component.
 
-        Creates a NetworkX graph with buses as nodes and in-service branches as edges,
-        then checks if there is exactly one connected component.
+        Builds a sparse adjacency matrix from in-service branches and checks if
+        it has exactly one connected component.
 
         Returns:
             bool: True if there is exactly one connected component, False otherwise
         """
-        # Create NetworkX graph
-        G = nx.Graph()
-
-        # Add all buses as nodes
         n_buses = self.buses.shape[0]
-        G.add_nodes_from(range(n_buses))
-
-        # Add in-service branches as edges
-        in_service_branches = self.idx_branches_in_service
-        for branch_idx in in_service_branches:
-            from_bus = int(self.branches[branch_idx, F_BUS])
-            to_bus = int(self.branches[branch_idx, T_BUS])
-            G.add_edge(from_bus, to_bus)
-
-        # Find connected components
-        connected_components = list(nx.connected_components(G))
-
-        # Check if there is exactly one connected component
-        if len(connected_components) == 1:
-            return True
-        else:
-            return False
+        in_service = self.branches[:, BR_STATUS] == 1
+        from_buses = self.branches[in_service, F_BUS].astype(np.int64, copy=False)
+        to_buses = self.branches[in_service, T_BUS].astype(np.int64, copy=False)
+        adjacency = csr_matrix(
+            (
+                np.ones(from_buses.size, dtype=np.uint8),
+                (from_buses, to_buses),
+            ),
+            shape=(n_buses, n_buses),
+        )
+        return (
+            connected_components(
+                adjacency,
+                directed=False,
+                return_labels=False,
+            )
+            == 1
+        )
 
     def version(self) -> str:
         """Get the MATPOWER version from the MPC dictionary.
