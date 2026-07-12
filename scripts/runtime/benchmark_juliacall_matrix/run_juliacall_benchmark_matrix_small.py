@@ -8,9 +8,12 @@ import sys
 from pathlib import Path
 
 
+from case_paths import pglib_case_file
+
+
 SCRIPT_DIR = Path(__file__).resolve().parent
-REPO_ROOT = SCRIPT_DIR.parents[1]
-BENCHMARK_SCRIPT = REPO_ROOT / "scripts" / "benchmark_case118_dynamic_pf_sweep_juliacall.py"
+REPO_ROOT = SCRIPT_DIR.parents[2]
+BENCHMARK_SCRIPT = SCRIPT_DIR / "benchmark_case118_dynamic_pf_sweep_juliacall.py"
 GRIDS_DIR = REPO_ROOT / "gridfm_datakit" / "grids"
 OUTPUT_DIR = SCRIPT_DIR / "outputs" / "small"
 
@@ -31,10 +34,7 @@ BENCHMARK_SPECS: list[tuple[str, int, bool | None]] = [
 
 
 def case_file_for_network(network: str) -> Path:
-    case_file = GRIDS_DIR / f"pglib_opf_{network}_corrected.m"
-    if not case_file.exists():
-        raise FileNotFoundError(f"Corrected case file not found: {case_file}")
-    return case_file
+    return pglib_case_file(GRIDS_DIR, network)
 
 
 def main() -> int:
