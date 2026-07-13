@@ -26,7 +26,13 @@ import yaml
 from gridfm_datakit.dynamic import DynamicResults, load_raw_inputs
 from gridfm_datakit.generate import _prepare_network_and_scenarios, _setup_environment
 from gridfm_datakit.process.solver_output import SolverVerbosity
-from gridfm_datakit.utils.column_names import BRANCH_COLUMNS, BUS_COLUMNS, GEN_COLUMNS
+from gridfm_datakit.utils.column_names import (
+    BRANCH_COLUMNS,
+    BUS_COLUMNS,
+    GEN_COLUMNS,
+    RUNTIME_COLUMNS,
+    YBUS_COLUMNS,
+)
 from gridfm_datakit.utils.param_handler import NestedNamespace
 
 # Progress/status logger for the dynamic pipeline. A NullHandler keeps the
@@ -130,6 +136,13 @@ def generate_dynamic_data(
     # output to files instead of dropping it.
     args.settings.solver_log_dir = file_paths["solver_log_dir"]
 
+    # The dynamic pipeline reports progress through the "gridfm_datakit.dynamic"
+    # logger (per-chunk), not tqdm — so _setup_environment's tqdm.log would only
+    # ever be an empty file. Drop it rather than export a misleading artifact.
+    tqdm_log = file_paths.pop("tqdm_log", None)
+    if tqdm_log is not None:
+        Path(tqdm_log).unlink(missing_ok=True)
+
     # --- Step 2: network + scenarios (reuse generate.py logic) ---
     # TODO: discuss with YE: just a function to prep load scenarios and the path
     # we don't need the net, since we'll pass the path instead of the net along the pipeline
@@ -228,6 +241,8 @@ def _save_generated_data(
       bus_data.parquet
       branch_data.parquet
       gen_data.parquet
+      y_bus_data.parquet
+      runtime_data.parquet
       dynamic_results.zarr/   ← shape (n_scenarios, n_variables, n_timesteps)
       metadata.json
 
@@ -252,6 +267,7 @@ def _save_generated_data(
     # the dynamic trajectory (labels) by key rather than by row position. This
     # keeps the two modalities aligned even when a sample contributes to only one.
     bus_rows, gen_rows, branch_rows = [], [], []
+    y_bus_rows, runtime_rows = [], []
     static_keys = []  # list of (scenario_index, perturbation_index)
     for r in all_results:
         pf = r["pf_data"]
@@ -261,6 +277,8 @@ def _save_generated_data(
         bus_rows.append(pf["bus"])
         gen_rows.append(pf["gen"])
         branch_rows.append(pf["branch"])
+        y_bus_rows.append(pf["Y_bus"])
+        runtime_rows.append(pf["runtime"])
 
     def _to_parquet(rows, keys, columns, path):
         if not rows:
@@ -281,14 +299,23 @@ def _save_generated_data(
     bus_path = str(output_dir / "bus_data.parquet")
     branch_path = str(output_dir / "branch_data.parquet")
     gen_path = str(output_dir / "gen_data.parquet")
+    y_bus_path = str(output_dir / "y_bus_data.parquet")
+    runtime_path = str(output_dir / "runtime_data.parquet")
 
     _to_parquet(bus_rows, static_keys, BUS_COLUMNS, bus_path)
     _to_parquet(gen_rows, static_keys, GEN_COLUMNS, gen_path)
     _to_parquet(branch_rows, static_keys, BRANCH_COLUMNS, branch_path)
+    # Y-bus and runtime complete the static snapshot at parity with the static
+    # pipeline's _save_generated_data, which exports both. pf_data already
+    # carries them, so omitting them silently dropped data.
+    _to_parquet(y_bus_rows, static_keys, YBUS_COLUMNS, y_bus_path)
+    _to_parquet(runtime_rows, static_keys, RUNTIME_COLUMNS, runtime_path)
 
     file_paths["bus_data"] = bus_path
     file_paths["branch_data"] = branch_path
     file_paths["gen_data"] = gen_path
+    file_paths["y_bus_data"] = y_bus_path
+    file_paths["runtime_data"] = runtime_path
 
     # ---- Dynamic time-series → Zarr -----------------------------------------
     # Collect per-scenario arrays as (n_variables, n_timesteps) — the per-scenario
