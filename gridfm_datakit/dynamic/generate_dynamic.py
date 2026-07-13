@@ -202,6 +202,14 @@ def _validate_dynamic_config(args: NestedNamespace) -> None:
             "Set 'dynamic_solver: dynawo' in the dynamic block.",
         )
 
+    # Fail fast on a missing Dynawo installation. pypowsybl.dynamic imports fine
+    # without it, so otherwise the run only dies once the workers reach
+    # Simulation.run(), with an opaque provider-instantiation error.
+    if dynamic_solver == "dynawo":
+        from gridfm_datakit.dynamic.dynawo.api import check_dynawo_available
+
+        check_dynawo_available()
+
     # Ensure reader is set to powsybl (required for pp_net in meta)
     if getattr(args.network, "reader", "native") != "powsybl":
         args.network.reader = "powsybl"
