@@ -108,6 +108,34 @@ def test_parquet_rows_carry_scenario_index(tmp_path):
     assert bus["scenario_index"].tolist() == [7, 7, 7, 7, 9, 9, 9, 9]
 
 
+def test_all_scenarios_failing_raises_instead_of_keeping_stale_outputs(tmp_path):
+    """An empty result set must not silently leave a previous run's files in place."""
+    out = tmp_path / "dyn"
+    out.mkdir(parents=True)
+    with pytest.raises(RuntimeError, match="every scenario failed"):
+        _save_generated_data(
+            all_results=[],
+            output_dir=out,
+            file_paths={},
+            config=NestedNamespace(dummy=1),
+            seed=0,
+        )
+
+
+def test_variable_count_mismatch_raises(tmp_path):
+    """Samples monitoring different variables cannot share one Zarr store."""
+    out = tmp_path / "dyn"
+    out.mkdir(parents=True)
+    with pytest.raises(ValueError, match="disagree on the number of variables"):
+        _save_generated_data(
+            all_results=[_result(0, n_variables=3), _result(1, n_variables=2)],
+            output_dir=out,
+            file_paths={},
+            config=NestedNamespace(dummy=1),
+            seed=0,
+        )
+
+
 def test_static_snapshot_is_at_parity_with_static_pipeline(tmp_path):
     """Y-bus and runtime are exported too, like generate._save_generated_data."""
     out, _, _ = _save([_result(7), _result(9)], tmp_path)

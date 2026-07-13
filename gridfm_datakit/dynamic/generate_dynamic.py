@@ -138,9 +138,14 @@ def generate_dynamic_data(
 
     # The dynamic pipeline reports progress through the "gridfm_datakit.dynamic"
     # logger (per-chunk), not tqdm — so _setup_environment's tqdm.log would only
-    # ever be an empty file. Drop it rather than export a misleading artifact.
+    # ever be an empty file. Stop exporting it.
+    #
+    # Only remove the file when settings.overwrite is set, i.e. when
+    # _setup_environment has just wiped and recreated base_path so the tqdm.log
+    # there is certainly ours. Otherwise base_path may be reused from an earlier
+    # *static* run, whose accumulated tqdm.log we must not destroy.
     tqdm_log = file_paths.pop("tqdm_log", None)
-    if tqdm_log is not None:
+    if tqdm_log is not None and getattr(args.settings, "overwrite", False):
         Path(tqdm_log).unlink(missing_ok=True)
 
     # --- Step 2: network + scenarios (reuse generate.py logic) ---
@@ -257,9 +262,15 @@ def _save_generated_data(
     """
     import zarr
 
+    # Every scenario failed. Returning quietly here would leave any artifacts from
+    # a previous run in output_dir (the pipeline deliberately does not wipe it) and
+    # hand the caller file_paths pointing at that stale data as if it were fresh.
     if not all_results:
-        logger.warning("No results to save.")
-        return
+        raise RuntimeError(
+            "Dynamic generation produced no samples: every scenario failed. "
+            f"See the error log for per-scenario causes. Nothing was written to "
+            f"{output_dir}; any files already there are from a previous run.",
+        )
 
     # ---- Static PF outputs → Parquet ----------------------------------------
     # Every element row is tagged with its (scenario_index, perturbation_index)
@@ -345,6 +356,16 @@ def _save_generated_data(
     if dyn_arrays:
         n_scenarios = len(dyn_arrays)
         n_variables = dyn_arrays[0].shape[0]
+        # Every sample must monitor the same variables, else axis 1 of the store
+        # is meaningless. Fail loudly rather than emit a corrupt array (an
+        # unchecked mismatch surfaces as an opaque broadcast/zero-division error).
+        mismatched = {a.shape[0] for a in dyn_arrays} - {n_variables}
+        if mismatched:
+            raise ValueError(
+                f"Dynamic samples disagree on the number of variables: found "
+                f"{sorted(mismatched | {n_variables})}. All scenarios must monitor "
+                f"the same variables to share one Zarr store.",
+            )
         # Solvers with adaptive time-stepping (e.g. IDA) or unstable trajectories
         # can emit a different number of timesteps per scenario. Size the store to
         # the longest run and NaN-pad shorter scenarios along the time axis; the
