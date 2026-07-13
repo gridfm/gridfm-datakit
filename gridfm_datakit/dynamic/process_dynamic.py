@@ -327,6 +327,18 @@ def process_single_dynamic_simulation(
     gfm_net.Pd = scenarios[:, scenario_index, 0]
     gfm_net.Qd = scenarios[:, scenario_index, 1]
 
+    # The three generators are handled differently because they have different
+    # cardinality, not by accident — this mirrors the static pipeline exactly
+    # (see process_network.process_scenario_*).
+    #
+    #   generation / admittance : 1 -> 1. They consume a stream of networks and
+    #       yield one perturbed network per input, so we take next() once. They
+    #       modify the operating point the OPF then optimises.
+    #   topology                : 1 -> N. It yields n_topology_variants outages
+    #       for a single network, so it is the only generator that expands one
+    #       load scenario into several samples — hence the loop below, and hence
+    #       perturbation_index existing at all.
+    #
     # Generation + admittance perturbations, applied before OPF.
     net_iter = iter([gfm_net])
     if generation_generator is not None:
