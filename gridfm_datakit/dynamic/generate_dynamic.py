@@ -259,6 +259,20 @@ def _validate_dynamic_config(args: NestedNamespace) -> None:
         args.network.reader = "powsybl"
 
 
+def _time_axis_seconds(curves: pd.DataFrame) -> np.ndarray:
+    """Return the curves' time axis as float seconds of simulation time.
+
+    pypowsybl exposes the curves index as pandas Timestamps built from the raw
+    Dynawo time (so t=0 s is the epoch). Convert back to seconds, which is what
+    the config speaks in (``solver_parameters.start_time`` / ``stop_time``).
+    Falls back to a plain float cast if the index is already numeric.
+    """
+    index = curves.index
+    if isinstance(index, pd.DatetimeIndex):
+        return index.to_numpy(dtype="datetime64[ns]").astype("int64") / 1e9
+    return np.asarray(index, dtype="float64")
+
+
 def _save_generated_data(
     all_results: List[Dict[str, Any]],
     output_dir: Path,
@@ -371,6 +385,7 @@ def _save_generated_data(
     # store is n_scenarios x n_variables x n_timesteps). Dynawo returns curves as a
     # (n_timesteps, n_variables) DataFrame, so transpose here.
     dyn_arrays = []
+    time_arrays: List[np.ndarray] = []
     timesteps_per_scenario: List[int] = []
     dynamic_scenarios: List[int] = []
     dynamic_perturbations: List[int] = []
@@ -383,6 +398,7 @@ def _save_generated_data(
             dtype="float64",
         ).T  # (n_variables, n_timesteps)
         dyn_arrays.append(arr)
+        time_arrays.append(_time_axis_seconds(dr.dynamic_results))
         timesteps_per_scenario.append(arr.shape[1])
         dynamic_scenarios.append(r["scenario_index"])
         dynamic_perturbations.append(r.get("perturbation_index", 0))
@@ -464,6 +480,33 @@ def _save_generated_data(
         _write_coord("scenario_index", dynamic_scenarios)
         _write_coord("perturbation_index", dynamic_perturbations)
 
+        # "time" coordinate: the simulation time (seconds) of every column of
+        # curves, shaped (n_scenarios, n_timesteps) and NaN-padded like the curves.
+        #
+        # It is stored per scenario, not once for the whole store, because with an
+        # adaptive-step solver (IDA) each run picks its own time grid: column t then
+        # means a *different* physical instant in different scenarios, and without
+        # this array the mapping back to time is unrecoverable. With a fixed-step
+        # solver (SIM) every row is identical and this is merely redundant — cheap
+        # insurance rather than a 4-D tensor.
+        time_grid = np.full((n_scenarios, max_n_timesteps), np.nan, dtype="float64")
+        for i, times in enumerate(time_arrays):
+            time_grid[i, : times.shape[0]] = times
+        if hasattr(store, "create_array"):  # zarr v3
+            t = store.create_array(
+                "time",
+                shape=time_grid.shape,
+                dtype="float64",
+            )
+            t[:] = time_grid
+        else:  # zarr v2
+            store.create_dataset(
+                "time",
+                data=time_grid,
+                shape=time_grid.shape,
+                dtype="float64",
+            )
+
     file_paths["dynamic_results"] = zarr_path
 
     # ---- Dynawo solver reports → JSON ---------------------------------------
@@ -515,6 +558,11 @@ def _save_generated_data(
         # valid (unpadded) length.
         "n_timesteps": max_n_timesteps,
         "timesteps_per_scenario": timesteps_per_scenario,
+        # The simulation time (in seconds) of each column of curves lives in the
+        # store's "time" array, shaped (n_scenarios, n_timesteps) and NaN-padded to
+        # match. Per-scenario, since an adaptive-step solver gives each run its own
+        # time grid. Never assume a shared/uniform time axis — read this instead.
+        "time_units": "seconds",
         # Join keys: the Parquet rows are labelled by (scenario_index,
         # perturbation_index) columns; the Zarr curves slices by the matching
         # "scenario_index"/"perturbation_index" coordinate arrays. Join the two

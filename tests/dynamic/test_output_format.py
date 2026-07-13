@@ -108,6 +108,23 @@ def test_parquet_rows_carry_scenario_index(tmp_path):
     assert bus["scenario_index"].tolist() == [7, 7, 7, 7, 9, 9, 9, 9]
 
 
+def test_time_axis_is_stored_per_scenario(tmp_path):
+    """Each scenario carries its own time grid (adaptive solvers differ per run)."""
+    out, grp, meta = _save(
+        [_result(0, n_timesteps=5), _result(1, n_timesteps=3)],
+        tmp_path,
+    )
+    assert grp["time"].shape == (2, 5)  # (n_scenarios, n_timesteps)
+    assert meta["time_units"] == "seconds"
+
+    # _result builds a 0..n-1 second index, so the time axis round-trips as seconds
+    # and the short scenario's padding is NaN — not a bogus 0.0 that would read as
+    # a real instant.
+    assert np.array_equal(grp["time"][0], [0.0, 1.0, 2.0, 3.0, 4.0])
+    assert np.array_equal(grp["time"][1][:3], [0.0, 1.0, 2.0])
+    assert np.isnan(grp["time"][1][3:]).all()
+
+
 def test_all_scenarios_failing_raises_instead_of_keeping_stale_outputs(tmp_path):
     """An empty result set must not silently leave a previous run's files in place."""
     out = tmp_path / "dyn"
