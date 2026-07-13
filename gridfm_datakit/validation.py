@@ -154,6 +154,25 @@ def validate_generated_data(
         "file_paths": file_paths,
     }
 
+    return _run_validation_checks(generated_data, mode, sn_mva)
+
+
+def _run_validation_checks(
+    generated_data: Dict[str, pd.DataFrame],
+    mode: str,
+    sn_mva: float,
+) -> bool:
+    """Run every consistency/physics check against an already-loaded data dict.
+
+    Split out of validate_generated_data so the static and dynamic pipelines can
+    share exactly the same checks despite storing their data differently: the
+    static one writes partitioned parquet keyed by a ``scenario`` column, the
+    dynamic one writes flat parquet keyed by (scenario_index, perturbation_index).
+    Every check below reads only the DataFrames in ``generated_data``, so the
+    caller just has to supply them with a ``scenario`` column.
+
+    See validate_dynamic_data for the dynamic-side loader.
+    """
     # Run core validations on sampled partitions
     try:
         validate_scenario_indexing_consistency(generated_data)
@@ -291,6 +310,82 @@ def validate_generated_data(
         )
 
     return True
+
+
+def validate_dynamic_data(
+    file_paths: Dict[str, str],
+    mode: str = "pf",
+    sn_mva: float = 100.0,
+) -> bool:
+    """Run the static-data validation suite on the dynamic pipeline's PF snapshot.
+
+    The dynamic pipeline stores the same physical quantities as the static one, but
+    lays them out differently, so validate_generated_data cannot read them directly:
+
+    * flat single-file parquet, not partitioned directories (no ``n_scenarios.txt``);
+    * a sample is keyed by the pair (scenario_index, perturbation_index), because a
+      topology perturbation expands one load scenario into several samples, whereas
+      the static schema has a single ``scenario`` column.
+
+    This loader bridges the two: it reads the flat files and adds a dense
+    ``scenario`` column by ranking the distinct (scenario_index, perturbation_index)
+    pairs, so each dynamic sample becomes one "scenario" from the checks' point of
+    view. The checks themselves are shared verbatim with the static pipeline.
+
+    Note this validates the *static snapshot* (the initial operating point Dynawo
+    starts from) — the bus/branch/gen/Y-bus/runtime tables. It does not validate the
+    time-series curves in the Zarr store.
+
+    Args:
+        file_paths: Paths as returned by generate_dynamic_data (needs "bus_data",
+            "branch_data", "gen_data", "y_bus_data", optionally "runtime_data").
+        mode: Operating mode ("opf" or "pf"). The dynamic pipeline balances with an
+            OPF but stores an AC-PF solution, so the default is "pf".
+        sn_mva: Base MVA used to scale power quantities.
+
+    Returns:
+        True if all validations pass.
+
+    Raises:
+        AssertionError: If any validation fails.
+    """
+    KEY = ["scenario_index", "perturbation_index"]
+
+    def _read(key: str) -> pd.DataFrame:
+        df = pd.read_parquet(file_paths[key], engine="pyarrow")
+        # One dense "scenario" per distinct sample, consistent across every table:
+        # the checks assume a single integer key and compare its set across files.
+        df.insert(0, "scenario", df.set_index(KEY).index.map(sample_ids))
+        return df.drop(columns=KEY)
+
+    # Build the sample -> dense id map once, from the bus table (every table carries
+    # the same set of samples), so the id is stable across all five files.
+    bus_keys = pd.read_parquet(file_paths["bus_data"], columns=KEY, engine="pyarrow")
+    unique_keys = bus_keys.drop_duplicates().sort_values(KEY)
+    sample_ids = {
+        (int(s), int(p)): i
+        for i, (s, p) in enumerate(
+            zip(unique_keys["scenario_index"], unique_keys["perturbation_index"]),
+        )
+    }
+
+    generated_data = {
+        "bus_data": _read("bus_data"),
+        "branch_data": _read("branch_data"),
+        "gen_data": _read("gen_data"),
+        "y_bus_data": _read("y_bus_data"),
+        "runtime_data": (
+            _read("runtime_data") if "runtime_data" in file_paths else None
+        ),
+        "mode": mode,
+        "file_paths": file_paths,
+    }
+
+    print(
+        f"Validating dynamic static snapshot: {len(sample_ids)} samples "
+        f"({len(generated_data['bus_data'])} bus rows)",
+    )
+    return _run_validation_checks(generated_data, mode, sn_mva)
 
 
 def validate_ybus_diagonal_consistency(generated_data: Dict[str, pd.DataFrame]) -> None:
