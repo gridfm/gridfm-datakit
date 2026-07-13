@@ -243,7 +243,12 @@ def _process_dynamic_chunk(args: Tuple) -> Union[List[Dict[str, Any]], List[Exce
 
             chunk_results: List[Dict[str, Any]] = []
 
-            with custom_seed(seed * 20000 + start_idx):
+            # Same derivation as the static pipeline (process_network.py): the
+            # x20_000 spreads chunk seeds so runs with nearby base seeds don't
+            # overlap, and the +1 keeps seed=0/start_idx=0 from reusing the very
+            # seed the load scenarios were drawn with (which would correlate the
+            # perturbations with the loads instead of making them independent).
+            with custom_seed(seed * 20_000 + start_idx + 1):
                 for scenario_index in range(start_idx, end_idx):
                     try:
                         # One scenario expands to one result per topology
