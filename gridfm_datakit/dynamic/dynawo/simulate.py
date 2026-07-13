@@ -179,6 +179,16 @@ def run_dynawo_simulation(
             report_node=report_node,
         )
 
+    # Dynawo does NOT raise when the simulation fails: sim.run() returns a result
+    # whose status is FAILURE and whose curves are empty or truncated. Left
+    # unchecked, a diverged/aborted run would be stored as a valid trajectory (or
+    # blow up the Zarr writer with a zero-width array). Raise instead: the caller
+    # logs it and drops the sample, exactly like an OPF/PF divergence.
+    if dyn_res.status().name != "SUCCESS":
+        raise RuntimeError(
+            f"Dynawo simulation failed ({dyn_res.status().name}): {dyn_res.status_text()}",
+        )
+
     # Format results
     formated_dyn_res = _format_dynamic_res(dyn_res, drop_duplicate_timestep)
 
