@@ -81,7 +81,14 @@ the console limited to pipeline progress. The Dynawo per-simulation reports
 - **Topology perturbations:** set `topology_perturbation.type: random` (with
   `k` / `n_topology_variants` / `elements`) to expand each scenario into several
   samples — one Dynawo run per perturbed topology, each labelled by
-  `perturbation_index`.
+  `perturbation_index`. This is the only perturbation that adds *dynamic*
+  diversity.
+- **`generation_perturbation` / `admittance_perturbation` are not supported
+  here.** They are accepted for parity with the static pipeline, but
+  `generation_perturbation` randomises generation *cost*, so in the dynamic
+  pipeline both only shift the OPF dispatch — the initial operating point Dynawo
+  starts from — and produce no dynamic-model or event variation. They are not
+  validated against the dynamic outputs.
 - **Quieter/louder:** `dynamic.logging.verbosity` (`silent|error|warning|info|debug`);
   set `settings.enable_solver_logs: false` to skip solver-log capture;
   `dynamic.logging.save_reports: false` to skip report files.
