@@ -53,13 +53,15 @@ dynamic:
     solver_type: SIM
     solver_parameters_file: grids/IEEE14.par
     solver_parameters_id: SimplifiedSolver
-  output_dir: out
   logging:
     verbosity: info        # progress logger threshold: silent|error|warning|info|debug
-    save_reports: true     # persist each simulation's Dynawo report under out/reports/
+    save_reports: true     # persist each simulation's Dynawo report under raw/dynamic/reports/
 
 settings:
   num_processes: 2
+  # Single output root for the whole run. Everything lands under
+  # out/IEEE14/raw/ : logs + scenarios directly there, dynamic artifacts in
+  # out/IEEE14/raw/dynamic/. There is no separate dynamic output directory.
   data_dir: out
   large_chunk_size: 3      # 6 scenarios / 3 -> 2 chunks -> visible chunk progress
   overwrite: true

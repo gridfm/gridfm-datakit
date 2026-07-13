@@ -6,7 +6,9 @@ the example runs from any working directory, then calls the public entry point
 ``generate_dynamic_data``. Full logging is enabled: the pipeline's progress
 logger streams chunk-by-chunk advancement to the console, OPF/PF/Dynawo native
 output is captured under out/IEEE14/raw/solver_log/, and each simulation's Dynawo
-report is saved under out/reports/.
+report is saved under out/IEEE14/raw/dynamic/reports/.
+
+Everything the run produces lives under a single root, settings.data_dir (out/).
 
 Usage:
     python scripts/dynamic_example/run.py          # from the project root
@@ -38,7 +40,6 @@ def _resolve_paths(cfg: dict) -> dict:
     sp = cfg["dynamic"]["solver_parameters"]
     for key in ("parameters_file", "network_parameters_file", "solver_parameters_file"):
         sp[key] = _abs(sp[key])
-    cfg["dynamic"]["output_dir"] = _abs(cfg["dynamic"]["output_dir"])
     cfg["settings"]["data_dir"] = _abs(cfg["settings"]["data_dir"])
     return cfg
 
@@ -61,11 +62,15 @@ def main() -> None:
         "branch_data",
         "y_bus_data",
         "runtime_data",
-        "dynamic_results_zarr",
+        "dynamic_results",
         "dynamic_reports_dir",
-        "metadata_json",
+        "metadata",
+        "scenarios",
+        "error_log",
+        "solver_log_dir",
     ):
-        if key in file_paths:
+        # solver_log_dir is None when settings.enable_solver_logs is off.
+        if file_paths.get(key) is not None:
             print(f"  {key:22s} {file_paths[key]}")
 
 

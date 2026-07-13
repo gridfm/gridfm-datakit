@@ -29,7 +29,7 @@ Progress logging streams advancement to the console as it runs:
 HH:MM:SS INFO    gridfm_datakit.dynamic | Dynamic generation: 6 scenarios in 2 chunk(s), 2 worker(s).
 HH:MM:SS INFO    gridfm_datakit.dynamic | Chunk 1/2 done (3 scenarios) — 3 samples so far.
 HH:MM:SS INFO    gridfm_datakit.dynamic | Chunk 2/2 done (3 scenarios) — 6 samples so far.
-HH:MM:SS INFO    gridfm_datakit.dynamic | Saved 6 samples to .../out (6 with dynamic results, 6 reports).
+HH:MM:SS INFO    gridfm_datakit.dynamic | Saved 6 samples to .../out/IEEE14/raw/dynamic (6 with dynamic results, 6 reports).
 ```
 
 ## Files
@@ -46,24 +46,41 @@ dynamic_example/
     └── variables.csv                       # curves to monitor
 ```
 
-## Output (`out/`)
+## Output
+
+Everything the run produces lives under **one root**: `settings.data_dir` (here
+`out/`). There is no separate dynamic output directory — the layout reuses the
+static pipeline's `{data_dir}/{network.name}/raw/`, with the dynamic artifacts in
+a `dynamic/` subfolder of it.
 
 ```
-out/
-├── bus_data.parquet / gen_data.parquet / branch_data.parquet
-│   y_bus_data.parquet / runtime_data.parquet
-│       static PF snapshot (features), tagged with (scenario_index, perturbation_index)
-├── dynamic_results.zarr/
-│       curves (n_samples, n_variables, n_timesteps) + scenario_index / perturbation_index
-│       coordinate arrays; join the two modalities on this key pair
-├── reports/
-│       one Dynawo report (JSON) per sample — model build-up + convergence
-├── metadata.json
-│       variable names, dimensions, join-key index, config hash
+out/                                    <- settings.data_dir
 └── IEEE14/raw/
-        pipeline logs (scenarios, errors). solver_log/ appears only when
-        settings.enable_solver_logs is on (see note below).
+    ├── args.log, error.log
+    ├── scenarios_agg_load_profile.{parquet,html,log}
+    ├── solver_log/                     only when settings.enable_solver_logs is on
+    └── dynamic/
+        ├── bus_data.parquet / gen_data.parquet / branch_data.parquet
+        │   y_bus_data.parquet / runtime_data.parquet
+        │       static PF snapshot (features), tagged with
+        │       (scenario_index, perturbation_index)
+        ├── dynamic_results.zarr/
+        │       curves (n_samples, n_variables, n_timesteps) + scenario_index /
+        │       perturbation_index coordinate arrays; join the two modalities on
+        │       this key pair
+        ├── reports/
+        │       one Dynawo report (JSON) per sample — model build-up + convergence
+        └── metadata.json
+                variable names, dimensions, join-key index, config hash
 ```
+
+The dynamic artifacts sit in their own `dynamic/` subfolder rather than directly
+in `raw/` because the static pipeline writes `bus_data.parquet` as a *partitioned
+directory* while the dynamic pipeline writes it as a flat file — same name,
+different kind, so they must not share a directory.
+
+`raw/dynamic/` is owned by the pipeline and recreated on every run, so it never
+mixes fresh artifacts with a previous run's leftovers.
 
 ### A note on `enable_solver_logs`
 

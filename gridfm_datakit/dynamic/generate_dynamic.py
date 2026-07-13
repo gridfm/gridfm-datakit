@@ -5,7 +5,21 @@ Entry point: generate_dynamic_data(config_path)
 
 Analogous to generate_power_flow_data in generate.py but extended with a
 dynamic simulation step. Produces both static PF snapshots (Parquet) and
-dynamic time-series (Zarr) under config.dynamic.output_dir.
+dynamic time-series (Zarr).
+
+All outputs live under a single root, ``settings.data_dir`` — there is no separate
+dynamic output directory. The layout reuses the static pipeline's base_path so a
+run is one self-contained tree::
+
+    {settings.data_dir}/{network.name}/raw/
+        args.log, error.log, scenarios_*.{parquet,html,log}
+        solver_log/                    (only when settings.enable_solver_logs)
+        dynamic/
+            bus_data.parquet, branch_data.parquet, gen_data.parquet,
+            y_bus_data.parquet, runtime_data.parquet
+            dynamic_results.zarr/
+            reports/
+            metadata.json
 """
 
 from __future__ import annotations
@@ -13,7 +27,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import os
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -106,14 +119,17 @@ def generate_dynamic_data(
     Returns
     -------
     dict
-        Paths to all generated artifacts (same keys as generate_power_flow_data
-        plus ``"dynamic_results_zarr"`` and ``"metadata_json"``).
+        Paths to all generated artifacts, all rooted at ``settings.data_dir``:
+        the static keys (``bus_data``, ``branch_data``, ``gen_data``,
+        ``y_bus_data``, ``runtime_data``, ``error_log``, ``args_log``,
+        ``solver_log_dir``, ``scenarios``) plus ``dynamic_results`` (Zarr store),
+        ``dynamic_reports_dir`` and ``metadata``.
 
     Raises
     ------
     ValueError
-        If ``network.source != "powsybl"`` or ``dynamic.dynamic_solver``
-        is not set.
+        If ``network.reader != "powsybl"``, ``dynamic.dynamic_solver`` is not set,
+        or the removed ``dynamic.output_dir`` key is still present.
     """
 
     # --- Step 0: load and validate config ---
@@ -157,19 +173,17 @@ def generate_dynamic_data(
     dynamic_inputs = load_raw_inputs(args)
 
     # --- Step 4: output directory ---
-    # Do NOT rmtree the whole output_dir: users may point it at data_dir, so it can
-    # contain base_path (env + solver logs) and even the input files. Each writer
-    # overwrites its own artifact (parquet, zarr mode="w", metadata); stale reports
-    # are cleared in _save_generated_data. This keeps the environment intact.
+    # Single root: everything this run produces lives under settings.data_dir, in
+    # the same base_path (data_dir/<network>/raw) the static pipeline uses for its
+    # logs and scenarios. The dynamic artifacts go one level down, in dynamic/,
+    # because the static pipeline writes bus_data.parquet as a *partitioned
+    # directory* while we write it as a flat file — same name, different kind, so
+    # they must not share a directory.
+    #
+    # _save_generated_data owns this directory: it recreates it from scratch, so a
+    # re-run can never mix fresh artifacts with a previous run's leftovers.
     dynamic_solver = args.dynamic.dynamic_solver
-    output_dir = Path(
-        getattr(args.dynamic, "output_dir", os.path.join(base_path, "dynamic")),
-    )
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    file_paths["dynamic_output_dir"] = str(output_dir)
-    file_paths["dynamic_results_zarr"] = str(output_dir / "dynamic_results.zarr")
-    file_paths["metadata_json"] = str(output_dir / "metadata.json")
+    output_dir = Path(base_path) / "dynamic"
 
     # --- Step 5: distributed simulation ---
     from gridfm_datakit.dynamic.process_dynamic import process_dynamic_simulations
@@ -220,6 +234,18 @@ def _validate_dynamic_config(args: NestedNamespace) -> None:
             "Set 'dynamic_solver: dynawo' in the dynamic block.",
         )
 
+    # dynamic.output_dir used to be a second, independent output root, which split
+    # a single run's artifacts across two unrelated trees. Outputs are now rooted
+    # at settings.data_dir like the static pipeline. Fail loudly rather than
+    # silently ignore the key and write somewhere the user does not expect.
+    if getattr(dyn, "output_dir", None) is not None:
+        raise ValueError(
+            "dynamic.output_dir has been removed: dynamic outputs are now written "
+            "under settings.data_dir, in {data_dir}/{network.name}/raw/dynamic/. "
+            "Delete 'output_dir' from the dynamic block and set settings.data_dir "
+            "instead.",
+        )
+
     # Fail fast on a missing Dynawo installation. pypowsybl.dynamic imports fine
     # without it, so otherwise the run only dies once the workers reach
     # Simulation.run(), with an opaque provider-instantiation error.
@@ -242,6 +268,10 @@ def _save_generated_data(
 ) -> None:
     """Save static PF snapshot (Parquet) and dynamic time-series (Zarr).
 
+    Owns ``output_dir`` ({data_dir}/{network}/raw/dynamic): it is recreated from
+    scratch on every call, so a re-run can never mix fresh artifacts with a
+    previous run's leftovers. Nothing outside it is touched.
+
     Layout under output_dir:
       bus_data.parquet
       branch_data.parquet
@@ -249,6 +279,7 @@ def _save_generated_data(
       y_bus_data.parquet
       runtime_data.parquet
       dynamic_results.zarr/   ← shape (n_scenarios, n_variables, n_timesteps)
+      reports/                ← one Dynawo report per sample
       metadata.json
 
     Args
@@ -262,15 +293,21 @@ def _save_generated_data(
     """
     import zarr
 
-    # Every scenario failed. Returning quietly here would leave any artifacts from
-    # a previous run in output_dir (the pipeline deliberately does not wipe it) and
-    # hand the caller file_paths pointing at that stale data as if it were fresh.
+    # Every scenario failed. Bail out *before* clearing output_dir, so a failed
+    # re-run leaves the previous run's data intact instead of destroying it — and
+    # raise, so the caller never receives file_paths pointing at stale artifacts.
     if not all_results:
         raise RuntimeError(
             "Dynamic generation produced no samples: every scenario failed. "
             f"See the error log for per-scenario causes. Nothing was written to "
             f"{output_dir}; any files already there are from a previous run.",
         )
+
+    # Recreate the directory. Safe to wipe: it holds only our own artifacts —
+    # never inputs, logs or scenarios, which live one level up in base_path.
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     # ---- Static PF outputs → Parquet ----------------------------------------
     # Every element row is tagged with its (scenario_index, perturbation_index)
@@ -427,7 +464,7 @@ def _save_generated_data(
         _write_coord("scenario_index", dynamic_scenarios)
         _write_coord("perturbation_index", dynamic_perturbations)
 
-    file_paths["dynamic_results_zarr"] = zarr_path
+    file_paths["dynamic_results"] = zarr_path
 
     # ---- Dynawo solver reports → JSON ---------------------------------------
     # Each simulation's pypowsybl ReportNode (model build-up + convergence) is a
@@ -438,10 +475,8 @@ def _save_generated_data(
     save_reports = getattr(save_reports, "save_reports", True) if save_reports else True
     report_index: List[str] = []
     if save_reports:
+        # No stale-report cleanup needed: output_dir was recreated from scratch above.
         reports_dir = output_dir / "reports"
-        # Clear stale reports so a re-run with fewer samples leaves no orphans.
-        if reports_dir.exists():
-            shutil.rmtree(reports_dir)
         reports_dir.mkdir(parents=True, exist_ok=True)
         for r in all_results:
             dr = r.get("dynamic_results")
@@ -497,7 +532,7 @@ def _save_generated_data(
     with open(meta_path, "w") as f:
         json.dump(metadata, f, indent=2)
 
-    file_paths["metadata_json"] = meta_path
+    file_paths["metadata"] = meta_path
 
     logger.info(
         "Saved %d samples to %s (%d with dynamic results, %d reports).",

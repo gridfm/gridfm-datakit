@@ -70,7 +70,7 @@ def _make_config(tmp_dir: str, dataset) -> NestedNamespace:
     _write_csv(events_path, df_events)
     _write_csv(variables_path, df_variables)
 
-    output_dir = os.path.join(tmp_dir)
+    data_dir = os.path.join(tmp_dir)
 
     return NestedNamespace(
         network=NestedNamespace(
@@ -108,7 +108,8 @@ def _make_config(tmp_dir: str, dataset) -> NestedNamespace:
                 solver_parameters_file=PARAMETERS_PATH,
                 solver_parameters_id="SimplifiedSolver",
             ),
-            output_dir=output_dir,
+            # No output_dir: outputs are rooted at settings.data_dir, under
+            # {data_dir}/{network.name}/raw/dynamic/.
         ),
         # Booleans must be real bools, never the strings "true"/"false": a
         # non-empty string is truthy in Python, so enable_solver_logs="false"
@@ -116,7 +117,7 @@ def _make_config(tmp_dir: str, dataset) -> NestedNamespace:
         # pf_fast, dcpf_fast).
         settings=NestedNamespace(
             num_processes=1,
-            data_dir=output_dir,
+            data_dir=data_dir,
             large_chunk_size=5,
             overwrite=True,
             mode="pf",
