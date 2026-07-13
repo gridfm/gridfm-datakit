@@ -10,12 +10,14 @@ from gridfm_datakit.dynamic.dynawo import (
 from gridfm_datakit.dynamic import load_raw_inputs
 from gridfm_datakit.generate import _setup_environment, _prepare_network_and_scenarios
 from gridfm_datakit.powsybl import load_net
-from gridfm_datakit.powsybl.api import is_powsybl_available
+from gridfm_datakit.dynamic.dynawo.api import is_dynawo_available
 
-# These end-to-end tests run OPF (Julia) + Dynawo, so they need pypowsybl.
+# These end-to-end tests run OPF (Julia) + Dynawo. Gate on the Dynawo backend,
+# not just pypowsybl: a local Dynawo installation is a separate prerequisite, and
+# without it the simulation raises rather than skipping.
 pytestmark = pytest.mark.skipif(
-    is_powsybl_available() is False,
-    reason="pypowsybl is not installed. Install with: pip install gridfm-datakit[powsybl]",
+    is_dynawo_available() is False,
+    reason="Dynawo backend unavailable (needs pypowsybl + a local Dynawo installation)",
 )
 
 

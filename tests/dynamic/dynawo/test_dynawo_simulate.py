@@ -10,11 +10,19 @@ try:
 except ImportError:  # pragma: no cover - optional dependency
     pp = None
 
+from gridfm_datakit.dynamic.dynawo.api import is_dynawo_available
 from gridfm_datakit.powsybl.api import is_powsybl_available
 
+# Most tests here only run OPF + AC-PF (no Dynawo), so pypowsybl alone is enough.
 pytestmark = pytest.mark.skipif(
     is_powsybl_available() is False,
     reason="pypowsybl is not installed. Install with: pip install gridfm-datakit[powsybl]",
+)
+
+# Tests that actually call Simulation.run() additionally need a local Dynawo install.
+requires_dynawo = pytest.mark.skipif(
+    is_dynawo_available() is False,
+    reason="Dynawo backend unavailable (needs pypowsybl + a local Dynawo installation)",
 )
 
 # IEEE14 network whose buses are NOT exported in sorted-ID order — the fixture
@@ -123,6 +131,7 @@ def test_pg_bus_assignment_format_independent(julia):
 # Test run_dynawo_simulation using ieee14 benchmark
 
 
+@requires_dynawo
 def test_benchmark_ieee14_run_dynawo_simulation(
     pp_net_ieee14,
     model_mapping_ieee14,

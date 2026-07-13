@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import pytest
 
-from gridfm_datakit.powsybl.api import is_powsybl_available
+from gridfm_datakit.dynamic.dynawo.api import is_dynawo_available
 
-# Full end-to-end pipeline (OPF via Julia + Dynawo), so it needs pypowsybl.
+# Full end-to-end pipeline (OPF via Julia + Dynawo). Gate on the Dynawo backend,
+# not just pypowsybl: a local Dynawo installation is a separate prerequisite, and
+# without it the pipeline raises rather than skipping.
 pytestmark = pytest.mark.skipif(
-    is_powsybl_available() is False,
-    reason="pypowsybl is not installed. Install with: pip install gridfm-datakit[powsybl]",
+    is_dynawo_available() is False,
+    reason="Dynawo backend unavailable (needs pypowsybl + a local Dynawo installation)",
 )
 
 
