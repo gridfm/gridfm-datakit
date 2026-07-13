@@ -35,10 +35,15 @@ def _result(
 ):
     pf = None
     if static:
+        # Same keys as pf_post_processing's output — the contract the dynamic
+        # saver consumes. Y_bus / runtime included so the fixture stays faithful
+        # to it (both are exported, at parity with the static pipeline).
         pf = {
             "bus": np.full((4, 5), scenario_index, dtype=float),
             "gen": np.full((2, 4), scenario_index, dtype=float),
             "branch": np.full((6, 6), scenario_index, dtype=float),
+            "Y_bus": np.full((7, 5), scenario_index, dtype=float),
+            "runtime": np.full((1, 2), scenario_index, dtype=float),
         }
     dr = None
     if dynamic:
@@ -101,6 +106,30 @@ def test_parquet_rows_carry_scenario_index(tmp_path):
     assert "scenario_index" in bus.columns
     # 4 bus rows per scenario, tagged with the right scenario
     assert bus["scenario_index"].tolist() == [7, 7, 7, 7, 9, 9, 9, 9]
+
+
+def test_static_snapshot_is_at_parity_with_static_pipeline(tmp_path):
+    """Y-bus and runtime are exported too, like generate._save_generated_data."""
+    out, _, _ = _save([_result(7), _result(9)], tmp_path)
+
+    y_bus = pd.read_parquet(out / "y_bus_data.parquet")
+    assert list(y_bus.columns) == ["scenario_index", "perturbation_index"] + [
+        "load_scenario_idx",
+        "index1",
+        "index2",
+        "G",
+        "B",
+    ]
+    assert y_bus["scenario_index"].tolist() == [7] * 7 + [9] * 7
+
+    runtime = pd.read_parquet(out / "runtime_data.parquet")
+    assert list(runtime.columns) == [
+        "scenario_index",
+        "perturbation_index",
+        "load_scenario_idx",
+        "ac",
+    ]
+    assert runtime["scenario_index"].tolist() == [7, 9]
 
 
 def test_topology_perturbations_labeled_by_composite_key(tmp_path):
