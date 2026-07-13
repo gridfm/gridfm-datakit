@@ -156,8 +156,10 @@ def run_dynawo_simulation(
     Returns
     -------
     DynamicResults
-        Solver-agnostic container with a Zarr-shaped array
-        ``(n_variables, n_timesteps)`` and the solver status report string.
+        Solver-agnostic container holding the curves as a pandas DataFrame
+        indexed by time — shape **(n_timesteps, n_variables)** — plus the solver
+        status report string. The transpose to (n_variables, n_timesteps) happens
+        only when writing the Zarr store in ``_save_generated_data``.
     """
     # Setup
     sim = pp.dynamic.Simulation()

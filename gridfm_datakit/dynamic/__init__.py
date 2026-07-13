@@ -117,15 +117,20 @@ class DynamicResults:
 
     Attributes
     ----------
-    dynamic_results : zarr.Array or zarr.Group
-        Time-series output shaped (n_variables, n_timesteps) per scenario.
-        Stored as an in-memory Zarr array during per-scenario processing;
-        written to a persistent Zarr store by _save_generated_data.
+    dynamic_results : pandas.DataFrame
+        Curves for one sample, indexed by time: shape **(n_timesteps, n_variables)**,
+        one column per output variable. This is the solver's natural orientation
+        and is kept as-is through the pipeline.
+
+        Note the persistent store uses the *transposed* orientation:
+        ``_save_generated_data`` transposes each sample to (n_variables,
+        n_timesteps) and stacks them into a Zarr array of shape
+        (n_scenarios, n_variables, n_timesteps).
     report : Any
         Dynamic simulation report including model build-up and problem resolution.
     """
 
-    dynamic_results: Any  # zarr.Array or zarr.Group — (n_variables, n_timesteps)
+    dynamic_results: Any  # pandas.DataFrame — (n_timesteps, n_variables)
     report: Any
 
 
