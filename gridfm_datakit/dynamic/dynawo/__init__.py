@@ -96,8 +96,20 @@ def generate_dynawo_mappings(dynamic_inputs: DynamicInputs) -> DynawoMappings:
 
 def get_dynawo_simulation_parameters(args: NestedNamespace) -> pp.dynamic.Parameters:
     """Prepares the parameters for Dynawo simulation."""
-    # TODO: add validation or validate at loading config
     dict_parameters = args.dynamic.solver_parameters.to_dict()
+
+    # An unmapped key would otherwise be a bare KeyError raised inside a worker,
+    # failing every chunk with no hint as to which setting was wrong.
+    unknown = sorted(
+        set(dict_parameters)
+        - set(SIMULATION_PARAMETERS_MAPPING)
+        - {"start_time", "stop_time"},
+    )
+    if unknown:
+        raise ValueError(
+            f"dynamic.solver_parameters: unsupported key(s) {unknown}. Accepted: "
+            f"{sorted(SIMULATION_PARAMETERS_MAPPING)} (plus start_time, stop_time).",
+        )
 
     # provider_parameters only accept strings
     provider_parameters = {
@@ -130,7 +142,11 @@ def _map_dynamic_models_dynawo(
     # The second dataframe introduces automation systems that dynamiclly affect the grid behavior
     # Not only the separation is based the difference in nature but also more practically
     # the automation systems are parsed differently in Dynawo.
-    df_dm, df_as = dynamic_models.copy()
+    # Plain unpack: the mappers below never write to these frames (every write
+    # targets a fresh frame produced by groupby/get_group/reset_index). A
+    # list.copy() here would only copy the list, not the DataFrames, so it looked
+    # protective while protecting nothing.
+    df_dm, df_as = dynamic_models
 
     # TODO: add validation test for the inputs and flag invalid entries.
 
@@ -195,8 +211,13 @@ def _map_events_dynawo(events: pd.DataFrame) -> pp.dynamic.EventMapping:
 
             df_with_option = df_event_type_t[df_event_type_t["disconnect_only"].notna()]
             df_with_option = df_with_option[["start_time", "disconnect_only"]]
-            event_mapping.add_event_model(event_name=type_t, df=df_without_option)
-            event_mapping.add_event_model(event_name=type_t, df=df_with_option)
+            # Skip the empty side: in practice every Disconnect either sets the
+            # option or none do, so one of these frames is always empty. Passing an
+            # empty frame happens to work today, but nothing guarantees it.
+            if not df_without_option.empty:
+                event_mapping.add_event_model(event_name=type_t, df=df_without_option)
+            if not df_with_option.empty:
+                event_mapping.add_event_model(event_name=type_t, df=df_with_option)
         else:
             df_event_type_t = df_event_type_t[["start_time"] + param_keywords]
             event_mapping.add_event_model(event_name=type_t, df=df_event_type_t)
@@ -241,7 +262,9 @@ def _get_param_value(params, keyword):
     Pattern: "key1=value1;key2=value2;..."
     """
 
-    pairs = dict(pair.split("=") for pair in params.split(";") if "=" in pair)
+    # maxsplit=1: only the FIRST "=" separates key from value, so a value that
+    # itself contains "=" parses instead of raising ("too many values to unpack").
+    pairs = dict(pair.split("=", 1) for pair in params.split(";") if "=" in pair)
     # specific case for the "Disconnect" event, the sole one to have an optional parameter
     if keyword == "disconnect_only" and pairs.get(keyword) == "":
         return np.nan

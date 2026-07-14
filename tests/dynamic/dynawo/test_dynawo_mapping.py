@@ -356,6 +356,40 @@ def test_variable_mapping(
     assert _validate_output_curves_against_ref(res, df_ref_curves_ieee14)
 
 
+def test_param_value_containing_equals_sign():
+    """A param value that itself contains '=' must parse, not raise.
+
+    The parser used an unbounded split('='), so 'k=a=b' produced a 3-element list
+    and dict() raised "dictionary update sequence element #0 has length 3".
+    """
+    from gridfm_datakit.dynamic.dynawo import _get_param_value
+
+    params = "generator=_GEN=3;x_pu=0.1"
+    assert _get_param_value(params, "generator") == "_GEN=3"
+    assert _get_param_value(params, "x_pu") == "0.1"
+    # the Disconnect option keeps its "present but empty -> NaN" behaviour
+    assert pd.isna(_get_param_value("disconnect_only=;", "disconnect_only"))
+
+
+def test_unsupported_solver_parameter_key_raises():
+    """An unmapped solver_parameters key was a bare KeyError raised inside a worker."""
+    from gridfm_datakit.dynamic.dynawo import get_dynawo_simulation_parameters
+    from gridfm_datakit.utils.param_handler import NestedNamespace
+
+    config = NestedNamespace(
+        dynamic=NestedNamespace(
+            solver_parameters=NestedNamespace(
+                start_time=0.0,
+                stop_time=500.0,
+                solver_type="SIM",
+                dump_export=True,  # not a supported key
+            ),
+        ),
+    )
+    with pytest.raises(ValueError, match=r"unsupported key\(s\) \['dump_export'\]"):
+        get_dynawo_simulation_parameters(config)
+
+
 # test full mapping process through generate_dynawo_mapping
 def test_generate_dynawo_mapping(
     pp_net_ieee14,
