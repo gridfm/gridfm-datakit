@@ -357,9 +357,16 @@ def process_single_dynamic_simulation(
     results: List[Dict[str, Any]] = []
     for perturbation_index, perturbed_net in enumerate(topologies):
         variant_id = f"scenario_{scenario_index}_perturbation_{perturbation_index}"
-        pp_net.clone_variant(base_variant_id, variant_id)
-        pp_net.set_working_variant(variant_id)
+        variant_created = False
         try:
+            # Inside the try: a failing clone_variant would otherwise escape this
+            # function entirely — bypassing the handler meant to keep one bad
+            # perturbation from dropping the whole scenario — and leave the working
+            # variant dangling for the rest of the worker's chunk.
+            pp_net.clone_variant(base_variant_id, variant_id)
+            variant_created = True
+            pp_net.set_working_variant(variant_id)
+
             # Step 1+2: balanced static state on the perturbed network
             _, pf_data = _compute_balanced_static_state(
                 pp_net=pp_net,
@@ -391,9 +398,10 @@ def process_single_dynamic_simulation(
                 f"{perturbation_index} failed: {e}\n{traceback.format_exc()}\n",
             )
         finally:
-            # Step 5: clean up the per-perturbation variant
+            # Step 5: clean up the per-perturbation variant (only if it was created)
             pp_net.set_working_variant(base_variant_id)
-            pp_net.remove_variant(variant_id)
+            if variant_created:
+                pp_net.remove_variant(variant_id)
 
     return results
 
