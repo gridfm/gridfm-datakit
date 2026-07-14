@@ -152,6 +152,58 @@ class TestLoadCsvFormat:
 #         assert len(result.dynamic_models) == 1
 
 
+class TestValidateValues:
+    """The tables' *values* are validated, not just their columns.
+
+    Each value below is later used as a key into a Dynawo mapping dict, or as a
+    branch in _map_variables_dynawo. Unvalidated, a typo either raises a bare
+    KeyError inside a worker process (failing every chunk with no hint which key
+    was wrong) or — for the variables 'type' — is silently ignored, producing a
+    simulation that monitors nothing and only dies later in the Zarr writer.
+    """
+
+    def _config(self, tmp_path, dataset, **overrides):
+        dataset = {k: v.copy() for k, v in dataset.items()}
+        dataset.update(overrides)
+        return _make_config(str(tmp_path), dataset)
+
+    def test_unknown_event_name_raises(self, tmp_path, minimal_dataset):
+        events = minimal_dataset["df_events"].copy()
+        events.loc[0, "event_name"] = "Disconect"  # typo
+        config = self._config(tmp_path, minimal_dataset, df_events=events)
+        with pytest.raises(ValueError, match=r"unsupported event_name \['Disconect'\]"):
+            load_raw_inputs(config)
+
+    def test_unknown_automation_category_raises(self, tmp_path, minimal_dataset):
+        systems = minimal_dataset["df_automation_systems"].copy()
+        systems.loc[0, "category_name"] = "UnderVoltage"  # model_name, not a category
+        config = self._config(tmp_path, minimal_dataset, df_automation_systems=systems)
+        with pytest.raises(ValueError, match="unsupported category_name"):
+            load_raw_inputs(config)
+
+    def test_unknown_variable_type_raises(self, tmp_path, minimal_dataset):
+        """Silently dropped before: no curves -> ZeroDivisionError in the Zarr writer."""
+        variables = minimal_dataset["df_variables"].copy()
+        variables["type"] = "curve"  # lowercase typo
+        config = self._config(tmp_path, minimal_dataset, df_variables=variables)
+        with pytest.raises(ValueError, match=r"unsupported type \['curve'\]"):
+            load_raw_inputs(config)
+
+    def test_no_curve_rows_raises(self, tmp_path, minimal_dataset):
+        """The dynamic store is built from Curve rows; with none, curves come back empty."""
+        variables = minimal_dataset["df_variables"].copy()
+        variables["type"] = "FinalStateValue"
+        config = self._config(tmp_path, minimal_dataset, df_variables=variables)
+        with pytest.raises(ValueError, match="no row of type 'Curve'"):
+            load_raw_inputs(config)
+
+    def test_valid_dataset_still_loads(self, tmp_path, minimal_dataset):
+        assert isinstance(
+            load_raw_inputs(_make_config(str(tmp_path), minimal_dataset)),
+            DynamicInputs,
+        )
+
+
 class TestLoadRawInputsErrors:
     def test_missing_file_raises(self, tmp_path):
         config = NestedNamespace(

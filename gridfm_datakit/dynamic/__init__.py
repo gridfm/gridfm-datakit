@@ -206,6 +206,7 @@ def load_raw_inputs(
         dynamic_models = [_normalize_dtypes(df) for df in dynamic_models]
         events = _normalize_dtypes(events)
         variables = _normalize_dtypes(variables)
+        _validate_dynawo_values(dynamic_models[1], events, variables)
 
     return DynamicInputs(
         dynamic_models=dynamic_models,
@@ -248,6 +249,63 @@ def _normalize_dtypes(df: pd.DataFrame) -> pd.DataFrame:
         elif col == "start_time":
             df[col] = pd.to_numeric(df[col], errors="raise").astype(float)
     return df
+
+
+def _validate_dynawo_values(
+    automation_systems: pd.DataFrame,
+    events: pd.DataFrame,
+    variables: pd.DataFrame,
+) -> None:
+    """Validate the *values* of the Dynawo input tables, not just their columns.
+
+    Every value checked here is used later as a key into one of the mapping dicts
+    in dynawo/utils.py (or as a branch in _map_variables_dynawo). Without this,
+    a single typo surfaces either as a bare ``KeyError`` from deep inside a worker
+    process — where it fails every chunk and the user only ever sees "every
+    scenario failed" — or, worse, is silently ignored: an unrecognised variable
+    ``type`` monitors nothing, so Dynawo returns SUCCESS with empty curves and the
+    run only dies much later, in the Zarr writer, after all the compute.
+
+    Raises
+    ------
+    ValueError
+        Naming the offending value, its column, and the accepted values.
+    """
+    # Imported here rather than at module scope: these are Dynawo-specific and this
+    # module is the solver-agnostic layer.
+    from gridfm_datakit.dynamic.dynawo.utils import (
+        AUTOMATION_SYSTEM_PARAMS_MAPPING,
+        EVENT_PARAMS_MAPPING,
+        VARIABLE_TYPES,
+    )
+
+    def _check_values(df, column, accepted, file_label):
+        if column not in df.columns:  # already reported by _check_cols
+            return
+        unknown = sorted(set(df[column].unique()) - set(accepted))
+        if unknown:
+            raise ValueError(
+                f"{file_label}: unsupported {column} {unknown}. "
+                f"Accepted values: {sorted(accepted)}.",
+            )
+
+    _check_values(
+        automation_systems,
+        "category_name",
+        AUTOMATION_SYSTEM_PARAMS_MAPPING,
+        "automation_systems",
+    )
+    _check_values(events, "event_name", EVENT_PARAMS_MAPPING, "events")
+    _check_values(variables, "type", VARIABLE_TYPES, "variables")
+
+    # The dynamic time-series store is built from "Curve" rows only. With none, the
+    # simulation runs, monitors nothing, and returns an empty curves frame — which
+    # would otherwise blow up the Zarr writer with an opaque ZeroDivisionError.
+    if "type" in variables.columns and "Curve" not in set(variables["type"]):
+        raise ValueError(
+            "variables: no row of type 'Curve'. The dynamic results store is built "
+            "from Curve rows, so at least one is required.",
+        )
 
 
 def _check_cols(df: pd.DataFrame, required: set[str], file_label: str) -> None:

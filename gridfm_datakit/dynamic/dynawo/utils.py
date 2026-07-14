@@ -27,6 +27,11 @@ EVENT_PARAMS_MAPPING = {
     "ReferenceVoltageVariation": ["delta_u"],
 }
 
+# The two accepted values of the "type" column in variables.csv. "Curve" rows
+# become time-series (the Zarr store); "FinalStateValue" rows only yield a final
+# value. Anything else is a typo — see _validate_dynawo_values.
+VARIABLE_TYPES = ["Curve", "FinalStateValue"]
+
 SIMULATION_PARAMETERS_MAPPING = {
     "parameters_file": "parametersFile",
     "network_parameters_file": "network.parametersFile",
