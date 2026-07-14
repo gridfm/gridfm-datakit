@@ -246,6 +246,15 @@ def _validate_dynamic_config(args: NestedNamespace) -> None:
             "instead.",
         )
 
+    # Without at least one scenario there is nothing to chunk: np.array_split would
+    # raise "number sections must be larger than 0" from inside numpy.
+    n_scenarios = getattr(getattr(args, "load", None), "scenarios", 0)
+    if not n_scenarios or n_scenarios < 1:
+        raise ValueError(
+            f"load.scenarios must be >= 1, got {n_scenarios!r}. "
+            "Set the number of load scenarios to generate.",
+        )
+
     # Fail fast on a missing Dynawo installation. pypowsybl.dynamic imports fine
     # without it, so otherwise the run only dies once the workers reach
     # Simulation.run(), with an opaque provider-instantiation error.
@@ -419,6 +428,14 @@ def _save_generated_data(
                 f"{sorted(mismatched | {n_variables})}. All scenarios must monitor "
                 f"the same variables to share one Zarr store.",
             )
+        # Defence in depth. load_raw_inputs already rejects a variables table with
+        # no "Curve" row, but any other route to empty curves would reach zarr as a
+        # zero-width array and surface as an opaque ZeroDivisionError.
+        if n_variables == 0:
+            raise ValueError(
+                "Dynamic simulations produced no monitored variables (empty curves). "
+                "Check the 'Curve' rows of the variables input table.",
+            )
         # Solvers with adaptive time-stepping (e.g. IDA) or unstable trajectories
         # can emit a different number of timesteps per scenario. Size the store to
         # the longest run and NaN-pad shorter scenarios along the time axis; the
@@ -549,11 +566,15 @@ def _save_generated_data(
     metadata = {
         "generated_at": datetime.now().isoformat(),
         "seed": seed,
-        "n_scenarios": len(all_results),
-        "n_successful": len(dyn_arrays) if dyn_arrays else 0,
+        # SAMPLES, not load scenarios: a topology perturbation expands one load
+        # scenario into several samples, so this exceeds config.load.scenarios
+        # whenever topology_perturbation is enabled. It is the length of axis 0 of
+        # curves. Never compare it against load.scenarios.
+        "n_samples": len(all_results),
+        "n_samples_with_curves": len(dyn_arrays) if dyn_arrays else 0,
         "variable_names": variable_names,
         "n_variables": n_variables,
-        # Store dimensions: curves is (n_scenarios, n_variables, n_timesteps),
+        # Store dimensions: curves is (n_samples, n_variables, n_timesteps),
         # NaN-padded to n_timesteps; timesteps_per_scenario gives each run's
         # valid (unpadded) length.
         "n_timesteps": max_n_timesteps,

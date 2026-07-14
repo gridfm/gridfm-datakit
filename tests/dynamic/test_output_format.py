@@ -139,6 +139,29 @@ def test_all_scenarios_failing_raises_instead_of_keeping_stale_outputs(tmp_path)
         )
 
 
+def test_empty_curves_raise_instead_of_zero_division(tmp_path):
+    """A simulation that monitored nothing must not reach the Zarr writer.
+
+    n_variables == 0 gives zarr a zero-width chunk, which surfaced as an opaque
+    ZeroDivisionError after the entire OPF + Dynawo compute had already run.
+    """
+    out = tmp_path / "dyn"
+    out.mkdir(parents=True)
+    sample = _result(0)
+    sample["dynamic_results"] = DynamicResults(
+        dynamic_results=pd.DataFrame(),
+        report="{}",
+    )
+    with pytest.raises(ValueError, match="no monitored variables"):
+        _save_generated_data(
+            all_results=[sample],
+            output_dir=out,
+            file_paths={},
+            config=NestedNamespace(dummy=1),
+            seed=0,
+        )
+
+
 def test_variable_count_mismatch_raises(tmp_path):
     """Samples monitoring different variables cannot share one Zarr store."""
     out = tmp_path / "dyn"
