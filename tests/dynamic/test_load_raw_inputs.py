@@ -289,12 +289,7 @@ class TestLoadRawInputsErrors:
 
 
 class TestDelimiterSniffing:
-    """_load_table sniffs the delimiter, so both the "," and ";" conventions work.
-
-    Sniffing is constrained to a candidate set and falls back to ",". Unconstrained,
-    csv.Sniffer picks any character that looks regular: on a single-column file it
-    returns a letter, which parses to silent garbage rather than raising.
-    """
+    """_load_table sniffs the delimiter, so "," and ";" files both work."""
 
     @pytest.mark.parametrize("sep", [",", ";", "\t"])
     def test_supported_delimiters_round_trip(self, tmp_path, sep):
@@ -320,7 +315,6 @@ class TestDelimiterSniffing:
         assert df["type"].tolist() == ["Curve", "FinalStateValue"]
 
     def test_header_only_file_keeps_its_columns(self, tmp_path):
-        # A grid with no automation systems is legitimate: the file is a bare header.
         from gridfm_datakit.dynamic import _load_table
 
         path = tmp_path / "automation_systems.csv"
@@ -332,8 +326,6 @@ class TestDelimiterSniffing:
         assert df.empty
 
     def test_semicolons_inside_params_do_not_win_over_the_separator(self, tmp_path):
-        # The "params" column packs its own key=value;key=value payload, so ";" is
-        # frequent in the body of a comma-separated file.
         from gridfm_datakit.dynamic import _load_table
 
         path = tmp_path / "events.csv"

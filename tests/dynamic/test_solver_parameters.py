@@ -1,12 +1,4 @@
-"""Config-block validation for the Dynawo solver and load flow parameters.
-
-These checks run in the parent process, before any worker is spawned. That is the
-point of them: a bad key reaching a worker surfaces as a bare KeyError that fails
-every chunk with no indication of which setting was wrong.
-
-The rejection tests need no pypowsybl — validation happens before any pypowsybl
-object is built. Only the tests that inspect a constructed Parameters object do.
-"""
+"""Config-block validation for the Dynawo solver and load flow parameters."""
 
 from __future__ import annotations
 
@@ -73,8 +65,6 @@ def test_unsupported_loadflow_key_raises():
 
 @needs_powsybl
 def test_loadflow_defaults_put_the_slack_on_a_generator():
-    # Dynawo initialises its machines from this solution, so the default must keep
-    # the slack on a bus that carries one. See get_dynawo_loadflow_parameters.
     params = get_dynawo_loadflow_parameters(NestedNamespace())
     assert params.distributed_slack is False
     assert params.provider_parameters["slackBusSelectionMode"] == "LARGEST_GENERATOR"
@@ -103,5 +93,4 @@ def test_loadflow_overrides_are_applied():
     params = get_dynawo_loadflow_parameters(config)
     assert params.distributed_slack is True
     assert params.provider_parameters["slackBusSelectionMode"] == "MOST_MESHED"
-    # Keys not overridden keep their defaults.
-    assert params.read_slack_bus is True
+    assert params.read_slack_bus is True  # not overridden, keeps its default

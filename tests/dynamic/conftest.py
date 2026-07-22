@@ -18,9 +18,7 @@ except ImportError:  # pragma: no cover - optional dependency
 from gridfm_datakit.powsybl import load_net
 from gridfm_datakit.utils.param_handler import NestedNamespace
 
-# No pytestmark here: pytest only honours it in test modules, so a skipif in a
-# conftest silently does nothing. Test modules carry needs_powsybl/needs_dynawo
-# from markers.py instead.
+# No pytestmark: pytest ignores it in conftest. See markers.py.
 
 # File paths
 PATH_NETWORK_IEEE14 = str(
@@ -268,10 +266,7 @@ def benchmark_dataset():
                 ("Curve", "_BUS____2_TN", "U_value"),
                 ("Curve", "UVA", "underVoltageAutomaton_UMinPu"),
                 ("Curve", "_GEN____1_SM", "generator_efdPu_value"),
-                # A FinalStateValue row alongside the curves: the solver returns
-                # these separately and they land in final_state_values.parquet, not
-                # in the Zarr store. Keeping one here means the end-to-end tests
-                # cover both output kinds.
+                # covers the FinalStateValue output path end-to-end
                 ("FinalStateValue", "_GEN____1_SM", "generator_UPu"),
             ],
         ),

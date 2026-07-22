@@ -1,8 +1,4 @@
-"""The `generate` CLI command routes on the presence of a dynamic: block.
-
-Needs neither pypowsybl nor Dynawo: the routing decision is made from the config
-file alone, and the pipelines themselves are stubbed out.
-"""
+"""The `generate` CLI command routes on the presence of a dynamic: block."""
 
 from __future__ import annotations
 
@@ -38,9 +34,7 @@ class TestConfigRouting:
         assert cli._config_has_dynamic_block(_write(tmp_path, STATIC_CONFIG)) is False
 
     def test_empty_dynamic_block_is_not_a_dynamic_run(self, tmp_path):
-        # "dynamic:" with nothing under it parses to None; it names no solver, so
-        # routing to the dynamic pipeline would only produce a confusing error.
-        config = {**STATIC_CONFIG, "dynamic": None}
+        config = {**STATIC_CONFIG, "dynamic": None}  # "dynamic:" parses to None
         assert cli._config_has_dynamic_block(_write(tmp_path, config)) is False
 
     @pytest.mark.parametrize("content", ["", "just a string", "[1, 2, 3]"])
@@ -49,8 +43,6 @@ class TestConfigRouting:
         tmp_path,
         content,
     ):
-        # The pipeline reports the problem with its own message; routing must not
-        # raise first with a less useful one.
         path = tmp_path / "config.yaml"
         path.write_text(content)
         assert cli._config_has_dynamic_block(str(path)) is False
@@ -60,8 +52,6 @@ class TestConfigRouting:
 
 
 class TestGenerateCommand:
-    """The dispatch itself, with both pipelines stubbed."""
-
     @pytest.fixture
     def stub_pipelines(self, monkeypatch):
         calls = {}

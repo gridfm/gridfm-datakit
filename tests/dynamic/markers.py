@@ -1,14 +1,6 @@
 """Shared skip markers for the dynamic test suite.
 
-Two prerequisites, gated separately because they fail differently:
-
-- ``needs_powsybl``: pypowsybl, a pip dependency.
-- ``needs_dynawo``: pypowsybl *and* a local Dynawo installation, which is native,
-  not bundled with pypowsybl, and declared to powsybl through ~/.itools/config.yml.
-  Without it ``Simulation.run()`` raises rather than skipping.
-
-Use ``pytestmark = needs_x`` when a whole module needs it, ``@needs_x`` for
-individual tests.
+Dynawo is a native install, not a pip dependency, so it is gated separately.
 """
 
 import pytest

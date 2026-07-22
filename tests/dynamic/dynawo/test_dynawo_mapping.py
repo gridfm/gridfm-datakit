@@ -12,7 +12,6 @@ except ImportError:  # pragma: no cover - optional dependency
 
 from markers import needs_dynawo
 
-# Most tests here call Simulation.run().
 pytestmark = needs_dynawo
 
 

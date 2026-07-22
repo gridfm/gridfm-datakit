@@ -13,13 +13,9 @@ from markers import needs_dynawo
 
 from gridfm_datakit.utils.param_handler import NestedNamespace
 
-# Calls Simulation.run().
 pytestmark = needs_dynawo
 
-# Coverage note: this module only benchmarks a full parameter set end-to-end
-# against reference curves. Unit-level checks on the config block (missing and
-# unsupported keys) live in tests/dynamic/test_solver_parameters.py, which needs
-# no Dynawo installation.
+# Unit-level checks on the config block live in test_solver_parameters.py.
 
 
 @pytest.fixture(scope="module")

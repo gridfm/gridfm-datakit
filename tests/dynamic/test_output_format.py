@@ -253,7 +253,7 @@ def test_features_and_labels_joinable_when_membership_differs(tmp_path):
 
 
 def _fsv(**values) -> pd.DataFrame:
-    """Mimic pypowsybl's final_state_values(): indexed by name, one "values" column."""
+    """Mimic pypowsybl's final_state_values()."""
     frame = pd.DataFrame({"values": list(values.values())}, index=list(values))
     frame.index.name = "variables"
     return frame
@@ -279,7 +279,6 @@ def test_final_state_values_are_exported_as_a_keyed_table(tmp_path):
 
 
 def test_no_final_state_values_writes_no_table(tmp_path):
-    # A curves-only run must not leave an empty table behind.
     out, _, meta = _save([_result(0), _result(1)], tmp_path)
     assert not (out / "final_state_values.parquet").exists()
     assert meta["final_state_value_names"] == []
@@ -298,8 +297,7 @@ def test_final_state_values_join_the_static_snapshot_by_key(tmp_path):
 
 
 def test_variable_order_is_not_assumed_from_the_solver(tmp_path):
-    # Dynawo does not return the variables in registration order, so a later
-    # sample may list them differently. Values must follow their names.
+    # Dynawo does not return variables in registration order.
     results = [_result(0), _result(1)]
     results[0]["dynamic_results"].final_state_values = _fsv(a=1.0, b=2.0)
     results[1]["dynamic_results"].final_state_values = _fsv(b=20.0, a=10.0)
@@ -317,7 +315,6 @@ def test_variable_order_is_not_assumed_from_the_solver(tmp_path):
 
 
 def _save_chunked(chunks, tmp_path):
-    """Write via the streaming writer, one call per chunk."""
     from gridfm_datakit.dynamic.generate_dynamic import _DynamicDataWriter
 
     out = tmp_path / "dyn"
@@ -345,8 +342,6 @@ def test_chunked_write_matches_single_shot_write(tmp_path):
 
 
 def test_store_grows_when_a_later_chunk_runs_longer(tmp_path):
-    # The store is sized from the first chunk, so a longer run arriving later must
-    # resize the time axis and leave the earlier samples NaN-padded.
     out, grp, meta = _save_chunked(
         [[_result(0, n_timesteps=3)], [_result(1, n_timesteps=7)]],
         tmp_path,
@@ -356,8 +351,7 @@ def test_store_grows_when_a_later_chunk_runs_longer(tmp_path):
     assert np.isnan(grp["curves"][0, :, 3:]).all()
     assert not np.isnan(grp["curves"][0, :, :3]).any()
     assert not np.isnan(grp["curves"][1]).any()
-    # the padded region of the time axis is NaN too, so it cannot be mistaken for t=0
-    assert np.isnan(grp["time"][0, 3:]).all()
+    assert np.isnan(grp["time"][0, 3:]).all()  # never mistakable for t=0
 
 
 def test_static_parquet_accumulates_across_chunks(tmp_path):
@@ -372,7 +366,6 @@ def test_static_parquet_accumulates_across_chunks(tmp_path):
 
 
 def test_empty_leading_chunk_does_not_break_the_run(tmp_path):
-    # A large chunk whose scenarios all failed yields an empty list.
     out, grp, meta = _save_chunked([[], [_result(0)], []], tmp_path)
     assert grp["curves"].shape == (1, 3, 5)
     assert meta["n_samples"] == 1
@@ -389,5 +382,4 @@ def test_every_chunk_empty_raises_and_writes_nothing(tmp_path):
     writer.write_chunk([])
     with pytest.raises(RuntimeError, match="every scenario failed"):
         writer.close()
-    # the previous run's data survives a failed re-run
     assert (out / "previous_run.parquet").read_text() == "kept"

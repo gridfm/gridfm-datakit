@@ -1,11 +1,4 @@
-"""End-to-end tests for the dynamic generation pipeline.
-
-Coverage note: these exercise the happy path (a run completes, its static
-snapshot passes the shared validation suite, curves carry a time axis). Output
-shape, padding and join keys are covered in test_output_format.py; input loading
-in test_load_raw_inputs.py; solver/load-flow config rejection in
-test_solver_parameters.py.
-"""
+"""End-to-end tests for the dynamic generation pipeline."""
 
 from __future__ import annotations
 
@@ -14,7 +7,6 @@ from pathlib import Path
 
 from markers import needs_dynawo
 
-# Full end-to-end pipeline: OPF via Julia, then Dynawo.
 pytestmark = needs_dynawo
 
 
@@ -63,11 +55,7 @@ def test_curves_carry_a_time_axis_in_seconds(config_ieee14):
 
 
 def test_final_state_values_reach_the_output(config_ieee14):
-    """A FinalStateValue row in the variables table produces a keyed table.
-
-    Guards the gap where these were mapped and simulated but never persisted: the
-    run consumed them, Dynawo computed them, and nothing came out.
-    """
+    """A FinalStateValue row in the variables table produces a keyed table."""
     import pandas as pd
 
     from gridfm_datakit.dynamic.generate_dynamic import generate_dynamic_data
@@ -83,13 +71,11 @@ def test_final_state_values_reach_the_output(config_ieee14):
     names = metadata["final_state_value_names"]
     assert names, "the run monitors a FinalStateValue row, so names must be recorded"
     assert list(frame.columns[2:]) == names
-    # one row per sample, and the values are real numbers rather than NaN padding
     assert len(frame) == metadata["n_samples"]
     assert frame[names].notna().all().all()
 
 
 def test_validate_flag_runs_the_validation_suite(config_ieee14, monkeypatch):
-    """dynamic.validate: true runs the shared checks over the static snapshot."""
     from gridfm_datakit.dynamic import generate_dynamic as gd
 
     config_ieee14.dynamic.validate = True

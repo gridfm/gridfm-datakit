@@ -11,7 +11,6 @@ from gridfm_datakit.dynamic import load_raw_inputs
 from gridfm_datakit.generate import _setup_environment, _prepare_network_and_scenarios
 from gridfm_datakit.powsybl import load_net
 
-# These end-to-end tests run OPF (Julia), then Dynawo.
 pytestmark = needs_dynawo
 
 

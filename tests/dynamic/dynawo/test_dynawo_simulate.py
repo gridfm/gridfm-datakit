@@ -12,8 +12,7 @@ except ImportError:  # pragma: no cover - optional dependency
 
 from markers import needs_dynawo, needs_powsybl
 
-# Most tests here only run OPF + AC-PF; the ones calling Simulation.run() carry
-# @needs_dynawo on top.
+# Most tests only run OPF + AC-PF; Simulation.run() ones carry @needs_dynawo.
 pytestmark = needs_powsybl
 
 # IEEE14 network whose buses are NOT exported in sorted-ID order — the fixture

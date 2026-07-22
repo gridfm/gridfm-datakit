@@ -16,9 +16,7 @@ except ImportError:  # pragma: no cover - optional dependency
 
 from gridfm_datakit.powsybl import load_net
 
-# No pytestmark here: pytest only honours it in test modules, so a skipif in a
-# conftest silently does nothing. Test modules carry needs_powsybl/needs_dynawo
-# from markers.py instead.
+# No pytestmark: pytest ignores it in conftest. See markers.py.
 
 # ---------------------------------------------------------------------------
 # File paths
