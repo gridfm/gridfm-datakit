@@ -67,10 +67,8 @@ def _get_pypowsybl_dynamic():
             _pypowsybl_dynamic = _dyn
         except ImportError as exc:
             raise ImportError(
-                "pypowsybl dynamic simulation support is required for the Dynawo backend. "
-                "Install it with: pip install 'gridfm-datakit[dynamic]' "
-                "(the plain 'powsybl' extra is not enough — the backend lives behind "
-                "pypowsybl's own 'dynamic' extra).",
+                "pypowsybl is required for the Dynawo backend. "
+                "Install it with: pip install 'gridfm-datakit[dynamic]'",
             ) from exc
     return _pypowsybl_dynamic
 

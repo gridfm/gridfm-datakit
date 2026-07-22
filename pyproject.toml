@@ -85,13 +85,13 @@ powsybl = [
   "pypowsybl"
 ]
 
-# Dynamic (time-domain) simulation. The plain "powsybl" extra is not enough:
-# the Dynawo backend lives behind pypowsybl's own "dynamic" extra, and zarr is
-# only used by the dynamic time-series store.
+# Dynamic (time-domain) simulation. Adds zarr, which backs the dynamic
+# time-series store and is used nowhere else. pypowsybl.dynamic itself ships in
+# the base pypowsybl package — there is no "dynamic" extra on that side.
 #
-# A local Dynawo installation is a separate, non-pip prerequisite — see
-# gridfm_datakit.dynamic.dynawo.api.check_dynawo_available.
+# The Dynawo solver is a separate, non-pip prerequisite: a native installation
+# declared to powsybl. See gridfm_datakit.dynamic.dynawo.api.check_dynawo_available.
 dynamic = [
-  "pypowsybl[dynamic]",
+  "pypowsybl",
   "zarr",
 ]

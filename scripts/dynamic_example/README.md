@@ -9,8 +9,7 @@ at `t = 50 s`; the resulting voltage/field transients are recorded per scenario.
 
 ## Prerequisites
 
-- `pip install 'gridfm-datakit[dynamic]'` (pulls in `pypowsybl[dynamic]` and
-  `zarr`; the plain `powsybl` extra is not enough).
+- `pip install 'gridfm-datakit[dynamic]'` (pulls in `pypowsybl` and `zarr`).
 - **Dynawo** installed and referenced from `~/.itools/config.yml`
   (`dynawo: { homeDir: /path/to/dynawo }`). Without it pypowsybl raises
   `DynawoSimulationProvider could not be instantiated`.
