@@ -17,26 +17,31 @@ run is one self-contained tree::
         dynamic/
             bus_data.parquet, branch_data.parquet, gen_data.parquet,
             y_bus_data.parquet, runtime_data.parquet
+            final_state_values.parquet   (only when FinalStateValue rows are monitored)
             dynamic_results.zarr/
             reports/
             metadata.json
+
+Outputs are written incrementally, one large chunk at a time, so peak memory
+tracks ``settings.large_chunk_size`` rather than the size of the whole dataset.
 """
 
 from __future__ import annotations
 
+import gc
 import hashlib
 import json
 import logging
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Union
 
 import numpy as np
 import pandas as pd
 import yaml
 
-from gridfm_datakit.dynamic import DynamicResults, load_raw_inputs
+from gridfm_datakit.dynamic import load_raw_inputs
 from gridfm_datakit.generate import _prepare_network_and_scenarios, _setup_environment
 from gridfm_datakit.process.solver_output import SolverVerbosity
 from gridfm_datakit.utils.column_names import (
@@ -123,7 +128,8 @@ def generate_dynamic_data(
         the static keys (``bus_data``, ``branch_data``, ``gen_data``,
         ``y_bus_data``, ``runtime_data``, ``error_log``, ``args_log``,
         ``solver_log_dir``, ``scenarios``) plus ``dynamic_results`` (Zarr store),
-        ``dynamic_reports_dir`` and ``metadata``.
+        ``dynamic_reports_dir`` and ``metadata``. ``final_state_values`` is
+        present only when the variables table declares FinalStateValue rows.
 
     Raises
     ------
@@ -180,15 +186,20 @@ def generate_dynamic_data(
     # directory* while we write it as a flat file — same name, different kind, so
     # they must not share a directory.
     #
-    # _save_generated_data owns this directory: it recreates it from scratch, so a
-    # re-run can never mix fresh artifacts with a previous run's leftovers.
+    # The writer owns this directory: it recreates it from scratch, so a re-run can
+    # never mix fresh artifacts with a previous run's leftovers.
     dynamic_solver = args.dynamic.dynamic_solver
     output_dir = Path(base_path) / "dynamic"
 
-    # --- Step 5: distributed simulation ---
-    from gridfm_datakit.dynamic.process_dynamic import process_dynamic_simulations
+    # --- Steps 5 & 6: simulate and save, one chunk at a time ---
+    # Each chunk is written and released before the next runs, so peak memory
+    # tracks settings.large_chunk_size rather than the whole dataset. Dynamic
+    # curves are far larger than static snapshots, which is why this streams
+    # instead of collecting every sample first.
+    from gridfm_datakit.dynamic.process_dynamic import iter_dynamic_simulations
 
-    all_results = process_dynamic_simulations(
+    writer = _DynamicDataWriter(output_dir, file_paths, args, seed)
+    for chunk_results in iter_dynamic_simulations(
         network_path=meta["network_path"],
         scenarios=scenarios,
         dynamic_inputs=dynamic_inputs,
@@ -196,16 +207,11 @@ def generate_dynamic_data(
         config=args,
         error_log_file=file_paths["error_log"],
         seed=seed,
-    )
-
-    # --- Step 6: save outputs ---
-    _save_generated_data(
-        all_results=all_results,
-        output_dir=output_dir,
-        file_paths=file_paths,
-        config=args,
-        seed=seed,
-    )
+    ):
+        writer.write_chunk(chunk_results)
+        del chunk_results
+        gc.collect()
+    writer.close()
 
     return file_paths
 
@@ -278,18 +284,40 @@ def _time_axis_seconds(curves: pd.DataFrame) -> np.ndarray:
     return np.asarray(index, dtype="float64")
 
 
-def _save_generated_data(
-    all_results: List[Dict[str, Any]],
-    output_dir: Path,
-    file_paths: Dict[str, str],
-    config: NestedNamespace,
-    seed: int,
-) -> None:
-    """Save static PF snapshot (Parquet) and dynamic time-series (Zarr).
+def _final_state_values_to_mapping(fsv: Any) -> Dict[str, float]:
+    """Normalise a solver's final-state-value frame to a {name: value} mapping.
+
+    pypowsybl returns a DataFrame indexed by the flattened variable name
+    (``<model_id>_<variable>``) with a single "values" column. The two-column
+    layout its docstring describes is handled too, so a change on that side
+    degrades to a wrong column rather than a crash. Order is never relied on:
+    Dynawo does not return the variables in the order they were registered.
+    """
+    if fsv is None or len(fsv) == 0:
+        return {}
+    if fsv.shape[1] == 1:
+        names, values = fsv.index, fsv.iloc[:, 0]
+    else:
+        names, values = fsv.iloc[:, 0], fsv.iloc[:, 1]
+    return {str(name): float(value) for name, value in zip(names, values)}
+
+
+class _DynamicDataWriter:
+    """Incremental writer for one dynamic run's outputs.
+
+    Chunks are written and released as they complete, so peak memory tracks the
+    largest chunk rather than the whole dataset — matching the static pipeline,
+    which saves per large chunk and drops the batch (see generate._save_generated_data).
+    ``settings.large_chunk_size`` is what bounds memory here.
 
     Owns ``output_dir`` ({data_dir}/{network}/raw/dynamic): it is recreated from
-    scratch on every call, so a re-run can never mix fresh artifacts with a
-    previous run's leftovers. Nothing outside it is touched.
+    scratch, so a re-run can never mix fresh artifacts with a previous run's
+    leftovers. Nothing outside it is touched.
+
+    The directory is only created on the first chunk that actually carries a
+    sample. A run in which every scenario fails therefore leaves the previous
+    run's data untouched, and ``close()`` raises instead of returning paths to
+    artifacts that were never written.
 
     Layout under output_dir:
       bus_data.parquet
@@ -297,131 +325,233 @@ def _save_generated_data(
       gen_data.parquet
       y_bus_data.parquet
       runtime_data.parquet
-      dynamic_results.zarr/   ← shape (n_scenarios, n_variables, n_timesteps)
-      reports/                ← one Dynawo report per sample
+      final_state_values.parquet  ← only when the run monitors FinalStateValue rows
+      dynamic_results.zarr/       ← shape (n_samples, n_variables, n_timesteps)
+      reports/                    ← one Dynawo report per sample
       metadata.json
-
-    Args
-    ----
-    all_results : list of dicts
-        Each dict has keys: "pf_data", "dynamic_results", "scenario_index".
-    output_dir : Path
-    file_paths : dict (updated in-place with output paths)
-    config : NestedNamespace
-    seed : int
     """
-    import zarr
 
-    # Every scenario failed. Bail out *before* clearing output_dir, so a failed
-    # re-run leaves the previous run's data intact instead of destroying it — and
-    # raise, so the caller never receives file_paths pointing at stale artifacts.
-    if not all_results:
-        raise RuntimeError(
-            "Dynamic generation produced no samples: every scenario failed. "
-            f"See the error log for per-scenario causes. Nothing was written to "
-            f"{output_dir}; any files already there are from a previous run.",
+    _STATIC_TABLES = (
+        ("bus_data", "bus", BUS_COLUMNS),
+        ("branch_data", "branch", BRANCH_COLUMNS),
+        ("gen_data", "gen", GEN_COLUMNS),
+        ("y_bus_data", "Y_bus", YBUS_COLUMNS),
+        ("runtime_data", "runtime", RUNTIME_COLUMNS),
+    )
+
+    def __init__(
+        self,
+        output_dir: Path,
+        file_paths: Dict[str, str],
+        config: NestedNamespace,
+        seed: int,
+    ) -> None:
+        self.output_dir = Path(output_dir)
+        self.file_paths = file_paths
+        self.config = config
+        self.seed = seed
+
+        self._started = False
+        self._parquet_writers: Dict[str, Any] = {}
+        self._store = None
+        self._curves = None
+        self._time = None
+
+        # Metadata accumulated across chunks; nothing else survives a chunk.
+        self.n_samples = 0
+        self.n_variables = 0
+        self.max_n_timesteps = 0
+        self.timesteps_per_scenario: List[int] = []
+        self.static_keys: List[tuple] = []
+        self.dynamic_scenarios: List[int] = []
+        self.dynamic_perturbations: List[int] = []
+        self.variable_names: List[str] = []
+        self.fsv_names: List[str] = []
+        self.report_index: List[str] = []
+
+        logging_cfg = getattr(getattr(config, "dynamic", None), "logging", None)
+        self.save_reports = (
+            getattr(logging_cfg, "save_reports", True) if logging_cfg else True
         )
 
-    # Recreate the directory. Safe to wipe: it holds only our own artifacts —
-    # never inputs, logs or scenarios, which live one level up in base_path.
-    if output_dir.exists():
-        shutil.rmtree(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    # -- lifecycle ---------------------------------------------------------
 
-    # ---- Static PF outputs → Parquet ----------------------------------------
-    # Every element row is tagged with its (scenario_index, perturbation_index)
-    # so the static snapshot (features / initial conditions) can be joined back to
-    # the dynamic trajectory (labels) by key rather than by row position. This
-    # keeps the two modalities aligned even when a sample contributes to only one.
-    bus_rows, gen_rows, branch_rows = [], [], []
-    y_bus_rows, runtime_rows = [], []
-    static_keys = []  # list of (scenario_index, perturbation_index)
-    for r in all_results:
-        pf = r["pf_data"]
-        if pf is None:
-            continue
-        static_keys.append((r["scenario_index"], r.get("perturbation_index", 0)))
-        bus_rows.append(pf["bus"])
-        gen_rows.append(pf["gen"])
-        branch_rows.append(pf["branch"])
-        y_bus_rows.append(pf["Y_bus"])
-        runtime_rows.append(pf["runtime"])
+    def _start(self) -> None:
+        """Create output_dir on first use. Safe to wipe: it holds only our own
+        artifacts — never inputs, logs or scenarios, which live one level up."""
+        if self._started:
+            return
+        if self.output_dir.exists():
+            shutil.rmtree(self.output_dir)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self._started = True
 
-    def _to_parquet(rows, keys, columns, path):
+    def write_chunk(self, results: List[Dict[str, Any]]) -> None:
+        """Append one chunk of samples, then let the caller drop them."""
+        if not results:
+            return
+        self._start()
+        self._write_static(results)
+        self._write_curves(results)
+        self._write_reports(results)
+        self.n_samples += len(results)
+
+    def close(self) -> None:
+        """Flush every writer and emit metadata.json.
+
+        Raises
+        ------
+        RuntimeError
+            If no sample was ever written, i.e. every scenario failed.
+        """
+        for writer in self._parquet_writers.values():
+            writer.close()
+        self._parquet_writers.clear()
+
+        if not self._started:
+            raise RuntimeError(
+                "Dynamic generation produced no samples: every scenario failed. "
+                "See the error log for per-scenario causes. Nothing was written to "
+                f"{self.output_dir}; any files already there are from a previous run.",
+            )
+
+        self._write_metadata()
+
+    # -- static snapshot ---------------------------------------------------
+
+    def _write_static(self, results: List[Dict[str, Any]]) -> None:
+        """Append the static PF snapshot rows for this chunk.
+
+        Every element row is tagged with its (scenario_index, perturbation_index)
+        so the static snapshot (features / initial conditions) can be joined back
+        to the dynamic trajectory (labels) by key rather than by row position.
+        This keeps the two modalities aligned even when a sample contributes to
+        only one.
+        """
+        keys, rows = [], {key: [] for key, _, _ in self._STATIC_TABLES}
+        for result in results:
+            pf_data = result["pf_data"]
+            if pf_data is None:
+                continue
+            keys.append(
+                (result["scenario_index"], result.get("perturbation_index", 0)),
+            )
+            for key, pf_key, _ in self._STATIC_TABLES:
+                rows[key].append(pf_data[pf_key])
+        if not keys:
+            return
+        self.static_keys.extend(keys)
+
+        for key, _, columns in self._STATIC_TABLES:
+            frames = []
+            for (scenario_id, perturbation_id), array in zip(keys, rows[key]):
+                array = np.atleast_2d(array)
+                frame = pd.DataFrame(array, columns=columns[: array.shape[1]])
+                frame.insert(0, "perturbation_index", perturbation_id)
+                frame.insert(0, "scenario_index", scenario_id)
+                frames.append(frame)
+            self._append_parquet(key, pd.concat(frames, ignore_index=True))
+
+        self._write_final_state_values(results)
+
+    def _write_final_state_values(self, results: List[Dict[str, Any]]) -> None:
+        """Append one row per sample of FinalStateValue results, if any.
+
+        These are per-sample scalars, not trajectories, so they belong in a table
+        keyed like the rest of the static snapshot rather than in the Zarr store.
+        The file is only created when the run actually monitors FinalStateValue
+        rows; a curves-only run produces no such table.
+
+        The column set is fixed by the first chunk that carries values. A later
+        sample reporting a different set would silently change the schema, so the
+        frame is reindexed onto the known columns: unexpected names are dropped
+        and missing ones become NaN.
+        """
+        rows = []
+        for result in results:
+            dynamic_results = result.get("dynamic_results")
+            values = _final_state_values_to_mapping(
+                getattr(dynamic_results, "final_state_values", None),
+            )
+            if not values:
+                continue
+            if not self.fsv_names:
+                self.fsv_names = sorted(values)
+            row = {
+                "scenario_index": result["scenario_index"],
+                "perturbation_index": result.get("perturbation_index", 0),
+            }
+            row.update(values)
+            rows.append(row)
         if not rows:
             return
-        frames = []
-        for (scen_id, pert_id), arr in zip(keys, rows):
-            arr = np.atleast_2d(arr)
-            df = pd.DataFrame(arr, columns=columns[: arr.shape[1]])
-            df.insert(0, "perturbation_index", pert_id)
-            df.insert(0, "scenario_index", scen_id)
-            frames.append(df)
-        pd.concat(frames, ignore_index=True).to_parquet(
-            path,
-            index=False,
-            engine="pyarrow",
+        frame = pd.DataFrame(rows).reindex(
+            columns=["scenario_index", "perturbation_index"] + self.fsv_names,
         )
+        self._append_parquet("final_state_values", frame)
 
-    bus_path = str(output_dir / "bus_data.parquet")
-    branch_path = str(output_dir / "branch_data.parquet")
-    gen_path = str(output_dir / "gen_data.parquet")
-    y_bus_path = str(output_dir / "y_bus_data.parquet")
-    runtime_path = str(output_dir / "runtime_data.parquet")
+    def _append_parquet(self, key: str, frame: pd.DataFrame) -> None:
+        """Append a row group to ``key``'s Parquet file, opening it on first use.
 
-    _to_parquet(bus_rows, static_keys, BUS_COLUMNS, bus_path)
-    _to_parquet(gen_rows, static_keys, GEN_COLUMNS, gen_path)
-    _to_parquet(branch_rows, static_keys, BRANCH_COLUMNS, branch_path)
-    # Y-bus and runtime complete the static snapshot, at parity with the static
-    # pipeline's _save_generated_data. Both are already carried on pf_data.
-    _to_parquet(y_bus_rows, static_keys, YBUS_COLUMNS, y_bus_path)
-    _to_parquet(runtime_rows, static_keys, RUNTIME_COLUMNS, runtime_path)
+        The schema is fixed by the first chunk; later chunks are cast onto it so a
+        column that happens to be all-integer in one chunk and float in the next
+        cannot make the file unreadable.
+        """
+        import pyarrow as pa
+        import pyarrow.parquet as pq
 
-    file_paths["bus_data"] = bus_path
-    file_paths["branch_data"] = branch_path
-    file_paths["gen_data"] = gen_path
-    file_paths["y_bus_data"] = y_bus_path
-    file_paths["runtime_data"] = runtime_path
+        writer = self._parquet_writers.get(key)
+        if writer is None:
+            path = str(self.output_dir / f"{key}.parquet")
+            table = pa.Table.from_pandas(frame, preserve_index=False)
+            writer = pq.ParquetWriter(path, table.schema)
+            self._parquet_writers[key] = writer
+            self.file_paths[key] = path
+        else:
+            table = pa.Table.from_pandas(
+                frame,
+                schema=writer.schema,
+                preserve_index=False,
+            )
+        writer.write_table(table)
 
-    # ---- Dynamic time-series → Zarr -----------------------------------------
-    # Collect per-scenario arrays as (n_variables, n_timesteps) — the per-scenario
-    # shape declared by the DynamicResults contract (and architecture §8, where the
-    # store is n_scenarios x n_variables x n_timesteps). Dynawo returns curves as a
-    # (n_timesteps, n_variables) DataFrame, so transpose here.
-    dyn_arrays = []
-    time_arrays: List[np.ndarray] = []
-    timesteps_per_scenario: List[int] = []
-    dynamic_scenarios: List[int] = []
-    dynamic_perturbations: List[int] = []
-    for r in all_results:
-        dr: Optional[DynamicResults] = r.get("dynamic_results")
-        if dr is None or dr.dynamic_results is None:
-            continue
-        arr = np.asarray(
-            dr.dynamic_results,
-            dtype="float64",
-        ).T  # (n_variables, n_timesteps)
-        dyn_arrays.append(arr)
-        time_arrays.append(_time_axis_seconds(dr.dynamic_results))
-        timesteps_per_scenario.append(arr.shape[1])
-        dynamic_scenarios.append(r["scenario_index"])
-        dynamic_perturbations.append(r.get("perturbation_index", 0))
+    # -- curves ------------------------------------------------------------
 
-    zarr_path = str(output_dir / "dynamic_results.zarr")
-    n_variables = 0
-    max_n_timesteps = 0
-    if dyn_arrays:
-        n_scenarios = len(dyn_arrays)
-        n_variables = dyn_arrays[0].shape[0]
+    def _write_curves(self, results: List[Dict[str, Any]]) -> None:
+        """Append this chunk's trajectories to the Zarr store.
+
+        Collected as (n_variables, n_timesteps) — the per-sample shape declared by
+        the DynamicResults contract (and architecture §8, where the store is
+        n_samples x n_variables x n_timesteps). Dynawo returns curves as a
+        (n_timesteps, n_variables) DataFrame, so transpose here.
+        """
+        arrays, times, scenarios, perturbations = [], [], [], []
+        for result in results:
+            dynamic_results = result.get("dynamic_results")
+            if dynamic_results is None or dynamic_results.dynamic_results is None:
+                continue
+            curves = dynamic_results.dynamic_results
+            arrays.append(np.asarray(curves, dtype="float64").T)
+            times.append(_time_axis_seconds(curves))
+            scenarios.append(result["scenario_index"])
+            perturbations.append(result.get("perturbation_index", 0))
+            if not self.variable_names:
+                self.variable_names = list(curves.columns)
+        if not arrays:
+            return
+
+        n_variables = arrays[0].shape[0]
         # Every sample must monitor the same variables, else axis 1 of the store
         # is meaningless. Fail loudly rather than emit a corrupt array (an
         # unchecked mismatch surfaces as an opaque broadcast/zero-division error).
-        mismatched = {a.shape[0] for a in dyn_arrays} - {n_variables}
-        if mismatched:
+        seen = {array.shape[0] for array in arrays} | (
+            {self.n_variables} if self._curves is not None else set()
+        )
+        if len(seen - {n_variables}) > 0:
             raise ValueError(
                 f"Dynamic samples disagree on the number of variables: found "
-                f"{sorted(mismatched | {n_variables})}. All scenarios must monitor "
-                f"the same variables to share one Zarr store.",
+                f"{sorted(seen)}. All scenarios must monitor the same variables "
+                "to share one Zarr store.",
             )
         # Defence in depth. load_raw_inputs already rejects a variables table with
         # no "Curve" row, but any other route to empty curves would reach zarr as a
@@ -431,177 +561,220 @@ def _save_generated_data(
                 "Dynamic simulations produced no monitored variables (empty curves). "
                 "Check the 'Curve' rows of the variables input table.",
             )
+
+        chunk_max_timesteps = max(array.shape[1] for array in arrays)
+        self._ensure_curves_store(n_variables, chunk_max_timesteps)
+
         # Solvers with adaptive time-stepping (e.g. IDA) or unstable trajectories
-        # can emit a different number of timesteps per scenario. Size the store to
-        # the longest run and NaN-pad shorter scenarios along the time axis; the
-        # valid length per scenario is recorded in metadata (timesteps_per_scenario)
-        # so consumers can mask the padding.
-        max_n_timesteps = max(a.shape[1] for a in dyn_arrays)
-        shape = (n_scenarios, n_variables, max_n_timesteps)
-        chunks = (1, n_variables, max_n_timesteps)
-        store = zarr.open(zarr_path, mode="w")
+        # can emit a different number of timesteps per sample. The store is sized
+        # to the longest run seen so far and grown when a longer one arrives;
+        # shorter samples keep the array's NaN fill. The valid length per sample is
+        # recorded in metadata (timesteps_per_scenario) so consumers can mask it.
+        if chunk_max_timesteps > self.max_n_timesteps:
+            self.max_n_timesteps = chunk_max_timesteps
+            self._curves.resize(
+                (self._curves.shape[0], n_variables, self.max_n_timesteps),
+            )
+            self._time.resize((self._time.shape[0], self.max_n_timesteps))
+
+        start = self._curves.shape[0]
+        self._curves.resize(
+            (start + len(arrays), n_variables, self.max_n_timesteps),
+        )
+        self._time.resize((start + len(arrays), self.max_n_timesteps))
+        for offset, array in enumerate(arrays):
+            n_timesteps = array.shape[1]
+            self._curves[start + offset, :, :n_timesteps] = array
+            self._time[start + offset, : times[offset].shape[0]] = times[offset]
+            self.timesteps_per_scenario.append(n_timesteps)
+
+        self.dynamic_scenarios.extend(scenarios)
+        self.dynamic_perturbations.extend(perturbations)
+
+    def _ensure_curves_store(self, n_variables: int, n_timesteps: int) -> None:
+        """Create the Zarr store on first use, empty along the sample axis.
+
+        ``fill_value=nan`` is what makes the padding free: a resize along either
+        the sample or the time axis exposes NaN, so a short run needs no explicit
+        padding pass.
+        """
+        if self._curves is not None:
+            return
+        import zarr
+
+        self.n_variables = n_variables
+        self.max_n_timesteps = n_timesteps
+        path = str(self.output_dir / "dynamic_results.zarr")
+        self._store = zarr.open(path, mode="w")
+        self.file_paths["dynamic_results"] = path
+
+        shape = (0, n_variables, n_timesteps)
+        chunks = (1, n_variables, n_timesteps)
         # The Zarr array-creation API differs between v2 and v3; support both so
         # the pipeline works regardless of which major version is installed.
-        if hasattr(store, "create_array"):  # zarr v3
-            z = store.create_array(
+        if hasattr(self._store, "create_array"):  # zarr v3
+            self._curves = self._store.create_array(
                 "curves",
                 shape=shape,
                 dtype="float64",
                 chunks=chunks,
+                fill_value=np.nan,
                 compressors=zarr.codecs.BloscCodec(cname="zstd", clevel=3),
+            )
+            self._time = self._store.create_array(
+                "time",
+                shape=(0, n_timesteps),
+                dtype="float64",
+                fill_value=np.nan,
             )
         else:  # zarr v2
             import numcodecs
 
-            z = store.create_dataset(
+            self._curves = self._store.create_dataset(
                 "curves",
                 shape=shape,
                 dtype="float64",
                 chunks=chunks,
+                fill_value=np.nan,
                 compressor=numcodecs.Blosc(cname="zstd", clevel=3),
             )
-        for i, arr in enumerate(dyn_arrays):
-            n_t = arr.shape[1]
-            if n_t == max_n_timesteps:
-                z[i] = arr
-            else:
-                padded = np.full(
-                    (n_variables, max_n_timesteps),
-                    np.nan,
-                    dtype="float64",
-                )
-                padded[:, :n_t] = arr
-                z[i] = padded
+            self._time = self._store.create_dataset(
+                "time",
+                shape=(0, n_timesteps),
+                dtype="float64",
+                fill_value=np.nan,
+            )
 
-        # (scenario_index, perturbation_index) coordinates: map each curves slice
-        # (axis 0) back to the sample it came from, so the Zarr labels join to the
-        # Parquet snapshot by key.
-        def _write_coord(name, values):
+    # -- reports -----------------------------------------------------------
+
+    def _write_reports(self, results: List[Dict[str, Any]]) -> None:
+        """Persist each sample's Dynawo report.
+
+        The pypowsybl ReportNode (model build-up + convergence) is a JSON string on
+        DynamicResults.report, and the documented way to diagnose a failed or
+        degenerate run. Controlled by dynamic.logging.save_reports (default True).
+        """
+        if not self.save_reports:
+            return
+        reports_dir = self.output_dir / "reports"
+        reports_dir.mkdir(parents=True, exist_ok=True)
+        self.file_paths["dynamic_reports_dir"] = str(reports_dir)
+        for result in results:
+            dynamic_results = result.get("dynamic_results")
+            if (
+                dynamic_results is None
+                or getattr(dynamic_results, "report", None) is None
+            ):
+                continue
+            name = (
+                f"scenario_{result['scenario_index']}"
+                f"_perturbation_{result.get('perturbation_index', 0)}.json"
+            )
+            (reports_dir / name).write_text(str(dynamic_results.report))
+            self.report_index.append(name)
+
+    # -- metadata ----------------------------------------------------------
+
+    def _write_metadata(self) -> None:
+        config_hash = hashlib.md5(
+            json.dumps(self.config.to_dict(), sort_keys=True, default=str).encode(),
+        ).hexdigest()
+
+        metadata = {
+            "generated_at": datetime.now().isoformat(),
+            "seed": self.seed,
+            # SAMPLES, not load scenarios: a topology perturbation expands one load
+            # scenario into several samples, so this exceeds config.load.scenarios
+            # whenever topology_perturbation is enabled. It is the length of axis 0
+            # of curves. Never compare it against load.scenarios.
+            "n_samples": self.n_samples,
+            "n_samples_with_curves": len(self.dynamic_scenarios),
+            "variable_names": self.variable_names,
+            "n_variables": self.n_variables,
+            # Store dimensions: curves is (n_samples, n_variables, n_timesteps),
+            # NaN-padded to n_timesteps; timesteps_per_scenario gives each run's
+            # valid (unpadded) length.
+            "n_timesteps": self.max_n_timesteps,
+            "timesteps_per_scenario": self.timesteps_per_scenario,
+            # The simulation time (in seconds) of each column of curves lives in the
+            # store's "time" array, shaped (n_samples, n_timesteps) and NaN-padded to
+            # match. Per-sample, since an adaptive-step solver gives each run its own
+            # time grid. Never assume a shared/uniform time axis — read this instead.
+            "time_units": "seconds",
+            # Join keys: the Parquet rows are labelled by (scenario_index,
+            # perturbation_index) columns; the Zarr curves slices by the matching
+            # "scenario_index"/"perturbation_index" coordinate arrays. Join the two
+            # modalities on this key pair, never on row/slice position.
+            "static_scenario_index": [key[0] for key in self.static_keys],
+            "static_perturbation_index": [key[1] for key in self.static_keys],
+            "dynamic_scenario_index": self.dynamic_scenarios,
+            "dynamic_perturbation_index": self.dynamic_perturbations,
+            # Columns of final_state_values.parquet, in order. Empty when the run
+            # monitors no FinalStateValue rows, in which case no such file exists.
+            "final_state_value_names": self.fsv_names,
+            # Per-sample Dynawo solver reports under reports/ (empty if disabled).
+            "reports": self.report_index,
+            "config_hash": config_hash,
+        }
+
+        if self._store is not None:
+            self._write_coordinates()
+
+        path = str(self.output_dir / "metadata.json")
+        with open(path, "w") as f:
+            json.dump(metadata, f, indent=2)
+        self.file_paths["metadata"] = path
+
+        logger.info(
+            "Saved %d samples to %s (%d with dynamic results, %d reports).",
+            self.n_samples,
+            self.output_dir,
+            len(self.dynamic_scenarios),
+            len(self.report_index),
+        )
+
+    def _write_coordinates(self) -> None:
+        """Write the (scenario_index, perturbation_index) coordinate arrays.
+
+        They map each curves slice (axis 0) back to the sample it came from, so the
+        Zarr labels join to the Parquet snapshot by key. Written once at close,
+        when the final sample count is known.
+        """
+        n_samples = len(self.dynamic_scenarios)
+        for name, values in (
+            ("scenario_index", self.dynamic_scenarios),
+            ("perturbation_index", self.dynamic_perturbations),
+        ):
             data = np.asarray(values, dtype="int64")
-            if hasattr(store, "create_array"):  # zarr v3
-                arr = store.create_array(name, shape=(n_scenarios,), dtype="int64")
-                arr[:] = data
+            if hasattr(self._store, "create_array"):  # zarr v3
+                array = self._store.create_array(
+                    name,
+                    shape=(n_samples,),
+                    dtype="int64",
+                )
+                array[:] = data
             else:  # zarr v2
-                store.create_dataset(
+                self._store.create_dataset(
                     name,
                     data=data,
-                    shape=(n_scenarios,),
+                    shape=(n_samples,),
                     dtype="int64",
                 )
 
-        _write_coord("scenario_index", dynamic_scenarios)
-        _write_coord("perturbation_index", dynamic_perturbations)
 
-        # "time" coordinate: the simulation time (seconds) of every column of
-        # curves, shaped (n_scenarios, n_timesteps) and NaN-padded like the curves.
-        #
-        # It is stored per scenario, not once for the whole store, because with an
-        # adaptive-step solver (IDA) each run picks its own time grid: column t then
-        # means a *different* physical instant in different scenarios, and without
-        # this array the mapping back to time is unrecoverable. With a fixed-step
-        # solver (SIM) every row is identical and this is merely redundant — cheap
-        # insurance rather than a 4-D tensor.
-        time_grid = np.full((n_scenarios, max_n_timesteps), np.nan, dtype="float64")
-        for i, times in enumerate(time_arrays):
-            time_grid[i, : times.shape[0]] = times
-        if hasattr(store, "create_array"):  # zarr v3
-            t = store.create_array(
-                "time",
-                shape=time_grid.shape,
-                dtype="float64",
-            )
-            t[:] = time_grid
-        else:  # zarr v2
-            store.create_dataset(
-                "time",
-                data=time_grid,
-                shape=time_grid.shape,
-                dtype="float64",
-            )
+def _save_generated_data(
+    all_results: List[Dict[str, Any]],
+    output_dir: Path,
+    file_paths: Dict[str, str],
+    config: NestedNamespace,
+    seed: int,
+) -> None:
+    """Write a complete result list in one shot.
 
-    file_paths["dynamic_results"] = zarr_path
-
-    # ---- Dynawo solver reports → JSON ---------------------------------------
-    # Each simulation's pypowsybl ReportNode (model build-up + convergence) is a
-    # JSON string on DynamicResults.report. It is the documented way to diagnose
-    # a failed/degenerate run, so persist one file per sample, keyed like every
-    # other output. Controlled by dynamic.logging.save_reports (default True).
-    save_reports = getattr(getattr(config, "dynamic", None), "logging", None)
-    save_reports = getattr(save_reports, "save_reports", True) if save_reports else True
-    report_index: List[str] = []
-    if save_reports:
-        # No stale-report cleanup needed: output_dir was recreated from scratch above.
-        reports_dir = output_dir / "reports"
-        reports_dir.mkdir(parents=True, exist_ok=True)
-        for r in all_results:
-            dr = r.get("dynamic_results")
-            if dr is None or getattr(dr, "report", None) is None:
-                continue
-            name = (
-                f"scenario_{r['scenario_index']}"
-                f"_perturbation_{r.get('perturbation_index', 0)}.json"
-            )
-            (reports_dir / name).write_text(str(dr.report))
-            report_index.append(name)
-        file_paths["dynamic_reports_dir"] = str(reports_dir)
-
-    # ---- metadata.json -------------------------------------------------------
-    # Determine variable names from the first successful result
-    variable_names: List[str] = []
-    for r in all_results:
-        dr = r.get("dynamic_results")
-        if dr and dr.dynamic_results is not None:
-            variable_names = list(dr.dynamic_results.columns)
-            break
-
-    config_hash = hashlib.md5(
-        json.dumps(config.to_dict(), sort_keys=True, default=str).encode(),
-    ).hexdigest()
-
-    metadata = {
-        "generated_at": datetime.now().isoformat(),
-        "seed": seed,
-        # SAMPLES, not load scenarios: a topology perturbation expands one load
-        # scenario into several samples, so this exceeds config.load.scenarios
-        # whenever topology_perturbation is enabled. It is the length of axis 0 of
-        # curves. Never compare it against load.scenarios.
-        "n_samples": len(all_results),
-        "n_samples_with_curves": len(dyn_arrays) if dyn_arrays else 0,
-        "variable_names": variable_names,
-        "n_variables": n_variables,
-        # Store dimensions: curves is (n_samples, n_variables, n_timesteps),
-        # NaN-padded to n_timesteps; timesteps_per_scenario gives each run's
-        # valid (unpadded) length.
-        "n_timesteps": max_n_timesteps,
-        "timesteps_per_scenario": timesteps_per_scenario,
-        # The simulation time (in seconds) of each column of curves lives in the
-        # store's "time" array, shaped (n_scenarios, n_timesteps) and NaN-padded to
-        # match. Per-scenario, since an adaptive-step solver gives each run its own
-        # time grid. Never assume a shared/uniform time axis — read this instead.
-        "time_units": "seconds",
-        # Join keys: the Parquet rows are labelled by (scenario_index,
-        # perturbation_index) columns; the Zarr curves slices by the matching
-        # "scenario_index"/"perturbation_index" coordinate arrays. Join the two
-        # modalities on this key pair, never on row/slice position.
-        "static_scenario_index": [k[0] for k in static_keys],
-        "static_perturbation_index": [k[1] for k in static_keys],
-        "dynamic_scenario_index": dynamic_scenarios,
-        "dynamic_perturbation_index": dynamic_perturbations,
-        # Per-sample Dynawo solver reports under reports/ (empty if disabled).
-        "reports": report_index,
-        "config_hash": config_hash,
-    }
-
-    meta_path = str(output_dir / "metadata.json")
-    with open(meta_path, "w") as f:
-        json.dump(metadata, f, indent=2)
-
-    file_paths["metadata"] = meta_path
-
-    logger.info(
-        "Saved %d samples to %s (%d with dynamic results, %d reports).",
-        len(all_results),
-        output_dir,
-        len(dyn_arrays),
-        len(report_index),
-    )
+    Thin wrapper over :class:`_DynamicDataWriter` for callers that already hold
+    every sample in memory (tests, ad-hoc scripts). The pipeline itself streams
+    chunk by chunk instead — see generate_dynamic_data.
+    """
+    writer = _DynamicDataWriter(output_dir, file_paths, config, seed)
+    writer.write_chunk(all_results)
+    writer.close()

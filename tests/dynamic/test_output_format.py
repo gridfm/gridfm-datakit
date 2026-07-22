@@ -245,3 +245,85 @@ def test_features_and_labels_joinable_when_membership_differs(tmp_path):
     # and its curve slice is addressable via the scenario_index coordinate
     i7 = np.asarray(grp["scenario_index"]).tolist().index(7)
     assert np.all(grp["curves"][i7] == 7.0)
+
+
+# ---------------------------------------------------------------------------
+# Incremental (chunked) writing
+# ---------------------------------------------------------------------------
+
+
+def _save_chunked(chunks, tmp_path):
+    """Write via the streaming writer, one call per chunk."""
+    from gridfm_datakit.dynamic.generate_dynamic import _DynamicDataWriter
+
+    out = tmp_path / "dyn"
+    file_paths = {}
+    writer = _DynamicDataWriter(out, file_paths, NestedNamespace(dummy=1), 0)
+    for chunk in chunks:
+        writer.write_chunk(chunk)
+    writer.close()
+    curves_group = zarr.open(str(out / "dynamic_results.zarr"), mode="r")
+    metadata = json.loads((out / "metadata.json").read_text())
+    return out, curves_group, metadata
+
+
+def test_chunked_write_matches_single_shot_write(tmp_path):
+    results = [_result(i) for i in range(4)]
+    _, one_shot, meta_one = _save(results, tmp_path / "a")
+    _, chunked, meta_many = _save_chunked(
+        [results[:1], results[1:3], results[3:]],
+        tmp_path / "b",
+    )
+    np.testing.assert_array_equal(one_shot["curves"][:], chunked["curves"][:])
+    np.testing.assert_array_equal(one_shot["time"][:], chunked["time"][:])
+    for key in ("n_samples", "n_variables", "n_timesteps", "timesteps_per_scenario"):
+        assert meta_one[key] == meta_many[key]
+
+
+def test_store_grows_when_a_later_chunk_runs_longer(tmp_path):
+    # The store is sized from the first chunk, so a longer run arriving later must
+    # resize the time axis and leave the earlier samples NaN-padded.
+    out, grp, meta = _save_chunked(
+        [[_result(0, n_timesteps=3)], [_result(1, n_timesteps=7)]],
+        tmp_path,
+    )
+    assert grp["curves"].shape == (2, 3, 7)
+    assert meta["timesteps_per_scenario"] == [3, 7]
+    assert np.isnan(grp["curves"][0, :, 3:]).all()
+    assert not np.isnan(grp["curves"][0, :, :3]).any()
+    assert not np.isnan(grp["curves"][1]).any()
+    # the padded region of the time axis is NaN too, so it cannot be mistaken for t=0
+    assert np.isnan(grp["time"][0, 3:]).all()
+
+
+def test_static_parquet_accumulates_across_chunks(tmp_path):
+    out, _, meta = _save_chunked(
+        [[_result(0), _result(1)], [_result(2)]],
+        tmp_path,
+    )
+    bus = pd.read_parquet(out / "bus_data.parquet")
+    assert bus["scenario_index"].unique().tolist() == [0, 1, 2]
+    assert meta["n_samples"] == 3
+    assert meta["static_scenario_index"] == [0, 1, 2]
+
+
+def test_empty_leading_chunk_does_not_break_the_run(tmp_path):
+    # A large chunk whose scenarios all failed yields an empty list.
+    out, grp, meta = _save_chunked([[], [_result(0)], []], tmp_path)
+    assert grp["curves"].shape == (1, 3, 5)
+    assert meta["n_samples"] == 1
+
+
+def test_every_chunk_empty_raises_and_writes_nothing(tmp_path):
+    from gridfm_datakit.dynamic.generate_dynamic import _DynamicDataWriter
+
+    out = tmp_path / "dyn"
+    out.mkdir(parents=True)
+    (out / "previous_run.parquet").write_text("kept")
+
+    writer = _DynamicDataWriter(out, {}, NestedNamespace(dummy=1), 0)
+    writer.write_chunk([])
+    with pytest.raises(RuntimeError, match="every scenario failed"):
+        writer.close()
+    # the previous run's data survives a failed re-run
+    assert (out / "previous_run.parquet").read_text() == "kept"

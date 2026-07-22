@@ -17,7 +17,7 @@ import copy
 import logging
 import multiprocessing
 import traceback
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, Iterator, List, Tuple, Union
 
 import numpy as np
 
@@ -52,7 +52,7 @@ logger = logging.getLogger("gridfm_datakit.dynamic")
 # ---------------------------------------------------------------------------
 
 
-def process_dynamic_simulations(
+def iter_dynamic_simulations(
     network_path: str,
     scenarios: np.ndarray,
     dynamic_inputs: Any,
@@ -60,12 +60,18 @@ def process_dynamic_simulations(
     config: NestedNamespace,
     error_log_file: str,
     seed: int,
-) -> List[Dict[str, Any]]:
+) -> Iterator[List[Dict[str, Any]]]:
     """Distributed outer loop for dynamic simulation data generation.
 
     Splits scenarios into chunks and dispatches each chunk to a worker
     process. Each worker initialises a Julia instance and a local copy of the
     pypowsybl network once, then reuses them for all scenarios in the chunk.
+
+    Yields one large chunk's samples at a time so the caller can persist and drop
+    them: holding every sample would make peak memory scale with the whole dataset
+    rather than with ``settings.large_chunk_size``, and dynamic curves are far
+    larger than static snapshots. Use ``process_dynamic_simulations`` for the
+    collected list.
 
     Args
     ----
@@ -85,12 +91,13 @@ def process_dynamic_simulations(
         Global seed — deterministically derived per-chunk seeds are computed
         from this value.
 
-    Returns
-    -------
+    Yields
+    ------
     list of dict
-        One dict per successfully processed (scenario, topology-perturbation)
-        sample, each with keys ``"pf_data"``, ``"dynamic_results"``,
-        ``"scenario_index"``, ``"perturbation_index"``.
+        One list per large chunk, holding one dict per successfully processed
+        (scenario, topology-perturbation) sample, each with keys ``"pf_data"``,
+        ``"dynamic_results"``, ``"scenario_index"``, ``"perturbation_index"``.
+        A chunk whose scenarios all failed yields an empty list.
     """
     n_scenarios = config.load.scenarios
     large_chunk_size = config.settings.large_chunk_size
@@ -130,7 +137,7 @@ def process_dynamic_simulations(
         int(np.ceil(n_scenarios / large_chunk_size)),
     )
 
-    all_results: List[Dict[str, Any]] = []
+    n_samples = 0
 
     logger.info(
         "Dynamic generation: %d scenarios in %d chunk(s), %d worker(s).",
@@ -171,11 +178,12 @@ def process_dynamic_simulations(
         with _mp_ctx.Pool(processes=num_processes) as pool:
             results = pool.map(_process_dynamic_chunk, tasks)
 
+        samples: List[Dict[str, Any]] = []
         for chunk_results in results:
             # A worker that dies before its per-scenario loop returns [exception]
             # (see _process_dynamic_chunk). Detect both a bare exception and the
-            # list-wrapped form so a failed chunk never poisons all_results with
-            # non-result objects (which would later crash _save_generated_data).
+            # list-wrapped form so a failed chunk never yields non-result objects
+            # (which would later crash the writer).
             if isinstance(chunk_results, Exception):
                 logger.error("Error in dynamic chunk: %s", chunk_results)
             else:
@@ -183,17 +191,46 @@ def process_dynamic_simulations(
                     if isinstance(scenario_result, Exception):
                         logger.error("Error in dynamic chunk: %s", scenario_result)
                     else:
-                        all_results.append(scenario_result)
+                        samples.append(scenario_result)
 
+        n_samples += len(samples)
         logger.info(
             "Chunk %d/%d done (%d scenarios) — %d samples so far.",
             large_chunk_index + 1,
             len(large_chunks),
             chunk_size,
-            len(all_results),
+            n_samples,
         )
+        yield samples
 
-    return all_results
+
+def process_dynamic_simulations(
+    network_path: str,
+    scenarios: np.ndarray,
+    dynamic_inputs: Any,
+    dynamic_solver: str,
+    config: NestedNamespace,
+    error_log_file: str,
+    seed: int,
+) -> List[Dict[str, Any]]:
+    """Collect every sample from :func:`iter_dynamic_simulations` into one list.
+
+    Convenience for callers that want the whole run in memory (tests, ad-hoc
+    scripts). The pipeline streams instead — see generate_dynamic.generate_dynamic_data.
+    """
+    return [
+        sample
+        for chunk in iter_dynamic_simulations(
+            network_path=network_path,
+            scenarios=scenarios,
+            dynamic_inputs=dynamic_inputs,
+            dynamic_solver=dynamic_solver,
+            config=config,
+            error_log_file=error_log_file,
+            seed=seed,
+        )
+        for sample in chunk
+    ]
 
 
 # ---------------------------------------------------------------------------
