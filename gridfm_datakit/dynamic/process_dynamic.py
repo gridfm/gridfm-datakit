@@ -108,12 +108,14 @@ def process_dynamic_simulations(
         getattr(config, "topology_perturbation", _none),
         base_net,
     )
-    # NOT a supported source of *dynamic* diversity: generation_perturbation
-    # randomises generation *cost*, so in this pipeline it only shifts the OPF
-    # dispatch, i.e. the initial operating point Dynawo starts from. It adds no
-    # dynamic-model or event variation. Same for admittance_perturbation, which
-    # only perturbs branch admittances pre-OPF. Both are wired for parity with
-    # the static pipeline and left untested against the dynamic outputs.
+    # generation_perturbation randomises generation *cost* and admittance_perturbation
+    # perturbs branch admittances, both pre-OPF. They therefore vary the initial
+    # operating point Dynawo starts from — which machines are dispatched and at what
+    # loading — and so do influence the trajectory. What they do NOT vary is the
+    # dynamic model set or the event sequence: those come from the CSV inputs and are
+    # identical across every sample. Only topology_perturbation changes the network
+    # the dynamic models are built on. Wired for parity with the static pipeline;
+    # their effect on the dynamic outputs is untested.
     generation_generator = initialize_generation_generator(
         getattr(config, "generation_perturbation", _none),
         base_net,

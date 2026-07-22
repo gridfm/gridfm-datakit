@@ -24,12 +24,13 @@ load:
 # here; enable e.g. topology_perturbation to expand each scenario into several
 # samples (one Dynawo run per perturbed topology).
 #
-# Only topology_perturbation is a supported source of dynamic diversity.
 # generation_perturbation (generation *cost* randomisation) and
-# admittance_perturbation are accepted for parity with the static pipeline, but
-# in the dynamic pipeline they only shift the OPF dispatch — i.e. the initial
-# operating point — and add no dynamic-model or event variation. They are not
-# validated against the dynamic outputs.
+# admittance_perturbation act before the OPF, so they vary the initial operating
+# point Dynawo starts from — which machines are dispatched and at what loading —
+# and do influence the trajectory. What they do not vary is the dynamic model set
+# or the event sequence, which come from the CSV inputs and are identical across
+# samples. Only topology_perturbation changes the network the dynamic models are
+# built on. Their effect on the dynamic outputs is not validated.
 topology_perturbation:
   type: none               # options: random, n_minus_k, none
   # When type is "random", also set (uncomment) these:
