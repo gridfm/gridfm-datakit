@@ -281,3 +281,75 @@ class TestLoadRawInputsErrors:
         )
         with pytest.raises(ValueError, match="parameter_set_id"):
             load_raw_inputs(config)
+
+
+# ---------------------------------------------------------------------------
+# CSV delimiter handling
+# ---------------------------------------------------------------------------
+
+
+class TestDelimiterSniffing:
+    """_load_table sniffs the delimiter, so both the "," and ";" conventions work.
+
+    Sniffing is constrained to a candidate set and falls back to ",". Unconstrained,
+    csv.Sniffer picks any character that looks regular: on a single-column file it
+    returns a letter, which parses to silent garbage rather than raising.
+    """
+
+    @pytest.mark.parametrize("sep", [",", ";", "\t"])
+    def test_supported_delimiters_round_trip(self, tmp_path, sep):
+        from gridfm_datakit.dynamic import _load_table
+
+        path = tmp_path / "variables.csv"
+        path.write_text(
+            f"type{sep}model_id{sep}variables\n"
+            f"Curve{sep}_BUS____2_TN{sep}U_value\n"
+            f"Curve{sep}_GEN____1_SM{sep}generator_efdPu_value\n",
+        )
+        df = _load_table(str(path))
+        assert list(df.columns) == ["type", "model_id", "variables"]
+        assert len(df) == 2
+
+    def test_single_column_file_is_not_split_on_a_letter(self, tmp_path):
+        from gridfm_datakit.dynamic import _load_table
+
+        path = tmp_path / "one_column.csv"
+        path.write_text("type\nCurve\nFinalStateValue\n")
+        df = _load_table(str(path))
+        assert list(df.columns) == ["type"]
+        assert df["type"].tolist() == ["Curve", "FinalStateValue"]
+
+    def test_header_only_file_keeps_its_columns(self, tmp_path):
+        # A grid with no automation systems is legitimate: the file is a bare header.
+        from gridfm_datakit.dynamic import _load_table
+
+        path = tmp_path / "automation_systems.csv"
+        path.write_text(
+            "category_name,dynamic_model_id,parameter_set_id,params,model_name\n",
+        )
+        df = _load_table(str(path))
+        assert set(df.columns) == AUTOMATION_SYSTEMS_REQUIRED_COLS
+        assert df.empty
+
+    def test_semicolons_inside_params_do_not_win_over_the_separator(self, tmp_path):
+        # The "params" column packs its own key=value;key=value payload, so ";" is
+        # frequent in the body of a comma-separated file.
+        from gridfm_datakit.dynamic import _load_table
+
+        path = tmp_path / "events.csv"
+        path.write_text(
+            "event_name,static_id,start_time,params\n"
+            "NodeFault,_BUS____1_TN,1.0,fault_time=0.1;r_pu=0.0;x_pu=0.01\n"
+            "NodeFault,_BUS____2_TN,1.0,fault_time=0.1;r_pu=0.0;x_pu=0.01\n",
+        )
+        df = _load_table(str(path))
+        assert list(df.columns) == ["event_name", "static_id", "start_time", "params"]
+        assert df.loc[0, "params"] == "fault_time=0.1;r_pu=0.0;x_pu=0.01"
+
+    def test_unsupported_suffix_raises_type_error(self, tmp_path):
+        from gridfm_datakit.dynamic import _load_table
+
+        path = tmp_path / "variables.txt"
+        path.write_text("type,model_id,variables\n")
+        with pytest.raises(TypeError, match="csv or parquet"):
+            _load_table(str(path))

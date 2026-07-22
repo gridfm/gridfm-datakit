@@ -317,19 +317,48 @@ def _check_cols(df: pd.DataFrame, required: set[str], file_label: str) -> None:
         )
 
 
+# Delimiters the CSV sniffer is allowed to choose between. Restricting the set is
+# what makes sniffing safe: left unconstrained, csv.Sniffer picks any character
+# that looks regular, so a single-column file yields a letter ("e") and parses to
+# silent garbage. Covers the comma/semicolon convention split plus tabs.
+_CSV_DELIMITERS = ",;\t"
+
+
+def _read_csv_sample(p: Path) -> str:
+    """Return whole lines from the head of a CSV, for delimiter sniffing."""
+    sample = p.read_text()[:8192]
+    # Never end mid-line: a truncated last line can carry an unbalanced quote or a
+    # partial field, either of which skews the sniffer.
+    cut = sample.rfind("\n")
+    return sample[: cut + 1] if cut != -1 else sample
+
+
 def _load_table(path: str) -> pd.DataFrame:
-    """Load a CSV or Parquet file into a DataFrame."""
+    """Load a CSV or Parquet file into a DataFrame.
+
+    CSV delimiters are sniffed rather than assumed, so the files work under both
+    the North American (",") and European (";") conventions. The sniffer falls
+    back to "," when it cannot decide — which is the case for a header-only or
+    single-column file, where there is no delimiter to find.
+    """
     p = Path(path)
     if not p.is_file():
         raise FileNotFoundError(f"Dynamic input file not found: {path}")
     if p.suffix.lower() == ".parquet":
         return pd.read_parquet(p)
-    elif (
-        p.suffix.lower() == ".csv"
-    ):  # TODO: validate with Youssouf. To handle convention difference for CSV between North America and Europe, use sniffer
-        with open(p) as f:
-            dialect = csv.Sniffer().sniff(f.read(1024))
-        return pd.read_csv(p, sep=dialect.delimiter)
+    elif p.suffix.lower() == ".csv":
+        try:
+            sep = (
+                csv.Sniffer()
+                .sniff(
+                    _read_csv_sample(p),
+                    delimiters=_CSV_DELIMITERS,
+                )
+                .delimiter
+            )
+        except csv.Error:
+            sep = ","
+        return pd.read_csv(p, sep=sep)
     else:
         raise TypeError(f"A csv or parquet file is expected, instead received {p}")
 
