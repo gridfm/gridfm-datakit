@@ -66,6 +66,11 @@ dynamic:
   #   write_slack_bus: true
   #   provider_parameters:
   #     slackBusSelectionMode: LARGEST_GENERATOR
+  # Run the shared validation suite over the static snapshot (the initial
+  # operating point) once generation finishes. Off by default: it re-reads every
+  # Parquet table, which is wasteful on a large run. The Zarr trajectories are
+  # not covered either way.
+  validate: false
   logging:
     verbosity: info        # progress logger threshold: silent|error|warning|info|debug
     save_reports: true     # persist each simulation's Dynawo report under raw/dynamic/reports/

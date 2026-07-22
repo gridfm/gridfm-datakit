@@ -93,3 +93,35 @@ def test_final_state_values_reach_the_output(config_ieee14):
     # one row per sample, and the values are real numbers rather than NaN padding
     assert len(frame) == metadata["n_samples"]
     assert frame[names].notna().all().all()
+
+
+def test_validate_flag_runs_the_validation_suite(config_ieee14, monkeypatch):
+    """dynamic.validate: true runs the shared checks over the static snapshot."""
+    from gridfm_datakit.dynamic import generate_dynamic as gd
+
+    config_ieee14.dynamic.validate = True
+    seen = {}
+
+    def _spy(file_paths, mode="pf", sn_mva=100.0):
+        seen["file_paths"] = file_paths
+        seen["mode"] = mode
+        return True
+
+    monkeypatch.setattr(
+        "gridfm_datakit.validation.validate_dynamic_data",
+        _spy,
+    )
+    file_paths = gd.generate_dynamic_data(config_ieee14)
+
+    assert seen["file_paths"] is file_paths
+    assert seen["mode"] == config_ieee14.settings.mode
+
+
+def test_validation_is_off_by_default(config_ieee14, monkeypatch):
+    from gridfm_datakit.dynamic import generate_dynamic as gd
+
+    def _fail(*_args, **_kwargs):
+        raise AssertionError("validation must not run unless dynamic.validate is set")
+
+    monkeypatch.setattr("gridfm_datakit.validation.validate_dynamic_data", _fail)
+    gd.generate_dynamic_data(config_ieee14)

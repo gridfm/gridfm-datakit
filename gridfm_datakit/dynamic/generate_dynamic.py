@@ -213,7 +213,35 @@ def generate_dynamic_data(
         gc.collect()
     writer.close()
 
+    # --- Step 7: optional validation ---
+    _validate_outputs(args, file_paths)
+
     return file_paths
+
+
+def _validate_outputs(args: NestedNamespace, file_paths: Dict[str, str]) -> None:
+    """Run the shared validation suite over the run's static snapshot.
+
+    Off by default: the checks re-read every Parquet table, which is wasteful on a
+    large run whose outputs are about to be validated downstream anyway. Enable
+    with ``dynamic.validate: true``.
+
+    Only the static snapshot is covered — the initial operating point Dynawo
+    starts from. The trajectories in the Zarr store are not validated.
+    """
+    dynamic_cfg = getattr(args, "dynamic", None)
+    if not getattr(dynamic_cfg, "validate", False):
+        return
+
+    from gridfm_datakit.validation import validate_dynamic_data
+
+    logger.info("Validating the static snapshot of the dynamic run...")
+    validate_dynamic_data(
+        file_paths,
+        mode=getattr(args.settings, "mode", "pf"),
+        sn_mva=getattr(args.settings, "sn_mva", 100.0),
+    )
+    logger.info("Validation passed.")
 
 
 def _validate_dynamic_config(args: NestedNamespace) -> None:
