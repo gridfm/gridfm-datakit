@@ -125,10 +125,17 @@ class DynamicResults:
         (n_scenarios, n_variables, n_timesteps).
     report : Any
         Dynamic simulation report including model build-up and problem resolution.
+    final_state_values : Any, optional
+        Values of the variables declared as "FinalStateValue" in the variables
+        input table: one scalar per variable at the end of the simulation, rather
+        than a trajectory. pypowsybl returns a DataFrame indexed by the flattened
+        variable name with a single "values" column. None when the run monitors no
+        such variable, in which case no final_state_values.parquet is written.
     """
 
     dynamic_results: Any  # pandas.DataFrame — (n_timesteps, n_variables)
     report: Any
+    final_state_values: Any = None
 
 
 # ---------------------------------------------------------------------------

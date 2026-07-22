@@ -162,8 +162,8 @@ def run_dynawo_simulation(
     DynamicResults
         Solver-agnostic container holding the curves as a pandas DataFrame
         indexed by time — shape **(n_timesteps, n_variables)** — plus the solver
-        status report string. The transpose to (n_variables, n_timesteps) happens
-        only when writing the Zarr store in ``_save_generated_data``.
+        status report string and the final state values. The transpose to
+        (n_variables, n_timesteps) happens only when writing the Zarr store.
     """
     # Setup
     sim = pp.dynamic.Simulation()
@@ -193,10 +193,16 @@ def run_dynawo_simulation(
             f"Dynawo simulation failed ({dyn_res.status().name}): {dyn_res.status_text()}",
         )
 
-    # Format results
+    # Format results. FinalStateValue rows of the variables table are returned
+    # separately from the curves and stored as a per-sample scalar table, so they
+    # are carried through here rather than dropped.
     formated_dyn_res = _format_dynamic_res(dyn_res, drop_duplicate_timestep)
 
-    return DynamicResults(formated_dyn_res, report_node.to_json())
+    return DynamicResults(
+        formated_dyn_res,
+        report_node.to_json(),
+        final_state_values=dyn_res.final_state_values(),
+    )
 
 
 # ---------------------------------------------------------------------------

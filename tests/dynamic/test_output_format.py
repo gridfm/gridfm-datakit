@@ -248,6 +248,70 @@ def test_features_and_labels_joinable_when_membership_differs(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# Final state values
+# ---------------------------------------------------------------------------
+
+
+def _fsv(**values) -> pd.DataFrame:
+    """Mimic pypowsybl's final_state_values(): indexed by name, one "values" column."""
+    frame = pd.DataFrame({"values": list(values.values())}, index=list(values))
+    frame.index.name = "variables"
+    return frame
+
+
+def test_final_state_values_are_exported_as_a_keyed_table(tmp_path):
+    results = [_result(0), _result(1)]
+    results[0]["dynamic_results"].final_state_values = _fsv(gen_UPu=1.05, gen_efd=2.0)
+    results[1]["dynamic_results"].final_state_values = _fsv(gen_UPu=0.98, gen_efd=2.5)
+
+    out, _, meta = _save(results, tmp_path)
+
+    frame = pd.read_parquet(out / "final_state_values.parquet")
+    assert list(frame.columns) == [
+        "scenario_index",
+        "perturbation_index",
+        "gen_UPu",
+        "gen_efd",
+    ]
+    assert frame["scenario_index"].tolist() == [0, 1]
+    assert frame["gen_UPu"].tolist() == [1.05, 0.98]
+    assert meta["final_state_value_names"] == ["gen_UPu", "gen_efd"]
+
+
+def test_no_final_state_values_writes_no_table(tmp_path):
+    # A curves-only run must not leave an empty table behind.
+    out, _, meta = _save([_result(0), _result(1)], tmp_path)
+    assert not (out / "final_state_values.parquet").exists()
+    assert meta["final_state_value_names"] == []
+
+
+def test_final_state_values_join_the_static_snapshot_by_key(tmp_path):
+    results = [_result(3, perturbation_index=1)]
+    results[0]["dynamic_results"].final_state_values = _fsv(gen_UPu=1.01)
+
+    out, _, _ = _save(results, tmp_path)
+
+    fsv = pd.read_parquet(out / "final_state_values.parquet")
+    bus = pd.read_parquet(out / "bus_data.parquet")
+    key = ["scenario_index", "perturbation_index"]
+    assert set(map(tuple, fsv[key].to_numpy())) == set(map(tuple, bus[key].to_numpy()))
+
+
+def test_variable_order_is_not_assumed_from_the_solver(tmp_path):
+    # Dynawo does not return the variables in registration order, so a later
+    # sample may list them differently. Values must follow their names.
+    results = [_result(0), _result(1)]
+    results[0]["dynamic_results"].final_state_values = _fsv(a=1.0, b=2.0)
+    results[1]["dynamic_results"].final_state_values = _fsv(b=20.0, a=10.0)
+
+    out, _, _ = _save(results, tmp_path)
+
+    frame = pd.read_parquet(out / "final_state_values.parquet")
+    assert frame["a"].tolist() == [1.0, 10.0]
+    assert frame["b"].tolist() == [2.0, 20.0]
+
+
+# ---------------------------------------------------------------------------
 # Incremental (chunked) writing
 # ---------------------------------------------------------------------------
 

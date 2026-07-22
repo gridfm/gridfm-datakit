@@ -271,6 +271,11 @@ def benchmark_dataset():
                 ("Curve", "_BUS____2_TN", "U_value"),
                 ("Curve", "UVA", "underVoltageAutomaton_UMinPu"),
                 ("Curve", "_GEN____1_SM", "generator_efdPu_value"),
+                # A FinalStateValue row alongside the curves: the solver returns
+                # these separately and they land in final_state_values.parquet, not
+                # in the Zarr store. Keeping one here means the end-to-end tests
+                # cover both output kinds.
+                ("FinalStateValue", "_GEN____1_SM", "generator_UPu"),
             ],
         ),
     }
