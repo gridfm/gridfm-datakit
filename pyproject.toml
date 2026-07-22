@@ -38,7 +38,6 @@ dependencies = [
     "networkx",
     "tqdm",
     "pyarrow",
-    "zarr",  # dynamic time-series output store (dynamic module)
 ]
 
 authors = [
@@ -84,4 +83,15 @@ test = [
 
 powsybl = [
   "pypowsybl"
+]
+
+# Dynamic (time-domain) simulation. The plain "powsybl" extra is not enough:
+# the Dynawo backend lives behind pypowsybl's own "dynamic" extra, and zarr is
+# only used by the dynamic time-series store.
+#
+# A local Dynawo installation is a separate, non-pip prerequisite — see
+# gridfm_datakit.dynamic.dynawo.api.check_dynawo_available.
+dynamic = [
+  "pypowsybl[dynamic]",
+  "zarr",
 ]

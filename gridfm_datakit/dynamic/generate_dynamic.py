@@ -284,6 +284,23 @@ def _time_axis_seconds(curves: pd.DataFrame) -> np.ndarray:
     return np.asarray(index, dtype="float64")
 
 
+def _import_zarr():
+    """Import zarr, or explain how to install it.
+
+    zarr backs the dynamic time-series store and nothing else, so it ships in the
+    "dynamic" extra rather than the core dependencies. Imported here, at the point
+    of use, so the rest of the package stays importable without it.
+    """
+    try:
+        import zarr
+    except ImportError as exc:  # pragma: no cover - optional dependency
+        raise ImportError(
+            "zarr is required to write the dynamic time-series store. "
+            "Install it with: pip install 'gridfm-datakit[dynamic]'",
+        ) from exc
+    return zarr
+
+
 def _final_state_values_to_mapping(fsv: Any) -> Dict[str, float]:
     """Normalise a solver's final-state-value frame to a {name: value} mapping.
 
@@ -600,7 +617,7 @@ class _DynamicDataWriter:
         """
         if self._curves is not None:
             return
-        import zarr
+        zarr = _import_zarr()
 
         self.n_variables = n_variables
         self.max_n_timesteps = n_timesteps
