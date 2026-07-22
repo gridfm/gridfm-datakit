@@ -17,27 +17,27 @@ version = "1.0.5"
 requires-python = ">=3.10,<3.13"
 
 dependencies = [
-    "ipykernel",
-    "matplotlib",
-    "matpowercaseframes",
-    "nbformat",
-    "numba",
-    "numpy",
-    "pandas",
-    "pathlib",
-    "plotly",
-    "pyaml",
-    "requests",
-    "urllib3>=2.6.0", # fix security issue
-    "ipywidgets",
-    "ipyfilechooser",
-    "scipy",
-    # Floor, not exact pin: 0.9.34+ supports Julia >=1.10.3 (incl. 1.12). The
-    # reproducible Julia environment is pinned in gridfm_datakit/juliapkg.json.
-    "juliacall>=0.9.34",
-    "networkx",
-    "tqdm",
-    "pyarrow",
+  "ipykernel",
+  "matplotlib",
+  "matpowercaseframes",
+  "nbformat",
+  "numba",
+  "numpy",
+  "pandas",
+  "pathlib",
+  "plotly",
+  "pyaml",
+  "requests",
+  "urllib3>=2.6.0", # fix security issue
+  "ipywidgets",
+  "ipyfilechooser",
+  "scipy",
+  # Floor, not exact pin: 0.9.34+ supports Julia >=1.10.3 (incl. 1.12). The
+  # reproducible Julia environment is pinned in gridfm_datakit/juliapkg.json.
+  "juliacall>=0.9.34",
+  "networkx",
+  "tqdm",
+  "pyarrow",
 ]
 
 authors = [
@@ -85,12 +85,6 @@ powsybl = [
   "pypowsybl"
 ]
 
-# Dynamic (time-domain) simulation. Adds zarr, which backs the dynamic
-# time-series store and is used nowhere else. pypowsybl.dynamic itself ships in
-# the base pypowsybl package — there is no "dynamic" extra on that side.
-#
-# The Dynawo solver is a separate, non-pip prerequisite: a native installation
-# declared to powsybl. See gridfm_datakit.dynamic.dynawo.api.check_dynawo_available.
 dynamic = [
   "pypowsybl",
   "zarr",
