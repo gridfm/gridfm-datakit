@@ -16,12 +16,9 @@ import csv
 from dataclasses import dataclass
 import pandas as pd
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from gridfm_datakit.utils.param_handler import NestedNamespace
-
-if TYPE_CHECKING:
-    pass
 
 
 # ---------------------------------------------------------------------------
@@ -68,7 +65,7 @@ EVENTS_REQUIRED_COLS = {
 VARIABLES_REQUIRED_COLS = {
     "type",  # str; either "Curve" for timeseries or "FinalStateValue" for the final state value only
     "model_id",  # str; identifier of the monitored element
-    "variables",  # str or list[str]; variables to monitor (check Dynawo dynamic model's description for the list of available variables per model)
+    "variables",  # str; one variable per row — repeat model_id to monitor several (check the Dynawo dynamic model's description for the variables it exposes)
 }
 
 

@@ -207,13 +207,12 @@ def _map_dynamic_models_dynawo(
     # The second dataframe introduces automation systems that dynamiclly affect the grid behavior
     # Not only the separation is based the difference in nature but also more practically
     # the automation systems are parsed differently in Dynawo.
-    # Plain unpack: the mappers below never write to these frames (every write
-    # targets a fresh frame produced by groupby/get_group/reset_index). A
-    # list.copy() here would only copy the list, not the DataFrames, so it looked
-    # protective while protecting nothing.
+    # Read-only: every frame written below is a fresh one produced by
+    # groupby/get_group/reset_index, so the caller's inputs are never mutated.
     df_dm, df_as = dynamic_models
 
-    # TODO: add validation test for the inputs and flag invalid entries.
+    # Values were validated against the mapping tables by
+    # gridfm_datakit.dynamic._validate_dynawo_values before this point.
 
     # map the dynamic models
     cats_dm = df_dm["category_name"].unique()
@@ -223,7 +222,7 @@ def _map_dynamic_models_dynawo(
             df_grp_dm.get_group(cat)[["static_id", "parameter_set_id", "model_name"]]
             .reset_index(drop=True)
             .set_index("static_id")
-        )  # TODO: validat with Youssouf, whether we should put the column names here or put it in a utils with something like DYNAWO_DYNAMIC_MAPPING_COLUMNS
+        )
         dynamic_model_mapping.add_dynamic_model(category_name=cat, df=df_cat)
 
     # map the automation systems
@@ -236,7 +235,7 @@ def _map_dynamic_models_dynawo(
             ]
             .reset_index(drop=True)
             .set_index("dynamic_model_id")
-        )  # TODO: same as above
+        )
         param_keywords = AUTOMATION_SYSTEM_PARAMS_MAPPING[cat]
         for keyword in param_keywords:
             df_cat[keyword] = df_cat["params"].map(
@@ -249,8 +248,6 @@ def _map_dynamic_models_dynawo(
 
 def _map_events_dynawo(events: pd.DataFrame) -> pp.dynamic.EventMapping:
     """Maps the event inputs to Dynawo format."""
-    # TODO: validate the inputs events
-    # map the events
     event_mapping = pp.dynamic.EventMapping()
     event_types = events["event_name"].unique()
     df_grp_event = events.groupby("event_name")
@@ -260,7 +257,7 @@ def _map_events_dynawo(events: pd.DataFrame) -> pp.dynamic.EventMapping:
             df_event_type_t[["static_id", "start_time", "params"]]
             .reset_index(drop=True)
             .set_index("static_id")
-        )  # TODO: same above
+        )
         param_keywords = EVENT_PARAMS_MAPPING[type_t]
         for k in param_keywords:
             df_event_type_t[k] = df_event_type_t["params"].map(
@@ -276,9 +273,8 @@ def _map_events_dynawo(events: pd.DataFrame) -> pp.dynamic.EventMapping:
 
             df_with_option = df_event_type_t[df_event_type_t["disconnect_only"].notna()]
             df_with_option = df_with_option[["start_time", "disconnect_only"]]
-            # Skip the empty side: in practice every Disconnect either sets the
-            # option or none do, so one of these frames is always empty. Passing an
-            # empty frame happens to work today, but nothing guarantees it.
+            # Only non-empty frames are registered: pypowsybl gives no guarantee
+            # about an empty event frame, and one of these two is usually empty.
             if not df_without_option.empty:
                 event_mapping.add_event_model(event_name=type_t, df=df_without_option)
             if not df_with_option.empty:
@@ -291,7 +287,6 @@ def _map_events_dynawo(events: pd.DataFrame) -> pp.dynamic.EventMapping:
 
 def _map_variables_dynawo(variables: pd.DataFrame) -> pp.dynamic.OutputVariableMapping:
     """Map variable inputs to Dynawo format."""
-    # TODO: add input validation test
     variable_mapping = pp.dynamic.OutputVariableMapping()
     variable_types = variables["type"].unique()
     df_grp_type = variables.groupby("type")

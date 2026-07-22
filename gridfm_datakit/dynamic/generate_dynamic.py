@@ -152,22 +152,22 @@ def generate_dynamic_data(
     # output to files instead of dropping it.
     args.settings.solver_log_dir = file_paths["solver_log_dir"]
 
-    # The dynamic pipeline reports progress through the "gridfm_datakit.dynamic"
-    # logger (per-chunk), not tqdm — so _setup_environment's tqdm.log would only
-    # ever be an empty file. Stop exporting it.
+    # The dynamic pipeline reports progress per chunk through the
+    # "gridfm_datakit.dynamic" logger, not tqdm, so _setup_environment's tqdm.log
+    # stays empty and is not exported.
     #
-    # Only remove the file when settings.overwrite is set, i.e. when
-    # _setup_environment has just wiped and recreated base_path so the tqdm.log
-    # there is certainly ours. Otherwise base_path may be reused from an earlier
-    # *static* run, whose accumulated tqdm.log we must not destroy.
+    # It is only deleted when settings.overwrite is set: base_path has then just
+    # been wiped and recreated, so the file there is certainly ours. Otherwise
+    # base_path may be shared with an earlier *static* run whose accumulated
+    # tqdm.log must be left alone.
     tqdm_log = file_paths.pop("tqdm_log", None)
     if tqdm_log is not None and getattr(args.settings, "overwrite", False):
         Path(tqdm_log).unlink(missing_ok=True)
 
     # --- Step 2: network + scenarios (reuse generate.py logic) ---
-    # TODO: discuss with YE: just a function to prep load scenarios and the path
-    # we don't need the net, since we'll pass the path instead of the net along the pipeline
-    net, scenarios, meta = _prepare_network_and_scenarios(args, file_paths, seed)
+    # Only the scenarios and meta["network_path"] are used downstream: workers
+    # reload the network themselves from that path (see _process_dynamic_chunk).
+    _, scenarios, meta = _prepare_network_and_scenarios(args, file_paths, seed)
 
     # --- Step 3: dynamic inputs ---
     dynamic_inputs = load_raw_inputs(args)
@@ -262,10 +262,6 @@ def _validate_dynamic_config(args: NestedNamespace) -> None:
         from gridfm_datakit.dynamic.dynawo.api import check_dynawo_available
 
         check_dynawo_available()
-
-    # Ensure reader is set to powsybl (required for pp_net in meta)
-    if getattr(args.network, "reader", "native") != "powsybl":
-        args.network.reader = "powsybl"
 
 
 def _time_axis_seconds(curves: pd.DataFrame) -> np.ndarray:
@@ -376,9 +372,8 @@ def _save_generated_data(
     _to_parquet(bus_rows, static_keys, BUS_COLUMNS, bus_path)
     _to_parquet(gen_rows, static_keys, GEN_COLUMNS, gen_path)
     _to_parquet(branch_rows, static_keys, BRANCH_COLUMNS, branch_path)
-    # Y-bus and runtime complete the static snapshot at parity with the static
-    # pipeline's _save_generated_data, which exports both. pf_data already
-    # carries them, so omitting them silently dropped data.
+    # Y-bus and runtime complete the static snapshot, at parity with the static
+    # pipeline's _save_generated_data. Both are already carried on pf_data.
     _to_parquet(y_bus_rows, static_keys, YBUS_COLUMNS, y_bus_path)
     _to_parquet(runtime_rows, static_keys, RUNTIME_COLUMNS, runtime_path)
 

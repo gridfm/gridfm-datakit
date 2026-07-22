@@ -1,4 +1,12 @@
-# TODO: add more tests
+"""End-to-end tests for the dynamic generation pipeline.
+
+Coverage note: these exercise the happy path (a run completes, its static
+snapshot passes the shared validation suite, curves carry a time axis). Output
+shape, padding and join keys are covered in test_output_format.py; input loading
+in test_load_raw_inputs.py; solver/load-flow config rejection in
+test_solver_parameters.py.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path

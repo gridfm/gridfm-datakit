@@ -18,7 +18,10 @@ pytestmark = pytest.mark.skipif(
     reason="Dynawo backend unavailable (needs pypowsybl + a local Dynawo installation)",
 )
 
-# TODO: add basic tests on top of the benchmarking
+# Coverage note: this module only benchmarks a full parameter set end-to-end
+# against reference curves. Unit-level checks on the config block (missing and
+# unsupported keys) live in tests/dynamic/test_solver_parameters.py, which needs
+# no Dynawo installation.
 
 
 @pytest.fixture(scope="module")
