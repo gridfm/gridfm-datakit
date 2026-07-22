@@ -95,11 +95,25 @@ def generate_dynawo_mappings(dynamic_inputs: DynamicInputs) -> DynawoMappings:
 
 
 def get_dynawo_simulation_parameters(args: NestedNamespace) -> pp.dynamic.Parameters:
-    """Prepares the parameters for Dynawo simulation."""
+    """Prepares the parameters for Dynawo simulation.
+
+    Raises
+    ------
+    ValueError
+        If a required key is missing, or an unsupported one is present.
+    """
     dict_parameters = args.dynamic.solver_parameters.to_dict()
 
-    # An unmapped key would otherwise be a bare KeyError raised inside a worker,
-    # failing every chunk with no hint as to which setting was wrong.
+    # Both checks run in the parent process, before any worker is spawned: a bad
+    # key raised inside a worker is a bare KeyError that fails every chunk with no
+    # hint as to which setting was wrong.
+    missing = sorted({"start_time", "stop_time"} - set(dict_parameters))
+    if missing:
+        raise ValueError(
+            f"dynamic.solver_parameters: missing required key(s) {missing}. "
+            "Both bound the simulation window, in seconds.",
+        )
+
     unknown = sorted(
         set(dict_parameters)
         - set(SIMULATION_PARAMETERS_MAPPING)
