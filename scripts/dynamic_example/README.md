@@ -24,6 +24,14 @@ python scripts/dynamic_example/run.py     # from the project root
 python run.py
 ```
 
+The CLI runs the same pipeline. A config carrying a `dynamic:` block selects it,
+so there is no separate subcommand — but note the CLI does not resolve this
+example's folder-relative paths, which is what `run.py` is for:
+
+```bash
+gridfm-datakit generate config.yaml       # paths must be absolute
+```
+
 Progress logging streams advancement to the console as it runs:
 
 ```

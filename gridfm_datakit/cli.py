@@ -38,6 +38,22 @@ def pm_setup():
     return pool, result
 
 
+def _config_has_dynamic_block(config_path: str) -> bool:
+    """Return True if the config asks for a dynamic (time-domain) run.
+
+    The presence of a ``dynamic:`` block is what selects the pipeline: a config
+    carrying one names a dynamic solver and its input tables, which the static
+    pipeline would silently ignore.
+    """
+    try:
+        with open(config_path, "r") as f:
+            config = yaml.safe_load(f)
+    except (OSError, yaml.YAMLError):
+        # Let the pipeline itself report the problem, with its own error message.
+        return False
+    return isinstance(config, dict) and bool(config.get("dynamic"))
+
+
 def validate_data_directory(
     data_path: str,
     sn_mva: float,
@@ -138,6 +154,10 @@ def main() -> None:
 Examples:
   # Generate data from config file
   gridfm-datakit generate config.yaml
+
+  # Generate dynamic (time-domain) data: same command, and a config that
+  # carries a dynamic: block selects the dynamic pipeline
+  gridfm-datakit generate dynamic_config.yaml
 
   # Validate existing data (sample 100 partitions)
   gridfm-datakit validate /path/to/data/
@@ -281,8 +301,17 @@ Examples:
     args = parser.parse_args()
 
     if args.command == "generate":
-        print(f"Generating power flow data from {args.config}...")
-        file_paths = generate_power_flow_data_distributed(args.config)
+        # A config with a dynamic: block runs the dynamic pipeline; without one it
+        # runs the static one. Both write under settings.data_dir and both return
+        # the same file_paths mapping.
+        if _config_has_dynamic_block(args.config):
+            from gridfm_datakit.dynamic.generate_dynamic import generate_dynamic_data
+
+            print(f"Generating dynamic simulation data from {args.config}...")
+            file_paths = generate_dynamic_data(args.config)
+        else:
+            print(f"Generating power flow data from {args.config}...")
+            file_paths = generate_power_flow_data_distributed(args.config)
 
         print("\nData generation complete!")
         print("Generated files:")
