@@ -10,14 +10,10 @@ try:
 except ImportError:  # pragma: no cover - optional dependency
     pp = None
 
-from gridfm_datakit.dynamic.dynawo.api import is_dynawo_available
+from markers import needs_dynawo
 
-# Every test here calls Simulation.run(), so it needs a local Dynawo installation
-# on top of pypowsybl.
-pytestmark = pytest.mark.skipif(
-    is_dynawo_available() is False,
-    reason="Dynawo backend unavailable (needs pypowsybl + a local Dynawo installation)",
-)
+# Most tests here call Simulation.run().
+pytestmark = needs_dynawo
 
 
 # ---------------------------------------------------------------------------

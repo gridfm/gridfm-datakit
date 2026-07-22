@@ -11,19 +11,14 @@ object is built. Only the tests that inspect a constructed Parameters object do.
 from __future__ import annotations
 
 import pytest
+from markers import needs_powsybl
 
 from gridfm_datakit.dynamic.dynawo import (
     get_dynawo_loadflow_parameters,
     get_dynawo_simulation_parameters,
 )
-from gridfm_datakit.dynamic.dynawo.api import is_pypowsybl_dynamic_available
 from gridfm_datakit.dynamic.dynawo.utils import LOADFLOW_PARAMETERS_DEFAULTS
 from gridfm_datakit.utils.param_handler import NestedNamespace
-
-needs_pypowsybl = pytest.mark.skipif(
-    is_pypowsybl_dynamic_available() is False,
-    reason="pypowsybl.dynamic not installed",
-)
 
 
 def _config(**solver_parameters) -> NestedNamespace:
@@ -56,7 +51,7 @@ def test_unsupported_solver_key_raises():
         get_dynawo_simulation_parameters(config)
 
 
-@needs_pypowsybl
+@needs_powsybl
 def test_minimal_solver_parameters_are_accepted():
     params = get_dynawo_simulation_parameters(_config(start_time=0.0, stop_time=500.0))
     assert params.start_time == 0.0
@@ -76,7 +71,7 @@ def test_unsupported_loadflow_key_raises():
         get_dynawo_loadflow_parameters(config)
 
 
-@needs_pypowsybl
+@needs_powsybl
 def test_loadflow_defaults_put_the_slack_on_a_generator():
     # Dynawo initialises its machines from this solution, so the default must keep
     # the slack on a bus that carries one. See get_dynawo_loadflow_parameters.
@@ -85,7 +80,7 @@ def test_loadflow_defaults_put_the_slack_on_a_generator():
     assert params.provider_parameters["slackBusSelectionMode"] == "LARGEST_GENERATOR"
 
 
-@needs_pypowsybl
+@needs_powsybl
 def test_absent_block_matches_explicit_defaults():
     implicit = get_dynawo_loadflow_parameters(NestedNamespace())
     explicit = get_dynawo_loadflow_parameters(
@@ -95,7 +90,7 @@ def test_absent_block_matches_explicit_defaults():
     assert implicit.provider_parameters == explicit.provider_parameters
 
 
-@needs_pypowsybl
+@needs_powsybl
 def test_loadflow_overrides_are_applied():
     config = NestedNamespace(
         dynamic={

@@ -16,14 +16,11 @@ except ImportError:  # pragma: no cover - optional dependency
     pp = None
 
 from gridfm_datakit.powsybl import load_net
-from gridfm_datakit.powsybl.api import is_powsybl_available
 from gridfm_datakit.utils.param_handler import NestedNamespace
 
-pytestmark = pytest.mark.skipif(
-    is_powsybl_available() is False,
-    reason="pypowsybl is not installed. Install with: pip install gridfm-datakit[powsybl]",
-)
-
+# No pytestmark here: pytest only honours it in test modules, so a skipif in a
+# conftest silently does nothing. Test modules carry needs_powsybl/needs_dynawo
+# from markers.py instead.
 
 # File paths
 PATH_NETWORK_IEEE14 = str(

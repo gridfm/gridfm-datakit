@@ -12,17 +12,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
+from markers import needs_dynawo
 
-from gridfm_datakit.dynamic.dynawo.api import is_dynawo_available
-
-# Full end-to-end pipeline (OPF via Julia + Dynawo). Gate on the Dynawo backend,
-# not just pypowsybl: a local Dynawo installation is a separate prerequisite, and
-# without it the pipeline raises rather than skipping.
-pytestmark = pytest.mark.skipif(
-    is_dynawo_available() is False,
-    reason="Dynawo backend unavailable (needs pypowsybl + a local Dynawo installation)",
-)
+# Full end-to-end pipeline: OPF via Julia, then Dynawo.
+pytestmark = needs_dynawo
 
 
 # ---------------------------------------------------------------------------

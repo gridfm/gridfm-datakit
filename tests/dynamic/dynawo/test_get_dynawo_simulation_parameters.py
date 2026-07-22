@@ -9,14 +9,12 @@ try:
 except ImportError:  # pragma: no cover - optional dependency
     pp = None
 
-from gridfm_datakit.dynamic.dynawo.api import is_dynawo_available
+from markers import needs_dynawo
+
 from gridfm_datakit.utils.param_handler import NestedNamespace
 
-# Calls Simulation.run(), so it needs a local Dynawo installation on top of pypowsybl.
-pytestmark = pytest.mark.skipif(
-    is_dynawo_available() is False,
-    reason="Dynawo backend unavailable (needs pypowsybl + a local Dynawo installation)",
-)
+# Calls Simulation.run().
+pytestmark = needs_dynawo
 
 # Coverage note: this module only benchmarks a full parameter set end-to-end
 # against reference curves. Unit-level checks on the config block (missing and
