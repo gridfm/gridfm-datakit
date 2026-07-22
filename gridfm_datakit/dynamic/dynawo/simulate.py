@@ -31,6 +31,7 @@ from gridfm_datakit import powsybl
 from gridfm_datakit.process.solvers import run_opf
 from gridfm_datakit.process.process_network import pf_preprocessing, pf_post_processing
 from gridfm_datakit.process.solver_output import solver_capture
+from gridfm_datakit.utils.param_handler import NestedNamespace
 
 # ---------------------------------------------------------------------------
 # Public: balanced static state
@@ -43,6 +44,7 @@ def compute_balanced_static_state_dynawo(
     julia: Any,
     p2g_maps,
     scenario_index: int = 0,
+    lf_params: Any = None,
 ) -> Tuple[Any, Dict[str, Any]]:
     """Compute the balanced initial conditions for a dynamic siulation.
 
@@ -74,6 +76,10 @@ def compute_balanced_static_state_dynawo(
     scenario_index: int
         Used to label the results row (matches ``pf_post_processing``'s
         ``scenario_index`` argument)
+    lf_params:
+        ``pypowsybl.loadflow.Parameters`` for step 3 (from
+        ``get_dynawo_loadflow_parameters``). Defaults to the dynamic-appropriate
+        settings in ``LOADFLOW_PARAMETERS_DEFAULTS`` when None.
 
     Returns
     -------
@@ -101,17 +107,15 @@ def compute_balanced_static_state_dynawo(
     # mapping_p2g = powsybl.build_p2g_maps(gfm_net_pf, pp_net); received as args to avoid repeated computation
     powsybl.update_powsybl(pp_net, gfm_net_pf, p2g_maps)
 
-    # Step 3: run AC-PF via pypowsybl OpenLoadFlow
-    # TODO: temporary override — restore powsybl.get_default_lf_params() once the
-    # upstream slack-bus fix is merged.
-    lf_params = pp.loadflow.Parameters(
-        distributed_slack=False,
-        read_slack_bus=True,
-        write_slack_bus=True,
-        provider_parameters={
-            "slackBusSelectionMode": "LARGEST_GENERATOR",  # default: MOST_MESHED
-        },
-    )
+    # Step 3: run AC-PF via pypowsybl OpenLoadFlow.
+    # These parameters deliberately differ from the static pipeline's
+    # get_default_lf_params(): Dynawo initialises its synchronous machines from
+    # this solution, so the slack has to sit on a machine that carries a dynamic
+    # model. See get_dynawo_loadflow_parameters.
+    if lf_params is None:
+        from gridfm_datakit.dynamic.dynawo import get_dynawo_loadflow_parameters
+
+        lf_params = get_dynawo_loadflow_parameters(NestedNamespace())
     t0 = time.perf_counter()
     pf_metadata = powsybl.pypowsybl.loadflow.run_ac(pp_net, lf_params)
     solve_time = time.perf_counter() - t0

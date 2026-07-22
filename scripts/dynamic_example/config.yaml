@@ -53,6 +53,18 @@ dynamic:
     solver_type: SIM
     solver_parameters_file: grids/IEEE14.par
     solver_parameters_id: SimplifiedSolver
+  # Optional. Governs the AC power flow that produces the balanced initial state.
+  # The defaults below are applied when this block is absent; they differ from the
+  # static pipeline's on purpose. Dynawo initialises each synchronous machine from
+  # this solution, so the slack has to sit on a machine that carries a dynamic
+  # model — OpenLoadFlow's own default (MOST_MESHED) can pick a bus with no
+  # generator at all.
+  # loadflow_parameters:
+  #   distributed_slack: false
+  #   read_slack_bus: true
+  #   write_slack_bus: true
+  #   provider_parameters:
+  #     slackBusSelectionMode: LARGEST_GENERATOR
   logging:
     verbosity: info        # progress logger threshold: silent|error|warning|info|debug
     save_reports: true     # persist each simulation's Dynawo report under raw/dynamic/reports/

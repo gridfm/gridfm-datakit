@@ -32,6 +32,17 @@ EVENT_PARAMS_MAPPING = {
 # value. Anything else is a typo — see _validate_dynawo_values.
 VARIABLE_TYPES = ["Curve", "FinalStateValue"]
 
+# Defaults for the AC load flow that produces the balanced initial state, and the
+# full set of keys accepted under the optional "dynamic.loadflow_parameters"
+# config block. See get_dynawo_loadflow_parameters for why these differ from the
+# static pipeline's get_default_lf_params().
+LOADFLOW_PARAMETERS_DEFAULTS = {
+    "distributed_slack": False,
+    "read_slack_bus": True,
+    "write_slack_bus": True,
+    "provider_parameters": {"slackBusSelectionMode": "LARGEST_GENERATOR"},
+}
+
 SIMULATION_PARAMETERS_MAPPING = {
     "parameters_file": "parametersFile",
     "network_parameters_file": "network.parametersFile",

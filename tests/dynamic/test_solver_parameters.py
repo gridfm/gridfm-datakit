@@ -1,4 +1,4 @@
-"""Config-block validation for the Dynawo solver parameters.
+"""Config-block validation for the Dynawo solver and load flow parameters.
 
 These checks run in the parent process, before any worker is spawned. That is the
 point of them: a bad key reaching a worker surfaces as a bare KeyError that fails
@@ -12,8 +12,12 @@ from __future__ import annotations
 
 import pytest
 
-from gridfm_datakit.dynamic.dynawo import get_dynawo_simulation_parameters
+from gridfm_datakit.dynamic.dynawo import (
+    get_dynawo_loadflow_parameters,
+    get_dynawo_simulation_parameters,
+)
 from gridfm_datakit.dynamic.dynawo.api import is_pypowsybl_dynamic_available
+from gridfm_datakit.dynamic.dynawo.utils import LOADFLOW_PARAMETERS_DEFAULTS
 from gridfm_datakit.utils.param_handler import NestedNamespace
 
 needs_pypowsybl = pytest.mark.skipif(
@@ -57,3 +61,52 @@ def test_minimal_solver_parameters_are_accepted():
     params = get_dynawo_simulation_parameters(_config(start_time=0.0, stop_time=500.0))
     assert params.start_time == 0.0
     assert params.stop_time == 500.0
+
+
+# ---------------------------------------------------------------------------
+# dynamic.loadflow_parameters
+# ---------------------------------------------------------------------------
+
+
+def test_unsupported_loadflow_key_raises():
+    config = NestedNamespace(
+        dynamic={"loadflow_parameters": {"distributed_slak": True}},
+    )
+    with pytest.raises(ValueError, match="distributed_slak"):
+        get_dynawo_loadflow_parameters(config)
+
+
+@needs_pypowsybl
+def test_loadflow_defaults_put_the_slack_on_a_generator():
+    # Dynawo initialises its machines from this solution, so the default must keep
+    # the slack on a bus that carries one. See get_dynawo_loadflow_parameters.
+    params = get_dynawo_loadflow_parameters(NestedNamespace())
+    assert params.distributed_slack is False
+    assert params.provider_parameters["slackBusSelectionMode"] == "LARGEST_GENERATOR"
+
+
+@needs_pypowsybl
+def test_absent_block_matches_explicit_defaults():
+    implicit = get_dynawo_loadflow_parameters(NestedNamespace())
+    explicit = get_dynawo_loadflow_parameters(
+        NestedNamespace(dynamic={"loadflow_parameters": LOADFLOW_PARAMETERS_DEFAULTS}),
+    )
+    assert implicit.distributed_slack == explicit.distributed_slack
+    assert implicit.provider_parameters == explicit.provider_parameters
+
+
+@needs_pypowsybl
+def test_loadflow_overrides_are_applied():
+    config = NestedNamespace(
+        dynamic={
+            "loadflow_parameters": {
+                "distributed_slack": True,
+                "provider_parameters": {"slackBusSelectionMode": "MOST_MESHED"},
+            },
+        },
+    )
+    params = get_dynawo_loadflow_parameters(config)
+    assert params.distributed_slack is True
+    assert params.provider_parameters["slackBusSelectionMode"] == "MOST_MESHED"
+    # Keys not overridden keep their defaults.
+    assert params.read_slack_bus is True

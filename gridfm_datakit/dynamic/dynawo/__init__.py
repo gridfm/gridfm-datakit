@@ -7,12 +7,14 @@ Exposes:
 - generate_dynawo_mappings : convert a DynamicInputs into DynawoMappings.
 - get_dynawo_simulation_parameters : build a pypowsybl.dynamic.Parameters object
   from the config's dynamic.solver_parameters block.
+- get_dynawo_loadflow_parameters : build the pypowsybl.loadflow.Parameters used
+  for the balanced initial state, from the config's dynamic.loadflow_parameters
+  block.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -32,11 +34,9 @@ from gridfm_datakit.dynamic import DynamicInputs
 from gridfm_datakit.dynamic.dynawo.utils import (
     AUTOMATION_SYSTEM_PARAMS_MAPPING,
     EVENT_PARAMS_MAPPING,
+    LOADFLOW_PARAMETERS_DEFAULTS,
     SIMULATION_PARAMETERS_MAPPING,
 )
-
-if TYPE_CHECKING:
-    pass
 
 
 @dataclass
@@ -135,6 +135,57 @@ def get_dynawo_simulation_parameters(args: NestedNamespace) -> pp.dynamic.Parame
     return pp.dynamic.Parameters(
         start_time=dict_parameters["start_time"],
         stop_time=dict_parameters["stop_time"],
+        provider_parameters=provider_parameters,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Public: get load flow parameters for the balanced initial state
+# ---------------------------------------------------------------------------
+
+
+def get_dynawo_loadflow_parameters(args: NestedNamespace) -> pp.loadflow.Parameters:
+    """Build the AC load flow parameters for the balanced initial state.
+
+    The defaults deliberately differ from ``powsybl.get_default_lf_params()``,
+    which the static pipeline uses. Dynawo initialises each synchronous machine
+    from the power flow solution, so the slack must sit on a machine that carries
+    a dynamic model: ``slackBusSelectionMode=LARGEST_GENERATOR`` puts it there,
+    and ``read_slack_bus``/``write_slack_bus`` keep that choice explicit and
+    visible in the network. OpenLoadFlow's own default (MOST_MESHED) can select a
+    bus with no generator at all, leaving Dynawo to initialise from a state its
+    machine models cannot reproduce.
+
+    Every default is overridable through the optional ``dynamic.loadflow_parameters``
+    config block.
+
+    Raises
+    ------
+    ValueError
+        If the config block contains an unsupported key.
+    """
+    cfg = getattr(getattr(args, "dynamic", None), "loadflow_parameters", None)
+    overrides = cfg.to_dict() if cfg is not None else {}
+
+    unknown = sorted(set(overrides) - set(LOADFLOW_PARAMETERS_DEFAULTS))
+    if unknown:
+        raise ValueError(
+            f"dynamic.loadflow_parameters: unsupported key(s) {unknown}. "
+            f"Accepted: {sorted(LOADFLOW_PARAMETERS_DEFAULTS)}.",
+        )
+
+    params = {**LOADFLOW_PARAMETERS_DEFAULTS, **overrides}
+    # provider_parameters is a free-form pass-through to OpenLoadFlow, which only
+    # accepts strings.
+    provider_parameters = {
+        str(key): str(value)
+        for key, value in (params["provider_parameters"] or {}).items()
+    }
+
+    return pp.loadflow.Parameters(
+        distributed_slack=bool(params["distributed_slack"]),
+        read_slack_bus=bool(params["read_slack_bus"]),
+        write_slack_bus=bool(params["write_slack_bus"]),
         provider_parameters=provider_parameters,
     )
 
@@ -289,6 +340,7 @@ __all__ = [
     # primary entry points
     "generate_dynawo_mappings",
     "get_dynawo_simulation_parameters",
+    "get_dynawo_loadflow_parameters",
     # data class
     "DynawoMappings",
 ]

@@ -28,6 +28,7 @@ from gridfm_datakit.dynamic.dynawo.simulate import (
 )
 from gridfm_datakit.dynamic import DynamicResults
 from gridfm_datakit.dynamic.dynawo import (
+    get_dynawo_loadflow_parameters,
     get_dynawo_simulation_parameters,
     generate_dynawo_mappings,
 )
@@ -229,17 +230,15 @@ def _process_dynamic_chunk(args: Tuple) -> Union[List[Dict[str, Any]], List[Exce
             # Initialise Julia once per worker — avoids repeated JIT compilation
             julia = init_julia(max_iter, solver_log_dir)
 
-            # TODO: discuss and delete this comment
-            # Reloading powsybl network for each worker.
-            # to_powsybl cannot work since gfm_network representation erases the original IDs
-            # thus the dynamic model mappings would bug
+            # Each worker reloads the network from file rather than receiving it:
+            # to_powsybl() erases the original element IDs, which the dynamic model
+            # mappings are keyed on.
             net = load_net(network_path)
 
-            # TODO: discuss with YE
-            # Generate DynawoMappings and the solver parameters: pypowsybl.dynamic.Parameters
-            # These objects cannot be pickled neither
+            # Built per worker because none of these objects can be pickled.
             dynamic_mappings = generate_dynawo_mappings(dynamic_inputs)
             dynamic_solver_params = get_dynawo_simulation_parameters(config)
+            lf_params = get_dynawo_loadflow_parameters(config)
 
             chunk_results: List[Dict[str, Any]] = []
 
@@ -263,6 +262,7 @@ def _process_dynamic_chunk(args: Tuple) -> Union[List[Dict[str, Any]], List[Exce
                             dynamic_solver_params=dynamic_solver_params,
                             dynamic_solver=dynamic_solver,
                             julia=julia,
+                            lf_params=lf_params,
                             topology_generator=topology_generator,
                             generation_generator=generation_generator,
                             admittance_generator=admittance_generator,
@@ -307,6 +307,7 @@ def process_single_dynamic_simulation(
     generation_generator: Any = None,
     admittance_generator: Any = None,
     error_log_file: str = None,
+    lf_params: Any = None,
 ) -> List[Dict[str, Any]]:
     """Process one load scenario, expanded over topology perturbations.
 
@@ -375,6 +376,7 @@ def process_single_dynamic_simulation(
                 dynamic_solver=dynamic_solver,
                 p2g_maps=p2g_maps,
                 scenario_index=scenario_index,
+                lf_params=lf_params,
             )
 
             # Step 3: dynamic simulation
@@ -425,6 +427,7 @@ def _compute_balanced_static_state(
     dynamic_solver,
     p2g_maps,
     scenario_index,
+    lf_params=None,
 ):
     """Wrapper around solver-specific balanced-state computation.
 
@@ -438,6 +441,7 @@ def _compute_balanced_static_state(
             julia=julia,
             p2g_maps=p2g_maps,
             scenario_index=scenario_index,
+            lf_params=lf_params,
         )
     raise NotImplementedError(
         f"Dynamic solver {dynamic_solver!r} is not implemented. "
