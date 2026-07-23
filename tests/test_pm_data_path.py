@@ -25,11 +25,9 @@ from gridfm_datakit.utils.idx_bus import PD, QD, VA, VM
 from gridfm_datakit.utils.idx_cost import COST
 from gridfm_datakit.utils.idx_gen import PG, VG
 
-GRID_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "gridfm_datakit",
-    "grids",
-)
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+IEEE14_PATH = os.path.join(REPO_ROOT, "tests", "powsybl", "grids", "ieee14.m")
+DUMMY_PATH = os.path.join(REPO_ROOT, "gridfm_datakit", "process", "dummy.m")
 
 
 @pytest.fixture(scope="module")
@@ -39,9 +37,7 @@ def jl():
 
 @pytest.fixture()
 def net():
-    return load_net_from_file(
-        os.path.join(GRID_DIR, "pglib_opf_case24_ieee_rts.m"),
-    )
+    return load_net_from_file(IEEE14_PATH)
 
 
 def perturb_richly(net, seed=0):
@@ -215,17 +211,13 @@ def test_branch_limit_change_forces_reparse(net, jl):
 
 def test_base_reinit_on_network_switch(jl):
     """Feeding a different base network must re-initialize the Julia base."""
-    net_a = load_net_from_file(
-        os.path.join(GRID_DIR, "pglib_opf_case24_ieee_rts.m"),
-    )
-    net_b = load_net_from_file(
-        os.path.join(GRID_DIR, "pglib_opf_case14_ieee.m"),
-    )
+    net_a = load_net_from_file(IEEE14_PATH)
+    net_b = load_net_from_file(DUMMY_PATH)
 
     res_a = run_opf(net_a, jl)
     res_b = run_opf(net_b, jl)
-    assert len(res_a["solution"]["bus"]) == 24
-    assert len(res_b["solution"]["bus"]) == 14
+    assert len(res_a["solution"]["bus"]) == 14
+    assert len(res_b["solution"]["bus"]) == 5
     # and back
     res_a2 = run_opf(net_a, jl)
-    assert len(res_a2["solution"]["bus"]) == 24
+    assert len(res_a2["solution"]["bus"]) == 14
