@@ -1,11 +1,28 @@
-import numpy as np
-import copy
-from itertools import combinations
 from abc import ABC, abstractmethod
+from itertools import combinations
+from math import comb
 import warnings
-from typing import Generator, List, Mapping, Sequence, Union
+from typing import Generator, List, Mapping, Optional, Sequence, Union
+
+import numpy as np
+
 from gridfm_datakit.network import Network
 from gridfm_datakit.utils.idx_gen import GEN_BUS
+
+
+class _LazyComponentCombinations:
+    """Reusable iterable over N-k combinations without storing every tuple."""
+
+    def __init__(self, components: np.ndarray, k: int) -> None:
+        self.components = components
+        self.k = min(k, len(components))
+
+    def __iter__(self):
+        for count in range(self.k + 1):
+            yield from combinations(self.components, count)
+
+    def __len__(self) -> int:
+        return sum(comb(len(self.components), count) for count in range(self.k + 1))
 
 
 # Abstract base class for topology generation
@@ -47,7 +64,7 @@ class NoPerturbationGenerator(TopologyGenerator):
         Yields:
             The original power network.
         """
-        yield copy.deepcopy(net)
+        yield net.copy_for_perturbation()
 
 
 class NMinusKGenerator(TopologyGenerator):
@@ -61,10 +78,10 @@ class NMinusKGenerator(TopologyGenerator):
     Attributes:
         k: Maximum number of components to drop.
         components_to_drop: List of tuples containing component indices and types.
-        component_combinations: List of all possible combinations of components to drop.
+        component_combinations: Lazy iterable over all combinations to drop.
     """
 
-    def __init__(self, k: int, base_net: dict) -> None:
+    def __init__(self, k: int, base_net: Network) -> None:
         """Initialize the N-k generator.
 
         Args:
@@ -78,7 +95,7 @@ class NMinusKGenerator(TopologyGenerator):
         super().__init__()
         if k > 1:
             warnings.warn("k>1. This may result in slow data generation process.")
-        if k == 0:
+        if k <= 0:
             raise ValueError(
                 'k must be greater than 0. Use "none" as argument for the generator_type if you don\'t want to generate any perturbation',
             )
@@ -87,10 +104,13 @@ class NMinusKGenerator(TopologyGenerator):
         # Prepare the list of components to drop
         self.components_to_drop = base_net.idx_branches_in_service
 
-        # Generate all combinations of at most k components
-        self.component_combinations = []
-        for r in range(self.k + 1):
-            self.component_combinations.extend(combinations(self.components_to_drop, r))
+        # Generate combinations lazily. Materializing N-2 contingencies is
+        # quadratic in the branch count and can consume gigabytes before the
+        # first topology is processed.
+        self.component_combinations = _LazyComponentCombinations(
+            self.components_to_drop,
+            self.k,
+        )
 
         print(
             f"Number of possible topologies with at most {self.k} dropped components: {len(self.component_combinations)}",
@@ -110,12 +130,15 @@ class NMinusKGenerator(TopologyGenerator):
             A perturbed network topology with at most k components removed.
         """
         for selected_components in self.component_combinations:
-            perturbed_topology = copy.deepcopy(net)
+            perturbed_topology = net.copy_for_perturbation()
 
             perturbed_topology.deactivate_branches(selected_components)
 
             # Check network feasibility and yield the topology
-            if perturbed_topology.check_single_connected_component():
+            if (
+                not selected_components
+                or perturbed_topology.check_single_connected_component()
+            ):
                 yield perturbed_topology
 
 
@@ -136,7 +159,7 @@ class RandomComponentDropGenerator(TopologyGenerator):
         n_topology_variants: int,
         k: int,
         base_net: Network,
-        elements: List[str] = ["branch", "gen"],
+        elements: Optional[List[str]] = None,
         outage_count_probabilities: Sequence[float] | Mapping[int, float] | None = None,
         max_generation_attempts: int | None = None,
     ) -> None:
@@ -157,6 +180,7 @@ class RandomComponentDropGenerator(TopologyGenerator):
         super().__init__()
         self.n_topology_variants = n_topology_variants
         self.k = k
+        elements = ["branch", "gen"] if elements is None else elements
 
         # Create a list of all components that can be dropped
         self.components_to_drop = []
@@ -206,13 +230,12 @@ class RandomComponentDropGenerator(TopologyGenerator):
                     "Consider reducing k or relaxing outage_count_probabilities.",
                 )
             n_attempts += 1
-            perturbed_topology = copy.deepcopy(net)
 
             r = self._sample_outage_count()
 
             # Randomly select r<=k components to drop
             components = tuple(
-                np.random.choice(range(len(self.components_to_drop)), r, replace=False),
+                np.random.choice(len(self.components_to_drop), r, replace=False),
             )
 
             # Convert indices back to actual components
@@ -229,6 +252,7 @@ class RandomComponentDropGenerator(TopologyGenerator):
             ]
 
             # Drop selected lines and transformers, turn off generators and static generators
+            perturbed_topology = net.copy_for_perturbation()
             perturbed_topology.deactivate_branches(branches_to_drop)
             perturbed_topology.deactivate_gens(gens_to_drop)
 
