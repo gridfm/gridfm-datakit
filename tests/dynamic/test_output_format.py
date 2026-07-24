@@ -1,4 +1,4 @@
-"""Tests for the dynamic output format written by ``_save_generated_data``.
+"""Tests for the dynamic output format written by ``_DynamicDataWriter``.
 
 These exercise the output contract directly with synthetic results, so they run
 without pypowsybl/Dynawo/Julia:
@@ -18,10 +18,22 @@ import pandas as pd
 import pytest
 
 from gridfm_datakit.dynamic import DynamicResults
-from gridfm_datakit.dynamic.generate_dynamic import _save_generated_data
+from gridfm_datakit.dynamic.generate_dynamic import _DynamicDataWriter
 from gridfm_datakit.utils.param_handler import NestedNamespace
 
 zarr = pytest.importorskip("zarr")
+
+
+def _write(results, output_dir, file_paths=None):
+    """Write a whole result list as one chunk; _save_chunked covers several."""
+    writer = _DynamicDataWriter(
+        output_dir,
+        file_paths if file_paths is not None else {},
+        NestedNamespace(dummy=1),
+        0,
+    )
+    writer.write_chunk(results)
+    writer.close()
 
 
 def _result(
@@ -65,14 +77,7 @@ def _result(
 def _save(results, tmp_path):
     out = tmp_path / "dyn"
     out.mkdir(parents=True)
-    file_paths = {}
-    _save_generated_data(
-        all_results=results,
-        output_dir=out,
-        file_paths=file_paths,
-        config=NestedNamespace(dummy=1),
-        seed=0,
-    )
+    _write(results, out)
     curves_group = zarr.open(str(out / "dynamic_results.zarr"), mode="r")
     metadata = json.loads((out / "metadata.json").read_text())
     return out, curves_group, metadata
@@ -130,13 +135,7 @@ def test_all_scenarios_failing_raises_instead_of_keeping_stale_outputs(tmp_path)
     out = tmp_path / "dyn"
     out.mkdir(parents=True)
     with pytest.raises(RuntimeError, match="every scenario failed"):
-        _save_generated_data(
-            all_results=[],
-            output_dir=out,
-            file_paths={},
-            config=NestedNamespace(dummy=1),
-            seed=0,
-        )
+        _write([], out)
 
 
 def test_empty_curves_raise_instead_of_zero_division(tmp_path):
@@ -153,13 +152,7 @@ def test_empty_curves_raise_instead_of_zero_division(tmp_path):
         report="{}",
     )
     with pytest.raises(ValueError, match="no monitored variables"):
-        _save_generated_data(
-            all_results=[sample],
-            output_dir=out,
-            file_paths={},
-            config=NestedNamespace(dummy=1),
-            seed=0,
-        )
+        _write([sample], out)
 
 
 def test_variable_count_mismatch_raises(tmp_path):
@@ -167,13 +160,7 @@ def test_variable_count_mismatch_raises(tmp_path):
     out = tmp_path / "dyn"
     out.mkdir(parents=True)
     with pytest.raises(ValueError, match="disagree on the number of variables"):
-        _save_generated_data(
-            all_results=[_result(0, n_variables=3), _result(1, n_variables=2)],
-            output_dir=out,
-            file_paths={},
-            config=NestedNamespace(dummy=1),
-            seed=0,
-        )
+        _write([_result(0, n_variables=3), _result(1, n_variables=2)], out)
 
 
 def test_static_snapshot_is_at_parity_with_static_pipeline(tmp_path):

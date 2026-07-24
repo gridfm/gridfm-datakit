@@ -515,7 +515,7 @@ def _combine_pf_and_dyn_res(
     The alignment schema between the per-bus/branch/gen PF snapshot and the
     per-variable dynamic time-series is TBD (see architecture §12, Open
     Question #2). This function currently packages both outputs side-by-side
-    so they can be saved independently by ``_save_generated_data``.
+    so the writer in generate_dynamic can save them independently.
 
     Args
     ----

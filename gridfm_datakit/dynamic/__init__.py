@@ -119,9 +119,9 @@ class DynamicResults:
         one column per output variable. This is the solver's natural orientation
         and is kept as-is through the pipeline.
 
-        Note the persistent store uses the *transposed* orientation:
-        ``_save_generated_data`` transposes each sample to (n_variables,
-        n_timesteps) and stacks them into a Zarr array of shape
+        Note the persistent store uses the *transposed* orientation: the writer in
+        generate_dynamic transposes each sample to (n_variables, n_timesteps) and
+        stacks them into a Zarr array of shape
         (n_scenarios, n_variables, n_timesteps).
     report : Any
         Dynamic simulation report including model build-up and problem resolution.

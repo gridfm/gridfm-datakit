@@ -813,21 +813,3 @@ class _DynamicDataWriter:
                     shape=(n_samples,),
                     dtype="int64",
                 )
-
-
-def _save_generated_data(
-    all_results: List[Dict[str, Any]],
-    output_dir: Path,
-    file_paths: Dict[str, str],
-    config: NestedNamespace,
-    seed: int,
-) -> None:
-    """Write a complete result list in one shot.
-
-    Thin wrapper over :class:`_DynamicDataWriter` for callers that already hold
-    every sample in memory (tests, ad-hoc scripts). The pipeline itself streams
-    chunk by chunk instead — see generate_dynamic_data.
-    """
-    writer = _DynamicDataWriter(output_dir, file_paths, config, seed)
-    writer.write_chunk(all_results)
-    writer.close()
