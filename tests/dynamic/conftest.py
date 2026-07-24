@@ -340,9 +340,33 @@ def minimal_dataset():
     }
 
 
+@pytest.fixture(scope="module")
+def multi_final_state_value_dataset(benchmark_dataset):
+    """benchmark_dataset with several FinalStateValue rows. A copy: the original is
+    module-scoped and its other users expect a single row."""
+    dataset = dict(benchmark_dataset)
+    dataset["df_variables"] = pd.DataFrame.from_records(
+        columns=["type", "model_id", "variables"],
+        data=[
+            ("Curve", "_BUS____2_TN", "U_value"),
+            ("Curve", "_GEN____1_SM", "generator_efdPu_value"),
+            # distinct models, so one column per (model, variable) is expected
+            ("FinalStateValue", "_GEN____1_SM", "generator_UPu"),
+            ("FinalStateValue", "_GEN____3_SM", "generator_UPu"),
+            ("FinalStateValue", "_GEN____6_SM", "generator_UPu"),
+        ],
+    )
+    return dataset
+
+
 @pytest.fixture(scope="function")
 def config_ieee14(tmp_path, benchmark_dataset):
     return _make_config(tmp_path, benchmark_dataset)
+
+
+@pytest.fixture(scope="function")
+def config_ieee14_multi_fsv(tmp_path, multi_final_state_value_dataset):
+    return _make_config(tmp_path, multi_final_state_value_dataset)
 
 
 @pytest.fixture(scope="module")
