@@ -181,8 +181,9 @@ def test_static_snapshot_is_at_parity_with_static_pipeline(tmp_path):
     out, _, _ = _save([_result(7), _result(9)], tmp_path)
 
     y_bus = pd.read_parquet(out / "y_bus_data.parquet")
-    assert list(y_bus.columns) == ["scenario_index", "perturbation_index"] + [
-        "load_scenario_idx",
+    assert list(y_bus.columns) == [
+        "scenario_index",
+        "perturbation_index",
         "index1",
         "index2",
         "G",
@@ -194,10 +195,19 @@ def test_static_snapshot_is_at_parity_with_static_pipeline(tmp_path):
     assert list(runtime.columns) == [
         "scenario_index",
         "perturbation_index",
-        "load_scenario_idx",
         "ac",
     ]
     assert runtime["scenario_index"].tolist() == [7, 9]
+
+
+def test_load_scenario_idx_is_not_duplicated_by_scenario_index(tmp_path):
+    """load_scenario_idx repeats scenario_index and cannot separate perturbations."""
+    out, _, _ = _save([_result(7), _result(9)], tmp_path)
+
+    for name in ("bus_data", "branch_data", "gen_data", "y_bus_data", "runtime_data"):
+        frame = pd.read_parquet(out / f"{name}.parquet")
+        assert "load_scenario_idx" not in frame.columns, name
+        assert list(frame.columns[:2]) == ["scenario_index", "perturbation_index"]
 
 
 def test_topology_perturbations_labeled_by_composite_key(tmp_path):

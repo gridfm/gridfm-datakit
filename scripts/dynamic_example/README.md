@@ -71,7 +71,9 @@ out/                                    <- settings.data_dir
         ├── bus_data.parquet / gen_data.parquet / branch_data.parquet
         │   y_bus_data.parquet / runtime_data.parquet
         │       static PF snapshot (features), tagged with
-        │       (scenario_index, perturbation_index)
+        │       (scenario_index, perturbation_index) — this pair replaces the
+        │       static pipeline's load_scenario_idx, which cannot tell two
+        │       perturbations of one load scenario apart
         ├── dynamic_results.zarr/
         │       curves (n_samples, n_variables, n_timesteps) + scenario_index /
         │       perturbation_index coordinate arrays; join the two modalities on

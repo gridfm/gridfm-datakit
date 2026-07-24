@@ -347,6 +347,11 @@ def _final_state_values_to_mapping(fsv: Any) -> Dict[str, float]:
     return {str(name): float(value) for name, value in zip(names, values)}
 
 
+# Repeated by scenario_index, which the writer inserts. The shared validation
+# suite already treats load_scenario_idx as optional.
+_REDUNDANT_STATIC_COLUMNS = ["load_scenario_idx"]
+
+
 class _DynamicDataWriter:
     """Incremental writer for one dynamic run's outputs.
 
@@ -492,6 +497,9 @@ class _DynamicDataWriter:
             for (scenario_id, perturbation_id), array in zip(keys, rows[key]):
                 array = np.atleast_2d(array)
                 frame = pd.DataFrame(array, columns=columns[: array.shape[1]])
+                # load_scenario_idx cannot tell two perturbations of one load
+                # scenario apart; the composite key below can.
+                frame = frame.drop(columns=_REDUNDANT_STATIC_COLUMNS, errors="ignore")
                 frame.insert(0, "perturbation_index", perturbation_id)
                 frame.insert(0, "scenario_index", scenario_id)
                 frames.append(frame)
