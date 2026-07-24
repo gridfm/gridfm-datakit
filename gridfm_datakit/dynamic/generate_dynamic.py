@@ -32,6 +32,7 @@ import gc
 import hashlib
 import json
 import logging
+import os
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -103,10 +104,11 @@ def _configure_logging(config: NestedNamespace) -> None:
 
 
 def generate_dynamic_data(
-    config: Union[str, Dict[str, Any], NestedNamespace],
+    config: Union[str, os.PathLike, Dict[str, Any], NestedNamespace],
 ) -> Dict[str, str]:
     """Generate dynamic simulation data from a YAML config.
-    Accepted format includes: a string for the path, a dictionnary or a NestedNamespace.
+    Accepted format includes: a path to the YAML file (str or os.PathLike), a
+    dictionnary or a NestedNamespace.
 
     Runs the full pipeline:
     1. Validate config.
@@ -118,7 +120,7 @@ def generate_dynamic_data(
 
     Args
     ----
-    config : str | dict | NestedNamespace
+    config : str | os.PathLike | dict | NestedNamespace
         Path to a YAML config file, a plain dict, or a NestedNamespace.
 
     Returns
@@ -133,19 +135,15 @@ def generate_dynamic_data(
 
     Raises
     ------
+    TypeError
+        If ``config`` is none of the accepted forms.
     ValueError
         If ``network.reader != "powsybl"``, ``dynamic.dynamic_solver`` is not set,
         or the removed ``dynamic.output_dir`` key is still present.
     """
 
     # --- Step 0: load and validate config ---
-    if isinstance(config, str):
-        with open(config, "r") as f:
-            config = yaml.safe_load(f)
-    if isinstance(config, dict):
-        args = NestedNamespace(**config)
-    else:
-        args = config
+    args = _load_config(config)
 
     _validate_dynamic_config(args)
     _configure_logging(args)
@@ -244,10 +242,39 @@ def _validate_outputs(args: NestedNamespace, file_paths: Dict[str, str]) -> None
     logger.info("Validation passed.")
 
 
+def _load_config(
+    config: Union[str, os.PathLike, Dict[str, Any], NestedNamespace],
+) -> NestedNamespace:
+    """Normalise every accepted config form into a NestedNamespace.
+
+    Anything else is refused here rather than carried into the pipeline, where it
+    used to surface as an AttributeError on the object itself.
+    """
+    if isinstance(config, NestedNamespace):
+        return config
+    if isinstance(config, (str, os.PathLike)):
+        with open(config, "r") as f:
+            config = yaml.safe_load(f)
+        if not isinstance(config, dict):
+            raise ValueError(
+                f"Config file must contain a YAML mapping (network:, load:, "
+                f"dynamic:, settings:), got {type(config).__name__}.",
+            )
+    if isinstance(config, dict):
+        return NestedNamespace(**config)
+    raise TypeError(
+        f"generate_dynamic_data expects a path to a YAML config (str or "
+        f"os.PathLike), a dict, or a NestedNamespace, got "
+        f"{type(config).__name__}.",
+    )
+
+
 def _validate_dynamic_config(args: NestedNamespace) -> None:
     """Raise ValueError for config issues that would cause silent failures."""
 
-    reader = getattr(args.network, "reader", None)
+    # getattr on the block too: a config with no network: block must report the
+    # missing reader, not an AttributeError.
+    reader = getattr(getattr(args, "network", None), "reader", None)
     if reader != "powsybl":
         raise ValueError(
             f"Dynamic simulations require network.reader='powsybl', "
