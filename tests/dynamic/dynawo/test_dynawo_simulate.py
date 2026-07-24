@@ -1,6 +1,8 @@
+import json
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 
 # pypowsybl is an optional dependency; guard the import so collection never
@@ -149,6 +151,170 @@ def test_benchmark_ieee14_run_dynawo_simulation(
         df_ref_curves_ieee14,
         drop_duplicate_timestep,
     )
+
+
+def _report(*models) -> str:
+    """A ReportNode JSON carrying one instantiation entry per (model, id, state)."""
+    return json.dumps(
+        {
+            "version": "3.0",
+            "reportRoot": {
+                "messageKey": "",
+                "children": [
+                    {
+                        "messageKey": "dynawo.dynasim.dynawoSimulation",
+                        "children": [
+                            {
+                                "messageKey": "pypowsybl.dynasim.pypowsyblDynamicModels",
+                                "children": [
+                                    {
+                                        "messageKey": "dynawo.dynasim.modelInstantiation",
+                                        "values": {
+                                            "modelName": {"value": model},
+                                            "dynamicId": {"value": dynamic_id},
+                                            "state": {"value": state},
+                                        },
+                                    }
+                                    for model, dynamic_id, state in models
+                                ],
+                            },
+                        ],
+                    },
+                ],
+            },
+        },
+    )
+
+
+class TestFailedModelInstantiations:
+    """A model Dynawo cannot build is skipped, and the run still reports SUCCESS."""
+
+    def test_all_models_instantiated_is_not_a_failure(self):
+        from gridfm_datakit.dynamic.dynawo.simulate import _failed_model_instantiations
+
+        report = _report(("GeneratorSynchronous", "_GEN____1_SM", "OK"))
+        assert _failed_model_instantiations(report) == []
+
+    def test_a_ko_model_is_reported_with_its_id(self):
+        from gridfm_datakit.dynamic.dynawo.simulate import _failed_model_instantiations
+
+        report = _report(
+            ("GeneratorSynchronous", "_GEN____1_SM", "OK"),
+            ("GeneratorSynchronous", "_LOAD___2_EC", "KO"),
+        )
+        assert _failed_model_instantiations(report) == [
+            "GeneratorSynchronous _LOAD___2_EC",
+        ]
+
+    @pytest.mark.parametrize(
+        "report",
+        ["", "not json", "{}", '{"reportRoot": null}', None, 42],
+    )
+    def test_an_unreadable_report_is_not_treated_as_a_failure(self, report):
+        from gridfm_datakit.dynamic.dynawo.simulate import _failed_model_instantiations
+
+        assert _failed_model_instantiations(report) == []
+
+
+@needs_dynawo
+def test_a_model_that_cannot_be_instantiated_raises(
+    pp_net_ieee14,
+    event_mapping_ieee14,
+    variable_mapping_ieee14,
+    param_ieee14,
+):
+    """Dynawo returns SUCCESS, the pipeline must not."""
+    from gridfm_datakit.dynamic.dynawo import DynawoMappings
+    from gridfm_datakit.dynamic.dynawo.simulate import run_dynawo_simulation
+
+    # A load equipped with a generator model, among four sound machines: the rest
+    # of the system is intact, so the run still converges.
+    model_mapping = pp.dynamic.ModelMapping()
+    model_mapping.add_dynamic_model(
+        category_name="SynchronousGenerator",
+        df=pd.DataFrame.from_records(
+            index="static_id",
+            columns=["static_id", "parameter_set_id", "model_name"],
+            data=[
+                (
+                    "_LOAD___2_EC",  # not a generator
+                    "Generator1",
+                    "GeneratorSynchronousFourWindingsProportionalRegulations",
+                ),
+                (
+                    "_GEN____2_SM",
+                    "Generator2",
+                    "GeneratorSynchronousFourWindingsProportionalRegulations",
+                ),
+                (
+                    "_GEN____3_SM",
+                    "Generator3",
+                    "GeneratorSynchronousFourWindingsProportionalRegulations",
+                ),
+                (
+                    "_GEN____6_SM",
+                    "Generator6",
+                    "GeneratorSynchronousThreeWindingsProportionalRegulations",
+                ),
+                (
+                    "_GEN____8_SM",
+                    "Generator8",
+                    "GeneratorSynchronousThreeWindingsProportionalRegulations",
+                ),
+            ],
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="failed to instantiate"):
+        run_dynawo_simulation(
+            pp_net=pp_net_ieee14,
+            dynawo_mapping=DynawoMappings(
+                dynamic_model_mapping=model_mapping,
+                event_mapping=event_mapping_ieee14,
+                variable_mapping=variable_mapping_ieee14,
+            ),
+            parameters=param_ieee14,
+        )
+
+
+@needs_dynawo
+def test_a_diverged_simulation_raises(
+    pp_net_ieee14,
+    event_mapping_ieee14,
+    variable_mapping_ieee14,
+    param_ieee14,
+):
+    """Dynawo returns a FAILURE result instead of raising."""
+    from gridfm_datakit.dynamic.dynawo import DynawoMappings
+    from gridfm_datakit.dynamic.dynawo.simulate import run_dynawo_simulation
+
+    # No machine carries a dynamic model, so initialisation has nothing to solve.
+    model_mapping = pp.dynamic.ModelMapping()
+    model_mapping.add_dynamic_model(
+        category_name="SynchronousGenerator",
+        df=pd.DataFrame.from_records(
+            index="static_id",
+            columns=["static_id", "parameter_set_id", "model_name"],
+            data=[
+                (
+                    "_LOAD___2_EC",
+                    "Generator1",
+                    "GeneratorSynchronousFourWindingsProportionalRegulations",
+                ),
+            ],
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="Dynawo simulation failed"):
+        run_dynawo_simulation(
+            pp_net=pp_net_ieee14,
+            dynawo_mapping=DynawoMappings(
+                dynamic_model_mapping=model_mapping,
+                event_mapping=event_mapping_ieee14,
+                variable_mapping=variable_mapping_ieee14,
+            ),
+            parameters=param_ieee14,
+        )
 
 
 def _validate_res_against_ref(res, df_ref, drop_duplicate_timestep):

@@ -12,8 +12,9 @@ Contains a helper function _format_dynamic_res that formats the raw Dynawo outpu
 from __future__ import annotations
 
 import copy
+import json
 import time
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, List, Tuple
 
 # pypowsybl is an optional dependency; guard the import so this module loads
 # without it. Type hints are lazy strings (`from __future__ import annotations`)
@@ -164,6 +165,11 @@ def run_dynawo_simulation(
         indexed by time — shape **(n_timesteps, n_variables)** — plus the solver
         status report string and the final state values. The transpose to
         (n_variables, n_timesteps) happens only when writing the Zarr store.
+
+    Raises
+    ------
+    RuntimeError
+        If the status is not SUCCESS, or if a dynamic model was not instantiated.
     """
     # Setup
     sim = pp.dynamic.Simulation()
@@ -193,6 +199,19 @@ def run_dynawo_simulation(
             f"Dynawo simulation failed ({dyn_res.status().name}): {dyn_res.status_text()}",
         )
 
+    # A model Dynawo cannot instantiate is skipped, and the run still reports
+    # SUCCESS: the sample would be a trajectory of a different system than the
+    # input tables describe. The report is the only trace.
+    report = report_node.to_json()
+    failed = _failed_model_instantiations(report)
+    if failed:
+        raise RuntimeError(
+            f"Dynawo failed to instantiate {len(failed)} dynamic model(s): {failed}. "
+            "The simulation still reports SUCCESS but runs without them. Check the "
+            "static_id / model_name / category_name of these rows against the "
+            "network's element IDs.",
+        )
+
     # Format results. FinalStateValue rows of the variables table are returned
     # separately from the curves and stored as a per-sample scalar table, so they
     # are carried through here rather than dropped.
@@ -200,9 +219,50 @@ def run_dynawo_simulation(
 
     return DynamicResults(
         formated_dyn_res,
-        report_node.to_json(),
+        report,
         final_state_values=dyn_res.final_state_values(),
     )
+
+
+# ---------------------------------------------------------------------------
+# Private: report inspection
+# ---------------------------------------------------------------------------
+
+# Report entry emitted once per model built: "Model ${modelName} ${dynamicId}
+# instantiation ${state}", with state OK | KO.
+_INSTANTIATION_MESSAGE_KEY = "dynawo.dynasim.modelInstantiation"
+
+
+def _failed_model_instantiations(report: Any) -> List[str]:
+    """Return the models Dynawo did not instantiate, from a ReportNode JSON string.
+
+    Empty when the report cannot be read: the schema is undocumented, so a change
+    on Dynawo's side must not start failing otherwise successful runs.
+    """
+    if not isinstance(report, (str, bytes, bytearray)):
+        return []
+    try:
+        parsed = json.loads(report)
+    except (ValueError, TypeError):
+        return []
+
+    failed: List[str] = []
+
+    def _walk(node: Any) -> None:
+        if not isinstance(node, dict):
+            return
+        if node.get("messageKey") == _INSTANTIATION_MESSAGE_KEY:
+            values = node.get("values") or {}
+            state = (values.get("state") or {}).get("value")
+            if state is not None and str(state).upper() != "OK":
+                dynamic_id = (values.get("dynamicId") or {}).get("value", "<unknown>")
+                model_name = (values.get("modelName") or {}).get("value", "<unknown>")
+                failed.append(f"{model_name} {dynamic_id}")
+        for child in node.get("children") or []:
+            _walk(child)
+
+    _walk(parsed.get("reportRoot") if isinstance(parsed, dict) else None)
+    return failed
 
 
 # ---------------------------------------------------------------------------
