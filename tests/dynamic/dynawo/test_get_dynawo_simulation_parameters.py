@@ -65,6 +65,25 @@ def test_benchmark_get_dynawo_simulation_parameters(
     assert _validate_output_curves_against_ref(res, df_ref_curves_ieee14)
 
 
+def test_unsupported_solver_parameter_key_raises():
+    """An unmapped solver_parameters key was a bare KeyError raised inside a worker."""
+    from gridfm_datakit.dynamic.dynawo import get_dynawo_simulation_parameters
+    from gridfm_datakit.utils.param_handler import NestedNamespace
+
+    config = NestedNamespace(
+        dynamic=NestedNamespace(
+            solver_parameters=NestedNamespace(
+                start_time=0.0,
+                stop_time=500.0,
+                solver_type="SIM",
+                dump_export=True,  # not a supported key
+            ),
+        ),
+    )
+    with pytest.raises(ValueError, match=r"unsupported key\(s\) \['dump_export'\]"):
+        get_dynawo_simulation_parameters(config)
+
+
 def _validate_output_curves_against_ref(res, df_ref):
     df_res = (
         res.curves()
