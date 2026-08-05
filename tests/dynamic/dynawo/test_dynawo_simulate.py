@@ -208,11 +208,38 @@ class TestFailedModelInstantiations:
 
     @pytest.mark.parametrize(
         "report",
-        ["", "not json", "{}", '{"reportRoot": null}', None, 42],
+        ["", "not json", "{}", '{"reportRoot": null}', "[]", None, 42],
     )
     def test_an_unreadable_report_is_not_treated_as_a_failure(self, report):
         from gridfm_datakit.dynamic.dynawo.simulate import _failed_model_instantiations
 
+        assert _failed_model_instantiations(report) == []
+
+    @pytest.mark.parametrize(
+        "node",
+        [
+            {"values": {"state": "KO", "modelName": "GSM", "dynamicId": "g1"}},
+            {"values": ["state", "KO"]},
+            {"values": None},
+            {},
+            {"values": {"state": {}}},
+            {"children": 3},
+            {"children": {"a": 1}},
+        ],
+    )
+    def test_an_unrecognised_entry_shape_does_not_raise(self, node):
+        """The schema is undocumented; a shape change must not fail a good run."""
+        from gridfm_datakit.dynamic.dynawo.simulate import _failed_model_instantiations
+
+        report = json.dumps(
+            {
+                "reportRoot": {
+                    "children": [
+                        dict(node, messageKey="dynawo.dynasim.modelInstantiation"),
+                    ],
+                },
+            },
+        )
         assert _failed_model_instantiations(report) == []
 
 
@@ -317,6 +344,7 @@ def test_a_diverged_simulation_raises(
         )
 
 
+@needs_dynawo
 def test_failed_simulation_raises(unit_test_param):
     """Test that a failed Dynawo simulation raises correctly."""
 
