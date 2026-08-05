@@ -116,6 +116,80 @@ jobs:
           export SKIP_LARGE_GRIDS=1
           pytest --cov=. tests/ -v -s
 
+  dynamic-pytests:
+    runs-on: ubuntu-latest
+    env:
+      DYNAWO_VERSION: '1.7.0'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Julia 1.12
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: '1.12'
+
+      - name: Cache Julia depot
+        uses: actions/cache@v4
+        with:
+          path: ~/.julia
+          key: julia-depot-${{ runner.os }}-julia1.12-${{ hashFiles('gridfm_datakit/juliapkg.json') }}
+          restore-keys: |
+            julia-depot-${{ runner.os }}-julia1.12-
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            pip-${{ runner.os }}-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++ unzip curl
+
+      - name: Cache Dynawo
+        id: cache-dynawo
+        uses: actions/cache@v4
+        with:
+          path: ~/dynawo
+          key: dynawo-${{ runner.os }}-${{ env.DYNAWO_VERSION }}
+
+      - name: Install Dynawo
+        if: steps.cache-dynawo.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL -o /tmp/dynawo.zip \
+            "https://github.com/dynawo/dynawo/releases/download/v${DYNAWO_VERSION}/Dynawo_Linux_v${DYNAWO_VERSION}.zip"
+          unzip -q /tmp/dynawo.zip -d "$HOME"
+          rm /tmp/dynawo.zip
+
+      - name: Configure powsybl
+        run: |
+          mkdir -p ~/.itools
+          printf 'dynawo:\n  homeDir: %s\n  debug: false\n' "$HOME/dynawo" > ~/.itools/config.yml
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip wheel
+          pip install -e ".[test,dynamic,powsybl]"
+
+      - name: Set up Julia packages (PowerModels)
+        run: python -c "from juliacall import Main as jl; jl.seval('using PowerModels, Ipopt, Memento')"
+
+      - name: Check Dynawo backend
+        run: |
+          "$HOME/dynawo/dynawo.sh" version
+          python -c "from gridfm_datakit.dynamic.dynawo.api import check_dynawo_available; check_dynawo_available()"
+
+      - name: Dynawo and powsybl tests
+        run: pytest tests/dynamic tests/powsybl -v
+
   codeql:
     name: CodeQL (Python)
     runs-on: ubuntu-latest

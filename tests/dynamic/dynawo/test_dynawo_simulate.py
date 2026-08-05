@@ -317,6 +317,54 @@ def test_a_diverged_simulation_raises(
         )
 
 
+def test_failed_simulation_raises(unit_test_param):
+    """Test that a failed Dynawo simulation raises correctly."""
+
+    import pandas as pd
+    from gridfm_datakit.dynamic.dynawo.simulate import run_dynawo_simulation
+    from gridfm_datakit.dynamic.dynawo import (
+        DynawoMappings,
+        _map_dynamic_models_dynawo,
+    )
+
+    pp_net = pp.network.create_ieee9()
+    df_static_element_models = pd.DataFrame.from_records(
+        columns=["category_name", "static_id", "parameter_set_id", "model_name"],
+        data=[
+            ("Wecc", "B1-G", "WECC_WTG4A", "WTG4AWeccCurrentSource"),
+            (
+                "Wecc",
+                "B2-G",
+                "WECC_WTG4A",
+                "WTG4AWeccCurrentSource",
+            ),
+        ],
+    )
+
+    df_automation_systems = pd.DataFrame(
+        columns=[
+            "category_name",
+            "dynamic_model_id",
+            "parameter_set_id",
+            "params",
+            "model_name",
+        ],
+    )
+    with pytest.raises(RuntimeError):
+        run_dynawo_simulation(
+            pp_net=pp_net,
+            dynawo_mapping=DynawoMappings(
+                dynamic_model_mapping=_map_dynamic_models_dynawo(
+                    [df_static_element_models, df_automation_systems],
+                ),
+                event_mapping=None,
+                variable_mapping=None,
+            ),
+            parameters=unit_test_param,
+            drop_duplicate_timestep=True,
+        )
+
+
 def _validate_res_against_ref(res, df_ref, drop_duplicate_timestep):
     df_res = res.dynamic_results.reset_index(drop=True).rename(
         columns={

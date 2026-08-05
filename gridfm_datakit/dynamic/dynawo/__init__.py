@@ -326,9 +326,15 @@ def _get_param_value(params, keyword):
     # itself contains "=" parses instead of raising ("too many values to unpack").
     pairs = dict(pair.split("=", 1) for pair in params.split(";") if "=" in pair)
     # specific case for the "Disconnect" event, the sole one to have an optional parameter
+
     if keyword == "disconnect_only" and pairs.get(keyword) == "":
         return np.nan
-    return pairs.get(keyword)
+
+    try:
+        value = float(pairs.get(keyword))
+    except (ValueError, TypeError):
+        value = pairs.get(keyword)
+    return value
 
 
 __all__ = [
