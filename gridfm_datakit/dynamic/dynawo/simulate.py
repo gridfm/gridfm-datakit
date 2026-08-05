@@ -233,6 +233,16 @@ def run_dynawo_simulation(
 _INSTANTIATION_MESSAGE_KEY = "dynawo.dynasim.modelInstantiation"
 
 
+def _report_value(values: Any, key: str, default: Any = "<unknown>") -> Any:
+    """Read values[key]["value"], the shape every entry of a report node uses.
+
+    Returns default for any other shape, so an unrecognised report reads as
+    "nothing to report" rather than raising.
+    """
+    entry = values.get(key) if isinstance(values, dict) else None
+    return entry.get("value", default) if isinstance(entry, dict) else default
+
+
 def _failed_model_instantiations(report: Any) -> List[str]:
     """Return the models Dynawo did not instantiate, from a ReportNode JSON string.
 
@@ -252,14 +262,17 @@ def _failed_model_instantiations(report: Any) -> List[str]:
         if not isinstance(node, dict):
             return
         if node.get("messageKey") == _INSTANTIATION_MESSAGE_KEY:
-            values = node.get("values") or {}
-            state = (values.get("state") or {}).get("value")
+            values = node.get("values")
+            state = _report_value(values, "state", None)
             if state is not None and str(state).upper() != "OK":
-                dynamic_id = (values.get("dynamicId") or {}).get("value", "<unknown>")
-                model_name = (values.get("modelName") or {}).get("value", "<unknown>")
-                failed.append(f"{model_name} {dynamic_id}")
-        for child in node.get("children") or []:
-            _walk(child)
+                failed.append(
+                    f"{_report_value(values, 'modelName')} "
+                    f"{_report_value(values, 'dynamicId')}",
+                )
+        children = node.get("children")
+        if isinstance(children, list):
+            for child in children:
+                _walk(child)
 
     _walk(parsed.get("reportRoot") if isinstance(parsed, dict) else None)
     return failed
