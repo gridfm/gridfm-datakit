@@ -545,12 +545,12 @@ class TestEventMapping:
         from gridfm_datakit.dynamic.dynawo import _map_events_dynawo
         from gridfm_datakit.dynamic.dynawo import _map_dynamic_models_dynawo
 
+        # drop the dynamic model for _LOAD___2_EC to apply Q variation
+        # otherwise a model compatible with Q variation should be mapped.
+        # On a copy: the fixture is shared with every other test in this module.
         df_static_elem_dyn_models = benchmark_dataset[
             "df_static_element_dynamic_models"
-        ]
-        # drop the dynamic model for _LOAD___2_EC to apply Q variation
-        # otherwise a model compatible with Q variation should be mapped
-        df_static_elem_dyn_models.drop(index=5, inplace=True)
+        ].drop(index=5)
         df_automation_systems = benchmark_dataset["df_automation_systems"]
 
         df_event = pd.DataFrame.from_records(
