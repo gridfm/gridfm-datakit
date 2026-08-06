@@ -1,4 +1,3 @@
-import json
 import pandas as pd
 
 # pypowsybl is an optional dependency; guard the import so collection never
@@ -10,10 +9,9 @@ except ImportError:  # pragma: no cover - optional dependency
 
 from markers import needs_dynawo
 
+from gridfm_datakit.dynamic.dynawo.simulate import _failed_model_instantiations
+
 pytestmark = needs_dynawo
-
-
-_INSTANTIATION_MESSAGE_KEY = "dynawo.dynasim.modelInstantiation"
 
 # ---------------------------------------------------------------------------
 # Helper
@@ -37,38 +35,6 @@ def _validate_output_curves_against_ref(res, df_ref_curves_ieee14):
     df_ref = df_ref_curves_ieee14.reset_index(drop=True)
     df_ref = df_ref[df_res.columns]
     return df_res.equals(df_ref)
-
-
-def _failed_model_instantiations(report):
-    """Return the models Dynawo did not instantiate, from a ReportNode JSON string.
-
-    Empty when the report cannot be read: the schema is undocumented, so a change
-    on Dynawo's side must not start failing otherwise successful runs.
-    """
-    if not isinstance(report, (str, bytes, bytearray)):
-        return []
-    try:
-        parsed = json.loads(report)
-    except (ValueError, TypeError):
-        return []
-
-    failed = []
-
-    def _walk(node) -> None:
-        if not isinstance(node, dict):
-            return
-        if node.get("messageKey") == _INSTANTIATION_MESSAGE_KEY:
-            values = node.get("values") or {}
-            state = (values.get("state") or {}).get("value")
-            if state is not None and str(state).upper() != "OK":
-                dynamic_id = (values.get("dynamicId") or {}).get("value", "<unknown>")
-                model_name = (values.get("modelName") or {}).get("value", "<unknown>")
-                failed.append(f"{model_name} {dynamic_id}")
-        for child in node.get("children") or []:
-            _walk(child)
-
-    _walk(parsed.get("reportRoot") if isinstance(parsed, dict) else None)
-    return failed
 
 
 # ---------------------------------------------------------------------------
