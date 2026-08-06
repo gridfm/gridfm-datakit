@@ -1,0 +1,97 @@
+# End-to-end dynamic-simulation example (IEEE14 + Dynawo).
+# Paths are RELATIVE to this folder and resolved to absolute by run.py, so the
+# example runs from any working directory. Run it with:  python run.py
+# (or: python scripts/dynamic_example/run.py from the project root).
+
+network:
+  name: IEEE14
+  reader: powsybl          # dynamic simulations require the powsybl reader
+  source: file
+  file: grids/IEEE14.iidm  # xiidm network (element IDs match the input CSVs below)
+
+load:
+  generator: agg_load_profile
+  agg_profile: default
+  scenarios: 6             # a few scenarios so chunk progress is visible
+  sigma: 0.2
+  change_reactive_power: true
+  global_range: 0.4
+  max_scaling_factor: 4.0
+  step_size: 0.05
+  start_scaling_factor: 0.8
+
+# Topology / generation / admittance perturbations are optional. Left at "none"
+# here; enable e.g. topology_perturbation to expand each scenario into several
+# samples (one Dynawo run per perturbed topology).
+#
+# generation_perturbation (generation *cost* randomisation) and
+# admittance_perturbation act before the OPF, so they vary the initial operating
+# point Dynawo starts from — which machines are dispatched and at what loading —
+# and do influence the trajectory. What they do not vary is the dynamic model set
+# or the event sequence, which come from the CSV inputs and are identical across
+# samples. Only topology_perturbation changes the network the dynamic models are
+# built on. Their effect on the dynamic outputs is not validated.
+topology_perturbation:
+  type: none               # options: random, n_minus_k, none
+  # When type is "random", also set (uncomment) these:
+  # k: 1
+  # n_topology_variants: 2
+  # elements: [branch, gen]
+
+dynamic:
+  dynamic_solver: dynawo
+  input_files:
+    static_element_dynamic_models_file: inputs/static_element_dynamic_models.csv
+    automation_systems_file: inputs/automation_systems.csv
+    events_file: inputs/events.csv
+    variables_file: inputs/variables.csv
+  solver_parameters:
+    start_time: 0.0
+    stop_time: 500.0
+    parameters_file: grids/IEEE14.par
+    network_parameters_file: grids/IEEE14.par
+    network_parameters_id: Network
+    solver_type: SIM
+    solver_parameters_file: grids/IEEE14.par
+    solver_parameters_id: SimplifiedSolver
+  # Optional. Governs the AC power flow that produces the balanced initial state.
+  # The defaults below are applied when this block is absent; they differ from the
+  # static pipeline's on purpose. Dynawo initialises each synchronous machine from
+  # this solution, so the slack has to sit on a machine that carries a dynamic
+  # model — OpenLoadFlow's own default (MOST_MESHED) can pick a bus with no
+  # generator at all.
+  # loadflow_parameters:
+  #   distributed_slack: false
+  #   read_slack_bus: true
+  #   write_slack_bus: true
+  #   provider_parameters:
+  #     slackBusSelectionMode: LARGEST_GENERATOR
+  # Run the shared validation suite over the static snapshot (the initial
+  # operating point) once generation finishes. Off by default: it re-reads every
+  # Parquet table, which is wasteful on a large run. The Zarr trajectories are
+  # not covered either way.
+  validate: false
+  logging:
+    verbosity: info        # progress logger threshold: silent|error|warning|info|debug
+    save_reports: true     # persist each simulation's Dynawo report under raw/dynamic/reports/
+
+settings:
+  num_processes: 2
+  # Single output root for the whole run. Everything lands under
+  # out/IEEE14/raw/ : logs + scenarios directly there, dynamic artifacts in
+  # out/IEEE14/raw/dynamic/. There is no separate dynamic output directory.
+  data_dir: out
+  large_chunk_size: 3      # 6 scenarios / 3 -> 2 chunks -> visible chunk progress
+  overwrite: true
+  mode: pf
+  include_dc_res: false
+  # Keep solver logs OFF so the console shows only pipeline progress. Turning
+  # this on raises solver verbosity to DEBUG, which un-silences PowerModels; its
+  # Julia-level logger is not reliably captured by the file router and can spill
+  # [ PowerModels | Info/Warn ] lines onto the console. See README.
+  enable_solver_logs: false
+  pf_fast: false
+  dcpf_fast: false
+  max_iter: 200
+  pf_solver: powsybl
+  seed: 42

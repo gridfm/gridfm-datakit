@@ -158,6 +158,15 @@ class RandomComponentDropGenerator(TopologyGenerator):
         self.n_topology_variants = n_topology_variants
         self.k = k
 
+        # Only "branch" and "gen" are recognized; flag anything else early so a
+        # typo (e.g. "line"/"trafo") does not silently drop nothing.
+        unknown = set(elements) - {"branch", "gen"}
+        if unknown:
+            raise ValueError(
+                f"Unknown element type(s) for topology perturbation: {sorted(unknown)}. "
+                'Supported element types are "branch" and "gen".',
+            )
+
         # Create a list of all components that can be dropped
         self.components_to_drop = []
         if "branch" in elements:
