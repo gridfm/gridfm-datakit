@@ -20,6 +20,7 @@
 * **Out-of-operating-limits scenarios for PF**: PF datasets include realistic violations of operating limits (e.g., voltage or branch overloads) resulting from topology and load perturbations without re-optimizing generator dispatch.
 * **Admittance perturbations**: Randomly scales branch resistances and reactances to enhance diversity.
 * **Structured outputs for ML**: Per-bus, per-branch, and per-generator data ready for training neural PF/OPF solvers, with pre-computed DC-PF and DC-OPF baselines and runtime.
+* **Dynamic (time-domain) simulation**: Optional [Dynaωo](https://dynawo.github.io/) backend that runs an RMS simulation from each scenario's balanced operating point, producing trajectories alongside the static snapshot. See [Dynamic Simulation](manual/dynamic_simulation.md).
 * **Data validation and benchmarking**: Includes CLI tools for consistency checks, statistics, and constraint validation.
 
 

@@ -24,6 +24,10 @@ gridfm-datakit generate path/to/config.yaml
 
 Refer to the sections [Network](network.md), [Load Scenarios](load_scenarios.md), and [Topology perturbations](topology_perturbations.md) for a description of the configuration parameters.
 
+To generate time-domain trajectories instead of power flow snapshots, add a
+`dynamic:` block to the config — the same `generate` command then runs the
+dynamic pipeline. See [Dynamic Simulation](dynamic_simulation.md).
+
 Sample configuration files are provided in `scripts/config`, e.g. `default.yaml`:
 
 ```yaml

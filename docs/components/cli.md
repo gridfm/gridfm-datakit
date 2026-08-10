@@ -20,6 +20,17 @@ gridfm-datakit generate path/to/config.yaml
 gridfm-datakit generate scripts/config/default.yaml
 ```
 
+A config that carries a `dynamic:` block selects the dynamic (time-domain)
+pipeline instead — same command, no separate subcommand:
+
+```bash
+gridfm-datakit generate scripts/dynamic_example/config.yaml
+```
+
+See [Dynamic Simulation](../manual/dynamic_simulation.md). Note that the
+`validate`, `stats` and `plots` commands below read the static pipeline's
+partitioned layout and do not accept a dynamic run's `raw/dynamic/` directory.
+
 ### Validate Data
 
 Validate previously generated power flow data. Runs comprehensive validation checks for data integrity and physical consistency:
