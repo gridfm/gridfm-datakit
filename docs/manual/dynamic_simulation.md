@@ -18,7 +18,7 @@ For every load scenario, and for every topology perturbation of it:
 2. **OPF** is solved with PowerModels.jl → an optimal dispatch.
 3. **Set-points are pushed to pypowsybl**, then an **AC power flow** is solved
    with OpenLoadFlow. This is the *balanced initial state*: Dynawo initialises
-   every synchronous machine from it.
+   the grid state from it.
 4. **Dynawo runs the time-domain simulation** on that balanced network, applying
    the events declared in the input tables and recording the monitored
    variables.
@@ -35,6 +35,12 @@ the whole dataset.
     tables and are **identical for every sample**. What varies from sample to
     sample is the operating point Dynawo starts from — and, with
     `topology_perturbation` enabled, the network the dynamic models are built on.
+
+!!! warning "`generation_perturbation` does not work here"
+    Step 1 accepts the block, but it cannot do its job. Dynamic runs require
+    `reader: powsybl`, and pypowsybl carries no generator cost data in any format
+    it reads, so every generator is loaded with the same placeholder cost
+    (`c2=0, c1=1, c0=0`). See [Perturbations](#perturbations).
 
 ## Prerequisites
 
@@ -160,8 +166,17 @@ Accepted `category_name` values and the `params` keys each one expects:
 | `PhaseShifterI` | `transformer` |
 | `PhaseShifterP` | `transformer` |
 | `TapChanger` | `static_id`, `side` |
-| `TapChangerBlocking` | `rfo_df`, `mp1_df`, `mp2_df`, `mp3_df`, `mp4_df`, `mp5_df` |
+| `TapChangerBlocking` | `rfo_df`, `mp1_df`, `mp2_df`, `mp3_df`, `mp4_df`, `mp5_df` — **not usable, see below** |
 | `UnderVoltageAutomationSystem` | `generator` |
+
+!!! danger "`TapChangerBlocking` cannot be configured from CSV"
+    Its six parameters are DataFrames (hence the `_df` suffix), and the `params`
+    column only expresses flat `key=value` scalars. There is no convention yet
+    for describing a DataFrame in it.
+
+    The category is still *accepted* by the input validation, so a row using it
+    passes the up-front checks and then fails further down. Supporting it means
+    first fixing a serialisation convention for those columns.
 
 ```csv
 category_name,dynamic_model_id,parameter_set_id,params,model_name
@@ -207,7 +222,10 @@ several variables of the same element.
 | --- | --- |
 | `type` | `Curve` (full time series) or `FinalStateValue` (end-of-simulation scalar) |
 | `model_id` | ID of the monitored element, or the `dynamic_model_id` of an automation system |
-| `variables` | One variable name per row; consult the Dynawo model's description for what it exposes |
+| `variables` | One variable name per row — see below for where the available names are listed |
+
+The variables a model exposes are listed in its description file, shipped with
+Dynawo as `<dynawo_home>/ddb/<model_name>.desc.xml`.
 
 ```csv
 type,model_id,variables
@@ -233,6 +251,12 @@ models (machine constants, regulator gains, tap-changer settings), the network
 parameters, and the solver settings. It is referenced from
 `dynamic.solver_parameters`, and Dynawo distributions ship examples under
 `<dynawo_home>/examples/`.
+
+To find out which parameters a given model requires, read the description file
+Dynawo ships for it at `<dynawo_home>/ddb/<model_name>.desc.xml` — one per model,
+listing its parameters and the variables it exposes. For instance, the set
+`Generator1` referenced above must supply what
+`ddb/GeneratorSynchronousFourWindingsProportionalRegulations.desc.xml` declares.
 
 `scripts/dynamic_example/grids/IEEE14.par` is a working example. Its `set id`s
 are `Network`, `SimplifiedSolver`, `Generator1`…`Generator8`,
@@ -428,12 +452,28 @@ equally to *dynamic* diversity:
 | Block | Acts | Effect on the trajectory |
 | --- | --- | --- |
 | `load` scenarios | before OPF | Different loading, hence a different initial operating point |
-| `generation_perturbation` | before OPF | Randomises generation **cost**, so it only shifts the OPF dispatch |
+| `generation_perturbation` | before OPF | **Does not work here** — see below |
 | `admittance_perturbation` | before OPF | Perturbs branch admittances, shifting the operating point |
 | `topology_perturbation` | before OPF | **The only one that changes the network the dynamic models are built on** — one Dynawo run per perturbed topology |
 
-`generation_perturbation` and `admittance_perturbation` are wired for parity with
-the static pipeline; their effect on the dynamic outputs is not validated.
+### Why `generation_perturbation` does not work
+
+It perturbs generator **cost** functions, and under `reader: powsybl` — which
+dynamic runs require — there are none to perturb. pypowsybl does not carry cost
+data in any format it reads, so every generator is loaded with the same
+placeholder cost `(c2=0, c1=1, c0=0)`. Both strategies degenerate:
+
+| `type` | Behaviour under `reader: powsybl` |
+| --- | --- |
+| `cost_permutation` | **Strict no-op.** It permutes cost rows that are all identical, so the dispatch is bit-for-bit unchanged. |
+| `cost_perturbation` | Scales each coefficient by a random factor. `c2` and `c0` stay 0, `c1` becomes a random per-generator value, so the dispatch *does* change — but the spread is **synthetic**, drawn around a placeholder $1/MWh and unrelated to the network's real economics. |
+
+Neither gives the cost diversity the block exists to provide. Use
+`topology_perturbation` and the load scenarios for dynamic diversity instead.
+
+`admittance_perturbation` is wired for parity with the static pipeline; it does
+shift the operating point, but its effect on the dynamic outputs is not
+validated.
 
 Only `topology_perturbation` expands one load scenario into several samples,
 which is why `perturbation_index` exists at all. Each perturbation runs in its
@@ -604,6 +644,10 @@ reports neither:
 - The dynamic model set, automation systems and events are the same for every
   sample. Only the operating point and (with `topology_perturbation`) the
   network topology vary.
+- `generation_perturbation` does not work: the powsybl reader supplies no real
+  generator costs for it to perturb.
+- The `TapChangerBlocking` automation system cannot be configured from the CSV
+  inputs; its parameters are DataFrames and the `params` column holds scalars.
 - `dynamic.validate` covers the static snapshot only; the trajectories are not
   validated.
 - The CLI `validate`, `stats` and `plots` commands read the static pipeline's
