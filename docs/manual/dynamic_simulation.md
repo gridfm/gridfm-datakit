@@ -468,6 +468,17 @@ placeholder cost `(c2=0, c1=1, c0=0)`. Both strategies degenerate:
 | `cost_permutation` | **Strict no-op.** It permutes cost rows that are all identical, so the dispatch is bit-for-bit unchanged. |
 | `cost_perturbation` | Scales each coefficient by a random factor. `c2` and `c0` stay 0, `c1` becomes a random per-generator value, so the dispatch *does* change — but the spread is **synthetic**, drawn around a placeholder $1/MWh and unrelated to the network's real economics. |
 
+!!! danger "A MATPOWER `.m` file's costs are silently discarded"
+    This is the surprising case: `.m` files *do* carry a `gencost` block, but
+    `reader: powsybl` drops it. The file is converted through pypowsybl, which
+    has no cost concept, and the costs come back as the placeholder above.
+
+    This is deliberate, not an oversight — pypowsybl gives no guarantee that the
+    generator row order it produces matches the `.m` file's, so injecting the
+    costs could attach them to the wrong generators. Neutral defaults were judged
+    safer than silently wrong economics. The consequence is that a user who wrote
+    real costs into their case file still gets the degenerate behaviour above.
+
 Neither gives the cost diversity the block exists to provide. Use
 `topology_perturbation` and the load scenarios for dynamic diversity instead.
 
