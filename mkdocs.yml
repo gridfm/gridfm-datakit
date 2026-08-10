@@ -12,6 +12,7 @@ nav:
       - Topology Perturbations: manual/topology_perturbations.md
       - Generation Perturbations: manual/generation_perturbations.md
       - Admittance Perturbations: manual/admittance_perturbations.md
+      - Dynamic Simulation: manual/dynamic_simulation.md
       - Outputs: manual/outputs.md
   - Components:
     - Network: components/network.md
@@ -30,6 +31,7 @@ nav:
       - Power Balance: components/power_balance.md
       - Param Handler: components/param_handler.md
     - Generate: components/generate.md
+    - Dynamic: components/dynamic.md
     - Validation: components/validation.md
     - CLI: components/cli.md
 
