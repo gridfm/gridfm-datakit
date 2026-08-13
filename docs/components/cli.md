@@ -21,7 +21,7 @@ gridfm-datakit generate scripts/config/default.yaml
 ```
 
 A config that carries a `dynamic:` block selects the dynamic (time-domain)
-pipeline instead — same command, no separate subcommand:
+pipeline instead, with the same command and no separate subcommand:
 
 ```bash
 gridfm-datakit generate scripts/dynamic_example/config.yaml

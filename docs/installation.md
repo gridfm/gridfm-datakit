@@ -23,19 +23,19 @@ Dynamic simulation needs two extra things on top of the base install. See the
 
 1. The `dynamic` extra, which pulls in `pypowsybl` and `zarr`:
 
-```bash
-pip install 'gridfm-datakit[dynamic]'
-```
+    ```bash
+    pip install 'gridfm-datakit[dynamic]'
+    ```
 
-2. A local [Dynawo](https://dynawo.github.io/install/) installation — it is a
-native solver and is **not** bundled with pypowsybl. Extract a release (e.g. to
-`~/dynawo`) and declare it to powsybl in `~/.itools/config.yml`:
+2. A local [Dynawo](https://dynawo.github.io/install/) installation. It is a
+   native solver and is **not** bundled with pypowsybl. Extract a release (e.g.
+   to `~/dynawo`) and declare it to powsybl in `~/.itools/config.yml`:
 
-```yaml
-dynawo:
-  homeDir: /path/to/dynawo
-  debug: false
-```
+    ```yaml
+    dynawo:
+      homeDir: /path/to/dynawo
+      debug: false
+    ```
 
 Verify both are usable:
 
