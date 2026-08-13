@@ -47,7 +47,7 @@ def _result(
 ):
     pf = None
     if static:
-        # Same keys as pf_post_processing's output — the contract the dynamic
+        # Same keys as pf_post_processing's output, the contract the dynamic
         # saver consumes. Y_bus / runtime included so the fixture stays faithful
         # to it (both are exported, at parity with the static pipeline).
         pf = {
@@ -123,7 +123,7 @@ def test_time_axis_is_stored_per_scenario(tmp_path):
     assert meta["time_units"] == "seconds"
 
     # _result builds a 0..n-1 second index, so the time axis round-trips as seconds
-    # and the short scenario's padding is NaN — not a bogus 0.0 that would read as
+    # and the short scenario's padding is NaN, not a bogus 0.0 that would read as
     # a real instant.
     assert np.array_equal(grp["time"][0], [0.0, 1.0, 2.0, 3.0, 4.0])
     assert np.array_equal(grp["time"][1][:3], [0.0, 1.0, 2.0])

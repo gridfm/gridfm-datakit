@@ -87,8 +87,8 @@ def test_process_dynamic_simulation(config_ieee14):
     assert len(res_dict) == args.load.scenarios
 
 
-# The tests below cover the orchestration — chunking, error isolation, variant
-# lifecycle — which is solver-independent, so the solvers are stubbed out.
+# The tests below cover the orchestration (chunking, error isolation, variant
+# lifecycle), which is solver-independent, so the solvers are stubbed out.
 
 
 class _FakeNet:

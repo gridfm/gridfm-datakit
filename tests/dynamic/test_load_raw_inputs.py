@@ -158,7 +158,7 @@ class TestValidateValues:
     Each value below is later used as a key into a Dynawo mapping dict, or as a
     branch in _map_variables_dynawo. Unvalidated, a typo either raises a bare
     KeyError inside a worker process (failing every chunk with no hint which key
-    was wrong) or — for the variables 'type' — is silently ignored, producing a
+    was wrong) or, for the variables 'type', is silently ignored, producing a
     simulation that monitors nothing and only dies later in the Zarr writer.
     """
 

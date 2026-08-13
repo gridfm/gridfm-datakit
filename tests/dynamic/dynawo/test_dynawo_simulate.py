@@ -17,7 +17,7 @@ from markers import needs_dynawo, needs_powsybl
 # Most tests only run OPF + AC-PF; Simulation.run() ones carry @needs_dynawo.
 pytestmark = needs_powsybl
 
-# IEEE14 network whose buses are NOT exported in sorted-ID order — the fixture
+# IEEE14 network whose buses are NOT exported in sorted-ID order. The fixture
 # that makes the format-independence test below meaningful.
 PATH_NETWORK_IEEE14 = str(
     Path(__file__).parent
@@ -109,7 +109,7 @@ def test_pg_bus_assignment_format_independent(julia):
     # the map), independently of the gfm network's internal GEN_BUS array.
     gens = net.pp_net.get_generators()
     gen_gfm_indices = {bus_map[b] for b in gens["bus_id"] if b in bus_map}
-    # the mapping is non-trivial (physical bus number != gfm index) — otherwise
+    # the mapping is non-trivial (physical bus number != gfm index), otherwise
     # this would not discriminate a row-order bug
     assert gen_gfm_indices != set(range(len(gen_gfm_indices)))
     pg_by_idx = {int(row[c_busidx]): row[c_pg] for row in bus}
