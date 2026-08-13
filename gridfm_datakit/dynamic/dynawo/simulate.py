@@ -47,7 +47,7 @@ def compute_balanced_static_state_dynawo(
     scenario_index: int = 0,
     lf_params: Any = None,
 ) -> Tuple[Any, Dict[str, Any]]:
-    """Compute the balanced initial conditions for a dynamic siulation.
+    """Compute the balanced initial conditions for a dynamic simulation.
 
     Runs the four-step sequence required to produce a consistent initial
     state for Dynawo:
@@ -74,6 +74,9 @@ def compute_balanced_static_state_dynawo(
         (with applied load scenario and perturbations)
     julia:
         Initialised Julia interface (from "init_julia")
+    p2g_maps:
+        Pypowsybl-to-gridfm index maps for ``pp_net`` (from
+        ``powsybl.build_p2g_maps``), passed in rather than rebuilt per scenario
     scenario_index: int
         Used to label the results row (matches ``pf_post_processing``'s
         ``scenario_index`` argument)
@@ -151,8 +154,8 @@ def run_dynawo_simulation(
     ----
     pp_net :
         Balanced pypowsybl network (output of ``compute_balanced_static_state_dynawo``).
-    dynamic_mappings : DynawoMappings
-        Validated Dynawo-ready mapping DataFrames (models, events, variables).
+    dynawo_mapping : DynawoMappings
+        Validated Dynawo-ready mappings (models, events, variables).
     parameters :
         ``pypowsybl.dynamic.Parameters`` object (from ``get_dynawo_simulation_parameters``).
     drop_duplicate_timestep :
@@ -162,7 +165,7 @@ def run_dynawo_simulation(
     -------
     DynamicResults
         Solver-agnostic container holding the curves as a pandas DataFrame
-        indexed by time — shape **(n_timesteps, n_variables)** — plus the solver
+        indexed by time with shape **(n_timesteps, n_variables)**, plus the solver
         status report string and the final state values. The transpose to
         (n_variables, n_timesteps) happens only when writing the Zarr store.
 

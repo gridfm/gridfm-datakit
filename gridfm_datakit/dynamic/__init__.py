@@ -65,7 +65,7 @@ EVENTS_REQUIRED_COLS = {
 VARIABLES_REQUIRED_COLS = {
     "type",  # str; either "Curve" for timeseries or "FinalStateValue" for the final state value only
     "model_id",  # str; identifier of the monitored element
-    "variables",  # str; one variable per row — repeat model_id to monitor several (check the Dynawo dynamic model's description for the variables it exposes)
+    "variables",  # str; one variable per row; repeat model_id to monitor several (check the Dynawo dynamic model's description for the variables it exposes)
 }
 
 
@@ -133,7 +133,7 @@ class DynamicResults:
         such variable, in which case no final_state_values.parquet is written.
     """
 
-    dynamic_results: Any  # pandas.DataFrame — (n_timesteps, n_variables)
+    dynamic_results: Any  # pandas.DataFrame, (n_timesteps, n_variables)
     report: Any
     final_state_values: Any = None
 
@@ -155,12 +155,13 @@ def load_raw_inputs(
     Args
     ----
     args : NestedNamespace
-        Configuration object. Must have a ``dynamic`` attribute with:
+        Configuration object. ``args.dynamic.input_files`` must carry:
         - static_element_dynamic_models_file     : path to the models CSV
         - automation_systems_file                : path to the automation systems CSV
         - events_file                            : path to the events CSV
         - variables_file                         : path to the variables CSV
-        - dynamic_solver                         : solver name ("dynawo" or future alternatives)
+        and ``args.dynamic.dynamic_solver`` the solver name ("dynawo" or future
+        alternatives); it defaults to "dynawo" when absent.
 
     Returns
     -------
@@ -171,9 +172,11 @@ def load_raw_inputs(
     FileNotFoundError
         If any of the four input files is missing.
     ValueError
-        If required columns are absent from a DataFrame (Dynawo solver only).
+        If required columns are absent from a DataFrame, if a key column holds an
+        unsupported value, or if the variables table declares no "Curve" row
+        (Dynawo solver only).
     TypeError
-        If any of the input files is not of CSV or Parquet foramt.
+        If any of the input files is not of CSV or Parquet format.
     """
     dyn_input_cfg = args.dynamic.input_files
 
@@ -265,8 +268,8 @@ def _validate_dynawo_values(
     Every value checked here is used later as a key into one of the mapping dicts
     in dynawo/utils.py (or as a branch in _map_variables_dynawo). Without this,
     a single typo surfaces either as a bare ``KeyError`` from deep inside a worker
-    process — where it fails every chunk and the user only ever sees "every
-    scenario failed" — or, worse, is silently ignored: an unrecognised variable
+    process (where it fails every chunk and the user only ever sees "every
+    scenario failed"), or, worse, is silently ignored: an unrecognised variable
     ``type`` monitors nothing, so Dynawo returns SUCCESS with empty curves and the
     run only dies much later, in the Zarr writer, after all the compute.
 
@@ -303,7 +306,7 @@ def _validate_dynawo_values(
     _check_values(variables, "type", VARIABLE_TYPES, "variables")
 
     # The dynamic time-series store is built from "Curve" rows only. With none, the
-    # simulation runs, monitors nothing, and returns an empty curves frame — which
+    # simulation runs, monitors nothing, and returns an empty curves frame, which
     # would otherwise blow up the Zarr writer with an opaque ZeroDivisionError.
     if "type" in variables.columns and "Curve" not in set(variables["type"]):
         raise ValueError(
@@ -342,7 +345,7 @@ def _load_table(path: str) -> pd.DataFrame:
 
     CSV delimiters are sniffed rather than assumed, so the files work under both
     the North American (",") and European (";") conventions. The sniffer falls
-    back to "," when it cannot decide — which is the case for a header-only or
+    back to "," when it cannot decide, which is the case for a header-only or
     single-column file, where there is no delimiter to find.
     """
     p = Path(path)

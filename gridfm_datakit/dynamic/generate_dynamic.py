@@ -7,8 +7,8 @@ Analogous to generate_power_flow_data in generate.py but extended with a
 dynamic simulation step. Produces both static PF snapshots (Parquet) and
 dynamic time-series (Zarr).
 
-All outputs live under a single root, ``settings.data_dir`` — there is no separate
-dynamic output directory. The layout reuses the static pipeline's base_path so a
+All outputs live under a single root, ``settings.data_dir``. There is no
+separate dynamic output directory. The layout reuses the static pipeline's base_path so a
 run is one self-contained tree::
 
     {settings.data_dir}/{network.name}/raw/
@@ -84,7 +84,7 @@ def _configure_logging(config: NestedNamespace) -> None:
     except ValueError:
         level = logging.INFO
     logger.setLevel(level)
-    # Only attach our own handler when nothing else will emit these records —
+    # Only attach our own handler when nothing else will emit these records:
     # neither a prior call here nor an application that configured the root
     # logger (e.g. logging.basicConfig). Otherwise records would print twice
     # (once via our handler, once via the propagated root handler).
@@ -129,17 +129,21 @@ def generate_dynamic_data(
         Paths to all generated artifacts, all rooted at ``settings.data_dir``:
         the static keys (``bus_data``, ``branch_data``, ``gen_data``,
         ``y_bus_data``, ``runtime_data``, ``error_log``, ``args_log``,
-        ``solver_log_dir``, ``scenarios``) plus ``dynamic_results`` (Zarr store),
-        ``dynamic_reports_dir`` and ``metadata``. ``final_state_values`` is
-        present only when the variables table declares FinalStateValue rows.
+        ``solver_log_dir``, ``scenarios``) plus ``dynamic_results`` (Zarr store)
+        and ``metadata``. ``dynamic_reports_dir`` is present unless
+        ``dynamic.logging.save_reports`` is off, and ``final_state_values`` only
+        when the variables table declares FinalStateValue rows.
 
     Raises
     ------
     TypeError
         If ``config`` is none of the accepted forms.
     ValueError
-        If ``network.reader != "powsybl"``, ``dynamic.dynamic_solver`` is not set,
-        or the removed ``dynamic.output_dir`` key is still present.
+        If ``network.reader != "powsybl"``, the ``dynamic`` block or
+        ``dynamic.dynamic_solver`` is missing, ``load.scenarios`` is below 1, or
+        the removed ``dynamic.output_dir`` key is still present.
+    RuntimeError
+        If no sample survived, i.e. every scenario failed.
     """
 
     # --- Step 0: load and validate config ---
@@ -181,7 +185,7 @@ def generate_dynamic_data(
     # the same base_path (data_dir/<network>/raw) the static pipeline uses for its
     # logs and scenarios. The dynamic artifacts go one level down, in dynamic/,
     # because the static pipeline writes bus_data.parquet as a *partitioned
-    # directory* while we write it as a flat file — same name, different kind, so
+    # directory* while we write it as a flat file: same name, different kind, so
     # they must not share a directory.
     #
     # The writer owns this directory: it recreates it from scratch, so a re-run can
@@ -224,7 +228,7 @@ def _validate_outputs(args: NestedNamespace, file_paths: Dict[str, str]) -> None
     large run whose outputs are about to be validated downstream anyway. Enable
     with ``dynamic.validate: true``.
 
-    Only the static snapshot is covered — the initial operating point Dynawo
+    Only the static snapshot is covered, the initial operating point Dynawo
     starts from. The trajectories in the Zarr store are not validated.
     """
     dynamic_cfg = getattr(args, "dynamic", None)
@@ -383,7 +387,7 @@ class _DynamicDataWriter:
     """Incremental writer for one dynamic run's outputs.
 
     Chunks are written and released as they complete, so peak memory tracks the
-    largest chunk rather than the whole dataset — matching the static pipeline,
+    largest chunk rather than the whole dataset, matching the static pipeline,
     which saves per large chunk and drops the batch (see generate._save_generated_data).
     ``settings.large_chunk_size`` is what bounds memory here.
 
@@ -455,7 +459,7 @@ class _DynamicDataWriter:
 
     def _start(self) -> None:
         """Create output_dir on first use. Safe to wipe: it holds only our own
-        artifacts — never inputs, logs or scenarios, which live one level up."""
+        artifacts, never inputs, logs or scenarios, which live one level up."""
         if self._started:
             return
         if self.output_dir.exists():
@@ -600,9 +604,8 @@ class _DynamicDataWriter:
     def _write_curves(self, results: List[Dict[str, Any]]) -> None:
         """Append this chunk's trajectories to the Zarr store.
 
-        Collected as (n_variables, n_timesteps) — the per-sample shape declared by
-        the DynamicResults contract (and architecture §8, where the store is
-        n_samples x n_variables x n_timesteps). Dynawo returns curves as a
+        Collected as (n_variables, n_timesteps), so the store stacks to
+        (n_samples, n_variables, n_timesteps). Dynawo returns curves as a
         (n_timesteps, n_variables) DataFrame, so transpose here.
         """
         arrays, times, scenarios, perturbations = [], [], [], []
@@ -779,7 +782,7 @@ class _DynamicDataWriter:
             # The simulation time (in seconds) of each column of curves lives in the
             # store's "time" array, shaped (n_samples, n_timesteps) and NaN-padded to
             # match. Per-sample, since an adaptive-step solver gives each run its own
-            # time grid. Never assume a shared/uniform time axis — read this instead.
+            # time grid. Never assume a shared/uniform time axis; read this instead.
             "time_units": "seconds",
             # Join keys: the Parquet rows are labelled by (scenario_index,
             # perturbation_index) columns; the Zarr curves slices by the matching

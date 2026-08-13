@@ -194,7 +194,7 @@ class LogChannel:
 # Sub-systems that get their own channel. Extend this list to bring any new
 # noisy object under the same controlled routing. "dynawo" captures the native
 # stdout/stderr of the Dynawo dynamic-simulation backend (OpenModelica banners,
-# solver iterations) — see gridfm_datakit.dynamic.dynawo.simulate.
+# solver iterations); see gridfm_datakit.dynamic.dynawo.simulate.
 SOLVER_CHANNELS = ("opf", "dcopf", "pf", "dcpf", "warmup", "dynawo")
 
 

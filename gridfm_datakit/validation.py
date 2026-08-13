@@ -333,7 +333,7 @@ def validate_dynamic_data(
     view. The checks themselves are shared verbatim with the static pipeline.
 
     Note this validates the *static snapshot* (the initial operating point Dynawo
-    starts from) — the bus/branch/gen/Y-bus/runtime tables. It does not validate the
+    starts from): the bus/branch/gen/Y-bus/runtime tables. It does not validate the
     time-series curves in the Zarr store.
 
     Args:

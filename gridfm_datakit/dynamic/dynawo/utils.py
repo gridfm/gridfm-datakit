@@ -29,7 +29,7 @@ EVENT_PARAMS_MAPPING = {
 
 # The two accepted values of the "type" column in variables.csv. "Curve" rows
 # become time-series (the Zarr store); "FinalStateValue" rows only yield a final
-# value. Anything else is a typo — see _validate_dynawo_values.
+# value. Anything else is a typo; see _validate_dynawo_values.
 VARIABLE_TYPES = ["Curve", "FinalStateValue"]
 
 # Defaults for the AC load flow that produces the balanced initial state, and the

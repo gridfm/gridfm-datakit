@@ -88,7 +88,7 @@ def iter_dynamic_simulations(
     error_log_file : str
         Path to error log.
     seed : int
-        Global seed — deterministically derived per-chunk seeds are computed
+        Global seed. Deterministically derived per-chunk seeds are computed
         from this value.
 
     Yields
@@ -105,7 +105,7 @@ def iter_dynamic_simulations(
     max_iter = config.settings.max_iter
     solver_log_dir = getattr(config.settings, "solver_log_dir", None)
 
-    # Perturbation generators — built once here (main process) from the config and
+    # Perturbation generators, built once here (main process) from the config and
     # the base network, then passed to workers (they are picklable, mirroring the
     # static pipeline). Absent config blocks default to the identity ("none")
     # generator, so a scenario expands to exactly one sample.
@@ -117,12 +117,14 @@ def iter_dynamic_simulations(
     )
     # generation_perturbation randomises generation *cost* and admittance_perturbation
     # perturbs branch admittances, both pre-OPF. They therefore vary the initial
-    # operating point Dynawo starts from — which machines are dispatched and at what
-    # loading — and so do influence the trajectory. What they do NOT vary is the
+    # operating point Dynawo starts from (which machines are dispatched and at what
+    # loading), and so do influence the trajectory. What they do NOT vary is the
     # dynamic model set or the event sequence: those come from the CSV inputs and are
-    # identical across every sample. Only topology_perturbation changes the network
-    # the dynamic models are built on. Wired for parity with the static pipeline;
-    # their effect on the dynamic outputs is untested.
+    # identical across every sample. admittance_perturbation's r/x do reach the
+    # simulated network (update_powsybl writes them), but only topology_perturbation
+    # changes which elements are in service, so it alone changes the set of models
+    # Dynawo instantiates and alone expands a scenario into several samples. Wired
+    # for parity with the static pipeline; effect on dynamic outputs untested.
     generation_generator = initialize_generation_generator(
         getattr(config, "generation_perturbation", _none),
         base_net,
@@ -195,7 +197,7 @@ def iter_dynamic_simulations(
 
         n_samples += len(samples)
         logger.info(
-            "Chunk %d/%d done (%d scenarios) — %d samples so far.",
+            "Chunk %d/%d done (%d scenarios), %d samples so far.",
             large_chunk_index + 1,
             len(large_chunks),
             chunk_size,
@@ -216,7 +218,7 @@ def process_dynamic_simulations(
     """Collect every sample from :func:`iter_dynamic_simulations` into one list.
 
     Convenience for callers that want the whole run in memory (tests, ad-hoc
-    scripts). The pipeline streams instead — see generate_dynamic.generate_dynamic_data.
+    scripts). The pipeline streams instead; see generate_dynamic.generate_dynamic_data.
     """
     return [
         sample
@@ -266,7 +268,7 @@ def _process_dynamic_chunk(args: Tuple) -> Union[List[Dict[str, Any]], List[Exce
 
     if dynamic_solver == "dynawo":
         try:
-            # Initialise Julia once per worker — avoids repeated JIT compilation
+            # Initialise Julia once per worker, avoids repeated JIT compilation
             julia = init_julia(max_iter, solver_log_dir)
 
             # Each worker reloads the network from file rather than receiving it:
@@ -358,7 +360,7 @@ def process_single_dynamic_simulation(
     per ``(scenario_index, perturbation_index)``.
 
     Absent generators default to identity, so a scenario yields exactly one
-    sample — the pre-perturbation behaviour.
+    sample, the pre-perturbation behaviour.
 
     Returns a list of result dicts (possibly empty if every perturbation failed).
     """
@@ -368,7 +370,7 @@ def process_single_dynamic_simulation(
     gfm_net.Qd = scenarios[:, scenario_index, 1]
 
     # The three generators are handled differently because they have different
-    # cardinality, not by accident — this mirrors the static pipeline exactly
+    # cardinality, not by accident. This mirrors the static pipeline exactly
     # (see process_network.process_scenario_*).
     #
     #   generation / admittance : 1 -> 1. They consume a stream of networks and
@@ -376,7 +378,7 @@ def process_single_dynamic_simulation(
     #       modify the operating point the OPF then optimises.
     #   topology                : 1 -> N. It yields n_topology_variants outages
     #       for a single network, so it is the only generator that expands one
-    #       load scenario into several samples — hence the loop below, and hence
+    #       load scenario into several samples, hence the loop below and hence
     #       perturbation_index existing at all.
     #
     # Generation + admittance perturbations, applied before OPF.
@@ -400,8 +402,8 @@ def process_single_dynamic_simulation(
         variant_created = False
         try:
             # Inside the try: a failing clone_variant would otherwise escape this
-            # function entirely — bypassing the handler meant to keep one bad
-            # perturbation from dropping the whole scenario — and leave the working
+            # function entirely, bypassing the handler meant to keep one bad
+            # perturbation from dropping the whole scenario, and leave the working
             # variant dangling for the rest of the worker's chunk.
             pp_net.clone_variant(base_variant_id, variant_id)
             variant_created = True
@@ -512,10 +514,9 @@ def _combine_pf_and_dyn_res(
 ) -> Dict[str, Any]:
     """Merge static PF snapshot with dynamic time-series into a single output dict.
 
-    The alignment schema between the per-bus/branch/gen PF snapshot and the
-    per-variable dynamic time-series is TBD (see architecture §12, Open
-    Question #2). This function currently packages both outputs side-by-side
-    so the writer in generate_dynamic can save them independently.
+    The two have different granularity, per element vs per monitored variable,
+    so they are packaged side by side and written to separate stores, joined by
+    the (scenario_index, perturbation_index) key the writer adds to both.
 
     Args
     ----

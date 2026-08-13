@@ -4,12 +4,12 @@ Availability guards for the Dynawo backend.
 Two independent things must be present to run a dynamic simulation, and each
 fails in a different way:
 
-1. The ``pypowsybl.dynamic`` Python module — missing when pypowsybl is not
+1. The ``pypowsybl.dynamic`` Python module, missing when pypowsybl is not
    installed. Guarded by the lazy-import pattern below, mirroring
    gridfm_datakit/powsybl/api.py, so that importing gridfm_datakit.dynamic
    never raises ImportError.
 
-2. A local **Dynawo installation** — the native solver that powsybl-dynawo
+2. A local **Dynawo installation**, the native solver that powsybl-dynawo
    shells out to. This is *not* bundled with pypowsybl: ``import
    pypowsybl.dynamic`` succeeds without it, and the run only fails much later,
    deep inside ``Simulation.run()``, with an opaque "DynawoSimulationProvider

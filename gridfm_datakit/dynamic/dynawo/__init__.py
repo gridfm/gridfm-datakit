@@ -104,9 +104,9 @@ def get_dynawo_simulation_parameters(args: NestedNamespace) -> pp.dynamic.Parame
     """
     dict_parameters = args.dynamic.solver_parameters.to_dict()
 
-    # Both checks run in the parent process, before any worker is spawned: a bad
-    # key raised inside a worker is a bare KeyError that fails every chunk with no
-    # hint as to which setting was wrong.
+    # This runs per worker, so a bad key fails every chunk. Both checks are what
+    # make that failure name the offending setting instead of surfacing as a bare
+    # KeyError from inside the provider.
     missing = sorted({"start_time", "stop_time"} - set(dict_parameters))
     if missing:
         raise ValueError(
