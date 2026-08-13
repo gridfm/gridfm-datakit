@@ -26,11 +26,15 @@ load:
 #
 # generation_perturbation (generation *cost* randomisation) and
 # admittance_perturbation act before the OPF, so they vary the initial operating
-# point Dynawo starts from — which machines are dispatched and at what loading —
+# point Dynawo starts from (which machines are dispatched and at what loading),
 # and do influence the trajectory. What they do not vary is the dynamic model set
 # or the event sequence, which come from the CSV inputs and are identical across
-# samples. Only topology_perturbation changes the network the dynamic models are
-# built on. Their effect on the dynamic outputs is not validated.
+# samples. Only topology_perturbation changes which elements are in service, so it
+# alone changes the set of models Dynawo instantiates and alone expands a scenario
+# into several samples. Their effect on the dynamic outputs is not validated.
+#
+# generation_perturbation additionally does not work under reader: powsybl, which
+# dynamic runs require: there are no real generator costs for it to perturb.
 topology_perturbation:
   type: none               # options: random, n_minus_k, none
   # When type is "random", also set (uncomment) these:
@@ -58,7 +62,7 @@ dynamic:
   # The defaults below are applied when this block is absent; they differ from the
   # static pipeline's on purpose. Dynawo initialises each synchronous machine from
   # this solution, so the slack has to sit on a machine that carries a dynamic
-  # model — OpenLoadFlow's own default (MOST_MESHED) can pick a bus with no
+  # model. OpenLoadFlow's own default (MOST_MESHED) can pick a bus with no
   # generator at all.
   # loadflow_parameters:
   #   distributed_slack: false
