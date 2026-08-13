@@ -25,16 +25,18 @@ For every load scenario, and for every topology perturbation of it:
 5. The static snapshot (Parquet) and the trajectory (Zarr) are written, both
    tagged with the same `(scenario_index, perturbation_index)` key.
 
-Each `(scenario, perturbation)` pair is one **sample**. Samples are processed in
-parallel across worker processes and written incrementally, one large chunk at a
-time, so peak memory tracks `settings.large_chunk_size` rather than the size of
-the whole dataset.
+Each `(scenario, perturbation)` pair is one **sample**. Load scenarios are
+distributed across worker processes (the perturbations of a single scenario run
+sequentially inside one worker), and results are written incrementally, one large
+chunk at a time, so peak memory tracks `settings.large_chunk_size` rather than
+the size of the whole dataset.
 
 !!! warning "The dynamic model set is fixed across samples"
     The dynamic models, automation systems and events come from the CSV input
     tables and are **identical for every sample**. What varies from sample to
-    sample is the operating point Dynawo starts from — and, with
-    `topology_perturbation` enabled, the network the dynamic models are built on.
+    sample is the operating point Dynawo starts from, plus, with
+    `topology_perturbation` enabled, which elements are in service and hence
+    which of those dynamic models Dynawo instantiates.
 
 !!! warning "`generation_perturbation` does not work here"
     Step 1 accepts the block, but it cannot do its job. Dynamic runs require
@@ -100,14 +102,14 @@ Dynamic simulations require the **powsybl reader**:
 ```yaml
 network:
   name: IEEE14
-  reader: powsybl        # required — the run is rejected otherwise
+  reader: powsybl        # required, the run is rejected otherwise
   source: file
   file: grids/IEEE14.iidm
 ```
 
 The dynamic model mappings are keyed on the network's **element IDs**, so the
-network file must be one whose IDs you can reference from the input tables —
-in practice an XIIDM/IIDM or CGMES file. Loading a MATPOWER `.m` case works, but
+network file must be one whose IDs you can reference from the input tables, in
+practice an XIIDM/IIDM or CGMES file. Loading a MATPOWER `.m` case works, but
 its element IDs are generated during conversion and are not stable to write
 mappings against.
 
@@ -121,8 +123,14 @@ mappings against.
 
 The dynamic behaviour is described by four CSV (or Parquet) files, declared
 under `dynamic.input_files`. CSV delimiters are sniffed, so `,`, `;` and tab are
-all accepted. Required columns are validated up front; unknown *values* in the
-key columns are rejected too, naming the offending value and the accepted set.
+all accepted. The required columns of all four tables are validated up front.
+
+Values are checked only where a typo would otherwise be swallowed: the
+`category_name` of `automation_systems`, the `event_name` of `events` and the
+`type` of `variables` are matched against the accepted sets, and a bad one is
+reported alongside them. Everything else (`model_name`, `static_id`, `model_id`
+and the `category_name` of `static_element_dynamic_models`) is handed to Dynawo
+as written and can only fail there, as a failed model instantiation.
 
 ### `static_element_dynamic_models_file`
 
@@ -153,7 +161,7 @@ they carry their own identifier and a free-form parameter string.
 | `category_name` | Automation-system category (see table below) |
 | `dynamic_model_id` | Identifier you give the automation system; usable as a `model_id` in `variables` |
 | `parameter_set_id` | `set id` in the `.par` file |
-| `params` | `key1=value1;key2=value2;…` — the keys depend on the category |
+| `params` | `key1=value1;key2=value2;…`, with keys that depend on the category |
 | `model_name` | Dynawo model name, e.g. `UnderVoltage` |
 
 Accepted `category_name` values and the `params` keys each one expects:
@@ -166,7 +174,7 @@ Accepted `category_name` values and the `params` keys each one expects:
 | `PhaseShifterI` | `transformer` |
 | `PhaseShifterP` | `transformer` |
 | `TapChanger` | `static_id`, `side` |
-| `TapChangerBlocking` | `rfo_df`, `mp1_df`, `mp2_df`, `mp3_df`, `mp4_df`, `mp5_df` — **not usable, see below** |
+| `TapChangerBlocking` | `rfo_df`, `mp1_df`, `mp2_df`, `mp3_df`, `mp4_df`, `mp5_df` (**not usable, see below**) |
 | `UnderVoltageAutomationSystem` | `generator` |
 
 !!! danger "`TapChangerBlocking` cannot be configured from CSV"
@@ -183,8 +191,7 @@ category_name,dynamic_model_id,parameter_set_id,params,model_name
 UnderVoltageAutomationSystem,UVA,UnderVoltageAutomatonGenerator3,generator=_GEN____3_SM;,UnderVoltage
 ```
 
-A run with no automation system still needs the file — write the header row
-only.
+A run with no automation system still needs the file. Write the header row only.
 
 ### `events_file`
 
@@ -195,7 +202,7 @@ The disturbance sequence. This is what makes the trajectory non-trivial.
 | `event_name` | Event type (see table below) |
 | `static_id` | ID of the element the event applies to |
 | `start_time` | Event time, in seconds of simulation time |
-| `params` | `key1=value1;…` — the keys depend on the event type |
+| `params` | `key1=value1;…`, with keys that depend on the event type |
 
 | `event_name` | `params` keys |
 | --- | --- |
@@ -203,7 +210,7 @@ The disturbance sequence. This is what makes the trajectory non-trivial.
 | `ReactivePowerVariation` | `delta_q` |
 | `ReferenceVoltageVariation` | `delta_u` |
 | `NodeFault` | `fault_time`, `r_pu`, `x_pu` |
-| `Disconnect` | `disconnect_only` (optional — leave the value empty to disconnect the whole element) |
+| `Disconnect` | `disconnect_only` (optional; leave the value empty to disconnect the whole element) |
 
 ```csv
 event_name,static_id,start_time,params
@@ -215,17 +222,21 @@ Disconnect,_GEN____2_SM,50,disconnect_only=;
 
 ### `variables_file`
 
-What to record. One row per monitored variable — repeat `model_id` to monitor
+What to record. One row per monitored variable; repeat `model_id` to monitor
 several variables of the same element.
 
 | Column | Description |
 | --- | --- |
 | `type` | `Curve` (full time series) or `FinalStateValue` (end-of-simulation scalar) |
 | `model_id` | ID of the monitored element, or the `dynamic_model_id` of an automation system |
-| `variables` | One variable name per row — see below for where the available names are listed |
+| `variables` | One variable name per row; see below for where the available names are listed |
 
 The variables a model exposes are listed in its description file, shipped with
-Dynawo as `<dynawo_home>/ddb/<model_name>.desc.xml`.
+Dynawo under `<dynawo_home>/ddb/`. That file is named after the **Dynawo model
+library**, which is usually, but not always, the `model_name` written in the
+input tables: pypowsybl's `UnderVoltage` is Dynawo's `UnderVoltageAutomaton`, so
+its variables are in `ddb/UnderVoltageAutomaton.desc.xml`. The prefix of the
+variable names is the reliable hint (`underVoltageAutomaton_…`).
 
 ```csv
 type,model_id,variables
@@ -237,8 +248,8 @@ FinalStateValue,_GEN____1_SM,generator_UPu
 
 !!! note "At least one `Curve` row is required"
     The time-series store is built from `Curve` rows only. A table with none is
-    rejected up front — without that check the simulation runs, monitors
-    nothing, and fails much later in the writer, after all the compute.
+    rejected up front. Without that check the simulation runs, monitors nothing,
+    and fails much later in the writer, after all the compute.
 
     `FinalStateValue` rows are optional. When present they are written to a
     separate per-sample scalar table, not to the Zarr store.
@@ -246,23 +257,25 @@ FinalStateValue,_GEN____1_SM,generator_UPu
 ## The Dynawo parameter file (`.par`)
 
 Every `parameter_set_id` in the input tables refers to a `<set id="...">` block
-in a Dynawo `.par` file — an XML file holding the physical parameters of the
+in a Dynawo `.par` file, an XML file holding the physical parameters of the
 models (machine constants, regulator gains, tap-changer settings), the network
 parameters, and the solver settings. It is referenced from
 `dynamic.solver_parameters`, and Dynawo distributions ship examples under
 `<dynawo_home>/examples/`.
 
 To find out which parameters a given model requires, read the description file
-Dynawo ships for it at `<dynawo_home>/ddb/<model_name>.desc.xml` — one per model,
-listing its parameters and the variables it exposes. For instance, the set
-`Generator1` referenced above must supply what
+Dynawo ships for it under `<dynawo_home>/ddb/`, one per model library, listing
+its parameters and the variables it exposes. For instance, the set `Generator1`
+referenced above must supply what
 `ddb/GeneratorSynchronousFourWindingsProportionalRegulations.desc.xml` declares.
 
 `scripts/dynamic_example/grids/IEEE14.par` is a working example. Its `set id`s
-are `Network`, `SimplifiedSolver`, `Generator1`…`Generator8`,
-`GenericLoadOneTransfo`, `GenericLoadTwoTransfos`, `OmegaRef`,
-`UnderVoltageAutomatonGenerator3` — which is exactly what the
-`parameter_set_id` column of the example input tables points at.
+are `Network`, `SimplifiedSolver`, `Generator1`, `Generator2`, `Generator3`,
+`Generator6`, `Generator8`, `GenericLoadOneTransfo`, `GenericLoadTwoTransfos`,
+`OmegaRef`, `GeneratorDisconnection` and `UnderVoltageAutomatonGenerator3`. The
+example input tables reference a subset of those; `Network` and
+`SimplifiedSolver` are reached through `dynamic.solver_parameters` instead, and a
+`.par` may carry sets that a given run never uses.
 
 ## Configuration
 
@@ -281,8 +294,16 @@ is optional and is passed through to the Dynawo provider:
 | `solver_parameters_id` | `solver.parametersId` |
 | `precision` | `precision` |
 
-An unsupported key is rejected before any worker is spawned, naming the accepted
+A missing required key or an unsupported one is rejected, naming the accepted
 set. Values of `none` or `""` are dropped rather than forwarded.
+
+!!! note "These parameters are validated inside the workers"
+    Unlike the Dynawo availability check, `dynamic.solver_parameters` and
+    `dynamic.loadflow_parameters` are only built once a worker starts. A bad key
+    therefore fails every chunk: the parent logs
+    `Error in dynamic chunk: dynamic.solver_parameters: unsupported key(s) …`
+    and the run ends with `Dynamic generation produced no samples`. The first
+    message is the one that names the offending key.
 
 ### `dynamic.loadflow_parameters` (optional)
 
@@ -316,15 +337,22 @@ dynamic:
     save_reports: true     # persist each simulation's Dynawo report
 ```
 
+The values above are the defaults, so the whole block can be omitted.
+
 `validate` is off by default: it re-reads every Parquet table, which is wasteful
-on a large run. It covers only the **static snapshot** — the initial operating
+on a large run. It covers only the **static snapshot**, the initial operating
 point. The trajectories in the Zarr store are not validated.
+
+`verbosity` sets the threshold of the `gridfm_datakit.dynamic` progress logger
+only; it does not quieten the solvers, which `settings.enable_solver_logs`
+governs. `silent` is the quietest setting but still lets errors through, since it
+maps onto the same level as `error`.
 
 ### Settings that behave differently
 
 The `settings:` block is the static one, with these caveats:
 
-- `settings.large_chunk_size` bounds peak memory — a chunk is written and
+- `settings.large_chunk_size` bounds peak memory: a chunk is written and
   released before the next runs. Dynamic curves are far larger than static
   snapshots, so this matters more here than in the static pipeline.
 - `settings.include_dc_res` is not honoured; the dynamic pipeline never computes
@@ -404,7 +432,7 @@ settings:
 
 ## Running
 
-A config carrying a `dynamic:` block selects the dynamic pipeline — there is no
+A config carrying a `dynamic:` block selects the dynamic pipeline. There is no
 separate subcommand:
 
 ```bash
@@ -435,8 +463,8 @@ Progress is reported per chunk through the `gridfm_datakit.dynamic` logger:
 
 ```
 HH:MM:SS INFO    gridfm_datakit.dynamic | Dynamic generation: 6 scenarios in 2 chunk(s), 2 worker(s).
-HH:MM:SS INFO    gridfm_datakit.dynamic | Chunk 1/2 done (3 scenarios) — 3 samples so far.
-HH:MM:SS INFO    gridfm_datakit.dynamic | Chunk 2/2 done (3 scenarios) — 6 samples so far.
+HH:MM:SS INFO    gridfm_datakit.dynamic | Chunk 1/2 done (3 scenarios), 3 samples so far.
+HH:MM:SS INFO    gridfm_datakit.dynamic | Chunk 2/2 done (3 scenarios), 6 samples so far.
 HH:MM:SS INFO    gridfm_datakit.dynamic | Saved 6 samples to .../out/IEEE14/raw/dynamic (6 with dynamic results, 6 reports).
 ```
 
@@ -452,28 +480,28 @@ equally to *dynamic* diversity:
 | Block | Acts | Effect on the trajectory |
 | --- | --- | --- |
 | `load` scenarios | before OPF | Different loading, hence a different initial operating point |
-| `generation_perturbation` | before OPF | **Does not work here** — see below |
-| `admittance_perturbation` | before OPF | Perturbs branch admittances, shifting the operating point |
-| `topology_perturbation` | before OPF | **The only one that changes the network the dynamic models are built on** — one Dynawo run per perturbed topology |
+| `generation_perturbation` | before OPF | **Does not work here**, see below |
+| `admittance_perturbation` | before OPF | Perturbs branch `r`/`x`. These are pushed to pypowsybl together with the OPF set-points, so they change the network Dynawo simulates, not just the dispatch |
+| `topology_perturbation` | before OPF | **The only one that changes which elements are in service**, hence the only one that changes the set of dynamic models Dynawo instantiates. One Dynawo run per perturbed topology |
 
 ### Why `generation_perturbation` does not work
 
-It perturbs generator **cost** functions, and under `reader: powsybl` — which
-dynamic runs require — there are none to perturb. pypowsybl does not carry cost
+It perturbs generator **cost** functions, and under `reader: powsybl`, which
+dynamic runs require, there are none to perturb. pypowsybl does not carry cost
 data in any format it reads, so every generator is loaded with the same
 placeholder cost `(c2=0, c1=1, c0=0)`. Both strategies degenerate:
 
 | `type` | Behaviour under `reader: powsybl` |
 | --- | --- |
 | `cost_permutation` | **Strict no-op.** It permutes cost rows that are all identical, so the dispatch is bit-for-bit unchanged. |
-| `cost_perturbation` | Scales each coefficient by a random factor. `c2` and `c0` stay 0, `c1` becomes a random per-generator value, so the dispatch *does* change — but the spread is **synthetic**, drawn around a placeholder $1/MWh and unrelated to the network's real economics. |
+| `cost_perturbation` | Scales each coefficient by a random factor. `c2` and `c0` stay 0, `c1` becomes a random per-generator value, so the dispatch *does* change, but the spread is **synthetic**, drawn around a placeholder $1/MWh and unrelated to the network's real economics. |
 
 !!! danger "A MATPOWER `.m` file's costs are silently discarded"
     This is the surprising case: `.m` files *do* carry a `gencost` block, but
     `reader: powsybl` drops it. The file is converted through pypowsybl, which
     has no cost concept, and the costs come back as the placeholder above.
 
-    This is deliberate, not an oversight — pypowsybl gives no guarantee that the
+    This is deliberate, not an oversight. pypowsybl gives no guarantee that the
     generator row order it produces matches the `.m` file's, so injecting the
     costs could attach them to the wrong generators. Neutral defaults were judged
     safer than silently wrong economics. The consequence is that a user who wrote
@@ -482,9 +510,12 @@ placeholder cost `(c2=0, c1=1, c0=0)`. Both strategies degenerate:
 Neither gives the cost diversity the block exists to provide. Use
 `topology_perturbation` and the load scenarios for dynamic diversity instead.
 
-`admittance_perturbation` is wired for parity with the static pipeline; it does
-shift the operating point, but its effect on the dynamic outputs is not
-validated.
+`admittance_perturbation` is wired for parity with the static pipeline. Its
+perturbed line and transformer impedances do reach the simulated network,
+since `update_powsybl` writes `r` and `x` alongside the OPF set-points, so it
+moves the trajectory and not only the dispatch. Its effect on the dynamic outputs is
+nonetheless unvalidated, and unlike `topology_perturbation` it yields one sample
+per scenario rather than expanding it.
 
 Only `topology_perturbation` expands one load scenario into several samples,
 which is why `perturbation_index` exists at all. Each perturbation runs in its
@@ -515,7 +546,7 @@ static pipeline's `{data_dir}/{network.name}/raw/`:
 
 The dynamic artifacts sit in a `dynamic/` subfolder rather than directly in
 `raw/` because the static pipeline writes `bus_data.parquet` as a *partitioned
-directory* while the dynamic pipeline writes it as a flat file — same name,
+directory* while the dynamic pipeline writes it as a flat file: same name,
 different kind, so they must not share a directory. `raw/dynamic/` is owned by
 the pipeline and recreated on every run, so it never mixes fresh artifacts with
 a previous run's leftovers.
@@ -535,10 +566,14 @@ the static pipeline ([Outputs](outputs.md)) with two differences:
 
 | Array | Shape | Contents |
 | --- | --- | --- |
-| `curves` | `(n_samples, n_variables, n_timesteps)` | The monitored `Curve` variables, NaN-padded along the time axis |
-| `time` | `(n_samples, n_timesteps)` | Simulation time in **seconds**, per sample, NaN-padded to match |
-| `scenario_index` | `(n_samples,)` | Join key — the load scenario each slice came from |
-| `perturbation_index` | `(n_samples,)` | Join key — the topology perturbation each slice came from |
+| `curves` | `(n_samples_with_curves, n_variables, n_timesteps)` | The monitored `Curve` variables, NaN-padded along the time axis |
+| `time` | `(n_samples_with_curves, n_timesteps)` | Simulation time in **seconds**, per sample, NaN-padded to match |
+| `scenario_index` | `(n_samples_with_curves,)` | Join key: the load scenario each slice came from |
+| `perturbation_index` | `(n_samples_with_curves,)` | Join key: the topology perturbation each slice came from |
+
+Axis 0 is the number of samples that produced curves, reported in
+`metadata.json` as `n_samples_with_curves`. Take the length from there rather
+than from `n_samples`, which counts the samples written to the Parquet snapshot.
 
 Variable names are the flattened `<model_id>_<variable>` names pypowsybl
 returns (e.g. `_GEN____1_SM_generator_efdPu_value`), listed in order in
@@ -564,7 +599,7 @@ names dropped, missing ones become `NaN`).
 ### `reports/`
 
 One JSON file per sample, `scenario_{i}_perturbation_{j}.json`, holding
-pypowsybl's `ReportNode` — the model build-up and problem resolution. This is
+pypowsybl's `ReportNode`, covering the model build-up and problem resolution. This is
 the documented way to diagnose a failed or degenerate run. Controlled by
 `dynamic.logging.save_reports`. Report verbosity can be raised through the
 Dynawo simulation parameter `log.levelFilter`.
@@ -574,7 +609,7 @@ Dynawo simulation parameter `log.levelFilter`.
 | Key | Meaning |
 | --- | --- |
 | `generated_at`, `seed`, `config_hash` | Provenance |
-| `n_samples` | Number of **samples**, not load scenarios — exceeds `load.scenarios` whenever `topology_perturbation` is enabled |
+| `n_samples` | Number of **samples**, not load scenarios: larger than `load.scenarios` as soon as a scenario expands into more than one topology, smaller when samples failed |
 | `n_samples_with_curves` | Length of axis 0 of `curves` |
 | `variable_names`, `n_variables` | Axis 1 of `curves`, in order |
 | `n_timesteps`, `timesteps_per_scenario`, `time_units` | Axis 2 of `curves`; the per-sample valid (unpadded) length |
@@ -585,21 +620,25 @@ Dynawo simulation parameter `log.levelFilter`.
 
 ### Joining features to labels
 
-A sample can contribute to only one modality — an OPF that converges but a
-Dynawo run that fails leaves a static row with no trajectory. **Always join on
-the `(scenario_index, perturbation_index)` key pair, never on row or slice
-position.**
+A sample reaches the outputs only when every step succeeded: a failed OPF, a
+failed power flow or a failed Dynawo run drops the whole sample, its static rows
+included. So a curves slice index is **not** a scenario number: failed samples
+leave gaps, and a run with `topology_perturbation` has several slices per load
+scenario. **Always join on the `(scenario_index, perturbation_index)` key pair,
+never on row or slice position.**
 
 ```python
 import json
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import zarr
 
-root = "out/IEEE14/raw/dynamic"
-meta = json.loads(open(f"{root}/metadata.json").read())
-store = zarr.open(f"{root}/dynamic_results.zarr", mode="r")
-bus = pd.read_parquet(f"{root}/bus_data.parquet")
+root = Path("out/IEEE14/raw/dynamic")
+meta = json.loads((root / "metadata.json").read_text())
+store = zarr.open(str(root / "dynamic_results.zarr"), mode="r")
+bus = pd.read_parquet(root / "bus_data.parquet")
 
 keys = list(zip(np.asarray(store["scenario_index"]), np.asarray(store["perturbation_index"])))
 slice_of = {(int(s), int(p)): i for i, (s, p) in enumerate(keys)}
@@ -613,15 +652,24 @@ initial_state = bus[(bus.scenario_index == 0) & (bus.perturbation_index == 0)]
 
 ## Failure handling
 
-Failures are contained at the smallest scope that makes sense and logged to
-`raw/error.log`, so one bad sample never aborts a run:
+Failures are contained at the smallest scope that makes sense, so one bad sample
+never aborts a run. Per-perturbation and per-scenario failures are appended to
+`raw/error.log` with their traceback. A worker that dies before reaching its
+scenario loop never gets to write there, so the parent reports it through the
+progress logger instead:
 
-| Failure | Behaviour |
-| --- | --- |
-| One topology perturbation fails | Logged; the scenario's other perturbations continue |
-| One scenario fails | Logged; the rest of the chunk continues |
-| A whole worker dies | Logged in the parent; the other chunks continue |
-| **Every** sample fails | `close()` raises `RuntimeError`; nothing is written, and a previous run's files under `raw/dynamic/` are left untouched |
+| Failure | Behaviour | Reported in |
+| --- | --- | --- |
+| One topology perturbation fails | The scenario's other perturbations continue | `raw/error.log` |
+| One scenario fails | The rest of the chunk continues | `raw/error.log` |
+| A whole worker dies | The other workers and chunks continue | progress logger, as `Error in dynamic chunk: …` |
+| **Every** sample fails | `close()` raises `RuntimeError` | the raised error |
+
+When every sample fails, `raw/dynamic/` is never created, since the writer only
+makes it on the first chunk that carries a sample, so no half-written output is
+left behind. Whether the *previous* run's data survives is decided earlier and
+elsewhere: `settings.overwrite: true` deletes the whole `{data_dir}/{name}/raw/`
+tree at startup, before any simulation runs.
 
 Two silent failure modes are turned into hard errors on purpose, because Dynawo
 reports neither:
@@ -645,7 +693,8 @@ reports neither:
 | `variables: no row of type 'Curve'` | The time-series store needs at least one `Curve` row |
 | `automation_systems: unsupported category_name …` | Typo in a key column; the message lists the accepted values |
 | `dynamic.solver_parameters: missing required key(s)` | `start_time` / `stop_time` are mandatory |
-| `Dynamic generation produced no samples: every scenario failed` | Read `raw/error.log` for the per-scenario cause, then the JSON under `raw/dynamic/reports/` |
+| `Error in dynamic chunk: …` on every chunk | A per-worker setup step failed identically everywhere, most often a bad key in `dynamic.solver_parameters` or `dynamic.loadflow_parameters`. The message carries the underlying error |
+| `Dynamic generation produced no samples: every scenario failed` | Read `raw/error.log` for the per-scenario cause, and the `Error in dynamic chunk` lines above it for worker-level ones. No reports are written in this case, since `raw/dynamic/` is never created |
 | Trajectory looks like the base case | Check that `events.csv` `start_time` falls inside `[start_time, stop_time]` |
 
 ## Current limitations
@@ -653,8 +702,8 @@ reports neither:
 - Dynawo is the only backend. `dynamic_solver` is the extension point, but any
   other value raises `NotImplementedError`.
 - The dynamic model set, automation systems and events are the same for every
-  sample. Only the operating point and (with `topology_perturbation`) the
-  network topology vary.
+  sample. What varies is the operating point, the branch impedances (with
+  `admittance_perturbation`) and the topology (with `topology_perturbation`).
 - `generation_perturbation` does not work: the powsybl reader supplies no real
   generator costs for it to perturb.
 - The `TapChangerBlocking` automation system cannot be configured from the CSV
@@ -663,5 +712,5 @@ reports neither:
   validated.
 - The CLI `validate`, `stats` and `plots` commands read the static pipeline's
   partitioned layout and do not accept `raw/dynamic/`.
-- All samples in a run must monitor the same variables — they share one Zarr
+- All samples in a run must monitor the same variables, since they share one Zarr
   store, and a mismatch is rejected rather than written as a corrupt array.
