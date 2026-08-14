@@ -60,7 +60,7 @@ from gridfm_datakit.utils.idx_bus import (
     VMIN,
 )
 from gridfm_datakit.utils.idx_cost import COST, NCOST
-from gridfm_datakit.utils.idx_gen import GEN_BUS, PMAX, PMIN, QMAX, QMIN
+from gridfm_datakit.utils.idx_gen import GEN_BUS, PMAX, PMIN, QMAX, QMIN, VG
 from gridfm_datakit.utils.random_seed import custom_seed
 from gridfm_datakit.process.solver_output import (
     SolverOutputConfig,
@@ -364,8 +364,11 @@ def pf_preprocessing(net: Network, res: Dict[str, Any]) -> Network:
 
     Updates the following network components with OPF results:
 
-    - sgen.p_mw: active power generation for static generators
-    - gen.p_mw, gen.vm_pu: active power and voltage magnitude for generators
+    - gen.pg: active power generation for in-service generators
+    - bus.vm: bus voltage magnitudes from OPF solution
+    - gen.vg: generator voltage setpoints, synced to the OPF bus voltage so
+      that the subsequent PF solve uses a consistent initial point and
+      PowerModels does not emit voltage-setpoint mismatch warnings.
 
     Args:
         net: The power network to preprocess.
@@ -385,6 +388,12 @@ def pf_preprocessing(net: Network, res: Dict[str, Any]) -> Network:
 
     net.Pg_gen = pg
     net.Vm = vm
+
+    # Sync each in-service generator's voltage setpoint (VG) to the OPF bus
+    # voltage at its terminal bus, so gen.vg == bus.vm in the written .m file.
+    for gen_idx in net.idx_gens_in_service:
+        bus_idx = int(net.gens[gen_idx, GEN_BUS])
+        net.gens[gen_idx, VG] = vm[bus_idx]
 
     return net
 
