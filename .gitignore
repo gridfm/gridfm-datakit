@@ -21,3 +21,5 @@ test_data/
 scripts/datasets_sampled/
 pfdelta/data/
 site/
+dc_benchmark_data/
+*.pt
