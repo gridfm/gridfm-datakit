@@ -7,9 +7,9 @@
 </p>
 
 
-# GridFM DataKit
+# GridFM dataKit
 
-**GridFM DataKit** (`gridfm-datakit`) is a Python library for generating realistic, diverse, and scalable synthetic datasets for power flow (PF) and optimal power flow (OPF) machine learning solvers. It unifies state-of-the-art methods for perturbing loads, generator dispatches, network topologies, and branch parameters, addressing limitations of existing data generation libraries.
+**GridFM dataKit** (`gridfm-datakit`) is a Python library for generating realistic, diverse, and scalable synthetic datasets for power flow (PF) and optimal power flow (OPF) machine learning solvers. It unifies state-of-the-art methods for perturbing loads, generator dispatches, network topologies, and branch parameters, addressing limitations of existing data generation libraries.
 
 ## Key Features
 
