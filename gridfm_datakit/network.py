@@ -17,7 +17,13 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import requests
-from juliapkg.deps import executable, run_julia
+from juliapkg.deps import executable
+
+try:
+    # juliapkg >= 0.1.24 renamed run_julia to run_script (signature unchanged).
+    from juliapkg.deps import run_script as run_julia
+except ImportError:  # juliapkg < 0.1.24
+    from juliapkg.deps import run_julia
 from juliapkg.state import STATE
 from matpowercaseframes import CaseFrames
 from numpy import any, conj, exp, hstack, int64, nonzero, ones, pi, real
