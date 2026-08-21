@@ -23,6 +23,10 @@ topology_perturbation:
   k: 1 # Maximum number of components to drop in each perturbation
   n_topology_variants: 20 # Number of unique perturbed topologies per scenario
   elements: [branch, gen] # elements to perturb. options: branch, gen
+  # Optional for type: "random": entry i is the probability of sampling i outages.
+  # If omitted, the generator samples uniformly between 1 and k.
+  # Example for k: 1 -> 10% N-0 and 90% N-1.
+  # outage_count_probabilities: [0.1, 0.9]
 
 generation_perturbation:
   type: "cost_permutation" # Type of generation perturbation; options: cost_permutation, cost_perturbation, none

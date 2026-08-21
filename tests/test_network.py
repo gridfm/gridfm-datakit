@@ -6,6 +6,8 @@ Tests the Network class and load functions with matpowercaseframes integration
 import pytest
 import numpy as np
 from gridfm_datakit.network import load_net_from_pglib, Network
+from gridfm_datakit.utils.idx_brch import BR_STATUS
+from gridfm_datakit.utils.idx_gen import GEN_STATUS
 
 
 class TestNetwork:
@@ -273,11 +275,11 @@ class TestNetwork:
 
         # Test deactivating a generator
         network.deactivate_gens(np.array([0]))
-        assert network.gens[0, 7] == 0, "Generator should be deactivated"
+        assert network.gens[0, GEN_STATUS] == 0, "Generator should be deactivated"
 
         # Test deactivating a branch
         network.deactivate_branches(np.array([0]))
-        assert network.branches[0, 10] == 0, "Branch should be deactivated"
+        assert network.branches[0, BR_STATUS] == 0, "Branch should be deactivated"
 
         # Test that idx_gens_in_service and idx_branches_in_service reflect the changes
         assert 0 not in network.idx_gens_in_service, (

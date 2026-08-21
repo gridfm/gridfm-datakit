@@ -13,7 +13,7 @@ name = "gridfm-datakit"
 description = "Data Generation Kit"
 readme = "README.md"
 license = "Apache-2.0"
-version = "1.0.5rc2"
+version = "1.0.5"
 requires-python = ">=3.10,<3.13"
 
 dependencies = [
@@ -32,7 +32,9 @@ dependencies = [
     "ipywidgets",
     "ipyfilechooser",
     "scipy",
-    "juliacall",
+    # Floor, not exact pin: 0.9.34+ supports Julia >=1.10.3 (incl. 1.12). The
+    # reproducible Julia environment is pinned in gridfm_datakit/juliapkg.json.
+    "juliacall>=0.9.34",
     "networkx",
     "tqdm",
     "pyarrow",
