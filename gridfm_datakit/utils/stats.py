@@ -11,7 +11,11 @@ from gridfm_datakit.utils.power_balance import (
     compute_bus_balance,
 )
 from gridfm_datakit.utils.utils import get_num_scenarios
-from gridfm_datakit.utils.utils import read_partitions, n_scenario_per_partition
+from gridfm_datakit.utils.utils import (
+    read_partitions,
+    n_scenario_per_partition,
+    write_parquet,
+)
 
 
 def compute_stats_from_data(
@@ -279,11 +283,10 @@ def plot_stats(data_dir: str, sn_mva: float, n_partitions: int = 0) -> None:
     df_stats["scenario_partition"] = (
         df_stats["scenario"] // n_scenario_per_partition
     ).astype("int64")
-    df_stats.to_parquet(
+    write_parquet(
+        df_stats,
         os.path.join(data_dir, "stats.parquet"),
         partition_cols=["scenario_partition"],
-        engine="pyarrow",
-        index=False,
     )
 
     # Titles and data pairs
