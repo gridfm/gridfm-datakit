@@ -7,13 +7,124 @@ It also includes functionality for comparing results between temporary files
 and original case files.
 """
 
+import hashlib
 import numpy as np
 import tempfile
 import os
 from typing import Any, Dict
 from gridfm_datakit.network import Network
 from gridfm_datakit.process.solver_output import solver_capture
+from gridfm_datakit.utils.idx_brch import (
+    ANGMAX,
+    ANGMIN,
+    BR_B,
+    BR_R,
+    BR_STATUS,
+    BR_X,
+    RATE_A,
+    RATE_B,
+    RATE_C,
+    SHIFT,
+    TAP,
+)
+from gridfm_datakit.utils.idx_bus import BUS_I, BUS_TYPE, PD, QD, VA, VM
+from gridfm_datakit.utils.idx_cost import COST, NCOST
+from gridfm_datakit.utils.idx_gen import GEN_STATUS, PG, QG, VG
 from typing import Union
+
+# Fingerprint of the base network whose parsed dict currently lives in the
+# Julia process (_GFM_BASE). One per process: jl (juliacall Main) is a
+# process-wide singleton, so a plain module global mirrors its state.
+_ACTIVE_BASE_KEY = None
+
+
+def _network_fingerprint(net: Network) -> str:
+    """Identity of the base case a Network was constructed from.
+
+    Perturbations mutate ``net.buses``/``net.gens``/... but never the original
+    ``net.mpc`` arrays, so hashing those identifies the base network even on a
+    heavily perturbed copy.
+    """
+    h = hashlib.sha1(usedforsecurity=False)
+    h.update(np.float64(net.baseMVA).tobytes())
+    for key in ("bus", "gen", "branch", "gencost"):
+        h.update(np.ascontiguousarray(net.mpc[key], dtype=np.float64).tobytes())
+    return h.hexdigest()
+
+
+_LIMIT_COLS = [RATE_A, RATE_B, RATE_C, TAP, SHIFT, ANGMIN, ANGMAX]
+
+
+def _branch_limit_fingerprint(net: Network) -> bytes:
+    """Hash of the branch fields ``_gfm_state`` does NOT push per solve.
+
+    Ratings, tap, shift, and angle limits live on ``net.branches`` just like
+    R/X/B/status, but only R/X/B/status get pushed into a fresh copy of
+    ``_GFM_BASE`` on every call. Unlike ``_network_fingerprint`` this must be
+    recomputed every call (not cached on ``net``), so a change to these
+    fields — e.g. a limit study lowering ``net.branches[:, RATE_A]`` — is
+    detected and forces a reparse instead of silently reusing stale limits.
+    """
+    return np.ascontiguousarray(
+        net.branches[:, _LIMIT_COLS],
+        dtype=np.float64,
+    ).tobytes()
+
+
+def _julia_pm_data(net: Network, jl: Any) -> Any:
+    """Build a PowerModels data dict for ``net`` in-memory in Julia.
+
+    The MATPOWER case is written to a file and parsed only once per
+    (process, base network, branch ratings/tap/shift/angle limits); after
+    that each call pushes just the mutable state (loads, setpoints,
+    statuses, admittances, costs) into a fresh copy of the parsed base —
+    field-for-field equivalent to ``PowerModels.parse_file(net.to_mpc(...))``
+    (see tests/test_pm_data_path.py) without the serialization and parsing
+    cost.
+    """
+    global _ACTIVE_BASE_KEY
+    mpc_key = getattr(net, "_pm_fingerprint", None)
+    if mpc_key is None:
+        mpc_key = _network_fingerprint(net)
+        net._pm_fingerprint = mpc_key
+    key = (mpc_key, _branch_limit_fingerprint(net))
+    if _ACTIVE_BASE_KEY != key:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            suffix=".m",
+            delete=False,
+        ) as temp_file:
+            temp_filename = temp_file.name
+        try:
+            net.to_mpc(temp_filename)
+            jl._gfm_init_base(temp_filename)
+        finally:
+            if os.path.exists(temp_filename):
+                os.unlink(temp_filename)
+        _ACTIVE_BASE_KEY = key
+
+    n_buses = net.buses.shape[0]
+    rev = np.empty(n_buses, dtype=np.int64)
+    for new_idx, orig_idx in net.reverse_bus_index_mapping.items():
+        rev[new_idx] = orig_idx
+    ncost = int(net.gencosts[0, NCOST])
+    return jl._gfm_state(
+        rev[net.buses[:, BUS_I].astype(np.int64)],
+        net.buses[:, BUS_TYPE].astype(np.int64),
+        net.buses[:, PD],
+        net.buses[:, QD],
+        net.buses[:, VM],
+        net.buses[:, VA],
+        net.gens[:, PG],
+        net.gens[:, QG],
+        net.gens[:, VG],
+        net.gens[:, GEN_STATUS].astype(np.int64),
+        np.ascontiguousarray(net.gencosts[:, COST : COST + ncost]),
+        net.branches[:, BR_STATUS].astype(np.int64),
+        net.branches[:, BR_R],
+        net.branches[:, BR_X],
+        net.branches[:, BR_B],
+    )
 
 
 def run_opf(net: Network, jl: Any) -> Dict[str, Any]:
@@ -29,16 +140,11 @@ def run_opf(net: Network, jl: Any) -> Dict[str, Any]:
     Raises:
         RuntimeError: If OPF fails to converge or encounters an error.
     """
-    # Create a temporary file for the MATPOWER case
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".m", delete=False) as temp_file:
-        temp_filename = temp_file.name
-
     try:
-        # Save network to temporary file
-        net.to_mpc(temp_filename)
+        data = _julia_pm_data(net, jl)
 
         with solver_capture("opf"):
-            result = jl.run_opf(temp_filename)
+            result = jl.run_opf(data)
 
         if str(result["termination_status"]) != "LOCALLY_SOLVED":
             raise RuntimeError(f"OPF did not converge: {result['termination_status']}")
@@ -47,11 +153,6 @@ def run_opf(net: Network, jl: Any) -> Dict[str, Any]:
 
     except Exception as e:
         raise RuntimeError(f"Error running OPF: {e}")
-    finally:
-        # Clean up temporary file
-        if os.path.exists(temp_filename):
-            os.unlink(temp_filename)
-    # TODO: try warm start
 
 
 def run_pf(net: Network, jl: Any, fast: Union[bool, None] = None) -> Dict[str, Any]:
@@ -71,18 +172,12 @@ def run_pf(net: Network, jl: Any, fast: Union[bool, None] = None) -> Dict[str, A
     Raises:
         RuntimeError: If power flow fails to converge or encounters an error.
     """
-
-    # Create a temporary file for the MATPOWER case
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".m", delete=False) as temp_file:
-        temp_filename = temp_file.name
-
     try:
-        # Save network to temporary file
-        net.to_mpc(temp_filename)
+        data = _julia_pm_data(net, jl)
 
         # Run PF
         with solver_capture("pf"):
-            result = jl.run_pf_fast(temp_filename) if fast else jl.run_pf(temp_filename)
+            result = jl.run_pf_fast_data(data) if fast else jl.run_pf_data(data)
         if (
             fast
             and str(result["termination_status"]) != "True"
@@ -96,10 +191,6 @@ def run_pf(net: Network, jl: Any, fast: Union[bool, None] = None) -> Dict[str, A
 
     except Exception as e:
         raise RuntimeError(f"Error running PF: {e}")
-    finally:
-        # Clean up temporary file
-        if os.path.exists(temp_filename):
-            os.unlink(temp_filename)
 
 
 def run_dcpf(net: Network, jl: Any, fast: Union[bool, None] = None) -> Dict[str, Any]:
@@ -119,20 +210,12 @@ def run_dcpf(net: Network, jl: Any, fast: Union[bool, None] = None) -> Dict[str,
     Raises:
         RuntimeError: If DC power flow fails to converge or encounters an error.
     """
-
-    # Create a temporary file for the MATPOWER case
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".m", delete=False) as temp_file:
-        temp_filename = temp_file.name
-
     try:
-        # Save network to temporary file
-        net.to_mpc(temp_filename)
+        data = _julia_pm_data(net, jl)
 
         # Run DCPF (fast or standard)
         with solver_capture("dcpf"):
-            result = (
-                jl.run_dcpf_fast(temp_filename) if fast else jl.run_dcpf(temp_filename)
-            )
+            result = jl.run_dcpf_fast_data(data) if fast else jl.run_dcpf_data(data)
 
         if (
             fast
@@ -147,10 +230,6 @@ def run_dcpf(net: Network, jl: Any, fast: Union[bool, None] = None) -> Dict[str,
 
     except Exception as e:
         raise RuntimeError(f"Error running DC PF: {e}")
-    finally:
-        # Clean up temporary file
-        if os.path.exists(temp_filename):
-            os.unlink(temp_filename)
 
 
 def run_dcopf(net: Network, jl: Any) -> Dict[str, Any]:
@@ -169,17 +248,12 @@ def run_dcopf(net: Network, jl: Any) -> Dict[str, Any]:
     Raises:
         RuntimeError: If DC OPF fails to converge or encounters an error.
     """
-    # Create a temporary file for the MATPOWER case
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".m", delete=False) as temp_file:
-        temp_filename = temp_file.name
-
     try:
-        # Save network to temporary file
-        net.to_mpc(temp_filename)
+        data = _julia_pm_data(net, jl)
 
         # Run DC OPF
         with solver_capture("dcopf"):
-            result = jl.run_dcopf(temp_filename)
+            result = jl.run_dcopf(data)
 
         if str(result["termination_status"]) != "LOCALLY_SOLVED":
             raise RuntimeError(
@@ -190,10 +264,6 @@ def run_dcopf(net: Network, jl: Any) -> Dict[str, Any]:
 
     except Exception as e:
         raise RuntimeError(f"Error running DC OPF: {e}")
-    finally:
-        # Clean up temporary file
-        if os.path.exists(temp_filename):
-            os.unlink(temp_filename)
 
 
 def compare_pf_results(
