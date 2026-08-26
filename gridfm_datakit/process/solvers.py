@@ -12,7 +12,7 @@ import numpy as np
 import tempfile
 import os
 from typing import Any, Dict
-from gridfm_datakit.network import Network
+from gridfm_datakit.network import Network, get_pglib_source_path
 from gridfm_datakit.process.solver_output import solver_capture
 from gridfm_datakit.utils.idx_brch import (
     ANGMAX,
@@ -314,8 +314,6 @@ def compare_pf_results(
         FileNotFoundError: If the original case file is not found.
         ValueError: If solver_type is not "pf" or "opf".
     """
-    import os
-
     if solver_type not in ["pf", "opf"]:
         raise ValueError(f"solver_type must be 'pf' or 'opf', got '{solver_type}'")
 
@@ -334,10 +332,7 @@ def compare_pf_results(
         temp_converged = False
 
     # Step 2: Run solver directly on original case file
-    original_file_path = f"gridfm_datakit/grids/pglib_opf_{case_name}.m"
-
-    if not os.path.exists(original_file_path):
-        raise FileNotFoundError(f"Original case file not found: {original_file_path}")
+    original_file_path = get_pglib_source_path(case_name)
 
     print(f"Running {solver_name} directly on original file: {original_file_path}")
     try:
