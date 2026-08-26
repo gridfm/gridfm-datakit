@@ -24,7 +24,6 @@ dependencies = [
   "numba",
   "numpy",
   "pandas",
-  "pathlib",
   "plotly",
   "pyaml",
   "requests",
