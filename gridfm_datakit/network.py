@@ -683,6 +683,11 @@ _DOWNLOAD_RETRY = Retry(
 
 
 def _pglib_session() -> requests.Session:
+    """Build the HTTP session used to download PGLib case files.
+
+    Returns:
+        requests.Session: Session with the retry policy mounted for https.
+    """
     session = requests.Session()
     session.mount("https://", HTTPAdapter(max_retries=_DOWNLOAD_RETRY))
     return session
