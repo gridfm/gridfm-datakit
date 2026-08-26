@@ -2,13 +2,46 @@ import os
 import time
 import errno
 import psutil
-from typing import TextIO
+from typing import List, Optional, TextIO
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 import pandas as pd
 
 
 n_scenario_per_partition = 200  # Number of scenarios per partition
+
+
+def write_parquet(
+    df: pd.DataFrame,
+    path: str,
+    partition_cols: Optional[List[str]] = None,
+) -> None:
+    """Write a DataFrame to parquet with space-optimized settings.
+
+    Uses zstd compression (smaller and faster to write than the snappy
+    default) and BYTE_STREAM_SPLIT encoding for float columns, which
+    groups the bytes of each float across values so zstd can exploit the
+    shared exponent/sign bytes of physical quantities.
+
+    Args:
+        df: DataFrame to write.
+        path: Output file path (directory when partition_cols is set).
+        partition_cols: Columns to partition the dataset by.
+    """
+    float_cols = [
+        c
+        for c in df.columns
+        if df[c].dtype.kind == "f" and c not in (partition_cols or [])
+    ]
+    df.to_parquet(
+        path,
+        partition_cols=partition_cols,
+        engine="pyarrow",
+        index=False,
+        compression="zstd",
+        use_dictionary=False,
+        column_encoding={c: "BYTE_STREAM_SPLIT" for c in float_cols},
+    )
 
 
 def get_num_scenarios(data_dir: str) -> int:
