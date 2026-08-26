@@ -21,7 +21,6 @@ dependencies = [
   "matplotlib",
   "matpowercaseframes",
   "nbformat",
-  "numba",
   "numpy",
   "pandas",
   "plotly",
