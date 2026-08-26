@@ -54,6 +54,37 @@ def _config_has_dynamic_block(config_path: str) -> bool:
     return isinstance(config, dict) and bool(config.get("dynamic"))
 
 
+# config.yaml is rewritten each run and is the primary source. args.log is appended
+# to, so a reused directory holds one timestamped YAML block per run and only the
+# last is current; it is read only for datasets generated before config.yaml existed.
+_RUN_HEADER = "\nNew generation started at "
+
+
+def _read_run_config(data_path: Path) -> tuple[str, dict | None]:
+    config_path = data_path / "config.yaml"
+    if config_path.exists():
+        try:
+            with open(config_path, "r") as f:
+                return "config.yaml", yaml.safe_load(f)
+        except Exception as e:
+            print(f"   Could not read config.yaml: {e}")
+
+    args_log = data_path / "args.log"
+    if args_log.exists():
+        try:
+            with open(args_log, "r") as f:
+                blocks = f.read().split(_RUN_HEADER)
+            for block in reversed(blocks):
+                _, _, body = block.partition("\n")
+                parsed = yaml.safe_load(body) if body.strip() else None
+                if isinstance(parsed, dict):
+                    return "args.log", parsed
+        except Exception as e:
+            print(f"   Could not read args.log: {e}")
+
+    return "config.yaml", None
+
+
 def validate_data_directory(
     data_path: str,
     sn_mva: float,
@@ -83,22 +114,21 @@ def validate_data_directory(
         "runtime_data": "runtime_data.parquet",
     }
 
-    # Determine mode: use provided mode or read from args.log
+    # Determine mode: use provided mode or read from the run configuration
     if mode is None:
-        try:
-            with open(data_path / "args.log", "r") as f:
-                lines = f.readlines()
-                # Skip the first two lines (empty line and timestamp)
-                yaml_content = "".join(lines[2:])
-                args = yaml.safe_load(yaml_content)
-            mode = args["settings"]["mode"]
-            print(f"   Found mode from args.log: {mode}")
-        except Exception as e:
-            print(f"   Could not read mode from args.log: {e}")
+        source, args = _read_run_config(data_path)
+        if args is None:
             print(
-                "   ERROR: Mode must be provided via --mode argument or args.log file",
+                "   ERROR: Mode must be provided via --mode argument, or "
+                "config.yaml or args.log must be readable",
             )
             return False
+        try:
+            mode = args["settings"]["mode"]
+        except (KeyError, TypeError):
+            print(f"   ERROR: No settings.mode in {source}")
+            return False
+        print(f"   Found mode from {source}: {mode}")
     else:
         print(f"   Using provided mode: {mode}")
 
