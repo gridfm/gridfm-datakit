@@ -54,13 +54,24 @@ def _config_has_dynamic_block(config_path: str) -> bool:
     return isinstance(config, dict) and bool(config.get("dynamic"))
 
 
-# config.yaml is rewritten each run and is the primary source. args.log is appended
-# to, so a reused directory holds one timestamped YAML block per run and only the
-# last is current; it is read only for datasets generated before config.yaml existed.
 _RUN_HEADER = "\nNew generation started at "
 
 
 def _read_run_config(data_path: Path) -> tuple[str, dict | None]:
+    """Read the run configuration written alongside a generated dataset.
+
+    config.yaml is rewritten on every run and is the primary source. args.log is
+    appended to instead, so a directory reused across runs holds one timestamped
+    YAML block per run and only the last is current. It is read only for datasets
+    generated before config.yaml existed.
+
+    Args:
+        data_path (Path): Directory containing the generated files.
+
+    Returns:
+        tuple[str, dict | None]: The file the configuration came from, and the
+            parsed configuration, or None if neither file could be read.
+    """
     config_path = data_path / "config.yaml"
     if config_path.exists():
         try:
@@ -97,7 +108,8 @@ def validate_data_directory(
     Args:
         data_path (str): Path to directory containing generated files
         n_partitions (int): Number of partitions to sample for validation (0 = all partitions)
-        mode (str): Operating mode ("opf" or "pf"). If None, reads from args.log.
+        mode (str): Operating mode ("opf" or "pf"). If None, reads from config.yaml,
+            falling back to args.log.
 
     Returns:
         bool: True if all validations pass, False otherwise
@@ -261,7 +273,7 @@ Examples:
         type=str,
         default=None,
         choices=["opf", "pf"],
-        help="Operating mode: 'opf' or 'pf'. If not provided, reads from args.log in data directory.",
+        help="Operating mode: 'opf' or 'pf'. If not provided, reads from config.yaml in the data directory, falling back to args.log.",
     )
     validate_parser.add_argument(
         "--sn-mva",
