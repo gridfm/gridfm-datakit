@@ -58,6 +58,7 @@ def test_setup_environment(conf):
         "Generator data file path should be in the dictionary"
     )
     assert os.path.exists(base_path), "Base path should exist"
+    assert args.settings.opf_formulation == "polar"
 
 
 def test_fail_setup_environment():
@@ -69,6 +70,15 @@ def test_fail_setup_environment():
         args, base_path, file_paths, seed = _setup_environment(
             "scripts/config/non_existent_config.yaml",
         )
+
+
+def test_setup_environment_rejects_unknown_opf_formulation(conf):
+    conf.settings.opf_formulation = "unsupported"
+    with pytest.raises(
+        ValueError,
+        match="settings.opf_formulation must be 'polar' or 'rectangular'",
+    ):
+        _setup_environment(conf)
 
 
 # Test prepare network and scenarios function

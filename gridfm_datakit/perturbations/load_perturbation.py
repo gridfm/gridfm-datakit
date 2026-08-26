@@ -434,31 +434,37 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
             ref_curve = self.interpolate_row(ref_curve, data_points=n_scenarios)
 
         # Use custom_seed context manager to temporarily set seed for noise generation
+        profile_shape = (p_mw_array.size, ref_curve.size)
+        load_profiles = np.empty((*profile_shape, 2), dtype=np.float64)
         with custom_seed(seed):
-            load_profile_pmw = p_mw_array[:, np.newaxis] * ref_curve
+            np.multiply(
+                p_mw_array[:, np.newaxis],
+                ref_curve,
+                out=load_profiles[:, :, 0],
+            )
             noise = np.random.uniform(
                 1 - self.sigma,
                 1 + self.sigma,
-                size=load_profile_pmw.shape,
+                size=profile_shape,
             )  # Add uniform noise
-            load_profile_pmw *= noise
+            load_profiles[:, :, 0] *= noise
+            del noise
 
             if self.change_reactive_power:
-                load_profile_qmvar = q_mvar_array[:, np.newaxis] * ref_curve
+                np.multiply(
+                    q_mvar_array[:, np.newaxis],
+                    ref_curve,
+                    out=load_profiles[:, :, 1],
+                )
                 noise = np.random.uniform(
                     1 - self.sigma,
                     1 + self.sigma,
-                    size=load_profile_qmvar.shape,
+                    size=profile_shape,
                 )  # Add uniform noise
-                load_profile_qmvar *= noise
+                load_profiles[:, :, 1] *= noise
             else:
-                load_profile_qmvar = q_mvar_array[:, np.newaxis] * np.ones_like(
-                    ref_curve,
-                )
+                load_profiles[:, :, 1] = q_mvar_array[:, np.newaxis]
                 print("No change in reactive power across scenarios")
-
-        # Stack profiles along the last dimension
-        load_profiles = np.stack((load_profile_pmw, load_profile_qmvar), axis=-1)
 
         return load_profiles
 
@@ -558,12 +564,17 @@ class Powergraph(LoadScenarioGeneratorBase):
             )
             ref_curve = self.interpolate_row(ref_curve, data_points=n_scenarios)
 
-        load_profile_pmw = p_mw_array[:, np.newaxis] * ref_curve
-        load_profile_qmvar = q_mvar_array[:, np.newaxis] * np.ones_like(ref_curve)
+        load_profiles = np.empty(
+            (p_mw_array.size, ref_curve.size, 2),
+            dtype=np.float64,
+        )
+        np.multiply(
+            p_mw_array[:, np.newaxis],
+            ref_curve,
+            out=load_profiles[:, :, 0],
+        )
+        load_profiles[:, :, 1] = q_mvar_array[:, np.newaxis]
         print("No change in reactive power across scenarios")
-
-        # Stack profiles along the last dimension
-        load_profiles = np.stack((load_profile_pmw, load_profile_qmvar), axis=-1)
 
         return load_profiles
 
