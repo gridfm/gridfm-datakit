@@ -24,7 +24,7 @@ dependencies = [
   "numpy",
   "pandas",
   "plotly",
-  "pyaml",
+  "pyyaml",
   "requests",
   "urllib3>=2.6.0", # fix security issue
   "ipywidgets",
