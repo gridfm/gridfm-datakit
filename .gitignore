@@ -36,3 +36,8 @@ scripts/runtime/outputs_julia/*
 scripts/runtime/trash/
 scripts/config/generated/
 _Joule__GridFM_Technical_Proof_Publication*.zip
+
+# Paper reproduction: sampled dataset snapshot (~1 GB) and generated figures
+paper/repro/dataset_sampled/
+paper/repro/out/
+paper/extracted/
