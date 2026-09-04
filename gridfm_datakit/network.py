@@ -17,6 +17,8 @@ import numpy as np
 import pandas as pd
 import requests
 from juliapkg.deps import executable
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 try:
     # juliapkg >= 0.1.24 renamed run_julia to run_script (signature unchanged).
@@ -25,7 +27,7 @@ except ImportError:  # juliapkg < 0.1.24
     from juliapkg.deps import run_julia
 from juliapkg.state import STATE
 from matpowercaseframes import CaseFrames
-from numpy import any, conj, exp, hstack, int64, nonzero, ones, pi, real
+from numpy import conj, exp, hstack, int64, nonzero, ones, pi, real
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
 
@@ -669,6 +671,28 @@ def load_net_from_file(network_path: str) -> Network:
     return Network(mpc)
 
 
+# (connect, read) seconds: the handshake is fast, a large .m file streams slowly.
+# Retries cover raw.githubusercontent.com's transient 5xx and rate limiting.
+_DOWNLOAD_TIMEOUT = (5, 60)
+_DOWNLOAD_RETRY = Retry(
+    total=4,
+    backoff_factor=0.5,
+    status_forcelist=(429, 500, 502, 503, 504),
+    allowed_methods=frozenset({"GET"}),
+)
+
+
+def _pglib_session() -> requests.Session:
+    """Build the HTTP session used to download PGLib case files.
+
+    Returns:
+        requests.Session: Session with the retry policy mounted for https.
+    """
+    session = requests.Session()
+    session.mount("https://", HTTPAdapter(max_retries=_DOWNLOAD_RETRY))
+    return session
+
+
 def get_pglib_file_path(grid_name: str) -> str:
     """Return the local path to a PGLib network file, downloading it if necessary.
 
@@ -685,7 +709,8 @@ def get_pglib_file_path(grid_name: str) -> str:
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
     if not os.path.exists(file_path):
         url = f"https://raw.githubusercontent.com/power-grid-lib/pglib-opf/master/pglib_opf_{grid_name}.m"
-        response = requests.get(url)
+        with _pglib_session() as session:
+            response = session.get(url, timeout=_DOWNLOAD_TIMEOUT)
         response.raise_for_status()
         with open(file_path, "wb") as f:
             f.write(response.content)
@@ -813,7 +838,9 @@ def branch_vectors(
     n_cols = branch.shape[1]
     stat = branch[:, BR_STATUS]  # ones at in-service branches
     Ysf = stat / (branch[:, BR_R] + 1j * branch[:, BR_X])  # series admittance
-    if n_cols > BR_R_ASYM and (any(branch[:, BR_R_ASYM]) or any(branch[:, BR_X_ASYM])):
+    if n_cols > BR_R_ASYM and (
+        np.any(branch[:, BR_R_ASYM]) or np.any(branch[:, BR_X_ASYM])
+    ):
         Yst = stat / (
             (branch[:, BR_R] + branch[:, BR_R_ASYM])
             + 1j * (branch[:, BR_X] + branch[:, BR_X_ASYM])
