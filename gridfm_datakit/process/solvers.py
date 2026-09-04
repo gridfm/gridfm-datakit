@@ -289,6 +289,7 @@ def compare_pf_results(
     net: Network,
     jl: Any,
     case_name: str,
+    *,
     fast: bool,
     solver_type: str = "pf",
 ) -> bool:
@@ -302,6 +303,7 @@ def compare_pf_results(
         net: A Network object containing the power system model.
         jl: Julia interface object for running power flow.
         case_name: Name of the case (e.g., 'case24_ieee_rts') to find the original file.
+        fast: Use the fast PF path. Only meaningful when solver_type is "pf".
         solver_type: Type of solver to test - "pf" for power flow or "opf" for optimal power flow.
 
     Returns:

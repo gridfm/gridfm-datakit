@@ -162,6 +162,7 @@ def _setup_environment(
         "tqdm_log": os.path.join(base_path, "tqdm.log"),
         "error_log": os.path.join(base_path, "error.log"),
         "args_log": os.path.join(base_path, "args.log"),
+        "config": os.path.join(base_path, "config.yaml"),
         "solver_log_dir": solver_log_dir,
         "bus_data": os.path.join(base_path, "bus_data.parquet"),
         "branch_data": os.path.join(base_path, "branch_data.parquet"),
@@ -194,6 +195,9 @@ def _setup_environment(
             f.write(f"\nNew generation started at {timestamp}\n")
             if log_file == file_paths["args_log"]:
                 yaml.safe_dump(args.to_dict(), f)
+
+    with open(file_paths["config"], "w") as f:
+        yaml.safe_dump(args.to_dict(), f)
 
     return args, base_path, file_paths, seed
 
@@ -313,6 +317,7 @@ def generate_power_flow_data(
             'tqdm_log': progress log file,
             'error_log': error log file,
             'args_log': configuration dump file,
+            'config': run configuration (YAML),
             'bus_data': bus-level features CSV (BUS_COLUMNS),
             'branch_data': branch-level features CSV (BRANCH_COLUMNS),
             'gen_data': generator features CSV (GEN_COLUMNS),
@@ -327,7 +332,8 @@ def generate_power_flow_data(
 
         - tqdm.log: Progress tracking
         - error.log: Error messages
-        - args.log: Configuration parameters (YAML dump)
+        - args.log: Configuration parameters (YAML dump, appended per run)
+        - config.yaml: Run configuration, rewritten each run
         - bus_data.parquet: Bus-level features for each scenario
         - branch_data.parquet: Branch-level features for each scenario
         - gen_data.parquet: Generator features for each scenario
@@ -459,7 +465,8 @@ def generate_power_flow_data_distributed(
 
         - tqdm.log: Progress tracking
         - error.log: Error messages
-        - args.log: Configuration parameters (YAML dump)
+        - args.log: Configuration parameters (YAML dump, appended per run)
+        - config.yaml: Run configuration, rewritten each run
         - bus_data.parquet: Bus-level features for each scenario
         - branch_data.parquet: Branch-level features for each scenario
         - gen_data.parquet: Generator features for each scenario
