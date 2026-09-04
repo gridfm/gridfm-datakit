@@ -15,11 +15,35 @@
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 
 
+## Citation
+
+If you use `gridfm-datakit` in your research, please cite both:
+
+```bibtex
+@article{puech2025gridfmdatakitv1pythonlibraryscalable,
+  title={gridfm-datakit-v1: A Python Library for Scalable and Realistic Power Flow and Optimal Power Flow Data Generation},
+  author={Alban Puech and Matteo Mazzonelli and Celia Cintas and Tamara R. Govindasamy and Mangaliso Mngomezulu and Jonas Weiss and Matteo Baù and Anna Varbella and François Mirallès and Kibaek Kim and Le Xie and Hendrik F. Hamann and Etienne Vos and Thomas Brunschwiler},
+  journal={arXiv preprint arXiv:2512.14658},
+  year={2025},
+  url={https://arxiv.org/abs/2512.14658}
+}
+
+
+@article{puech2026gencounifiedneural,
+  title={GENCO - A Unified Neural Solver Embedded in a Development Framework for Steady-State Grid Analysis},
+  author={Alban Puech and Matteo Mazzonelli and Tamara R. Govindasamy and Mangaliso Mngomezulu and Héctor Maeso-García and Thomas Tolhurst and Javad Bayazi and Ali Moeini and Naomi Simumba and Celia Cintas and David Nelischer and Romeo Kienzler and Jonas Weiss and Anna Varbella and Florian Dörfler and Gabriela Hug and Martin Mevissen and Juan Bernabé-Moreno and François Mirallès and Hendrik F. Hamann and Etienne Vos and Thomas Brunschwiler},
+  journal={arXiv preprint arXiv:2608.09921},
+  year={2026},
+  url={https://arxiv.org/abs/2608.09921}
+}
+```
+
+
 ---
 
-# GridFM DataKit
+# GridFM datakit
 
-**GridFM DataKit** (`gridfm-datakit`) is a Python library for generating realistic, diverse, and scalable synthetic datasets for power flow (PF) and optimal power flow (OPF) machine learning solvers. It unifies state-of-the-art methods for perturbing loads, generator dispatches, network topologies, and branch parameters, addressing limitations of existing data generation libraries.
+**GridFM datakit** (`gridfm-datakit`) is a Python library for generating realistic, diverse, and scalable synthetic datasets for power flow (PF) and optimal power flow (OPF) machine learning solvers. It unifies state-of-the-art methods for perturbing loads, generator dispatches, network topologies, and branch parameters, addressing limitations of existing data generation libraries.
 
 ## Key Features
 
