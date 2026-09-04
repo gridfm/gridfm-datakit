@@ -10,6 +10,13 @@ __pycache__/
 notebooks/opf_pertubations.ipynb
 .DS_Store
 gridfm_datakit/grids/*.m
+!gridfm_datakit/grids/pglib_opf_case14_ieee_corrected.m
+!gridfm_datakit/grids/pglib_opf_case30_ieee_corrected.m
+!gridfm_datakit/grids/pglib_opf_case57_ieee_corrected.m
+!gridfm_datakit/grids/pglib_opf_case118_ieee_corrected.m
+!gridfm_datakit/grids/pglib_opf_case500_goc_corrected.m
+!gridfm_datakit/grids/pglib_opf_case2000_goc_corrected.m
+!gridfm_datakit/grids/pglib_opf_case10000_goc_corrected.m
 notebooks/test_data
 tests/test_data
 build/
@@ -23,6 +30,9 @@ pfdelta/data/
 site/
 scripts/runtime/parquet_to_powermodels/outputs/
 scripts/runtime/outputs/
-scripts/runtime/outputs_julia/
+scripts/runtime/outputs_julia/*
+!scripts/runtime/outputs_julia/full_matrix/
+!scripts/runtime/outputs_julia/full_matrix/**
 scripts/runtime/trash/
 scripts/config/generated/
+_Joule__GridFM_Technical_Proof_Publication*.zip

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_ROOT="/u/apu/gridfm-datakit"
-SCRIPT_DIR="$REPO_ROOT/scripts/runtime/pure_julia"
-LOG_DIR="$HOME/.lsbatch"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+LOG_DIR="${LSB_LOG_DIR:-$HOME/.lsbatch}"
 
+# Original paper LSF host set (CCC 7xx). Override resources if reproducing elsewhere.
 HOST_SELECT="select[hname=='cccxc702' || hname=='cccxc703' || hname=='cccxc704' || hname=='cccxc705' || hname=='cccxc706' || hname=='cccxc707' || hname=='cccxc708' || hname=='cccxc709' || hname=='cccxc710' || hname=='cccxc711' || hname=='cccxc712' || hname=='cccxc713' || hname=='cccxc714' || hname=='cccxc715' || hname=='cccxc716']"
 SPAN='span[hosts=1]'
 EXCLUDE_7XX="select[hname!='cccxc701' && hname!='cccxc702' && hname!='cccxc703' && hname!='cccxc704' && hname!='cccxc705' && hname!='cccxc706' && hname!='cccxc707' && hname!='cccxc708' && hname!='cccxc709' && hname!='cccxc710' && hname!='cccxc711' && hname!='cccxc712' && hname!='cccxc713' && hname!='cccxc714' && hname!='cccxc715' && hname!='cccxc716']"

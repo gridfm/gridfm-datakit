@@ -15,7 +15,11 @@ BLAS.set_num_threads(1)
 include(joinpath(@__DIR__, "scenario_staging.jl"))
 
 const SCRIPT_PATH = abspath(@__FILE__)
-const DEFAULT_DATA_BASE = "/dccstor/gridfm/powermodels_data/v4/finetuning"
+const DEFAULT_DATA_BASE = get(
+    ENV,
+    "GRIDFM_DATA_BASE",
+    "/dccstor/gridfm/powermodels_data/v4/finetuning",
+)
 const MODES = ("pf", "dcpf", "opf", "dcopf")
 const SETUPS = ("cached-base", "per-solve-load")
 const CSV_HEADER = (

@@ -9,7 +9,11 @@ using Printf
 using UUIDs
 
 const SCRIPT_PATH = abspath(@__FILE__)
-const DATA_BASE = "/dccstor/gridfm/powermodels_data/v4/finetuning"
+const DATA_BASE = get(
+    ENV,
+    "GRIDFM_DATA_BASE",
+    "/dccstor/gridfm/powermodels_data/v4/finetuning",
+)
 const N_SCENARIOS = 10_000
 const DEFAULT_WORKERS = 32
 const NETWORKS = (

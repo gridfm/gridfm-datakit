@@ -11,7 +11,12 @@ const PROCESS_START = 24
 const PROCESS_STEP = 16
 const PROCESS_STOP = 216
 const INIT_TIMEOUT_S = 900
-const DATA_BASE = "/dccstor/gridfm/powermodels_data/v4/finetuning"
+# Original paper run: /dccstor/gridfm/powermodels_data/v4/finetuning
+const DATA_BASE = get(
+    ENV,
+    "GRIDFM_DATA_BASE",
+    "/dccstor/gridfm/powermodels_data/v4/finetuning",
+)
 
 const MATRIX_NETWORKS = (
     (network = "case14_ieee", count = 4_000_000, scope = "small", pf_fast = true),
