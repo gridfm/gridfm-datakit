@@ -22,5 +22,7 @@ scripts/datasets_sampled/
 pfdelta/data/
 site/
 scripts/runtime/parquet_to_powermodels/outputs/
-scripts/runtime/benchmark_juliacall_matrix/outputs/
+scripts/runtime/outputs/
+scripts/runtime/outputs_julia/
+scripts/runtime/trash/
 scripts/config/generated/

@@ -18,6 +18,7 @@ def compute_stats_from_data(
     data_dir: str,
     sn_mva: float,
     n_partitions: int = 0,
+    zero_slack_dc_residual: bool = False,
 ) -> Dict[str, np.ndarray]:
     """Compute statistics from parquet data files (vectorized).
 
@@ -28,6 +29,16 @@ def compute_stats_from_data(
         data_dir: Directory containing bus_data.parquet, branch_data.parquet, gen_data.parquet, and optionally runtime_data.parquet
         sn_mva: Base MVA used to scale power quantities
         n_partitions: Number of partitions to compute stats for (0 for all partitions)
+        zero_slack_dc_residual: If True, zero the DC active power residual at the
+            reference (slack) bus before aggregating over buses. DC power flow does not
+            enforce the slack balance -- Pg at the slack is reconstructed afterwards
+            against the *lossless* DC flows, while the residual here is scored with the
+            full complex Y (which keeps series resistance). The whole model difference
+            therefore lands on the slack bus as a bookkeeping artifact. Zeroing that one
+            entry is algebraically identical to reconstructing Pg_slack against the
+            full-Y flows, because Pg enters only its own bus's balance equation.
+            Active power only: Qg is not a reconstructed DC free variable, so
+            Q_mis_ac is never touched.
 
     Returns:
         Dictionary with the following keys and corresponding numpy arrays:
@@ -169,6 +180,18 @@ def compute_stats_from_data(
             True,
             sn_mva=sn_mva,
         )
+        if zero_slack_dc_residual:
+            # Join on (scenario, bus) rather than trusting row order: the balance frame
+            # comes back with a fresh index from an internal merge.
+            # Active power only -- see the docstring.
+            ref_keys = bus_data.loc[bus_data["REF"] == 1, ["scenario", "bus"]]
+            is_ref = (
+                pd.MultiIndex.from_frame(
+                    balance_dc[["scenario", "bus"]].astype(int),
+                )
+                .isin(pd.MultiIndex.from_frame(ref_keys.astype(int)))
+            )
+            balance_dc.loc[is_ref, "P_mis_dc"] = 0.0
         group_by_scenario = balance_dc.groupby("scenario")
         p_balance_dc_max = group_by_scenario["P_mis_dc"].max().reindex(scenarios)
         p_balance_dc_mean = group_by_scenario["P_mis_dc"].mean().reindex(scenarios)
@@ -218,7 +241,12 @@ def compute_stats_from_data(
     return result
 
 
-def plot_stats(data_dir: str, sn_mva: float, n_partitions: int = 0) -> None:
+def plot_stats(
+    data_dir: str,
+    sn_mva: float,
+    n_partitions: int = 0,
+    zero_slack_dc_residual: bool = False,
+) -> None:
     """Generate and save statistics plots using matplotlib.
 
     Creates a multi-panel histogram plot showing distributions of key metrics across all scenarios.
@@ -242,8 +270,16 @@ def plot_stats(data_dir: str, sn_mva: float, n_partitions: int = 0) -> None:
     - (If DC data available) DC active power balance error, bus index with max DC PBE
     - (If DC and runtime data available) DC runtime
     """
-    stats = compute_stats_from_data(data_dir, sn_mva=sn_mva, n_partitions=n_partitions)
-    filename = os.path.join(data_dir, "stats_plot.png")
+    stats = compute_stats_from_data(
+        data_dir,
+        sn_mva=sn_mva,
+        n_partitions=n_partitions,
+        zero_slack_dc_residual=zero_slack_dc_residual,
+    )
+    # Suffix the outputs when the slack correction is on, so a corrected run never
+    # overwrites the uncorrected stats_plot.png / stats.parquet already in the directory.
+    suffix = "_slack_corrected" if zero_slack_dc_residual else ""
+    filename = os.path.join(data_dir, f"stats_plot{suffix}.png")
 
     # Save per-scenario statistics to a parquet file with one row per scenario
 
@@ -280,7 +316,7 @@ def plot_stats(data_dir: str, sn_mva: float, n_partitions: int = 0) -> None:
         df_stats["scenario"] // n_scenario_per_partition
     ).astype("int64")
     df_stats.to_parquet(
-        os.path.join(data_dir, "stats.parquet"),
+        os.path.join(data_dir, f"stats{suffix}.parquet"),
         partition_cols=["scenario_partition"],
         engine="pyarrow",
         index=False,

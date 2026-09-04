@@ -1,0 +1,115 @@
+host: cccxc445  started: Mon Aug 10 09:23:08 AM EDT 2026
+
+******************************************************************************
+This program contains Ipopt, a library for large-scale nonlinear optimization.
+ Ipopt is released as open source code under the Eclipse Public License (EPL).
+         For more information visit https://github.com/coin-or/Ipopt
+******************************************************************************
+
+Found 219746 scenario files in /dccstor/gridfm/powermodels_data/v4/finetuning/pf/case500_goc/processed; processing 1000
+  solved 50/1000
+  solved 100/1000
+  solved 150/1000
+  solved 200/1000
+  solved 250/1000
+  solved 300/1000
+  solved 350/1000
+  solved 400/1000
+  solved 450/1000
+  solved 500/1000
+  solved 550/1000
+  solved 600/1000
+  solved 650/1000
+  solved 700/1000
+  solved 750/1000
+  solved 800/1000
+  solved 850/1000
+  solved 900/1000
+  solved 950/1000
+  solved 1000/1000
+
+Wrote 1000 rows to /u/apu/gridfm-datakit/dc_res_lsf/out_n1000/dc_residuals.csv
+Wrote statistics to /u/apu/gridfm-datakit/dc_res_lsf/out_n1000/dc_residuals_stats.txt
+
+DC-PF mean active power residual statistics
+============================================
+
+Data          : /dccstor/gridfm/powermodels_data/v4/finetuning/pf/case500_goc/processed
+Solver        : run_dcpf(fast=True)
+Residual      : |P_mis_ac| on the DC solution (Vm=1.0, Va=Va_dc), MW
+Per scenario  : mean over all buses
+
+Scenarios     : 1000
+Failed        : 0
+Branches off  : 5771 (summed over scenarios; their flows are forced to 0)
+
+Julia startup : 259.3 s (one-off: init_julia + Ipopt/JIT warmup)
+Solve loop    : 303.8 s for 1000 scenarios = 304 ms/scenario
+
+lossless slack (what datakit does today)
+--------------------------------------------
+mean of means : 1.764940e+00
+std           : 2.733780e-01
+min           : 1.231809e+00
+median        : 1.719403e+00
+95th pct      : 2.332214e+00
+max           : 2.821927e+00
+
+full-Y slack (slack residual is 0)
+--------------------------------------------
+mean of means : 1.739775e+00
+std           : 2.700460e-01
+min           : 1.226607e+00
+median        : 1.699296e+00
+95th pct      : 2.300852e+00
+max           : 2.769568e+00
+
+Effect of the slack convention
+--------------------------------------------
+mean reduction : 1.43%
+median per-scenario reduction : 0.74%
+
+finished: Mon Aug 10 09:33:41 AM EDT 2026
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@cccxc445>
+Subject: Job 13100: <dc_res_case500_n1000> in cluster <CCCFP15Cluster> Done
+
+Job <dc_res_case500_n1000> was submitted from host <ccc-login4> by user <apu> in cluster <CCCFP15Cluster> at Mon Aug 10 09:23:07 2026
+Job was executed on host(s) <4*cccxc445>, in queue <normal>, as user <apu> in cluster <CCCFP15Cluster> at Mon Aug 10 09:23:08 2026
+</u/apu> was used as the home directory.
+</u/apu/gridfm-datakit/dc_res_lsf> was used as the working directory.
+Started at Mon Aug 10 09:23:08 2026
+Terminated at Mon Aug 10 09:33:41 2026
+Results reported at Mon Aug 10 09:33:41 2026
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+/u/apu/gridfm-datakit/dc_res_lsf/dc_res_lsf.sh
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   746.00 sec.
+    Max Memory :                                 2 GB
+    Average Memory :                             0.95 GB
+    Total Requested Memory :                     -
+    Delta Memory :                               -
+    Max Swap :                                   -
+    Max Processes :                              16
+    Max Threads :                                90
+    Run time :                                   633 sec.
+    Turnaround time :                            634 sec.
+
+The output (if any) is above this job summary.
+
+
+
+PS:
+
+Read file </u/apu/gridfm-datakit/dc_res_lsf/lsf_13100.err> for stderr output of this job.
+

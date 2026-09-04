@@ -1,0 +1,490 @@
+┌ Warning: Module MacroTools with build ID fafbfcfd-f7cc-32e4-51f0-8c950fc5edee is missing from the cache.
+│ This may mean MacroTools [1914dd2f-81c6-5fcd-8719-6d5c9610ff09] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:2541
+┌ Warning: Module MacroTools with build ID fafbfcfd-f7cc-32e4-51f0-8c950fc5edee is missing from the cache.
+│ This may mean MacroTools [1914dd2f-81c6-5fcd-8719-6d5c9610ff09] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:2541
+┌ Warning: Module MacroTools with build ID fafbfcfd-f7cc-32e4-51f0-8c950fc5edee is missing from the cache.
+│ This may mean MacroTools [1914dd2f-81c6-5fcd-8719-6d5c9610ff09] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:2541
+┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+│ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:2541
+┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+│ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:2541
+┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+│ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:2541
+┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+│ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:2541
+┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+│ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:2541
+┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+│ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:2541
+┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+│ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:2541
+┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+│ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:2541
+┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+│ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:2541
+┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+│ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:2541
+┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+│ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:2541
+┌ Warning: Module Ipopt with build ID ffffffff-ffff-ffff-6a9c-31c277182022 is missing from the cache.
+│ This may mean Ipopt [b6b21f68-93f8-5de0-b562-5493be1d77c9] does not support precompilation but is imported by a module that does.
+└ @ Base loading.jl:2541
+Precompiling PythonCall...
+   1095.9 ms  ✓ DataAPI
+   1438.5 ms  ✓ DataValueInterfaces
+   1233.7 ms  ✓ IteratorInterfaceExtensions
+   1283.4 ms  ✓ UnsafePointers
+   1035.1 ms  ✓ Scratch
+   1954.0 ms  ✓ OrderedCollections
+   1090.3 ms  ✓ Pidfile
+   1649.1 ms  ✓ StructTypes
+    907.0 ms  ✓ TableTraits
+   1563.8 ms  ✓ Preferences
+    914.5 ms  ✓ PrecompileTools
+   1072.5 ms  ✓ JLLWrappers
+   1595.6 ms  ✓ Tables
+   4473.5 ms  ✓ MacroTools
+   2129.9 ms  ✓ micromamba_jll
+   2105.2 ms  ✓ pixi_jll
+   1819.7 ms  ✓ MicroMamba
+  13948.1 ms  ✓ Parsers
+   8765.7 ms  ✓ JSON3
+   3281.1 ms  ✓ CondaPkg
+  17322.6 ms  ✓ PythonCall
+  21 dependencies successfully precompiled in 47 seconds. 28 already precompiled.
+Precompiling PowerModels...
+   1152.9 ms  ✓ Statistics
+   1458.4 ms  ✓ Reexport
+   1588.3 ms  ✓ StaticArraysCore
+   1910.1 ms  ✓ DocStringExtensions
+   1826.4 ms  ✓ StatsAPI
+   1714.0 ms  ✓ ADTypes
+   1678.9 ms  ✓ NaNMath
+   1935.9 ms  ✓ ConstructionBase
+   1746.2 ms  ✓ Requires
+   1769.5 ms  ✓ TranscodingStreams
+   1616.7 ms  ✓ Bzip2_jll
+   1882.6 ms  ✓ CommonSubexpressions
+   1836.3 ms  ✓ Compat
+   1708.0 ms  ✓ OpenSpecFun_jll
+   1157.9 ms  ✓ DiffResults
+   3155.3 ms  ✓ IrrationalConstants
+   1318.1 ms  ✓ ConstructionBase → ConstructionBaseLinearAlgebraExt
+   1291.4 ms  ✓ ADTypes → ADTypesConstructionBaseExt
+   1954.3 ms  ✓ Statistics → SparseArraysExt
+   1416.3 ms  ✓ Adapt
+   1332.6 ms  ✓ Compat → CompatLinearAlgebraExt
+   1435.1 ms  ✓ CodecBzip2
+   1780.8 ms  ✓ Distances
+   1700.1 ms  ✓ CodecZlib
+   1410.8 ms  ✓ LogExpFunctions
+   1203.2 ms  ✓ ArrayInterface
+   2731.3 ms  ✓ DifferentiationInterface
+   1277.9 ms  ✓ Adapt → AdaptSparseArraysExt
+   1243.5 ms  ✓ Distances → DistancesSparseArraysExt
+   3879.3 ms  ✓ JSON
+    900.8 ms  ✓ ArrayInterface → ArrayInterfaceStaticArraysCoreExt
+   2475.7 ms  ✓ Setfield
+   1467.5 ms  ✓ ArrayInterface → ArrayInterfaceSparseArraysExt
+   4327.5 ms  ✓ Memento
+   1887.0 ms  ✓ DifferentiationInterface → DifferentiationInterfaceSparseArraysExt
+   1265.9 ms  ✓ FiniteDiff
+    950.9 ms  ✓ DifferentiationInterface → DifferentiationInterfaceFiniteDiffExt
+   1018.2 ms  ✓ FiniteDiff → FiniteDiffSparseArraysExt
+   4345.3 ms  ✓ SpecialFunctions
+   8983.3 ms  ✓ MutableArithmetics
+   1070.4 ms  ✓ DiffRules
+   8208.7 ms  ✓ BenchmarkTools
+   4939.7 ms  ✓ ForwardDiff
+   1346.0 ms  ✓ DifferentiationInterface → DifferentiationInterfaceForwardDiffExt
+   1507.1 ms  ✓ NLSolversBase
+   1657.3 ms  ✓ LineSearches
+   1874.0 ms  ✓ NLsolve
+  49810.8 ms  ✓ MathOptInterface
+   1008.3 ms  ? JuMP
+   1277.9 ms  ? InfrastructureModels
+Info Given PowerModels was explicitly requested, output will be shown live [0K
+[0K┌ Warning: Module MacroTools with build ID fafbfcfd-f7cc-32e4-51f0-8c950fc5edee is missing from the cache.
+[0K│ This may mean MacroTools [1914dd2f-81c6-5fcd-8719-6d5c9610ff09] does not support precompilation but is imported by a module that does.
+[0K└ @ Base loading.jl:2541
+   1704.7 ms  ? PowerModels
+  48 dependencies successfully precompiled in 70 seconds. 26 already precompiled.
+  3 dependencies failed but may be precompilable after restarting julia
+  3 dependencies had output during precompilation:
+┌ PowerModels
+│  [Output was shown above]
+└  
+┌ JuMP
+│  ┌ Warning: Module MacroTools with build ID fafbfcfd-f7cc-32e4-51f0-8c950fc5edee is missing from the cache.
+│  │ This may mean MacroTools [1914dd2f-81c6-5fcd-8719-6d5c9610ff09] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ InfrastructureModels
+│  ┌ Warning: Module MacroTools with build ID fafbfcfd-f7cc-32e4-51f0-8c950fc5edee is missing from the cache.
+│  │ This may mean MacroTools [1914dd2f-81c6-5fcd-8719-6d5c9610ff09] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+Precompiling InfrastructureModels...
+   1156.5 ms  ✓ OrderedCollections
+   1190.6 ms  ✓ Preferences
+   1130.4 ms  ? JLLWrappers
+   1195.8 ms  ? PrecompileTools
+   3179.4 ms  ✓ MacroTools
+   2396.6 ms  ? Parsers
+    970.1 ms  ? JuMP
+Info Given InfrastructureModels was explicitly requested, output will be shown live [0K
+[0K┌ Warning: Module MacroTools with build ID fafbfcfd-f7cc-32e4-51f0-8c950fc5edee is missing from the cache.
+[0K│ This may mean MacroTools [1914dd2f-81c6-5fcd-8719-6d5c9610ff09] does not support precompilation but is imported by a module that does.
+[0K└ @ Base loading.jl:2541
+   1351.2 ms  ? InfrastructureModels
+  3 dependencies successfully precompiled in 8 seconds. 44 already precompiled.
+  6 dependencies precompiled but different versions are currently loaded. Restart julia to access the new versions. Otherwise, loading dependents of these packages may trigger further precompilation to work with the unexpected versions.
+  5 dependencies failed but may be precompilable after restarting julia
+  5 dependencies had output during precompilation:
+┌ JLLWrappers
+│  ┌ Warning: Module Preferences with build ID fafbfcfd-2e93-7839-ab15-b7379d36f7f6 is missing from the cache.
+│  │ This may mean Preferences [21216c6a-2e73-6563-6e65-726566657250] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ PrecompileTools
+│  ┌ Warning: Module Preferences with build ID fafbfcfd-2e93-7839-ab15-b7379d36f7f6 is missing from the cache.
+│  │ This may mean Preferences [21216c6a-2e73-6563-6e65-726566657250] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ JuMP
+│  ┌ Warning: Module MacroTools with build ID fafbfcfd-f7cc-32e4-51f0-8c950fc5edee is missing from the cache.
+│  │ This may mean MacroTools [1914dd2f-81c6-5fcd-8719-6d5c9610ff09] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ Parsers
+│  ┌ Warning: Module PrecompileTools with build ID fafbfcfd-a346-0368-5df7-b1b9a180c584 is missing from the cache.
+│  │ This may mean PrecompileTools [aea7be01-6a6a-4083-8856-8a6e6704d82a] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ InfrastructureModels
+│  [Output was shown above]
+└  
+Precompiling JuMP...
+   1019.4 ms  ? JLLWrappers
+   1038.3 ms  ? PrecompileTools
+   2132.5 ms  ? Parsers
+Info Given JuMP was explicitly requested, output will be shown live [0K
+[0K┌ Warning: Module MacroTools with build ID fafbfcfd-f7cc-32e4-51f0-8c950fc5edee is missing from the cache.
+[0K│ This may mean MacroTools [1914dd2f-81c6-5fcd-8719-6d5c9610ff09] does not support precompilation but is imported by a module that does.
+[0K└ @ Base loading.jl:2541
+    982.2 ms  ? JuMP
+Precompiling Ipopt...
+   1058.0 ms  ? PrecompileTools
+   1093.9 ms  ? JLLWrappers
+   1084.1 ms  ? Xorg_libpciaccess_jll
+   1154.2 ms  ? ASL_jll
+   1216.2 ms  ? Libiconv_jll
+   1137.0 ms  ? METIS_jll
+   1272.7 ms  ? OpenBLAS32_jll
+    980.9 ms  ? XML2_jll
+    999.0 ms  ? MUMPS_seq_jll
+    960.8 ms  ? Hwloc_jll
+    954.6 ms  ? SPRAL_jll
+    985.8 ms  ? Ipopt_jll
+Info Given Ipopt was explicitly requested, output will be shown live [0K
+[0K┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+[0K│ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+[0K└ @ Base loading.jl:2541
+   1258.9 ms  ? Ipopt
+Precompiling Ipopt_jll...
+   1020.7 ms  ? JLLWrappers
+   1136.3 ms  ? ASL_jll
+   1103.1 ms  ? Xorg_libpciaccess_jll
+   1132.4 ms  ? METIS_jll
+   1200.6 ms  ? Libiconv_jll
+   1024.7 ms  ? XML2_jll
+   1037.4 ms  ? MUMPS_seq_jll
+    978.2 ms  ? Hwloc_jll
+    962.8 ms  ? SPRAL_jll
+Info Given Ipopt_jll was explicitly requested, output will be shown live [0K
+[0K┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+[0K│ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+[0K└ @ Base loading.jl:2541
+    972.2 ms  ? Ipopt_jll
+Precompiling ASL_jll...
+   1009.1 ms  ? JLLWrappers
+Info Given ASL_jll was explicitly requested, output will be shown live [0K
+[0K┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+[0K│ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+[0K└ @ Base loading.jl:2541
+    978.1 ms  ? ASL_jll
+Precompiling MUMPS_seq_jll...
+   1035.1 ms  ? JLLWrappers
+   1008.1 ms  ? METIS_jll
+Info Given MUMPS_seq_jll was explicitly requested, output will be shown live [0K
+[0K┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+[0K│ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+[0K└ @ Base loading.jl:2541
+    973.0 ms  ? MUMPS_seq_jll
+Precompiling METIS_jll...
+    994.1 ms  ? JLLWrappers
+Info Given METIS_jll was explicitly requested, output will be shown live [0K
+[0K┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+[0K│ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+[0K└ @ Base loading.jl:2541
+    960.8 ms  ? METIS_jll
+Precompiling SPRAL_jll...
+    979.6 ms  ? JLLWrappers
+   1008.9 ms  ? Libiconv_jll
+   1081.2 ms  ? Xorg_libpciaccess_jll
+   1116.0 ms  ? METIS_jll
+    975.4 ms  ? XML2_jll
+    974.4 ms  ? Hwloc_jll
+Info Given SPRAL_jll was explicitly requested, output will be shown live [0K
+[0K┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+[0K│ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+[0K└ @ Base loading.jl:2541
+    971.3 ms  ? SPRAL_jll
+Precompiling Hwloc_jll...
+   1000.1 ms  ? JLLWrappers
+   1018.6 ms  ? Libiconv_jll
+   1059.1 ms  ? Xorg_libpciaccess_jll
+    997.4 ms  ? XML2_jll
+Info Given Hwloc_jll was explicitly requested, output will be shown live [0K
+[0K┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+[0K│ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+[0K└ @ Base loading.jl:2541
+    967.7 ms  ? Hwloc_jll
+Precompiling XML2_jll...
+    996.2 ms  ? JLLWrappers
+    975.8 ms  ? Libiconv_jll
+Info Given XML2_jll was explicitly requested, output will be shown live [0K
+[0K┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+[0K│ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+[0K└ @ Base loading.jl:2541
+    975.5 ms  ? XML2_jll
+Precompiling Libiconv_jll...
+   1075.9 ms  ? JLLWrappers
+Info Given Libiconv_jll was explicitly requested, output will be shown live [0K
+[0K┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+[0K│ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+[0K└ @ Base loading.jl:2541
+    970.6 ms  ? Libiconv_jll
+Precompiling Xorg_libpciaccess_jll...
+    996.4 ms  ? JLLWrappers
+Info Given Xorg_libpciaccess_jll was explicitly requested, output will be shown live [0K
+[0K┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+[0K│ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+[0K└ @ Base loading.jl:2541
+    965.6 ms  ? Xorg_libpciaccess_jll
+Precompiling OpenBLAS32_jll...
+   1004.1 ms  ? JLLWrappers
+Info Given OpenBLAS32_jll was explicitly requested, output will be shown live [0K
+[0K┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+[0K│ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+[0K└ @ Base loading.jl:2541
+    977.8 ms  ? OpenBLAS32_jll
+Precompiling IpoptMathOptInterfaceExt...
+    901.1 ms  ✓ StaticArraysCore
+   1223.2 ms  ✓ DocStringExtensions
+   1373.9 ms  ✓ Statistics
+   1204.1 ms  ✓ NaNMath
+   1168.2 ms  ✓ Compat
+   1330.6 ms  ? CommonSubexpressions
+   1399.4 ms  ✓ TranscodingStreams
+   1334.2 ms  ? PrecompileTools
+   1382.6 ms  ? JLLWrappers
+   2377.9 ms  ✓ IrrationalConstants
+   1492.7 ms  ? DiffResults
+   1354.0 ms  ? Compat → CompatLinearAlgebraExt
+   1812.3 ms  ? Statistics → SparseArraysExt
+   1254.5 ms  ? Libiconv_jll
+   1548.8 ms  ? CodecZlib
+   1380.8 ms  ? Bzip2_jll
+   1521.8 ms  ? ASL_jll
+   1477.7 ms  ? OpenSpecFun_jll
+   1546.2 ms  ? Xorg_libpciaccess_jll
+   1172.5 ms  ? LogExpFunctions
+   1908.6 ms  ? METIS_jll
+   1934.6 ms  ? OpenBLAS32_jll
+   2373.3 ms  ? Parsers
+   1064.5 ms  ? XML2_jll
+   1178.8 ms  ? CodecBzip2
+   1029.7 ms  ? SpecialFunctions
+    978.2 ms  ? MUMPS_seq_jll
+   1035.3 ms  ? Hwloc_jll
+    982.8 ms  ? DiffRules
+   1383.2 ms  ? JSON
+    973.9 ms  ? SPRAL_jll
+   1107.0 ms  ? ForwardDiff
+   1114.4 ms  ? BenchmarkTools
+   1011.1 ms  ? Ipopt_jll
+   7277.7 ms  ✓ MutableArithmetics
+   1033.2 ms  ? Ipopt
+   1034.0 ms  ? MathOptInterface
+Info Given IpoptMathOptInterfaceExt was explicitly requested, output will be shown live [0K
+[0K┌ Warning: Module Ipopt with build ID ffffffff-ffff-ffff-6a9c-31c277182022 is missing from the cache.
+[0K│ This may mean Ipopt [b6b21f68-93f8-5de0-b562-5493be1d77c9] does not support precompilation but is imported by a module that does.
+[0K└ @ Base loading.jl:2541
+    981.2 ms  ? Ipopt → IpoptMathOptInterfaceExt
+  8 dependencies successfully precompiled in 10 seconds. 35 already precompiled.
+  37 dependencies precompiled but different versions are currently loaded. Restart julia to access the new versions. Otherwise, loading dependents of these packages may trigger further precompilation to work with the unexpected versions.
+  30 dependencies failed but may be precompilable after restarting julia
+  30 dependencies had output during precompilation:
+┌ Bzip2_jll
+│  ┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+│  │ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ JSON
+│  ┌ Warning: Module Parsers with build ID fafbfcfd-02ce-04fd-b4a9-72533363e5a7 is missing from the cache.
+│  │ This may mean Parsers [69de0a69-1ddd-5017-9359-2bf0b02dc9f0] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ OpenBLAS32_jll
+│  ┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+│  │ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ SpecialFunctions
+│  ┌ Warning: Module IrrationalConstants with build ID fafbfcfd-1ce6-06ea-8b23-ffaea6c89302 is missing from the cache.
+│  │ This may mean IrrationalConstants [92d709cd-6900-40b7-9082-c6be49f344b6] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ Ipopt → IpoptMathOptInterfaceExt
+│  [Output was shown above]
+└  
+┌ Statistics → SparseArraysExt
+│  ┌ Warning: Module Statistics with build ID fafbfcfd-686d-8188-a709-a9f9f44d45a8 is missing from the cache.
+│  │ This may mean Statistics [10745b16-79ce-11e8-11f9-7d13ad32a3b2] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ PrecompileTools
+│  ┌ Warning: Module Preferences with build ID fafbfcfd-2e93-7839-ab15-b7379d36f7f6 is missing from the cache.
+│  │ This may mean Preferences [21216c6a-2e73-6563-6e65-726566657250] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ JLLWrappers
+│  ┌ Warning: Module Preferences with build ID fafbfcfd-2e93-7839-ab15-b7379d36f7f6 is missing from the cache.
+│  │ This may mean Preferences [21216c6a-2e73-6563-6e65-726566657250] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ CodecZlib
+│  ┌ Warning: Module TranscodingStreams with build ID fafbfcfd-cefd-9c09-3559-c7b13c5df2e8 is missing from the cache.
+│  │ This may mean TranscodingStreams [3bb67fe8-82b1-5028-8e26-92a6c54297fa] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ Compat → CompatLinearAlgebraExt
+│  ┌ Warning: Module Compat with build ID fafbfcfd-2c9f-dbac-50f5-5b92ed5a70d7 is missing from the cache.
+│  │ This may mean Compat [34da2185-b29b-5c13-b0c7-acf172513d20] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ METIS_jll
+│  ┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+│  │ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ Xorg_libpciaccess_jll
+│  ┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+│  │ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ DiffResults
+│  ┌ Warning: Module StaticArraysCore with build ID fafbfcfd-9839-2f09-ac10-163cd1a6f538 is missing from the cache.
+│  │ This may mean StaticArraysCore [1e83bf80-4336-4d27-bf5d-d5a4f845583c] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ ASL_jll
+│  ┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+│  │ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ CodecBzip2
+│  ┌ Warning: Module TranscodingStreams with build ID fafbfcfd-cefd-9c09-3559-c7b13c5df2e8 is missing from the cache.
+│  │ This may mean TranscodingStreams [3bb67fe8-82b1-5028-8e26-92a6c54297fa] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ OpenSpecFun_jll
+│  ┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+│  │ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ MUMPS_seq_jll
+│  ┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+│  │ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ ForwardDiff
+│  ┌ Warning: Module DiffRules with build ID fafbfcfd-1781-4495-9138-236ea6d0cf67 is missing from the cache.
+│  │ This may mean DiffRules [b552c78f-8df3-52c6-915a-8e097449b14b] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ BenchmarkTools
+│  ┌ Warning: Module JSON with build ID fafbfcfd-a14d-0496-d9dd-65f62f8d45fc is missing from the cache.
+│  │ This may mean JSON [682c06a0-de6a-54ab-a142-c8b1cf79cde6] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ MathOptInterface
+│  ┌ Warning: Module MutableArithmetics with build ID fafbfcfd-08e7-7059-495a-95a985735905 is missing from the cache.
+│  │ This may mean MutableArithmetics [d8a4904e-b15c-11e9-3269-09a3773c0cb0] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ CommonSubexpressions
+│  ┌ Warning: Module MacroTools with build ID fafbfcfd-f7cc-32e4-51f0-8c950fc5edee is missing from the cache.
+│  │ This may mean MacroTools [1914dd2f-81c6-5fcd-8719-6d5c9610ff09] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ Hwloc_jll
+│  ┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+│  │ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ Ipopt_jll
+│  ┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+│  │ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ Libiconv_jll
+│  ┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+│  │ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ DiffRules
+│  ┌ Warning: Module IrrationalConstants with build ID fafbfcfd-1ce6-06ea-8b23-ffaea6c89302 is missing from the cache.
+│  │ This may mean IrrationalConstants [92d709cd-6900-40b7-9082-c6be49f344b6] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ SPRAL_jll
+│  ┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+│  │ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ Parsers
+│  ┌ Warning: Module PrecompileTools with build ID fafbfcfd-a346-0368-5df7-b1b9a180c584 is missing from the cache.
+│  │ This may mean PrecompileTools [aea7be01-6a6a-4083-8856-8a6e6704d82a] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ LogExpFunctions
+│  ┌ Warning: Module DocStringExtensions with build ID fafbfcfd-90db-3a55-7b6a-9e88357ca906 is missing from the cache.
+│  │ This may mean DocStringExtensions [ffbed154-4ef7-542d-bbb7-c09d3a79fcae] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ XML2_jll
+│  ┌ Warning: Module JLLWrappers with build ID fafbfcfd-2a93-63f3-e73c-d56365dd5ed3 is missing from the cache.
+│  │ This may mean JLLWrappers [692b3bcd-3c85-4b1f-b108-f13ce0eb3210] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
+┌ Ipopt
+│  ┌ Warning: Module Ipopt_jll with build ID ffffffff-ffff-ffff-9408-652f0a0a9613 is missing from the cache.
+│  │ This may mean Ipopt_jll [9cc047cb-c261-5740-88fc-0cf96f7bdcc7] does not support precompilation but is imported by a module that does.
+│  └ @ Base loading.jl:2541
+└  
