@@ -38,10 +38,10 @@ them from metadata and persist them externally before handing the pp_net off
 to a pypowsybl solver or exporter.
 """
 
-from pathlib import Path
-
 import numpy as np
 import pytest
+
+from gridfm_datakit.network import get_pglib_source_path
 
 import gridfm_datakit.powsybl as powsybl
 from gridfm_datakit.utils.idx_cost import COST, MODEL, NCOST, POLYNOMIAL
@@ -74,13 +74,12 @@ def xiidm_case14_path(tmp_path_factory):
 @pytest.fixture(scope="module")
 def matpower_case14_path():
     """
-    Return the path to the bundled PGLib MATPOWER case14 .m file.
+    Return the path to the PGLib MATPOWER case14 .m file.
 
-    This file is shipped with gridfm_datakit and contains a full MATPOWER
-    case including a gencost block with real quadratic cost coefficients.
+    Downloaded on demand into the gridfm_datakit grid cache. Contains a full
+    MATPOWER case including a gencost block with real quadratic cost coefficients.
     """
-    grids_dir = Path(__file__).parent.parent.parent / "gridfm_datakit" / "grids"
-    return str(grids_dir / "pglib_opf_case14_ieee.m")
+    return get_pglib_source_path("case14_ieee")
 
 
 # ---------------------------------------------------------------------------

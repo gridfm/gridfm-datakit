@@ -7,16 +7,17 @@ networks in MATPOWER format, with support for non-continuous bus indexing.
 
 import io
 import os
-import shutil
 import tempfile
 import warnings
-from importlib import resources
 from typing import Any, Dict, Tuple
 
 import numpy as np
 import pandas as pd
+import platformdirs
 import requests
 from juliapkg.deps import executable
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 try:
     # juliapkg >= 0.1.24 renamed run_julia to run_script (signature unchanged).
@@ -25,7 +26,7 @@ except ImportError:  # juliapkg < 0.1.24
     from juliapkg.deps import run_julia
 from juliapkg.state import STATE
 from matpowercaseframes import CaseFrames
-from numpy import any, conj, exp, hstack, int64, nonzero, ones, pi, real
+from numpy import conj, exp, hstack, int64, nonzero, ones, pi, real
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
 
@@ -83,8 +84,12 @@ def correct_network(network_path: str, force: bool = False) -> str:
     if os.path.exists(corrected_path) and not force:
         return corrected_path
 
-    # Use temporary file for atomic replace
-    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".m")
+    # Temp file in the destination directory so the replace below is atomic rather
+    # than a cross-device copy.
+    tmp_fd, tmp_path = tempfile.mkstemp(
+        dir=os.path.dirname(corrected_path) or ".",
+        suffix=".m.part",
+    )
     os.close(tmp_fd)
 
     try:
@@ -107,8 +112,7 @@ def correct_network(network_path: str, force: bool = False) -> str:
         if not os.path.exists(tmp_path) or os.path.getsize(tmp_path) == 0:
             raise RuntimeError("Julia produced empty MATPOWER file")
 
-        # Atomically replace target file (use shutil.move to allow cross-device)
-        shutil.move(tmp_path, corrected_path)
+        os.replace(tmp_path, corrected_path)
         return corrected_path
 
     finally:
@@ -669,6 +673,81 @@ def load_net_from_file(network_path: str) -> Network:
     return Network(mpc)
 
 
+# (connect, read) seconds: the handshake is fast, a large .m file streams slowly.
+# Retries cover raw.githubusercontent.com's transient 5xx and rate limiting.
+_DOWNLOAD_TIMEOUT = (5, 60)
+_DOWNLOAD_RETRY = Retry(
+    total=4,
+    backoff_factor=0.5,
+    status_forcelist=(429, 500, 502, 503, 504),
+    allowed_methods=frozenset({"GET"}),
+)
+
+
+def _pglib_session() -> requests.Session:
+    """Build the HTTP session used to download PGLib case files.
+
+    Returns:
+        requests.Session: Session with the retry policy mounted for https.
+    """
+    session = requests.Session()
+    session.mount("https://", HTTPAdapter(max_retries=_DOWNLOAD_RETRY))
+    return session
+
+
+# Downloaded grids are a user cache, not package data: site-packages may be read
+# only, survives no uninstall, and is shared by every process using the install.
+# Override with GRIDFM_DATAKIT_CACHE_DIR. Downloads land on a temporary file in the
+# cache directory and are os.replace'd into place, so concurrent workers either see
+# no file or a complete one, never a partial download.
+CACHE_DIR_ENV_VAR = "GRIDFM_DATAKIT_CACHE_DIR"
+
+
+def grids_cache_dir() -> str:
+    """Return the directory holding downloaded PGLib files, creating it if needed.
+
+    Returns:
+        Absolute path to the grid cache directory.
+    """
+    root = os.environ.get(CACHE_DIR_ENV_VAR) or platformdirs.user_cache_dir(
+        "gridfm-datakit",
+    )
+    path = os.path.join(root, "grids")
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def get_pglib_source_path(grid_name: str) -> str:
+    """Return the local path to an original PGLib file, downloading it if necessary.
+
+    Args:
+        grid_name: Name of the grid file without the prefix 'pglib_opf_'
+                  (e.g., 'case14_ieee', 'case118_ieee').
+
+    Returns:
+        Absolute path to the local .m file as published by PGLib.
+    """
+    cache_dir = grids_cache_dir()
+    file_path = os.path.join(cache_dir, f"pglib_opf_{grid_name}.m")
+    if os.path.exists(file_path):
+        return file_path
+
+    url = f"https://raw.githubusercontent.com/power-grid-lib/pglib-opf/master/pglib_opf_{grid_name}.m"
+    with _pglib_session() as session:
+        response = session.get(url, timeout=_DOWNLOAD_TIMEOUT)
+    response.raise_for_status()
+
+    tmp_fd, tmp_path = tempfile.mkstemp(dir=cache_dir, suffix=".m.part")
+    try:
+        with os.fdopen(tmp_fd, "wb") as f:
+            f.write(response.content)
+        os.replace(tmp_path, file_path)
+    finally:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+    return file_path
+
+
 def get_pglib_file_path(grid_name: str) -> str:
     """Return the local path to a PGLib network file, downloading it if necessary.
 
@@ -679,17 +758,7 @@ def get_pglib_file_path(grid_name: str) -> str:
     Returns:
         Absolute path to the (corrected) local .m file.
     """
-    file_path = str(
-        resources.files("gridfm_datakit.grids").joinpath(f"pglib_opf_{grid_name}.m"),
-    )
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
-    if not os.path.exists(file_path):
-        url = f"https://raw.githubusercontent.com/power-grid-lib/pglib-opf/master/pglib_opf_{grid_name}.m"
-        response = requests.get(url)
-        response.raise_for_status()
-        with open(file_path, "wb") as f:
-            f.write(response.content)
-    return correct_network(file_path)
+    return correct_network(get_pglib_source_path(grid_name))
 
 
 def load_net_from_pglib(grid_name: str) -> Network:
@@ -813,7 +882,9 @@ def branch_vectors(
     n_cols = branch.shape[1]
     stat = branch[:, BR_STATUS]  # ones at in-service branches
     Ysf = stat / (branch[:, BR_R] + 1j * branch[:, BR_X])  # series admittance
-    if n_cols > BR_R_ASYM and (any(branch[:, BR_R_ASYM]) or any(branch[:, BR_X_ASYM])):
+    if n_cols > BR_R_ASYM and (
+        np.any(branch[:, BR_R_ASYM]) or np.any(branch[:, BR_X_ASYM])
+    ):
         Yst = stat / (
             (branch[:, BR_R] + branch[:, BR_R_ASYM])
             + 1j * (branch[:, BR_X] + branch[:, BR_X_ASYM])
