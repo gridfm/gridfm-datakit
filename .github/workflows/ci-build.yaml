@@ -8,9 +8,14 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   pre-commit-run:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -35,6 +40,7 @@ jobs:
 
   security-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     container: python:3.12-slim
     steps:
       - uses: actions/checkout@v4
@@ -57,6 +63,7 @@ jobs:
 
   pytests:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -85,7 +92,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: pip-${{ runner.os }}-${{ hashFiles('**/requirements*.txt') }}
+          key: pip-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
           restore-keys: |
             pip-${{ runner.os }}-
 
@@ -118,6 +125,7 @@ jobs:
 
   dynamic-pytests:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     env:
       DYNAWO_VERSION: '1.7.0'
     steps:
@@ -145,7 +153,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: pip-${{ runner.os }}-${{ hashFiles('**/requirements*.txt') }}
+          key: pip-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
           restore-keys: |
             pip-${{ runner.os }}-
 
@@ -193,6 +201,7 @@ jobs:
   codeql:
     name: CodeQL (Python)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: github/codeql-action/init@v3
