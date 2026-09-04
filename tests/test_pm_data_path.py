@@ -23,11 +23,12 @@ from gridfm_datakit.process.process_network import (
 from gridfm_datakit.process.solvers import (
     _julia_pm_data,
     run_opf,
+    run_pf,
 )
 from gridfm_datakit.utils.idx_brch import BR_B, BR_R, BR_X, RATE_A
-from gridfm_datakit.utils.idx_bus import PD, QD, VA, VM
+from gridfm_datakit.utils.idx_bus import BUS_TYPE, PD, PV, QD, REF, VA, VM
 from gridfm_datakit.utils.idx_cost import COST
-from gridfm_datakit.utils.idx_gen import PG, VG
+from gridfm_datakit.utils.idx_gen import GEN_BUS, PG, VG
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 IEEE14_PATH = os.path.join(REPO_ROOT, "tests", "powsybl", "grids", "ieee14.m")
@@ -281,6 +282,74 @@ def test_pf_preprocessing_keeps_complete_opf_operating_point(net, jl):
     )
     np.testing.assert_allclose(prepared.Vm, bus_vmva[:, 0])
     np.testing.assert_allclose(prepared.Va, np.rad2deg(bus_vmva[:, 1]))
+    for gen_idx in prepared.idx_gens_in_service:
+        bus_idx = int(prepared.gens[gen_idx, GEN_BUS])
+        np.testing.assert_allclose(
+            prepared.gens[gen_idx, VG],
+            prepared.Vm[bus_idx],
+        )
+
+
+def _prepare_without_vg_sync(net, res):
+    """Historical pf_preprocessing: copy pg/qg/vm/va, leave gen.vg untouched."""
+    _, gen_pq, bus_vmva = _solution_arrays(res, net)
+    net.Pg_gen = gen_pq[:, 0] * net.baseMVA
+    net.Qg_gen = gen_pq[:, 1] * net.baseMVA
+    net.Vm = bus_vmva[:, 0]
+    net.Va = np.rad2deg(bus_vmva[:, 1])
+    return net
+
+
+@pytest.mark.parametrize("fast", [True, False])
+def test_pf_matches_opf_setpoints_with_or_without_vg_sync(net, jl, fast):
+    """PF holds OPF PV/REF voltages; syncing gen.vg must not change the PF.
+
+    PowerModels seeds PV/REF vm from bus.vm, not gen.vg. Force a large vg
+    mismatch on the unsynced copy so a regression that started controlling
+    to vg would fail this comparison.
+    """
+    opf = run_opf(net, jl)
+    assert str(opf["termination_status"]) == "LOCALLY_SOLVED"
+    _, _, opf_vmva = _solution_arrays(opf, net)
+    opf_vm = opf_vmva[:, 0]
+
+    synced = pf_preprocessing(copy.deepcopy(net), opf)
+    stale = _prepare_without_vg_sync(copy.deepcopy(net), opf)
+    stale.gens[stale.idx_gens_in_service, VG] = 0.9
+
+    assert not np.allclose(
+        synced.gens[synced.idx_gens_in_service, VG],
+        stale.gens[stale.idx_gens_in_service, VG],
+    ), "test is vacuous unless gen.vg differs between the two nets"
+
+    pf_synced = run_pf(synced, jl, fast=fast)
+    pf_stale = run_pf(stale, jl, fast=fast)
+    _, _, vmva_synced = _solution_arrays(pf_synced, synced)
+    _, _, vmva_stale = _solution_arrays(pf_stale, stale)
+
+    np.testing.assert_allclose(
+        vmva_synced[:, 0],
+        vmva_stale[:, 0],
+        rtol=1e-8,
+        atol=1e-6,
+        err_msg="PF bus.vm changed when gen.vg was left unsynced",
+    )
+    np.testing.assert_allclose(
+        vmva_synced[:, 1],
+        vmva_stale[:, 1],
+        rtol=1e-8,
+        atol=1e-6,
+        err_msg="PF bus.va changed when gen.vg was left unsynced",
+    )
+
+    pv_ref = (net.buses[:, BUS_TYPE] == PV) | (net.buses[:, BUS_TYPE] == REF)
+    np.testing.assert_allclose(
+        vmva_synced[pv_ref, 0],
+        opf_vm[pv_ref],
+        rtol=1e-8,
+        atol=1e-6,
+        err_msg="PF did not hold OPF voltage on PV/REF buses",
+    )
 
 
 def test_rectangular_opf_matches_polar_objective_and_cleans_starts(net, jl):

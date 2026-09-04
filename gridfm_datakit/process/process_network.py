@@ -58,7 +58,7 @@ from gridfm_datakit.utils.idx_bus import (
     VMIN,
 )
 from gridfm_datakit.utils.idx_cost import COST, NCOST
-from gridfm_datakit.utils.idx_gen import GEN_BUS, PMAX, PMIN, QMAX, QMIN
+from gridfm_datakit.utils.idx_gen import GEN_BUS, PMAX, PMIN, QMAX, QMIN, VG
 from gridfm_datakit.utils.random_seed import custom_seed
 from gridfm_datakit.process.solver_output import (
     SolverOutputConfig,
@@ -650,8 +650,13 @@ def _solution_arrays(
 def pf_preprocessing(net: Network, res: Dict[str, Any]) -> Network:
     """Set variables to the results of OPF.
 
-    Copies the complete OPF operating point needed to initialize PF: active
-    and reactive generator dispatch plus bus voltage magnitude and angle.
+    Copies the complete OPF operating point needed to initialize PF:
+
+    - gen.pg / gen.qg: active and reactive generator dispatch
+    - bus.vm / bus.va: bus voltage magnitude and angle
+    - gen.vg: generator voltage setpoints, synced to the OPF bus voltage so
+      gen.vg == bus.vm in the written case and PowerModels does not emit
+      voltage-setpoint mismatch warnings.
 
     Args:
         net: The power network to preprocess.
@@ -667,6 +672,12 @@ def pf_preprocessing(net: Network, res: Dict[str, Any]) -> Network:
     net.Vm = bus_vmva[:, 0]
     # PowerModels reports radians; MATPOWER stores degrees.
     net.Va = np.rad2deg(bus_vmva[:, 1])
+
+    # Sync each in-service generator's voltage setpoint (VG) to the OPF bus
+    # voltage at its terminal bus, so gen.vg == bus.vm in the written .m file.
+    for gen_idx in net.idx_gens_in_service:
+        bus_idx = int(net.gens[gen_idx, GEN_BUS])
+        net.gens[gen_idx, VG] = bus_vmva[bus_idx, 0]
 
     return net
 

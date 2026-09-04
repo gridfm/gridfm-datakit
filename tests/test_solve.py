@@ -15,7 +15,7 @@ from gridfm_datakit.process.process_network import (
     pf_preprocessing,
     pf_post_processing,
 )
-from gridfm_datakit.utils.idx_gen import GEN_BUS
+from gridfm_datakit.utils.idx_gen import GEN_BUS, VG
 from gridfm_datakit.utils.column_names import (
     BUS_COLUMNS,
     DC_BUS_COLUMNS,
@@ -844,6 +844,51 @@ class TestSolve:
         print(
             f"  {case_name} completed successfully: NaN values persist through parquet save/load",
         )
+
+
+class TestPfPreprocessingVoltageSetpoint:
+    """Unit tests for pf_preprocessing — no Julia required."""
+
+    def _make_res(self, net) -> dict:
+        """Build a synthetic OPF result dict with distinct vm values per bus."""
+        n_buses = net.buses.shape[0]
+        # Assign a unique, recognisable vm to each bus (0.95 + 0.001 * bus_idx).
+        bus_solution = {}
+        for cont_idx in range(n_buses):
+            orig_id = net.reverse_bus_index_mapping[cont_idx]
+            bus_solution[str(orig_id)] = {"vm": 0.95 + 0.001 * cont_idx, "va": 0.0}
+
+        gen_solution = {}
+        for i in net.idx_gens_in_service:
+            gen_solution[str(i + 1)] = {"pg": 0.5}  # arbitrary, in p.u.
+
+        # _solution_arrays reads sol["branch"] for every in-service branch.
+        branch_solution = {
+            str(i + 1): {"pf": 0.0, "pt": 0.0} for i in net.idx_branches_in_service
+        }
+
+        return {
+            "termination_status": "LOCALLY_SOLVED",
+            "solution": {
+                "bus": bus_solution,
+                "gen": gen_solution,
+                "branch": branch_solution,
+            },
+        }
+
+    def test_vg_equals_vm_at_terminal_bus_case24(self):
+        """After pf_preprocessing, net.gens[idx, VG] == net.Vm[bus_idx] for every
+        in-service generator (case24_ieee_rts)."""
+        net = load_net_from_pglib("case24_ieee_rts")
+        res = self._make_res(net)
+        net = pf_preprocessing(net, res)
+
+        for gen_idx in net.idx_gens_in_service:
+            bus_idx = int(net.gens[gen_idx, GEN_BUS])
+            assert net.gens[gen_idx, VG] == net.Vm[bus_idx], (
+                f"Generator {gen_idx}: VG={net.gens[gen_idx, VG]} "
+                f"!= Vm[{bus_idx}]={net.Vm[bus_idx]}"
+            )
 
 
 if __name__ == "__main__":
