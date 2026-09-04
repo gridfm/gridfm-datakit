@@ -15,6 +15,17 @@
 
 ---
 
+## Reproducing the paper
+
+This branch is a snapshot of the code used for the technical report
+[gridfm-datakit-v1](https://arxiv.org/abs/2512.14658), together with the scripts and
+PowerModels runtime results that reproduce its figures.
+
+- **Data-diversity figures** (entropy spiders, violins, branch loading): [`paper/repro/README.md`](paper/repro/README.md). Data: [`gridfm/reproducibility-datakit-technical-report`](https://huggingface.co/datasets/gridfm/reproducibility-datakit-technical-report).
+- **PowerModels runtime matrix** (classical AC/DC PF and OPF wall times): [`scripts/runtime/README.md`](scripts/runtime/README.md). Julia / Ipopt / hardware: [`scripts/runtime/outputs_julia/full_matrix/environment_versions.md`](scripts/runtime/outputs_julia/full_matrix/environment_versions.md).
+
+---
+
 # GridFM DataKit
 
 **GridFM DataKit** (`gridfm-datakit`) is a Python library for generating realistic, diverse, and scalable synthetic datasets for power flow (PF) and optimal power flow (OPF) machine learning solvers. It unifies state-of-the-art methods for perturbing loads, generator dispatches, network topologies, and branch parameters, addressing limitations of existing data generation libraries.
@@ -51,11 +62,6 @@ Please cite the library when using it in your work:
       url={https://arxiv.org/abs/2512.14658},
 }
 ```
-
-## Reproducing the paper
-
-- **Data-diversity figures** (entropy spiders, violins, branch loading): [`paper/repro/README.md`](paper/repro/README.md). Data: [`gridfm/reproducibility-datakit-technical-report`](https://huggingface.co/datasets/gridfm/reproducibility-datakit-technical-report).
-- **PowerModels runtime matrix** (classical AC/DC PF and OPF wall times): [`scripts/runtime/README.md`](scripts/runtime/README.md). Julia / Ipopt / hardware: [`scripts/runtime/outputs_julia/full_matrix/environment_versions.md`](scripts/runtime/outputs_julia/full_matrix/environment_versions.md).
 
 ---
 
