@@ -18,8 +18,8 @@ from plot_utils import set_datasets_folder, load_selected_datasets, IBM_COLORS
 #
 # The upstream code picks these buses with an unseeded np.random.choice, so the
 # figures were not reproducible run-to-run. These lists were recovered from the
-# published PDFs (paper/extracted/figures/comparison_plots/*_violin_*.pdf) and
-# reproduce all 12 violin panels pixel-for-pixel. List order is the x-axis order.
+# figures published with the paper and reproduce all 12 violin panels exactly.
+# List order is the x-axis order. See verify_reproducibility.md.
 PINNED_BUSES = {
     ("pf", "Pd"): [53, 112, 42, 111, 61, 23, 3, 116, 82, 103],
     ("pf", "Qd"): [114, 74, 10, 82, 105, 101, 108, 93, 58, 0],

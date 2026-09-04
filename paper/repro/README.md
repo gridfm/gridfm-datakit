@@ -1,41 +1,101 @@
-# Reproducing the paper's figures
+# Reproducing the figures
 
-**This is the branch used to generate the results published in
-*gridfm-datakit-v1: A Python Library for Scalable and Realistic Power Flow and
-Optimal Power Flow Data Generation* ([arXiv:2512.14658](https://arxiv.org/abs/2512.14658)).**
+This directory generates the data-diversity figures of *gridfm-datakit-v1*
+([arXiv:2512.14658](https://arxiv.org/abs/2512.14658)): the entropy spider plots,
+the feature violin plots, the branch-flow entropy barplot, and the branch-loading
+histograms.
 
-Everything needed to regenerate the paper's computed figures lives in this
-directory. All 17 published panels reproduce **pixel-for-pixel**.
+## 1. Install
+
+Python 3.10–3.12. From the repository root:
 
 ```bash
-# from the repository root
-PYTHONPATH=$PWD bash paper/repro/verify.sh
+pip install -e '.[dev,test]'
+pip install seaborn        # used by plot_branch_loading.py; not a package dependency
 ```
 
-This regenerates every figure and compares it against the published PDFs,
-printing one line per panel and exiting non-zero if any differs. Expected output:
+Run everything from the repository root with `PYTHONPATH` set to it:
 
+```bash
+export PYTHONPATH=$PWD
 ```
-All 17 panels are pixel-identical to the published figures.
+
+The scripts import `gridfm_datakit` for `load_net_from_pglib` and the bus/generator
+index constants. Depending on how the package was installed, the import may only
+resolve from the repository root.
+
+## 2. Get the data
+
+The figures are computed from a snapshot of sampled parquet (~979 MB), hosted at
+[`gridfm/gridfm-datakit-paper-figures`](https://huggingface.co/datasets/gridfm/gridfm-datakit-paper-figures)
+(private — you need access and a HuggingFace token):
+
+```bash
+hf download gridfm/gridfm-datakit-paper-figures \
+    --repo-type dataset \
+    --local-dir paper/repro/dataset_sampled
 ```
 
-## Where to find each figure
+The scripts expect it at `paper/repro/dataset_sampled/` (the default), or point them
+elsewhere with `--data-dir`.
 
-Reference PDFs (as published) are in `paper/extracted/figures/comparison_plots/`.
-Regenerated figures go to `paper/repro/out/` by default.
+The snapshot holds six datasets on `case118_ieee`, each downsampled to exactly
+10,000 scenarios × 118 buses so that every library contributes equally to the
+diversity metrics:
 
-| Paper figure | What it shows | Command | Output file(s) |
-|---|---|---|---|
-| **Figure 2** | Spider plot, normalized mean feature entropy (PF and OPF) | `python paper/repro/plot_spider.py --mode pf --metric entropy`<br>`python paper/repro/plot_spider.py --mode opf --metric entropy` | `spider_plot_entropy_pf.pdf`<br>`spider_plot_entropy_opf.pdf` |
-| **Figure 3** | Reactive power generation ($Q_g$) violins, PF | `python paper/repro/plot_violin.py --mode pf` | `Qg_violin_pf.pdf` |
-| **Figure 4** | Branch flow entropy barplot ($P_f$, $Q_f$) | `python paper/repro/plot_bar_branch.py --metric entropy` | `barplot_branch_entropy_pf.pdf` |
-| **Figure 5** | Branch loading histograms (log-scale y) | `python paper/repro/plot_branch_loading.py` | `branch_loading_datakit.pdf`<br>`branch_loading_pfdelta.pdf` |
-| **Figure 8** (appendix) | Feature distribution violins, 6 features × PF/OPF | `python paper/repro/plot_violin.py --mode pf`<br>`python paper/repro/plot_violin.py --mode opf` | `{Pd,Qd,Pg,Qg,Vm,Va}_violin_{pf,opf}.pdf` |
+| File prefix | Mode | Library |
+|---|---|---|
+| `gridfm_datakit_pf` | PF | this library, `mode: pf` |
+| `gridfm_datakit_opf` | OPF | this library, `mode: opf` |
+| `pfdelta` | PF | PFΔ |
+| `opfdata` | OPF | OPFData |
+| `pglearn` | OPF | PGLearn |
+| `opflearn` | OPF | OPF-Learn |
 
-Every script takes `--output-dir` and `--data-dir`. Add `--output-dir paper/repro/out`
-to match what `verify.sh` does.
+Each has `_bus_data.parquet` and `_gen_data.parquet`; the two PF datasets also have
+`_branch_data.parquet` (needed for the branch figures).
 
-`plot_branch_loading.py` also prints the overload statistics quoted in Section 5:
+## 3. Generate the figures
+
+```bash
+OUT=paper/repro/out
+
+# Entropy spider plots (PF and OPF)
+python paper/repro/plot_spider.py --mode pf  --metric entropy --output-dir $OUT
+python paper/repro/plot_spider.py --mode opf --metric entropy --output-dir $OUT
+
+# Feature violin plots: Pd, Qd, Pg, Qg, Vm, Va for PF and OPF
+python paper/repro/plot_violin.py --mode pf  --output-dir $OUT
+python paper/repro/plot_violin.py --mode opf --output-dir $OUT
+
+# Branch flow entropy barplot (Pf, Qf)
+python paper/repro/plot_bar_branch.py --metric entropy --output-dir $OUT
+
+# Branch loading histograms
+python paper/repro/plot_branch_loading.py --output-dir $OUT
+```
+
+That writes 17 PDFs into `paper/repro/out/`:
+
+| Script | Output |
+|---|---|
+| `plot_spider.py` | `spider_plot_entropy_{pf,opf}.pdf` |
+| `plot_violin.py` | `{Pd,Qd,Pg,Qg,Vm,Va}_violin_{pf,opf}.pdf` |
+| `plot_bar_branch.py` | `barplot_branch_entropy_pf.pdf` |
+| `plot_branch_loading.py` | `branch_loading_{datakit,pfdelta}.pdf` |
+
+Every script takes `--output-dir`, `--data-dir`, and `--datasets` (to restrict the
+comparison to a subset). `plot_spider.py` and `plot_bar_branch.py` also take
+`--metric std` for the standard-deviation variant; omitting `--metric` produces both.
+
+The first spider or violin run calls `load_net_from_pglib("case118_ieee")`, which
+downloads the PGLib case into the installed package's `grids/` directory and may
+resolve the pinned Julia packages. That is a one-off, cached cost — none of these
+scripts solve OPF or PF.
+
+## What the numbers mean
+
+`plot_branch_loading.py` prints the overload statistics alongside the histograms:
 
 ```
 Loading gridfm_datakit_pf...
@@ -46,110 +106,53 @@ Loading pfdelta...
   percentage of scenarios with overloaded branches: 100.0
 ```
 
-matching the paper's "1.2 % of the branches are overloaded ... 79 % of the scenarios
-have at least one branch overloading" and "all scenarios have overloads ... 8 % of all
-branches are overloaded".
+Branch loading is `max(S_from, S_to) / rate_a` with `S = sqrt(P² + Q²)`; a branch is
+overloaded when it exceeds 1.
 
-## Setup
+**Entropy.** `plot_utils.py` implements the mean normalized Shannon entropy: a 100-bin
+histogram per bus over a fixed domain, entropy in bits, averaged across buses and
+normalized by `log2(100)`, giving a value in `[0, 1]`. Domains are `(-π, π]` for `Va`
+(treated as circular via `entropy_circular_from_deg_fixed`), the network voltage bounds
+for `Vm`, and per-bus empirical min/max **pooled across all compared datasets** for
+`Pd, Qd, Pg, Qg`. Pooling the domain is what makes the values comparable across
+libraries instead of reflecting per-dataset binning.
 
-```bash
-# Python 3.10-3.12; run everything from the repository root
-pip install -e '.[dev,test]'
-pip install seaborn          # needed by plot_branch_loading.py only; not a package dependency
-brew install poppler         # provides pdftoppm, used by verify.sh
-```
+## Rebuilding the snapshot from raw output
 
-Run from the repository root with `PYTHONPATH=$PWD`. The scripts import
-`gridfm_datakit` (for `load_net_from_pglib` and the bus/gen index constants), and
-depending on how the package was installed the import may only resolve from the
-repository root.
-
-The first spider or violin run calls `load_net_from_pglib("case118_ieee")`, which
-downloads the PGLib case into the installed package's `grids/` directory and may
-resolve the pinned Julia packages. That is a one-off cost and is cached; none of the
-figure scripts solve OPF or PF.
-
-## Input data
-
-The figures are computed from a **snapshot of sampled parquet** in
-`paper/repro/dataset_sampled/` — six datasets on `case118_ieee`, each downsampled to
-exactly 10,000 scenarios × 118 buses:
-
-| Dataset | Mode | Source |
-|---|---|---|
-| `gridfm_datakit_pf` | PF | this library, `mode: pf` |
-| `gridfm_datakit_opf` | OPF | this library, `mode: opf` |
-| `pfdelta` | PF | PFΔ, converted by `pfdelta/batch_convert_pfdelta.py` |
-| `opfdata` | OPF | OPFData, converted by `opf_data/batch_convert.py` |
-| `pglearn` | OPF | PGLearn, converted by `pg_learn_conversion.py` |
-| `opflearn` | OPF | OPF-Learn, converted by `opf_learn_conversion.py` |
-
-This directory is ~979 MB and is **gitignored**, so it does not travel with the branch.
-It is the authoritative input: obtain it from the authors, or rebuild it with
-`prepare_datasets.py` subject to the caveat below.
-
-`prepare_datasets.py` rebuilds the snapshot from raw generated output:
+Only needed if you are generating new datasets rather than reproducing the published
+figures.
 
 ```bash
 python paper/repro/prepare_datasets.py --base-path /path/to/raw/datasets [--seed 0]
 ```
 
-## Reproducibility notes
+It finds the smallest scenario count across the datasets and downsamples all of them to
+it. Note that the subset is drawn randomly: a fresh run yields a different sample and
+therefore slightly different figures. `--seed` makes a run repeatable but cannot
+recover the published snapshot — use the HuggingFace snapshot for that.
 
-Read these before concluding that something failed to reproduce.
+The external libraries must be converted to this repository's parquet schema first:
 
-1. **Compare pixels, not PDF bytes.** PDFs embed a creation timestamp, so `md5` of two
-   PDFs never matches even when the figures are identical. `verify.sh` rasterises both
-   sides with `pdftoppm -r 100` and compares the PNGs.
+| Library | Converter |
+|---|---|
+| PFΔ | `pfdelta/batch_convert_pfdelta.py` |
+| OPFData | `opf_data/batch_convert.py` |
+| PGLearn | `paper/repro/pg_learn_conversion.py` (set `PGLEARN_DIR`) |
+| OPF-Learn | `paper/repro/opf_learn_conversion.py` (set `OPFLEARN_DIR`) |
 
-2. **Violin bus selections are pinned.** Upstream, `plot_violin.py` chose which 10 buses
-   to show with an *unseeded* `np.random.choice`, so figures 3 and 8 differed on every
-   run. The exact selections were recovered from the published PDFs and are pinned in
-   `PINNED_BUSES` in `plot_violin.py`; list order is the x-axis order. Pass `--no-pin`
-   to re-sample buses randomly instead.
+## Notes
 
-3. **Re-sampling the dataset snapshot will not reproduce the figures.**
-   `prepare_datasets.py` draws its scenario subset with `np.random.choice` and the
-   original run recorded no seed, so a fresh run yields a different 10,000-scenario
-   subset and therefore different (though qualitatively similar) figures. `--seed` only
-   makes future runs self-consistent. Use the committed snapshot for exact reproduction.
+- **Bus selection in the violin plots is pinned.** Each violin panel shows 10 buses,
+  fixed in `PINNED_BUSES` in `plot_violin.py` so the figures are stable across runs.
+  Pass `--no-pin` to sample buses randomly instead.
+- **`plot_branch_loading.py` forces the `Agg` matplotlib backend** before importing
+  pyplot. On macOS the default `macosx` backend applies Retina scaling to saved vector
+  output, which changes the rendering. Do not reorder those imports.
+- **`plot_spider_branch.py` and `plot_violin_branch.py`** produce branch-level spider
+  and violin figures that are not part of the paper. They are kept because they were
+  part of the original analysis. Careful: `plot_spider_branch.py` writes the same
+  filename as `plot_bar_branch.py` (`barplot_branch_{metric}_pf.pdf`), so run them into
+  separate `--output-dir`s.
 
-4. **`plot_branch_loading.py` forces the `Agg` matplotlib backend.** On macOS the
-   default `macosx` backend applies Retina scaling to saved vector output, which changes
-   the rendered figure. This is set before `pyplot` is imported; do not reorder those
-   imports.
-
-5. **Provenance.** Branched from `main` at `35da4b3` (Release 1.1.0). Do not use
-   `gridfm_datakit.__version__` to record provenance — it reports `0.1.0` while
-   `pyproject.toml` says `1.1.0`; cite the git SHA instead.
-
-## Entropy metric
-
-Implemented in `plot_utils.py` (`entropy_from_samples_fixed`,
-`entropy_circular_from_deg_fixed`), following the paper's Appendix C: a 100-bin
-histogram per bus over a fixed domain, Shannon entropy in bits, averaged across buses
-and normalized by $\log_2(100)$. Domains are $(-\pi, \pi]$ for $V_a$ (treated as
-circular), network voltage bounds for $V_m$, and per-bus empirical min/max pooled
-across all compared datasets for $P_d, Q_d, P_g, Q_g$ — so values are comparable across
-datasets rather than driven by binning differences.
-
-## Out of scope
-
-- **Figure 1** and the appendix library-comparison table are hand-authored HTML, not
-  computed. Sources: `paper/extracted/summary.txt` and `paper/extracted/output.txt`.
-- **Figures 6 and 7** are screenshots of the `gridfm_datakit stats` output and of a
-  generated dataset, not computed figures.
-- **Table 1** (samples / CPU-hours / convergence rate) required roughly 6,000 CPU-hours
-  across four grids. `scripts/summary_data_gen.py` recomputes it from the run logs
-  (`args.log`, `tqdm.log`, `n_scenarios.txt`, `solver_log/`) of completed generation runs;
-  it does not re-run the generation.
-
-## Also here, but not used in the paper
-
-`plot_spider_branch.py` and `plot_violin_branch.py` produce branch-level spider and
-violin figures that no published figure uses. They are kept because they were part of
-the original analysis.
-
-Note that `plot_spider_branch.py` writes the **same filename** as
-`plot_bar_branch.py` (`barplot_branch_{metric}_pf.pdf`). The paper's Figure 4 is the one
-from `plot_bar_branch.py`; run them into separate `--output-dir`s to avoid clobbering.
+For how these outputs were checked against the published figures, see
+[`verify_reproducibility.md`](verify_reproducibility.md).
