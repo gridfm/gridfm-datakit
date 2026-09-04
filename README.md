@@ -52,10 +52,10 @@ Please cite the library when using it in your work:
 }
 ```
 
-## Reproducing paper results
+## Reproducing the paper
 
-- **Data-diversity figures** (entropy spiders, violins, branch loading): [`paper/repro/README.md`](https://github.com/gridfm/gridfm-datakit/blob/paper-repro/paper/repro/README.md) on branch `paper-repro`.
-- **PowerModels runtime matrix** (classical AC/DC PF and OPF wall times used in the scaling figures): [`scripts/runtime/README.md`](scripts/runtime/README.md).
+- **Data-diversity figures** (entropy spiders, violins, branch loading): [`paper/repro/README.md`](paper/repro/README.md). Data: [`gridfm/reproducibility-datakit-technical-report`](https://huggingface.co/datasets/gridfm/reproducibility-datakit-technical-report).
+- **PowerModels runtime matrix** (classical AC/DC PF and OPF wall times): [`scripts/runtime/README.md`](scripts/runtime/README.md). Julia / Ipopt / hardware: [`scripts/runtime/outputs_julia/full_matrix/environment_versions.md`](scripts/runtime/outputs_julia/full_matrix/environment_versions.md).
 
 ---
 
