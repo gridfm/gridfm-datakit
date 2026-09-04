@@ -862,9 +862,18 @@ class TestPfPreprocessingVoltageSetpoint:
         for i in net.idx_gens_in_service:
             gen_solution[str(i + 1)] = {"pg": 0.5}  # arbitrary, in p.u.
 
+        # _solution_arrays reads sol["branch"] for every in-service branch.
+        branch_solution = {
+            str(i + 1): {"pf": 0.0, "pt": 0.0} for i in net.idx_branches_in_service
+        }
+
         return {
             "termination_status": "LOCALLY_SOLVED",
-            "solution": {"bus": bus_solution, "gen": gen_solution},
+            "solution": {
+                "bus": bus_solution,
+                "gen": gen_solution,
+                "branch": branch_solution,
+            },
         }
 
     def test_vg_equals_vm_at_terminal_bus_case24(self):
