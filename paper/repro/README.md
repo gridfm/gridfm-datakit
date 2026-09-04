@@ -23,11 +23,11 @@ export PYTHONPATH=$PWD
 ## 2. Get the data
 
 The figures are computed from a snapshot of sampled parquet (~979 MB), published at
-[`gridfm/gridfm-datakit-paper-figures`](https://huggingface.co/datasets/gridfm/gridfm-datakit-paper-figures).
+[`gridfm/reproducibility-datakit-technical-report`](https://huggingface.co/datasets/gridfm/reproducibility-datakit-technical-report).
 It is public, so no token is needed:
 
 ```bash
-hf download gridfm/gridfm-datakit-paper-figures \
+hf download gridfm/reproducibility-datakit-technical-report \
     --repo-type dataset \
     --exclude "full/*" \
     --local-dir paper/repro/dataset_sampled
@@ -62,7 +62,7 @@ who needs more than the 10,000 scenarios used by the figures. **You do not need 
 reproduce the figures** — it is 15 GB against the snapshot's 1 GB.
 
 ```
-gridfm/gridfm-datakit-paper-figures
+gridfm/reproducibility-datakit-technical-report
 ├── *_bus_data.parquet, *_gen_data.parquet, *_branch_data.parquet   <- the 1 GB snapshot (repo root)
 └── full/
     ├── gridfm_datakit_pf/     this library, mode: pf    199,207 scenarios

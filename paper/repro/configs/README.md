@@ -59,5 +59,5 @@ integer seed makes a run repeatable, but only if every other setting — includi
 per-chunk RNG — is unchanged. It cannot recover the original datasets.
 
 The generated data itself is on HuggingFace at
-[`gridfm/gridfm-datakit-paper-figures`](https://huggingface.co/datasets/gridfm/gridfm-datakit-paper-figures)
+[`gridfm/reproducibility-datakit-technical-report`](https://huggingface.co/datasets/gridfm/reproducibility-datakit-technical-report)
 under `full/gridfm_datakit_pf/` and `full/gridfm_datakit_opf/`.
