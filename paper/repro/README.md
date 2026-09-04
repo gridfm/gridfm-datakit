@@ -59,7 +59,7 @@ Each has `_bus_data.parquet` and `_gen_data.parquet`; the two PF datasets also h
 
 The same HuggingFace repo also holds the complete datasets under `full/`, for anyone
 who needs more than the 10,000 scenarios used by the figures. **You do not need this to
-reproduce the figures** — it is ~14 GB against the snapshot's 1 GB.
+reproduce the figures** — it is 15 GB against the snapshot's 1 GB.
 
 ```
 gridfm/gridfm-datakit-paper-figures
@@ -99,6 +99,11 @@ than the four tables the figures use:
 
 `include_dc_res: true` was set for both runs, so the bus/gen/branch tables also carry
 DC-PF or DC-OPF columns (`Va_dc`, `Pg_dc`, `p_mw_dc`, `pf_dc`, `pt_dc`) as ML baselines.
+
+The `gridfm_datakit_*` tables are single parquet files. The PFΔ tables are instead
+**partitioned parquet directories** (`scenario_partition=*/` subdirectories, 145 per
+table), so point `pandas.read_parquet` at the `*.parquet` directory rather than at an
+individual part file — it handles both layouts identically.
 
 The four external baselines under `full/` are the converted parquet only (`bus`/`gen`,
 plus `branch` and `y_bus` for PFΔ) — not the original downloads. They are third-party
