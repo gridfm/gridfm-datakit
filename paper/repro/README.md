@@ -127,7 +127,9 @@ python paper/repro/prepare_datasets.py --base-path /path/to/raw/datasets [--seed
 ```
 
 It finds the smallest scenario count across the datasets and downsamples all of them to
-it. Note that the subset is drawn randomly: a fresh run yields a different sample and
+it. The gridfm-datakit inputs themselves are generated with the configs in
+[`configs/`](configs/) (`gridfm_datakit generate paper/repro/configs/case118_ieee_pf.yaml`);
+the full non-downsampled data is on HuggingFace under `full/`. Note that the subset is drawn randomly: a fresh run yields a different sample and
 therefore slightly different figures. `--seed` makes a run repeatable but cannot
 recover the published snapshot — use the HuggingFace snapshot for that.
 
