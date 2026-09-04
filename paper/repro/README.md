@@ -55,6 +55,56 @@ diversity metrics:
 Each has `_bus_data.parquet` and `_gen_data.parquet`; the two PF datasets also have
 `_branch_data.parquet` (needed for the branch figures).
 
+### The full, non-downsampled data
+
+The same HuggingFace repo also holds the complete datasets under `full/`, for anyone
+who needs more than the 10,000 scenarios used by the figures. **You do not need this to
+reproduce the figures** — it is ~14 GB against the snapshot's 1 GB.
+
+```
+gridfm/gridfm-datakit-paper-figures
+├── *_bus_data.parquet, *_gen_data.parquet, *_branch_data.parquet   <- the 1 GB snapshot (repo root)
+└── full/
+    ├── gridfm_datakit_pf/     this library, mode: pf    199,207 scenarios
+    ├── gridfm_datakit_opf/    this library, mode: opf   195,753 scenarios
+    ├── opfdata/               OPFData                   300,000 scenarios
+    ├── pglearn/               PGLearn                    96,852 scenarios
+    ├── opflearn/              OPF-Learn                  10,000 scenarios
+    └── pfdelta/               PFΔ                        29,000 scenarios
+```
+
+Fetch one dataset rather than the whole repo:
+
+```bash
+hf download gridfm/gridfm-datakit-paper-figures \
+    --repo-type dataset \
+    --include "full/gridfm_datakit_pf/*" \
+    --local-dir /path/to/somewhere
+```
+
+The two `gridfm_datakit_*` directories are complete generation output, so they carry more
+than the four tables the figures use:
+
+| File | Contents |
+|---|---|
+| `bus_data.parquet` | per-bus `Pd, Qd, Pg, Qg, Vm, Va`, bus-type one-hots, voltage limits, shunts |
+| `gen_data.parquet` | per-generator dispatch, limits, cost coefficients, status |
+| `branch_data.parquet` | per-branch flows, impedances, admittance entries, `rate_a`, status |
+| `y_bus_data.parquet` | nonzero admittance-matrix entries per scenario |
+| `runtime_data.parquet` | per-sample AC and DC solver time |
+| `stats.parquet`, `stats_plot.png` | output of the `gridfm_datakit stats` command |
+| `scenarios_agg_load_profile.parquet` | the sampled load scenarios themselves |
+| `args.log` | the resolved config for the run (see [`configs/`](configs/)) |
+| `tqdm.log`, `error.log`, `solver_log/` | progress, per-sample failures, Ipopt logs |
+
+`include_dc_res: true` was set for both runs, so the bus/gen/branch tables also carry
+DC-PF or DC-OPF columns (`Va_dc`, `Pg_dc`, `p_mw_dc`, `pf_dc`, `pt_dc`) as ML baselines.
+
+The four external baselines under `full/` are the converted parquet only (`bus`/`gen`,
+plus `branch` and `y_bus` for PFΔ) — not the original downloads. They are third-party
+datasets reshaped into this repository's schema; see their upstream licences before
+redistributing.
+
 ## 3. Generate the figures
 
 ```bash
