@@ -21,12 +21,10 @@ dependencies = [
   "matplotlib",
   "matpowercaseframes",
   "nbformat",
-  "numba",
   "numpy",
   "pandas",
-  "pathlib",
   "plotly",
-  "pyaml",
+  "pyyaml",
   "requests",
   "urllib3>=2.6.0", # fix security issue
   "ipywidgets",
