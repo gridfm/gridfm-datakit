@@ -2,8 +2,7 @@
 
 Source: LSF **Run time** / **Max Memory** from job summary footers in `~/.lsbatch/julia_matrix_*_<jobid>.out`.
 
-Jobs: historical full-matrix s1/s2 runs after preflight removal + staging fix
-(see `experiments/powermodels_genco_handoff.md` §4.1).
+Jobs: historical full-matrix s1/s2 runs after preflight removal + staging fix.
 
 | Job | Name | Scope | Setup | Host | Started | Wall (d) | Max RAM (GB) | Avg RAM (GB) | Status |
 |----:|------|-------|-------|------|---------|---------:|-------------:|-------------:|--------|

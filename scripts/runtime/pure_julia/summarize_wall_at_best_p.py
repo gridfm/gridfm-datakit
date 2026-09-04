@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1] / "outputs_julia" / "full_matrix"
@@ -25,12 +26,16 @@ LONG_HEADER = [
     "mean_pf_solve_time_s",
     "mean_parse_time_s",
 ]
+EXPECTED = 56
+EXPECTED_P = 13
 
 
 def rows_from_csv(path: Path, setup: str, grid: str, solver: str) -> dict:
     best = None
+    n_rows = 0
     with path.open(newline="") as fh:
         for rec in csv.DictReader(fh):
+            n_rows += 1
             n = int(float(rec["n_pfs"]))
             wall_s = float(rec["pf_elapsed_s"])
             metric = wall_s / n
@@ -52,6 +57,8 @@ def rows_from_csv(path: Path, setup: str, grid: str, solver: str) -> dict:
                 best = cand
     if best is None:
         raise SystemExit(f"empty CSV: {path}")
+    if n_rows != EXPECTED_P:
+        raise SystemExit(f"{path} has {n_rows} p-points, expected {EXPECTED_P}")
     return best
 
 
@@ -69,6 +76,8 @@ def collect() -> list[dict]:
 
 
 def check(rows: list[dict]) -> None:
+    if len(rows) != EXPECTED:
+        raise SystemExit(f"found {len(rows)} sweep CSVs, expected {EXPECTED}")
     existing = ROOT / "wall_at_best_p_long.csv"
     with existing.open(newline="") as fh:
         old = list(csv.DictReader(fh))
@@ -83,23 +92,38 @@ def check(rows: list[dict]) -> None:
             raise SystemExit(
                 f"wall_s mismatch {a['grid']} {a['solver']}: {a['wall_s']} vs {b['wall_s']}"
             )
-    print(f"OK: {len(rows)} best-p rows match {existing}")
+    print(f"OK: {len(rows)} sweep CSVs, {EXPECTED_P} p-points each; best-p rows match {existing}")
 
 
 def main() -> None:
     p = argparse.ArgumentParser()
-    p.add_argument("--check", action="store_true", help="verify against committed long CSV")
+    p.add_argument(
+        "--check",
+        action="store_true",
+        help="verify 56 sweep CSVs and the committed long CSV",
+    )
+    p.add_argument(
+        "-o",
+        "--output",
+        type=Path,
+        help="write best-p long CSV (default: stdout)",
+    )
     args = p.parse_args()
     rows = collect()
     if args.check:
         check(rows)
         return
-    writer = csv.DictWriter(
-        (ROOT / "wall_at_best_p_long.csv").open("w", newline=""),
-        fieldnames=LONG_HEADER,
-    )
+    if args.output:
+        fh = args.output.open("w", newline="")
+        close = True
+    else:
+        fh = sys.stdout
+        close = False
+    writer = csv.DictWriter(fh, fieldnames=LONG_HEADER)
     writer.writeheader()
     writer.writerows(rows)
+    if close:
+        fh.close()
 
 
 if __name__ == "__main__":

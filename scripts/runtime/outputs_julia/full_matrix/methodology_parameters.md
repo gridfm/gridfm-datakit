@@ -14,9 +14,9 @@
 
 | Parameter | GENCO | PowerModels | Why |
 |-----------|-------|-------------|-----|
-| Sweep | Batch size ~16–16384 | Workers `p` = 24…216 (step 16) | Wide enough to see the plateau; coarse enough to stay tractable |
-| Prefetch / dispatch | 32 DataLoader workers | Dispatch batch 32 (small) / 1 (large) | Keep workers busy without excess queueing or stragglers |
-| Compilation / solver | `torch.compile` (`reduce-overhead`), 20 warmup batches | Fast AC PF on case14–500; Ipopt on case2000/10000 | Use the best reliable stack per network size |
+| Sweep | Batch size 64–16384 (IEEE) / 16–16384 (GOC), powers of two | Workers `p` = 24…216 (step 16) | Wide enough to see the plateau; coarse enough to stay tractable |
+| Prefetch / dispatch | 32 DataLoader workers | Dispatch batch 32 (small, incl. case500) / 1 (case2000/10000) | Keep workers busy without excess queueing or stragglers |
+| Compilation / solver | `torch.compile` (`reduce-overhead`) | Fast AC PF on case14–500; Ipopt on case2000/10000 | Use the best reliable stack per network size |
 
 ### PowerModels / Ipopt
 
@@ -28,7 +28,7 @@ Applies to Ipopt-backed modes: AC PF when `pf_fast=false` (case2000/10000), AC O
 | Ipopt `tol` | 1e-6 | Standard NLP convergence tolerance |
 | Ipopt `print_level` | 0 | No solver logging on the timed path |
 | Linear solver | MUMPS 5.8.2 (Ipopt default; not overridden) | Shipped with `Ipopt_jll`; HSL ma57 is often faster but needs a separate HSL license and is more expensive to deploy |
-| AC PF (small) | `PowerModels.compute_ac_pf` (Newton) | Fast native PF; used for case14–case500 |
+| AC PF (small) | `PowerModels.compute_ac_pf` (NLsolve Newton) | Fast native PF; used for case14–case500 |
 | AC PF (large) | `solve_ac_pf` + Ipopt | More robust on case2000 / case10000 |
 | DC PF | `compute_dc_pf` | Linear DC model; no Ipopt |
 | AC / DC OPF | `solve_ac_opf` / `solve_dc_opf` + Ipopt | Same Ipopt settings for all OPF solves |
