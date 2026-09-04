@@ -14,6 +14,7 @@ from gridfm_datakit.network import (
 )
 from gridfm_datakit.utils.idx_bus import BUS_TYPE, PV, PQ
 from gridfm_datakit.process.process_network import init_julia
+from gridfm_datakit.network import get_pglib_source_path
 import numpy as np
 
 
@@ -76,7 +77,7 @@ def verify_branch_direction():
     net = load_net_from_pglib(case_name)
 
     # Parse with PowerModels
-    parse = jl.PowerModels.parse_file(f"gridfm_datakit/grids/pglib_opf_{case_name}.m")
+    parse = jl.PowerModels.parse_file(get_pglib_source_path(case_name))
 
     active_branches = net.idx_branches_in_service
     for branch_idx in active_branches:
@@ -148,7 +149,7 @@ def verify_generator_bus_assignment():
     net = load_net_from_pglib(case_name)
 
     # Parse with PowerModels
-    parse = jl.PowerModels.parse_file(f"gridfm_datakit/grids/pglib_opf_{case_name}.m")
+    parse = jl.PowerModels.parse_file(get_pglib_source_path(case_name))
 
     # Check each generator's bus assignment
     for gen_idx in range(net.gens.shape[0]):

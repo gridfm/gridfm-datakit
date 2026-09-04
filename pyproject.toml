@@ -35,6 +35,7 @@ dependencies = [
   "juliacall>=0.9.34",
   "tqdm",
   "pyarrow",
+  "platformdirs",
 ]
 
 authors = [

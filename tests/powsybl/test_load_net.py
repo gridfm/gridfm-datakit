@@ -15,10 +15,10 @@ What is tested
 * Appropriate exceptions are raised for bad input.
 """
 
-from pathlib import Path
-
 import numpy as np
 import pytest
+
+from gridfm_datakit.network import get_pglib_source_path
 
 import gridfm_datakit.powsybl as powsybl
 from gridfm_datakit.network import Network
@@ -54,12 +54,11 @@ def xiidm_case14_path(tmp_path_factory):
 @pytest.fixture(scope="module")
 def matpower_case14_path():
     """
-    Return the path to the bundled MATPOWER pglib case14 .m file.
+    Return the path to the PGLib MATPOWER case14 .m file.
 
-    This file lives in gridfm_datakit's own ``grids/`` package directory.
+    Downloaded on demand into the gridfm_datakit grid cache.
     """
-    grids_dir = Path(__file__).parent.parent.parent / "gridfm_datakit" / "grids"
-    return str(grids_dir / "pglib_opf_case14_ieee.m")
+    return get_pglib_source_path("case14_ieee")
 
 
 # ---------------------------------------------------------------------------
