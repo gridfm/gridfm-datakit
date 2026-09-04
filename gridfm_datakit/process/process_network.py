@@ -655,8 +655,8 @@ def pf_preprocessing(net: Network, res: Dict[str, Any]) -> Network:
     - gen.pg / gen.qg: active and reactive generator dispatch
     - bus.vm / bus.va: bus voltage magnitude and angle
     - gen.vg: generator voltage setpoints, synced to the OPF bus voltage so
-      that the subsequent PF solve uses a consistent initial point and
-      PowerModels does not emit voltage-setpoint mismatch warnings.
+      gen.vg == bus.vm in the written case and PowerModels does not emit
+      voltage-setpoint mismatch warnings.
 
     Args:
         net: The power network to preprocess.
