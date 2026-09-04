@@ -11,12 +11,18 @@ const PROCESS_START = 24
 const PROCESS_STEP = 16
 const PROCESS_STOP = 216
 const INIT_TIMEOUT_S = 900
-# Original paper run: /dccstor/gridfm/powermodels_data/v4/finetuning
-const DATA_BASE = get(
-    ENV,
-    "GRIDFM_DATA_BASE",
-    "/dccstor/gridfm/powermodels_data/v4/finetuning",
-)
+
+function gridfm_data_base()
+    path = strip(get(ENV, "GRIDFM_DATA_BASE", ""))
+    isempty(path) && error(
+        "GRIDFM_DATA_BASE is not set. Download " *
+        "https://huggingface.co/datasets/gridfm/reproducibility-powermodels-setup2 " *
+        "and export GRIDFM_DATA_BASE to that directory. " *
+        "Expected: \$GRIDFM_DATA_BASE/{pf,opf}/<network>/powermodels/" *
+        "scenario_*_corrected.json",
+    )
+    return path
+end
 
 const MATRIX_NETWORKS = (
     (network = "case14_ieee", count = 4_000_000, scope = "small", pf_fast = true),

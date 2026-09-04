@@ -5,6 +5,10 @@ This directory generates the data-diversity figures of *gridfm-datakit-v1*
 the feature violin plots, the branch-flow entropy barplot, and the branch-loading
 histograms.
 
+These scripts live on the **`genco-paper-repro`** branch (not default `main`).
+PowerModels runtime CSVs and how to re-run that matrix:
+[`scripts/runtime/README.md`](../../scripts/runtime/README.md).
+
 ## 1. Install
 
 Python 3.10–3.12. From the repository root:

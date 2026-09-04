@@ -17,12 +17,28 @@
 
 ## Reproducing the paper
 
-This branch is a snapshot of the code used for the technical report
-[gridfm-datakit-v1](https://arxiv.org/abs/2512.14658), together with the scripts and
-PowerModels runtime results that reproduce its figures.
+This is the **`genco-paper-repro`** branch: a snapshot of the code used for the
+technical report [gridfm-datakit-v1](https://arxiv.org/abs/2512.14658), together
+with the scripts and PowerModels runtime results that reproduce its figures.
+Default `main` does not include this tree.
 
-- **Data-diversity figures** (entropy spiders, violins, branch loading): [`paper/repro/README.md`](paper/repro/README.md). Data: [`gridfm/reproducibility-datakit-technical-report`](https://huggingface.co/datasets/gridfm/reproducibility-datakit-technical-report).
-- **PowerModels runtime matrix** (classical AC/DC PF and OPF wall times): [`scripts/runtime/README.md`](scripts/runtime/README.md). Julia / Ipopt / hardware: [`scripts/runtime/outputs_julia/full_matrix/environment_versions.md`](scripts/runtime/outputs_julia/full_matrix/environment_versions.md).
+```bash
+git clone -b genco-paper-repro https://github.com/gridfm/gridfm-datakit.git
+cd gridfm-datakit
+```
+
+**Data-diversity figures** (entropy spiders, violins, branch loading)
+
+- How to: [`paper/repro/README.md`](paper/repro/README.md)
+- Data: [`gridfm/reproducibility-datakit-technical-report`](https://huggingface.co/datasets/gridfm/reproducibility-datakit-technical-report)
+
+**PowerModels runtime matrix** (classical AC/DC PF and OPF wall times)
+
+- How to: [`scripts/runtime/README.md`](scripts/runtime/README.md)
+- Julia / Ipopt / hardware of the timed jobs: [`scripts/runtime/outputs_julia/full_matrix/environment_versions.md`](scripts/runtime/outputs_julia/full_matrix/environment_versions.md)
+- Setup-2 scenario JSON (10 000 corrected files per grid × PF and OPF): [`gridfm/reproducibility-powermodels-setup2`](https://huggingface.co/datasets/gridfm/reproducibility-powermodels-setup2)
+
+GENCO GPU numbers are not in this repository.
 
 ---
 

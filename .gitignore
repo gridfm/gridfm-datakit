@@ -40,3 +40,7 @@ _Joule__GridFM_Technical_Proof_Publication*.zip
 # Paper reproduction: sampled dataset snapshot (~1 GB) and generated figures
 paper/repro/dataset_sampled/
 paper/repro/out/
+
+# Maintainer-only Hub upload (cluster paths)
+scripts/runtime/hf_dataset/upload_setup2.py
+scripts/runtime/hf_dataset/submit_upload_setup2.sh

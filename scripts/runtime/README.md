@@ -7,6 +7,12 @@ DC-OPF, under an in-memory protocol (setup 1) and a from-disk protocol (setup 2)
 The 56 committed CSVs **are** the paper raw results. You only need to re-run the
 jobs if you want to regenerate them.
 
+This tree lives on the **`genco-paper-repro`** branch, not on default `main`:
+
+```bash
+git clone -b genco-paper-repro https://github.com/gridfm/gridfm-datakit.git
+```
+
 GENCO GPU numbers are **not** produced here. Data-diversity figures:
 [`paper/repro/README.md`](../../paper/repro/README.md).
 
@@ -26,7 +32,7 @@ Manifest was resolved under Julia 1.11 (its header says `1.11.8`); reproduce wit
 **1.12.6**.
 
 Setup 1 also needs the seven corrected `.m` files in `gridfm_datakit/grids/`
-(they are tracked on this branch).
+(they are tracked on `genco-paper-repro`).
 
 ## 2. Read the paper numbers
 
@@ -78,18 +84,35 @@ bash scripts/runtime/pure_julia/run_large_setup1.sh
 ```
 
 **Setup 2 (from-disk)** — parse a datakit scenario per solve. The JSON pool is
-not in git:
+not in git. The 10,000 corrected files per grid used in the paper are on Hugging
+Face:
+[`gridfm/reproducibility-powermodels-setup2`](https://huggingface.co/datasets/gridfm/reproducibility-powermodels-setup2)
+(~156 GiB for all seven networks × PF and OPF).
+
+```bash
+hf download gridfm/reproducibility-powermodels-setup2 --repo-type dataset \
+    --local-dir /path/to/finetuning
+export GRIDFM_DATA_BASE=/path/to/finetuning   # required; there is no cluster default
+# already scenario_*_corrected.json — skip run_correction.sh
+bash scripts/runtime/pure_julia/run_small_setup2.sh
+bash scripts/runtime/pure_julia/run_large_setup2.sh
+```
+
+Expected layout:
 
 ```text
 $GRIDFM_DATA_BASE/{pf,opf}/<network>/powermodels/scenario_*_corrected.json
 ```
 
-Original path: `/dccstor/gridfm/powermodels_data/v4/finetuning`. At most 10,000
-distinct scenarios per network (indices wrap). Stage to node-local `/tmp` before
-the timed region.
+`GRIDFM_DATA_BASE` must be set for setup 2 and for `run_correction.sh`. At most
+10,000 distinct scenarios per network (indices wrap). Stage to node-local `/tmp`
+before the timed region.
+
+If you convert from parquet yourself instead of using the Hugging Face snapshot:
 
 ```bash
 export GRIDFM_DATA_BASE=/path/to/finetuning
+python scripts/convert/batch_convert_finetune.py --pf-base "$GRIDFM_DATA_BASE/pf" --opf-base "$GRIDFM_DATA_BASE/opf"
 bash scripts/runtime/pure_julia/run_correction.sh
 bash scripts/runtime/pure_julia/run_small_setup2.sh
 bash scripts/runtime/pure_julia/run_large_setup2.sh
@@ -102,13 +125,6 @@ bash scripts/runtime/pure_julia/submit_matrix.sh
 ```
 
 `--resume` is always on: delete a CSV first to recompute that cell.
-
-If you have parquet but not PowerModels JSON, convert then correct:
-
-```bash
-python scripts/convert/batch_convert_finetune.py --pf-base "$GRIDFM_DATA_BASE/pf" --opf-base "$GRIDFM_DATA_BASE/opf"
-bash scripts/runtime/pure_julia/run_correction.sh
-```
 
 The converter implementation is `gridfm_datakit/convert/`; `scripts/convert/` is
 the CLI over the finetuning tree.

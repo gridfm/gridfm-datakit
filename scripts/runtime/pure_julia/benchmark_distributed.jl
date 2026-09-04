@@ -15,11 +15,9 @@ BLAS.set_num_threads(1)
 include(joinpath(@__DIR__, "scenario_staging.jl"))
 
 const SCRIPT_PATH = abspath(@__FILE__)
-const DEFAULT_DATA_BASE = get(
-    ENV,
-    "GRIDFM_DATA_BASE",
-    "/dccstor/gridfm/powermodels_data/v4/finetuning",
-)
+const DEFAULT_DATA_BASE = let path = strip(get(ENV, "GRIDFM_DATA_BASE", ""))
+    isempty(path) ? nothing : path
+end
 const MODES = ("pf", "dcpf", "opf", "dcopf")
 const SETUPS = ("cached-base", "per-solve-load")
 const CSV_HEADER = (
@@ -727,6 +725,14 @@ function validate_config(cfg)
     if cfg.setup == "cached-base"
         cfg.case_file === nothing && error("cached-base setup requires --case-file")
         isfile(cfg.case_file) || error("case file not found: $(cfg.case_file)")
+    elseif cfg.setup == "per-solve-load"
+        data_base = cfg.data_base
+        (data_base isa AbstractString && !isempty(strip(data_base))) || error(
+            "per-solve-load setup requires --data-base or GRIDFM_DATA_BASE. " *
+            "Download https://huggingface.co/datasets/gridfm/reproducibility-powermodels-setup2 " *
+            "and export GRIDFM_DATA_BASE to that directory.",
+        )
+        isdir(data_base) || error("data base not found: $data_base")
     end
     return nothing
 end

@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=env.sh
 source "$SCRIPT_DIR/env.sh"
+require_gridfm_data_base()
 
 WORKERS="${CORRECTION_WORKERS:-84}"
 host="$(hostname -s)"

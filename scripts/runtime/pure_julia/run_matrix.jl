@@ -73,7 +73,7 @@ function benchmark_command(config, mode, scope, setup, output_csv)
     if setup == "setup1"
         append!(args, ["--case-file", corrected_case_file(config.network)])
     else
-        append!(args, ["--data-base", DATA_BASE])
+        append!(args, ["--data-base", gridfm_data_base()])
     end
     return Cmd(vcat(Base.julia_cmd().exec, args))
 end
@@ -85,8 +85,9 @@ function validate_files(configs, setup, dry_run)
     if setup == "setup1"
         missing = filter(path -> !isfile(path), corrected_case_file.(getproperty.(configs, :network)))
         isempty(missing) || error("corrected case file not found: $(first(missing))")
-    elseif !dry_run
-        isdir(DATA_BASE) || error("data base not found: $DATA_BASE")
+    elseif setup == "setup2"
+        base = gridfm_data_base()
+        dry_run || isdir(base) || error("data base not found: $base")
     end
 end
 

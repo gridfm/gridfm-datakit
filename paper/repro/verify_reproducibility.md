@@ -24,12 +24,18 @@ The reference PDFs are the ones submitted with the paper. They are not kept in t
 branch; obtain them from the paper's source archive (the `figures/comparison_plots/`
 directory of the arXiv submission) and point `REF` at them.
 
-**Compare rendered pixels, not PDF bytes.** PDFs embed a creation timestamp, so `md5` of
-two PDFs never matches even when the figures are identical. Rasterize both sides first:
+**Compare rendered pixels, not PDF bytes.** PDFs embed a creation timestamp, so a
+checksum of two PDFs never matches even when the figures are identical. Rasterize
+both sides first. The snippet below uses `md5sum` (Linux). The original check was
+run on macOS with `md5 -q FILE` (BSD md5); that flag does not exist on GNU
+`md5sum`. This file records that check — you do not need to re-run it to
+reproduce the figures.
 
 ```bash
 REF=/path/to/paper/figures/comparison_plots
 OUT=paper/repro/out
+
+checksum() { md5sum "$1" | awk '{print $1}'; }   # macOS: md5 -q "$1"
 
 for name in spider_plot_entropy_pf spider_plot_entropy_opf \
             Qg_violin_pf barplot_branch_entropy_pf \
@@ -39,7 +45,7 @@ for name in spider_plot_entropy_pf spider_plot_entropy_opf \
             Vm_violin_opf Va_violin_opf; do
     pdftoppm -r 100 -png "$REF/$name.pdf" "/tmp/ref_$name"
     pdftoppm -r 100 -png "$OUT/$name.pdf" "/tmp/mine_$name"
-    if [ "$(md5 -q /tmp/ref_$name-1.png)" = "$(md5 -q /tmp/mine_$name-1.png)" ]; then
+    if [ "$(checksum /tmp/ref_$name-1.png)" = "$(checksum /tmp/mine_$name-1.png)" ]; then
         printf '%-12s %s\n' IDENTICAL "$name"
     else
         printf '%-12s %s\n' DIFFERS "$name"

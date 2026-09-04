@@ -9,11 +9,6 @@ using Printf
 using UUIDs
 
 const SCRIPT_PATH = abspath(@__FILE__)
-const DATA_BASE = get(
-    ENV,
-    "GRIDFM_DATA_BASE",
-    "/dccstor/gridfm/powermodels_data/v4/finetuning",
-)
 const N_SCENARIOS = 10_000
 const DEFAULT_WORKERS = 32
 const NETWORKS = (
@@ -85,8 +80,21 @@ function parse_args(args)
 end
 
 
+function data_base()
+    path = strip(get(ENV, "GRIDFM_DATA_BASE", ""))
+    isempty(path) && error(
+        "GRIDFM_DATA_BASE is not set. Download " *
+        "https://huggingface.co/datasets/gridfm/reproducibility-powermodels-setup2 " *
+        "and export GRIDFM_DATA_BASE to that directory. " *
+        "Expected: \$GRIDFM_DATA_BASE/{pf,opf}/<network>/powermodels/" *
+        "scenario_*_corrected.json",
+    )
+    return path
+end
+
+
 scenario_dir(split, network) =
-    joinpath(DATA_BASE, split, network, "powermodels")
+    joinpath(data_base(), split, network, "powermodels")
 
 raw_path(dir, index) = joinpath(dir, "scenario_$(index).json")
 
@@ -367,7 +375,7 @@ function main(args)
     config === nothing && return 0
 
     overall_started = time()
-    println("Data base: $DATA_BASE")
+    println("Data base: $(data_base())")
     println("Networks: $(join(NETWORKS, ","))")
     println("Splits: $(join(config.splits, ","))")
     println(

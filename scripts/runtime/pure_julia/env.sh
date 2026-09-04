@@ -18,9 +18,18 @@ export OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-1}"
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}"
 export MKL_NUM_THREADS="${MKL_NUM_THREADS:-1}"
 
-# Setup 2 original location (override when reproducing elsewhere):
+# Setup 2 has no default path. Set it before run_*_setup2.sh or run_correction.sh:
 #   export GRIDFM_DATA_BASE=/path/to/finetuning
 # Expected layout: $GRIDFM_DATA_BASE/{pf,opf}/<network>/powermodels/scenario_*_corrected.json
+require_gridfm_data_base() {
+  if [[ -z "${GRIDFM_DATA_BASE:-}" ]]; then
+    echo "error: GRIDFM_DATA_BASE is not set." >&2
+    echo "Download https://huggingface.co/datasets/gridfm/reproducibility-powermodels-setup2" >&2
+    echo "and export GRIDFM_DATA_BASE=/path/to/that/tree." >&2
+    echo "Expected: \$GRIDFM_DATA_BASE/{pf,opf}/<network>/powermodels/scenario_*_corrected.json" >&2
+    exit 1
+  fi
+}
 
 JULIA_JOB_DEPOT="${TMPDIR:-/tmp}/gridfm_julia_${LSB_JOBID:-local}_$$"
 mkdir -p "$JULIA_JOB_DEPOT"
