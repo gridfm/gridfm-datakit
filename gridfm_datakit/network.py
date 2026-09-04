@@ -27,7 +27,7 @@ except ImportError:  # juliapkg < 0.1.24
     from juliapkg.deps import run_julia
 from juliapkg.state import STATE
 from matpowercaseframes import CaseFrames
-from numpy import any, conj, exp, hstack, int64, nonzero, ones, pi, real
+from numpy import conj, exp, hstack, int64, nonzero, ones, pi, real
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
 
@@ -838,7 +838,9 @@ def branch_vectors(
     n_cols = branch.shape[1]
     stat = branch[:, BR_STATUS]  # ones at in-service branches
     Ysf = stat / (branch[:, BR_R] + 1j * branch[:, BR_X])  # series admittance
-    if n_cols > BR_R_ASYM and (any(branch[:, BR_R_ASYM]) or any(branch[:, BR_X_ASYM])):
+    if n_cols > BR_R_ASYM and (
+        np.any(branch[:, BR_R_ASYM]) or np.any(branch[:, BR_X_ASYM])
+    ):
         Yst = stat / (
             (branch[:, BR_R] + branch[:, BR_R_ASYM])
             + 1j * (branch[:, BR_X] + branch[:, BR_X_ASYM])
