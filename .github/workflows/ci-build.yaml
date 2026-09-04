@@ -19,19 +19,7 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Cache pip
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: pip-${{ runner.os }}-${{ hashFiles('**/requirements*.txt') }}
-          restore-keys: |
-            pip-${{ runner.os }}-
-
-      - name: Install dependencies
-        run: pip install -e ".[dev]"
-
-      - name: Run pre-commit
-        run: pre-commit run --verbose --all-files
+      - uses: pre-commit/action@v3.0.1
 
   security-test:
     runs-on: ubuntu-latest
@@ -39,21 +27,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache pip
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: pip-${{ runner.os }}-${{ hashFiles('**/requirements*.txt') }}
-          restore-keys: |
-            pip-${{ runner.os }}-
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip wheel
-          pip install -e ".[dev]"
+      - name: Install bandit
+        run: pip install bandit
 
       - name: Security Checks
-        run: bandit --severity-level high .
+        run: bandit -r gridfm_datakit --severity-level high
 
   pytests:
     runs-on: ubuntu-latest
