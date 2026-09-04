@@ -20,21 +20,21 @@ Run everything from the repository root with `PYTHONPATH` set to it:
 export PYTHONPATH=$PWD
 ```
 
-The scripts import `gridfm_datakit` for `load_net_from_pglib` and the bus/generator
-index constants. Depending on how the package was installed, the import may only
-resolve from the repository root.
-
 ## 2. Get the data
 
-The figures are computed from a snapshot of sampled parquet (~979 MB), hosted at
-[`gridfm/gridfm-datakit-paper-figures`](https://huggingface.co/datasets/gridfm/gridfm-datakit-paper-figures)
-(private — you need access and a HuggingFace token):
+The figures are computed from a snapshot of sampled parquet (~979 MB), published at
+[`gridfm/gridfm-datakit-paper-figures`](https://huggingface.co/datasets/gridfm/gridfm-datakit-paper-figures).
+It is public, so no token is needed:
 
 ```bash
 hf download gridfm/gridfm-datakit-paper-figures \
     --repo-type dataset \
+    --exclude "full/*" \
     --local-dir paper/repro/dataset_sampled
 ```
+
+`--exclude "full/*"` is what keeps this to ~1 GB — without it you also pull the 15 GB of
+non-downsampled data described below.
 
 The scripts expect it at `paper/repro/dataset_sampled/` (the default), or point them
 elsewhere with `--data-dir`.
@@ -73,42 +73,7 @@ gridfm/gridfm-datakit-paper-figures
     └── pfdelta/               PFΔ                        29,000 scenarios
 ```
 
-Fetch one dataset rather than the whole repo:
 
-```bash
-hf download gridfm/gridfm-datakit-paper-figures \
-    --repo-type dataset \
-    --include "full/gridfm_datakit_pf/*" \
-    --local-dir /path/to/somewhere
-```
-
-The two `gridfm_datakit_*` directories are complete generation output, so they carry more
-than the four tables the figures use:
-
-| File | Contents |
-|---|---|
-| `bus_data.parquet` | per-bus `Pd, Qd, Pg, Qg, Vm, Va`, bus-type one-hots, voltage limits, shunts |
-| `gen_data.parquet` | per-generator dispatch, limits, cost coefficients, status |
-| `branch_data.parquet` | per-branch flows, impedances, admittance entries, `rate_a`, status |
-| `y_bus_data.parquet` | nonzero admittance-matrix entries per scenario |
-| `runtime_data.parquet` | per-sample AC and DC solver time |
-| `stats.parquet`, `stats_plot.png` | output of the `gridfm_datakit stats` command |
-| `scenarios_agg_load_profile.parquet` | the sampled load scenarios themselves |
-| `args.log` | the resolved config for the run (see [`configs/`](configs/)) |
-| `tqdm.log`, `error.log`, `solver_log/` | progress, per-sample failures, Ipopt logs |
-
-`include_dc_res: true` was set for both runs, so the bus/gen/branch tables also carry
-DC-PF or DC-OPF columns (`Va_dc`, `Pg_dc`, `p_mw_dc`, `pf_dc`, `pt_dc`) as ML baselines.
-
-The `gridfm_datakit_*` tables are single parquet files. The PFΔ tables are instead
-**partitioned parquet directories** (`scenario_partition=*/` subdirectories, 145 per
-table), so point `pandas.read_parquet` at the `*.parquet` directory rather than at an
-individual part file — it handles both layouts identically.
-
-The four external baselines under `full/` are the converted parquet only (`bus`/`gen`,
-plus `branch` and `y_bus` for PFΔ) — not the original downloads. They are third-party
-datasets reshaped into this repository's schema; see their upstream licences before
-redistributing.
 
 ## 3. Generate the figures
 
