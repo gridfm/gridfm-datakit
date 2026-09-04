@@ -6,20 +6,20 @@ Load perturbations generate multiple load scenarios from an initial case file sc
 
 
 
-The module provides two main perturbation strategies:
+The module provides three main perturbation strategies:
 
 ### Comparison of Perturbation Strategies
 
 
 <div class="center-table" markdown>
 
-| Feature                      | `LoadScenariosFromAggProfile` | `Powergraph`                   |
-|-----------------------------|-------------------------------|-------------------------------|
-| **Global scaling**          | ✅ Yes                        | ✅ Yes                        |
-| **Local (per-load) scaling**| ✅ Yes (via noise)            | ❌ No                         |
-| **Reactive power perturbed**| ✅ Optional                   | ❌ No                         |
-| **Interpolation**           | ✅ Yes                        | ✅ Yes                        |
-| **Use of real profile data**| ✅ Yes                        | ✅ Yes                        |
+| Feature                      | `LoadScenariosFromAggProfile` | `Powergraph`                   | `PrecomputedProfile`          |
+|-----------------------------|-------------------------------|-------------------------------|-------------------------------|
+| **Global scaling**          | ✅ Yes                        | ✅ Yes                        | ❌ No                         |
+| **Local (per-load) scaling**| ✅ Yes (via noise)            | ❌ No                         | ❌ No                         |
+| **Reactive power perturbed**| ✅ Optional                   | ❌ No                         | ✅ From file                  |
+| **Interpolation**           | ✅ Yes                        | ✅ Yes                        | ❌ No                         |
+| **Use of real profile data**| ✅ Yes                        | ✅ Yes                        | ✅ From file                  |
 
 </div>
 
@@ -85,7 +85,7 @@ Sample config parameters:
 
 ```yaml
 load:
-  generator: "agg_load_profile" # Name of the load generator; options: agg_load_profile, powergraph
+  generator: "agg_load_profile" # Name of the load generator; options: agg_load_profile, powergraph, precomputed_profile
   agg_profile: "default" # Name of the aggregated load profile
   scenarios: 200 # Number of different load scenarios to generate
   sigma: 0.2 # max local noise
@@ -128,6 +128,37 @@ load:
   agg_profile: "default"           # Aggregated load profile name
   scenarios: 200                   # Number of load scenarios to generate
 ```
+
+### `PrecomputedProfile`
+Loads scenarios directly from a CSV or Excel file. Each row specifies the active and
+reactive power for a given `(load_scenario, load)` pair. All pairs must be present.
+
+Required columns:
+
+- `load_scenario`: scenario index (0..n_scenarios-1)
+- `load`: bus index (0..n_buses-1) using the network's continuous indexing
+- `p_mw`: active power in MW
+- `q_mvar`: reactive power in MVAr
+
+Constraints:
+
+- `load_scenario` and `load` must be integer-valued.
+- All `(load_scenario, load)` pairs must be unique.
+- The file must include exactly `n_buses * n_scenarios` rows.
+
+Sample config parameters:
+
+```yaml
+load:
+  generator: "precomputed_profile"
+  scenario_file: "load-scenarios-precomputed.csv"
+  scenarios: 200
+```
+
+Example files:
+
+- `scripts/config/case14_config_precomputed_profile.yaml`
+- `scripts/precomputed_load_profiles/load-scenarios-precomputed-case14.csv`
 
 ## Aggregated load profiles
 
