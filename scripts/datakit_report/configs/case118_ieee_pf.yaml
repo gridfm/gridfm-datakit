@@ -1,18 +1,17 @@
-# Configuration used to generate the gridfm-datakit OPF dataset compared in
+# Configuration used to generate the gridfm-datakit PF dataset compared in
 # gridfm-datakit-v1 (arXiv:2512.14658).
 #
 # Recorded from the args.log of the original run (2025-11-12). Produces ~200,000
-# samples: 10,000 load scenarios x 20 topology variants. Of these, 195,753
+# samples: 10,000 load scenarios x 20 topology variants. Of these, 199,207
 # converged and 10,000 were sampled for the published figures.
 #
-#   gridfm_datakit generate paper/repro/configs/case118_ieee_opf.yaml
+#   gridfm_datakit generate scripts/datakit_report/configs/case118_ieee_pf.yaml
 #
-# OPF mode: load, cost and admittance perturbations are applied, then topology
-# perturbations, and an ACOPF is solved for every topology variant. Every sample is
-# therefore cost-optimal and satisfies all operating limits. This costs far more
-# than PF mode, which solves only one OPF per load scenario.
-#
-# Identical to case118_ieee_pf.yaml except for settings.mode and settings.data_dir.
+# PF mode: an ACOPF is solved once per load scenario on the base topology, the
+# generator setpoints are fixed, and only then are topology perturbations applied
+# and an AC power flow solved. Dispatch is therefore not re-optimised for the new
+# topology, so some samples violate OPF inequality constraints (branch overloads,
+# voltage or reactive-power limit violations).
 
 network:
   name: "case118_ieee" # Name of the power grid network (without extension)
@@ -46,11 +45,11 @@ admittance_perturbation:
 
 settings:
   num_processes: 16 # Number of parallel processes to use
-  data_dir: "./opf_baseline_perturbations_nov_12" # Output directory
+  data_dir: "./baseline_perturbations_nov_12" # Output directory
   large_chunk_size: 10000 # Load scenarios processed before each flush to parquet
   overwrite: true # If true, overwrites existing files
-  mode: "opf" # OPF mode; see header
-  include_dc_res: true # Also store DC-OPF results as an ML baseline
+  mode: "pf" # PF mode; see header
+  include_dc_res: true # Also store DC-PF results as an ML baseline
   enable_solver_logs: true # Write solver logs to {data_dir}/solver_log
   pf_fast: true # Use compute_ac_pf from PowerModels.jl
   dcpf_fast: true # Use compute_dc_pf from PowerModels.jl

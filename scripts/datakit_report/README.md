@@ -11,7 +11,7 @@ These scripts live on the **`genco-paper-repro`** branch (not default `main`).
 The **GENCO paper**
 ([arXiv:2608.09921](https://arxiv.org/abs/2608.09921)) runtime analysis
 (PowerModels wall times) is a different reproduction path:
-[`scripts/runtime/README.md`](../../scripts/runtime/README.md).
+[`scripts/runtime/README.md`](../runtime/README.md).
 
 ## 1. Install
 
@@ -38,13 +38,13 @@ It is public, so no token is needed:
 hf download gridfm/reproducibility-datakit-technical-report \
     --repo-type dataset \
     --exclude "full/*" \
-    --local-dir paper/repro/dataset_sampled
+    --local-dir scripts/datakit_report/dataset_sampled
 ```
 
 `--exclude "full/*"` is what keeps this to ~1 GB — without it you also pull the 15 GB of
 non-downsampled data described below.
 
-The scripts expect it at `paper/repro/dataset_sampled/` (the default), or point them
+The scripts expect it at `scripts/datakit_report/dataset_sampled/` (the default), or point them
 elsewhere with `--data-dir`.
 
 The snapshot holds six datasets on `case118_ieee`, each downsampled to exactly
@@ -86,24 +86,24 @@ gridfm/reproducibility-datakit-technical-report
 ## 3. Generate the figures
 
 ```bash
-OUT=paper/repro/out
+OUT=scripts/datakit_report/out
 
 # Entropy spider plots (PF and OPF)
-python paper/repro/plot_spider.py --mode pf  --metric entropy --output-dir $OUT
-python paper/repro/plot_spider.py --mode opf --metric entropy --output-dir $OUT
+python scripts/datakit_report/plot_spider.py --mode pf  --metric entropy --output-dir $OUT
+python scripts/datakit_report/plot_spider.py --mode opf --metric entropy --output-dir $OUT
 
 # Feature violin plots: Pd, Qd, Pg, Qg, Vm, Va for PF and OPF
-python paper/repro/plot_violin.py --mode pf  --output-dir $OUT
-python paper/repro/plot_violin.py --mode opf --output-dir $OUT
+python scripts/datakit_report/plot_violin.py --mode pf  --output-dir $OUT
+python scripts/datakit_report/plot_violin.py --mode opf --output-dir $OUT
 
 # Branch flow entropy barplot (Pf, Qf)
-python paper/repro/plot_bar_branch.py --metric entropy --output-dir $OUT
+python scripts/datakit_report/plot_bar_branch.py --metric entropy --output-dir $OUT
 
 # Branch loading histograms
-python paper/repro/plot_branch_loading.py --output-dir $OUT
+python scripts/datakit_report/plot_branch_loading.py --output-dir $OUT
 ```
 
-That writes 17 PDFs into `paper/repro/out/`:
+That writes 17 PDFs into `scripts/datakit_report/out/`:
 
 | Script | Output |
 |---|---|
@@ -151,12 +151,12 @@ Only needed if you are generating new datasets rather than reproducing the publi
 figures.
 
 ```bash
-python paper/repro/prepare_datasets.py --base-path /path/to/raw/datasets [--seed 0]
+python scripts/datakit_report/prepare_datasets.py --base-path /path/to/raw/datasets [--seed 0]
 ```
 
 It finds the smallest scenario count across the datasets and downsamples all of them to
 it. The gridfm-datakit inputs themselves are generated with the configs in
-[`configs/`](configs/) (`gridfm_datakit generate paper/repro/configs/case118_ieee_pf.yaml`);
+[`configs/`](configs/) (`gridfm_datakit generate scripts/datakit_report/configs/case118_ieee_pf.yaml`);
 the full non-downsampled data is on HuggingFace under `full/`. Note that the subset is drawn randomly: a fresh run yields a different sample and
 therefore slightly different figures. `--seed` makes a run repeatable but cannot
 recover the published snapshot — use the HuggingFace snapshot for that.
@@ -167,8 +167,8 @@ The external libraries must be converted to this repository's parquet schema fir
 |---|---|
 | PFΔ | `pfdelta/batch_convert_pfdelta.py` |
 | OPFData | `opf_data/batch_convert.py` |
-| PGLearn | `paper/repro/pg_learn_conversion.py` (set `PGLEARN_DIR`) |
-| OPF-Learn | `paper/repro/opf_learn_conversion.py` (set `OPFLEARN_DIR`) |
+| PGLearn | `scripts/datakit_report/pg_learn_conversion.py` (set `PGLEARN_DIR`) |
+| OPF-Learn | `scripts/datakit_report/opf_learn_conversion.py` (set `OPFLEARN_DIR`) |
 
 ## Notes
 

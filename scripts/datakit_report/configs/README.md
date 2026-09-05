@@ -15,7 +15,7 @@ Each run is 10,000 load scenarios × 20 topology variants. The published figures
 To re-run a generation:
 
 ```bash
-gridfm_datakit generate paper/repro/configs/case118_ieee_pf.yaml
+gridfm_datakit generate scripts/datakit_report/configs/case118_ieee_pf.yaml
 ```
 
 ## Provenance

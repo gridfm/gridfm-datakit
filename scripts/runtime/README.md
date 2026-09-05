@@ -17,7 +17,7 @@ git clone -b genco-paper-repro https://github.com/gridfm/gridfm-datakit.git
 ```
 
 The **gridfm-datakit technical report** diversity plots are a different
-reproduction path: [`paper/repro/README.md`](../../paper/repro/README.md).
+reproduction path: [`scripts/datakit_report/README.md`](../datakit_report/README.md).
 
 ## 1. Install
 
