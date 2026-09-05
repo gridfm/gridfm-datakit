@@ -1,12 +1,16 @@
-# Reproducing the figures
+# Reproducing the datakit technical report (diversity plots)
 
-This directory generates the data-diversity figures of *gridfm-datakit-v1*
+This directory generates the data-diversity figures of the **gridfm-datakit
+technical report** *gridfm-datakit-v1*
 ([arXiv:2512.14658](https://arxiv.org/abs/2512.14658)): the entropy spider plots,
 the feature violin plots, the branch-flow entropy barplot, and the branch-loading
 histograms.
 
 These scripts live on the **`genco-paper-repro`** branch (not default `main`).
-PowerModels runtime CSVs and how to re-run that matrix:
+
+The **GENCO paper**
+([arXiv:2608.09921](https://arxiv.org/abs/2608.09921)) runtime analysis
+(PowerModels wall times) is a different reproduction path:
 [`scripts/runtime/README.md`](../../scripts/runtime/README.md).
 
 ## 1. Install
@@ -179,6 +183,3 @@ The external libraries must be converted to this repository's parquet schema fir
   part of the original analysis. Careful: `plot_spider_branch.py` writes the same
   filename as `plot_bar_branch.py` (`barplot_branch_{metric}_pf.pdf`), so run them into
   separate `--output-dir`s.
-
-For how these outputs were checked against the published figures, see
-[`verify_reproducibility.md`](verify_reproducibility.md).

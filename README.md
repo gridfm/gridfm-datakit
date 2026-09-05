@@ -1,3 +1,12 @@
+# Reproducing the papers
+
+This branch is a snapshot of the code and scripts used for two papers:
+
+- **[GENCO](https://arxiv.org/abs/2608.09921)** — classical-solver runtime experiments: [`scripts/runtime/README.md`](scripts/runtime/README.md). The rest of the code needed (model, training, GPU numbers) is in [gridfm-graphkit `genco-paper-repro`](https://github.com/gridfm/gridfm-graphkit/tree/genco-paper-repro).
+- **[gridfm-datakit technical report](https://arxiv.org/abs/2512.14658)** — diversity plots: [`paper/repro/README.md`](paper/repro/README.md).
+
+---
+
 <p align="center">
   <img src="https://raw.githubusercontent.com/gridfm/gridfm-datakit/refs/heads/main/docs/figs/KIT_logo.png" alt="GridFM logo" style="width: 40%; height: auto;"/>
   <br/>
@@ -12,33 +21,6 @@
 ![Python](https://img.shields.io/badge/python-3.10%20%E2%80%93%203.12-blue)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 
-
----
-
-## Reproducing the paper
-
-This is the **`genco-paper-repro`** branch: a snapshot of the code used for the
-technical report [gridfm-datakit-v1](https://arxiv.org/abs/2512.14658), together
-with the scripts and PowerModels runtime results that reproduce its figures.
-Default `main` does not include this tree.
-
-```bash
-git clone -b genco-paper-repro https://github.com/gridfm/gridfm-datakit.git
-cd gridfm-datakit
-```
-
-**Data-diversity figures** (entropy spiders, violins, branch loading)
-
-- How to: [`paper/repro/README.md`](paper/repro/README.md)
-- Data: [`gridfm/reproducibility-datakit-technical-report`](https://huggingface.co/datasets/gridfm/reproducibility-datakit-technical-report)
-
-**PowerModels runtime matrix** (classical AC/DC PF and OPF wall times)
-
-- How to: [`scripts/runtime/README.md`](scripts/runtime/README.md)
-- Julia / Ipopt / hardware of the timed jobs: [`scripts/runtime/outputs_julia/full_matrix/environment_versions.md`](scripts/runtime/outputs_julia/full_matrix/environment_versions.md)
-- Setup-2 scenario JSON (10 000 corrected files per grid × PF and OPF): [`gridfm/reproducibility-powermodels-setup2`](https://huggingface.co/datasets/gridfm/reproducibility-powermodels-setup2)
-
-GENCO GPU numbers are not in this repository.
 
 ---
 

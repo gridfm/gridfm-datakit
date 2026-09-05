@@ -1,11 +1,14 @@
-# Reproducing the PowerModels runtime results
+# Reproducing the GENCO paper (runtime analysis)
 
 This directory holds the **classical-solver** (PowerModels) runtime matrix used in
-the paper figures: amortized per-instance wall time for AC-PF, DC-PF, AC-OPF, and
-DC-OPF, under an in-memory protocol (setup 1) and a from-disk protocol (setup 2).
+the **GENCO paper**
+([arXiv:2608.09921](https://arxiv.org/abs/2608.09921)): amortized per-instance
+wall time for AC-PF, DC-PF, AC-OPF, and DC-OPF, under an in-memory protocol
+(setup 1) and a from-disk protocol (setup 2).
 
-The 56 committed CSVs **are** the paper raw results. You only need to re-run the
-jobs if you want to regenerate them.
+The 56 committed CSVs **are** those paper raw results. You only need to re-run
+the jobs if you want to regenerate them. GENCO GPU numbers are **not** produced
+here.
 
 This tree lives on the **`genco-paper-repro`** branch, not on default `main`:
 
@@ -13,28 +16,25 @@ This tree lives on the **`genco-paper-repro`** branch, not on default `main`:
 git clone -b genco-paper-repro https://github.com/gridfm/gridfm-datakit.git
 ```
 
-GENCO GPU numbers are **not** produced here. Data-diversity figures:
-[`paper/repro/README.md`](../../paper/repro/README.md).
+The **gridfm-datakit technical report** diversity plots are a different
+reproduction path: [`paper/repro/README.md`](../../paper/repro/README.md).
 
 ## 1. Install
 
-Julia **1.12.6**, the version used on the timed jobs. From the repository root:
+Any recent Julia is fine. From the repository root:
 
 ```bash
 julia --project=scripts/runtime/pure_julia -e 'using Pkg; Pkg.instantiate()'
 ```
 
-Exact package pins, Ipopt/MUMPS versions, thread settings, and original hardware
-are in
+That uses [`pure_julia/Manifest.toml`](pure_julia/Manifest.toml). The original
+timed jobs used Julia 1.12.6; pins, Ipopt/MUMPS, threads, and hardware are in
 [`outputs_julia/full_matrix/environment_versions.md`](outputs_julia/full_matrix/environment_versions.md).
-Instantiate from [`pure_julia/Manifest.toml`](pure_julia/Manifest.toml). That
-Manifest was resolved under Julia 1.11 (its header says `1.11.8`); reproduce with
-**1.12.6**.
 
 Setup 1 also needs the seven corrected `.m` files in `gridfm_datakit/grids/`
-(they are tracked on `genco-paper-repro`).
+(they are tracked on this branch).
 
-## 2. Read the paper numbers
+## 2. Read the GENCO paper numbers
 
 They live at `scripts/runtime/outputs_julia/full_matrix/`. Do not edit the 56 CSVs.
 
@@ -84,7 +84,7 @@ bash scripts/runtime/pure_julia/run_large_setup1.sh
 ```
 
 **Setup 2 (from-disk)** — parse a datakit scenario per solve. The JSON pool is
-not in git. The 10,000 corrected files per grid used in the paper are on Hugging
+not in git. The 10,000 corrected files per grid used in the GENCO paper are on Hugging
 Face:
 [`gridfm/reproducibility-powermodels-setup2`](https://huggingface.co/datasets/gridfm/reproducibility-powermodels-setup2)
 (~156 GiB for all seven networks × PF and OPF).
@@ -121,6 +121,7 @@ bash scripts/runtime/pure_julia/run_large_setup2.sh
 On LSF (84 cores; 256 G small / 960 G large; original hosts were CCC 7xx):
 
 ```bash
+export GRIDFM_DATA_BASE=/path/to/finetuning   # required for correction and setup 2
 bash scripts/runtime/pure_julia/submit_matrix.sh
 ```
 
