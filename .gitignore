@@ -47,4 +47,3 @@ scripts/runtime/hf_dataset/submit_upload_setup2.sh
 
 # Personal reproducibility repo (separate git history, uploaded separately)
 /GENCO/
-GENCO/repro/5.1/reproducibility_result.md
