@@ -62,24 +62,7 @@ If you use `gridfm-datakit` in your research, please cite both:
   <br/>
 </p>
 
-## Citation
-
-Please cite the library when using it in your work:
-
-```bibtex
-@misc{puech2025gridfmdatakitv1pythonlibraryscalable,
-      title={gridfm-datakit-v1: A Python Library for Scalable and Realistic Power Flow and Optimal Power Flow Data Generation},
-      author={Alban Puech and Matteo Mazzonelli and Celia Cintas and Tamara R. Govindasamy and Mangaliso Mngomezulu and Jonas Weiss and Matteo Baù and Anna Varbella and François Mirallès and Kibaek Kim and Le Xie and Hendrik F. Hamann and Etienne Vos and Thomas Brunschwiler},
-      year={2025},
-      eprint={2512.14658},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG},
-      url={https://arxiv.org/abs/2512.14658},
-}
-```
-
 ---
-
 
 # Installation
 
