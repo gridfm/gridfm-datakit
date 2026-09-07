@@ -1,0 +1,4 @@
+type,model_id,variables
+Curve,_BUS____2_TN,U_value
+Curve,UVA,underVoltageAutomaton_UMinPu
+Curve,_GEN____1_SM,generator_efdPu_value

@@ -225,7 +225,9 @@ def initialize_topology_generator(
             raise ValueError(
                 "n_topology_variants and k parameters are required for random generator",
             )
-        elements = getattr(args, "elements", ["line", "trafo", "gen", "sgen"])
+        # RandomComponentDropGenerator only recognizes "branch" and "gen"; using
+        # any other names (e.g. "line"/"trafo") would silently drop nothing.
+        elements = getattr(args, "elements", ["branch", "gen"])
         generator = RandomComponentDropGenerator(
             args.n_topology_variants,
             args.k,

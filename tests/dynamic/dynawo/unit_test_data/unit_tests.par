@@ -1,0 +1,232 @@
+<?xml version='1.0' encoding='UTF-8'?>
+
+<parametersSet xmlns="http://www.rte-france.com/dynawo">
+  <set id="WECC_WTG4A">
+    <par type="DOUBLE" name="WTG4A_P0Pu" value="-0.7"/>
+    <par type="DOUBLE" name="WTG4A_Q0Pu" value="-0.2"/>
+    <par type="DOUBLE" name="WTG4A_U0Pu" value="1.0"/>
+    <par type="DOUBLE" name="WTG4A_UPhase0" value="0.00000144621"/>
+    <par type="DOUBLE" name="WTG4A_SNom" value="100"/>
+    <par type="DOUBLE" name="WTG4A_RPu" value="0"/>
+    <par type="DOUBLE" name="WTG4A_XPu" value="0.15"/>
+    <par type="DOUBLE" name="WTG4A_DDn" value="20"/>
+    <par type="DOUBLE" name="WTG4A_DUp" value="0.001"/>
+    <par type="BOOL" name="WTG4A_FreqFlag" value="true"/>
+    <par type="DOUBLE" name="WTG4A_IMaxPu" value="1.3"/>
+    <par type="DOUBLE" name="WTG4A_IqFrzPu" value="0"/>
+    <par type="DOUBLE" name="WTG4A_Iqh1Pu" value="1.1"/>
+    <par type="DOUBLE" name="WTG4A_Iql1Pu" value="-1.1"/>
+    <par type="DOUBLE" name="WTG4A_IqrMaxPu" value="20"/>
+    <par type="DOUBLE" name="WTG4A_IqrMinPu" value="-20"/>
+    <par type="DOUBLE" name="WTG4A_Kc" value="0"/>
+    <par type="DOUBLE" name="WTG4A_Ki" value="1.5"/>
+    <par type="DOUBLE" name="WTG4A_Kig" value="2.36"/>
+    <par type="DOUBLE" name="WTG4A_Kp" value="0.1"/>
+    <par type="DOUBLE" name="WTG4A_Kpg" value="0.05"/>
+    <par type="DOUBLE" name="WTG4A_Kqi" value="0.5"/>
+    <par type="DOUBLE" name="WTG4A_Kqp" value="1"/>
+    <par type="DOUBLE" name="WTG4A_Kqv" value="2"/>
+    <par type="DOUBLE" name="WTG4A_Kvi" value="0.7"/>
+    <par type="DOUBLE" name="WTG4A_Kvp" value="1"/>
+    <par type="DOUBLE" name="WTG4A_PMaxPu" value="1"/>
+    <par type="DOUBLE" name="WTG4A_PMinPu" value="0"/>
+    <par type="BOOL" name="WTG4A_PQFlag" value="false"/>
+    <par type="BOOL" name="WTG4A_PfFlag" value="false"/>
+    <par type="BOOL" name="WTG4A_QFlag" value="true"/>
+    <par type="DOUBLE" name="WTG4A_QMaxPu" value="0.4"/>
+    <par type="DOUBLE" name="WTG4A_QMinPu" value="-0.4"/>
+    <par type="BOOL" name="WTG4A_RateFlag" value="false"/>
+    <par type="BOOL" name="WTG4A_RefFlag" value="true"/>
+    <par type="DOUBLE" name="WTG4A_tFilterPC" value="0.04"/>
+    <par type="DOUBLE" name="WTG4A_tFilterGC" value="0.02"/>
+    <par type="DOUBLE" name="WTG4A_tFt" value="1e-5"/>
+    <par type="DOUBLE" name="WTG4A_tFv" value="0.1"/>
+    <par type="DOUBLE" name="WTG4A_tG" value="0.02"/>
+    <par type="DOUBLE" name="WTG4A_tIq" value="0.01"/>
+    <par type="DOUBLE" name="WTG4A_tLag" value="0.1"/>
+    <par type="DOUBLE" name="WTG4A_tP" value="0.05"/>
+    <par type="DOUBLE" name="WTG4A_tPord" value="0.01"/>
+    <par type="DOUBLE" name="WTG4A_tRv" value="0.01"/>
+    <par type="DOUBLE" name="WTG4A_VUpPu" value="1.1"/>
+    <par type="DOUBLE" name="WTG4A_VDipPu" value="0.9"/>
+    <par type="BOOL" name="WTG4A_VFlag" value="true"/>
+    <par type="BOOL" name="WTG4A_VCompFlag" value="false"/>
+    <par type="DOUBLE" name="WTG4A_VFrz" value="0"/>
+    <par type="DOUBLE" name="WTG4A_VMaxPu" value="1.1"/>
+    <par type="DOUBLE" name="WTG4A_VMinPu" value="0.9"/>
+    <par type="DOUBLE" name="WTG4A_VRef0Pu" value="0"/>
+    <par type="DOUBLE" name="WTG4A_DPMaxPu" value="2"/>
+    <par type="DOUBLE" name="WTG4A_DPMinPu" value="-2"/>
+    <par type="DOUBLE" name="WTG4A_DbdPu" value="0.01"/>
+    <par type="DOUBLE" name="WTG4A_Dbd1Pu" value="-0.05"/>
+    <par type="DOUBLE" name="WTG4A_Dbd2Pu" value="0.05"/>
+    <par type="DOUBLE" name="WTG4A_EMaxPu" value="0.5"/>
+    <par type="DOUBLE" name="WTG4A_EMinPu" value="-0.5"/>
+    <par type="DOUBLE" name="WTG4A_FDbd1Pu" value="0.004"/>
+    <par type="DOUBLE" name="WTG4A_FDbd2Pu" value="1"/>
+    <par type="DOUBLE" name="WTG4A_FEMaxPu" value="999"/>
+    <par type="DOUBLE" name="WTG4A_FEMinPu" value="-999"/>
+    <par type="DOUBLE" name="WTG4A_RrpwrPu" value="10"/>
+    <par type="DOUBLE" name="WTG4A_KiPLL" value="20"/>
+    <par type="DOUBLE" name="WTG4A_KpPLL" value="3"/>
+    <par type="DOUBLE" name="WTG4A_OmegaMaxPu" value="1.5"/>
+    <par type="DOUBLE" name="WTG4A_OmegaMinPu" value="0.5"/>
+    <par type="DOUBLE" name="WTG4A_tHoldIq" value="0"/>
+    <par type="DOUBLE" name="WTG4A_tHoldIpMax" value="0"/>
+    <par type="DOUBLE" name="WTG4A_VRef1Pu" value="0"/>
+    <par type="BOOL" name="WTG4A_PFlag" value="true"/>
+    <par type="DOUBLE" name="WTG4A_Dshaft" value="1.5"/>
+    <par type="DOUBLE" name="WTG4A_Hg" value="1"/>
+    <par type="DOUBLE" name="WTG4A_Ht" value="5"/>
+    <par type="DOUBLE" name="WTG4A_Kshaft" value="200"/>
+    <par type="DOUBLE" name="WTG4A_VDLIp11" value="1.1"/>
+    <par type="DOUBLE" name="WTG4A_VDLIp12" value="1.1"/>
+    <par type="DOUBLE" name="WTG4A_VDLIp21" value="1.15"/>
+    <par type="DOUBLE" name="WTG4A_VDLIp22" value="1"/>
+    <par type="DOUBLE" name="WTG4A_VDLIp31" value="1.16"/>
+    <par type="DOUBLE" name="WTG4A_VDLIp32" value="1"/>
+    <par type="DOUBLE" name="WTG4A_VDLIp41" value="1.17"/>
+    <par type="DOUBLE" name="WTG4A_VDLIp42" value="1"/>
+    <par type="DOUBLE" name="WTG4A_VDLIq11" value="1.1"/>
+    <par type="DOUBLE" name="WTG4A_VDLIq12" value="1.1"/>
+    <par type="DOUBLE" name="WTG4A_VDLIq21" value="1.15"/>
+    <par type="DOUBLE" name="WTG4A_VDLIq22" value="1"/>
+    <par type="DOUBLE" name="WTG4A_VDLIq31" value="1.16"/>
+    <par type="DOUBLE" name="WTG4A_VDLIq32" value="1"/>
+    <par type="DOUBLE" name="WTG4A_VDLIq41" value="1.17"/>
+    <par type="DOUBLE" name="WTG4A_VDLIq42" value="1"/>
+  </set>
+  <set id="Network">
+    <par type="DOUBLE" name="capacitor_no_reclosing_delay" value="300"/>
+    <par type="DOUBLE" name="dangling_line_currentLimit_maxTimeOperation" value="90"/>
+    <par type="DOUBLE" name="line_currentLimit_maxTimeOperation" value="90"/>
+    <par type="DOUBLE" name="load_Tp" value="90"/>
+    <par type="DOUBLE" name="load_Tq" value="90"/>
+    <par type="DOUBLE" name="load_alpha" value="1"/>
+    <par type="DOUBLE" name="load_alphaLong" value="0"/>
+    <par type="DOUBLE" name="load_beta" value="2"/>
+    <par type="DOUBLE" name="load_betaLong" value="0"/>
+    <par type="BOOL" name="load_isControllable" value="false"/>
+    <par type="BOOL" name="load_isRestorative" value="false"/>
+    <par type="DOUBLE" name="load_zPMax" value="100"/>
+    <par type="DOUBLE" name="load_zQMax" value="100"/>
+    <par type="DOUBLE" name="reactance_no_reclosing_delay" value="0"/>
+    <par type="DOUBLE" name="transformer_currentLimit_maxTimeOperation" value="90"/>
+    <par type="DOUBLE" name="transformer_t1st_HT" value="60"/>
+    <par type="DOUBLE" name="transformer_t1st_THT" value="30"/>
+    <par type="DOUBLE" name="transformer_tNext_HT" value="10"/>
+    <par type="DOUBLE" name="transformer_tNext_THT" value="10"/>
+    <par type="DOUBLE" name="transformer_tolV" value="0.015"/>
+  </set>
+  <set id="OmegaRef">
+    <par type="INT" name="nbGen" value="5"/>
+    <par type="DOUBLE" name="weight_gen_0" value="6539.4"/>
+    <par type="DOUBLE" name="weight_gen_1" value="7056"/>
+    <par type="DOUBLE" name="weight_gen_2" value="9281.25"/>
+    <par type="DOUBLE" name="weight_gen_3" value="398"/>
+    <par type="DOUBLE" name="weight_gen_4" value="687"/>
+  </set>
+  <set id="SimplifiedSolver">
+    <par type="BOOL" name="enableSilentZ" value="true"/>
+    <par type="DOUBLE" name="fnormtol" value="1e-4"/>
+    <par type="DOUBLE" name="fnormtolAlg" value="1e-4"/>
+    <par type="DOUBLE" name="fnormtolAlgJ" value="1e-4"/>
+    <par type="DOUBLE" name="hMax" value="1.0"/>
+    <par type="DOUBLE" name="hMin" value="1.0E-6"/>
+    <par type="DOUBLE" name="initialaddtol" value="0.1"/>
+    <par type="DOUBLE" name="initialaddtolAlg" value="0.1"/>
+    <par type="DOUBLE" name="initialaddtolAlgJ" value="0.1"/>
+    <par type="DOUBLE" name="kReduceStep" value="0.5"/>
+    <par type="INT" name="maxNewtonTry" value="10"/>
+    <par type="INT" name="msbset" value="0"/>
+    <par type="INT" name="msbsetAlg" value="5"/>
+    <par type="INT" name="msbsetAlgJ" value="1"/>
+    <par type="INT" name="mxiter" value="15"/>
+    <par type="INT" name="mxiterAlg" value="30"/>
+    <par type="INT" name="mxiterAlgJ" value="500"/>
+    <par type="DOUBLE" name="mxnewtstep" value="100000"/>
+    <par type="DOUBLE" name="mxnewtstepAlg" value="100000"/>
+    <par type="DOUBLE" name="mxnewtstepAlgJ" value="100000"/>
+    <par type="BOOL" name="optimizeAlgebraicResidualsEvaluations" value="true"/>
+    <par type="INT" name="printfl" value="0"/>
+    <par type="INT" name="printflAlg" value="0"/>
+    <par type="INT" name="printflAlgJ" value="0"/>
+    <par type="DOUBLE" name="scsteptol" value="1e-4"/>
+    <par type="DOUBLE" name="scsteptolAlg" value="1e-4"/>
+    <par type="DOUBLE" name="scsteptolAlgJ" value="1e-4"/>
+    <par type="BOOL" name="skipNRIfInitialGuessOK" value="true"/>
+  </set>
+  <set id="OMS">
+    <par type="DOUBLE" name="currentLimitAutomaton_IMax" value='1'/>
+    <par type="DOUBLE" name="currentLimitAutomaton_tLagBeforeActing" value='0.2'/>
+    <par type="BOOL" name="currentLimitAutomaton_Running" value="true"/>
+    <par type="INT" name="currentLimitAutomaton_OrderToEmit" value="1"/>
+  </set>
+  <set id="TLOMS">
+    <par type="DOUBLE" name="currentLimitAutomaton_IMax1" value='1'/>
+    <par type="DOUBLE" name="currentLimitAutomaton_IMax2" value='1'/>
+    <par type="DOUBLE" name="currentLimitAutomaton_tLagBeforeActing1" value='0.2'/>
+    <par type="DOUBLE" name="currentLimitAutomaton_tLagBeforeActing2" value='0.2'/>
+    <par type="BOOL" name="currentLimitAutomaton_Running1" value="true"/>
+    <par type="BOOL" name="currentLimitAutomaton_Running2" value="true"/>
+    <par type="INT" name="currentLimitAutomaton_OrderToEmit1" value="1"/>
+    <par type="INT" name="currentLimitAutomaton_OrderToEmit2" value="2"/>
+  </set>
+  <set id="PSP_par">
+    <par type="DOUBLE" name="phaseShifter_P0" value="1"/>
+    <par type="DOUBLE" name="phaseShifter_PDeadBand" value="0.05"/>
+    <par type="DOUBLE" name="phaseShifter_PTarget" value="1"/>
+    <par type="INT" name="phaseShifter_increasePhase" value="1"/>
+    <par type="BOOL" name="phaseShifter_regulating0" value="true"/>
+    <par type="DOUBLE" name="phaseShifter_t1st" value="60"/>
+    <par type="DOUBLE" name="phaseShifter_tNext" value="10"/>
+    <par type="INT" name="phaseShifter_tap0" value="0"/>
+    <par type="INT" name="phaseShifter_tapMax" value="0"/>
+    <par type="INT" name="phaseShifter_tapMin" value="0"/>
+  </set>
+  <set id="PSI_par">
+    <par type="DOUBLE" name="phaseShifter_I0" value="1"/>
+    <par type="DOUBLE" name="phaseShifter_P0" value="1"/>
+    <par type="DOUBLE" name="phaseShifter_iMax" value="1.1"/>
+    <par type="DOUBLE" name="phaseShifter_iStop" value="1.09"/>
+    <par type="INT" name="phaseShifter_increasePhase" value="1"/>
+    <par type="BOOL" name="phaseShifter_regulating0" value="true"/>
+    <par type="DOUBLE" name="phaseShifter_t1st" value="60"/>
+    <par type="DOUBLE" name="phaseShifter_tNext" value="10"/>
+    <par type="INT" name="phaseShifter_tap0" value="0"/>
+    <par type="INT" name="phaseShifter_tapMax" value="0"/>
+    <par type="INT" name="phaseShifter_tapMin" value="0"/>
+  </set>
+  <set id="PSBI_par">
+    <par type="DOUBLE" name="phaseShifterBlockingI_IMax" value="1.1"/>
+    <par type="DOUBLE" name="phaseShifterBlockingI_tLagBeforeActing" value="0.2"/>
+  </set>
+  <set id="TapChanger_par">
+    <par type="DOUBLE" name="tapChanger_UDeadBand" value="0.01"/>
+    <par type="DOUBLE" name="tapChanger_UTarget" value="1.014"/>
+    <par type="BOOL" name="tapChanger_regulating0" value="true"/>
+    <par type="DOUBLE" name="tapChanger_t1st" value="60"/>
+    <par type="DOUBLE" name="tapChanger_tNext" value="10"/>
+    <par type="INT" name="tapChanger_tap0" value="5"/>
+    <par type="INT" name="tapChanger_tapMax" value="16"/>
+    <par type="INT" name="tapChanger_tapMin" value="0"/>
+    <par type="DOUBLE" name="tapChanger_U0" value="1"/>
+  </set>
+  <set id="LoadOneTransfo">
+    <par type="DOUBLE" name="load_alpha" value="1"/>
+    <par type="DOUBLE" name="load_beta" value="2"/>
+    <par type="DOUBLE" name="transformer_B" value="0"/>
+    <par type="DOUBLE" name="transformer_G" value="0"/>
+    <par type="DOUBLE" name="transformer_R" value="0"/>
+    <par type="DOUBLE" name="transformer_X" value="10"/>
+    <par type="INT" name="transformer_NbTap" value="17"/>
+    <par type="DOUBLE" name="transformer_rTfoMaxPu" value="1.10"/>
+    <par type="DOUBLE" name="transformer_rTfoMinPu" value="0.90"/>
+    <par type="DOUBLE" name="transformer_Uc20Pu" value="1.01"/>
+    <reference type="DOUBLE" name="transformer_SNom" origData="IIDM" origName="sn"/>
+    <reference type="DOUBLE" name="transformer_P10Pu" origData="IIDM" origName="p_pu"/>
+    <reference type="DOUBLE" name="transformer_Q10Pu" origData="IIDM" origName="q_pu"/>
+    <reference type="DOUBLE" name="transformer_U10Pu" origData="IIDM" origName="v_pu"/>
+    <reference type="DOUBLE" name="transformer_U1Phase0" origData="IIDM" origName="angle_pu"/>
+  </set>
+</parametersSet>
