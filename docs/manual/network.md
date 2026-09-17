@@ -21,6 +21,24 @@ network:
   name: "case24_ieee_rts"   # Name of the power grid network **without the pglib prefix**
 ```
 
+### Where downloaded cases are stored
+
+A PGLib case is downloaded the first time it is used and then cached on disk, so later
+runs need no network access. The cache holds both the file published by PGLib and the
+PowerModels-corrected copy used for solving.
+
+By default it lives in the platform user cache directory, which is
+`~/.cache/gridfm-datakit/grids` on Linux, `~/Library/Caches/gridfm-datakit/grids` on
+macOS and the local app data directory on Windows. Nothing is written inside the
+installed package, so `gridfm-datakit` works from a read-only installation.
+
+Set `GRIDFM_DATAKIT_CACHE_DIR` to move the cache elsewhere, which is useful for a shared
+cache on a cluster or a warm cache in CI.
+
+```bash
+export GRIDFM_DATAKIT_CACHE_DIR=/scratch/gridfm-cache
+```
+
 ## Local MATPOWER files
 
 e.g.

@@ -18,7 +18,14 @@ Progress bar log showing the execution progress of the data generation process.
 Error messages captured during generation.
 
 #### `args.log`
-YAML dump of the configuration used for this run.
+YAML dump of the configuration used for this run. Appended to, so a directory reused
+across runs holds one timestamped block per run.
+
+### Configuration Files
+
+#### `config.yaml`
+YAML dump of the configuration used for this run, rewritten on every run. This is what
+`gridfm-datakit validate` reads to recover the operating mode when `--mode` is omitted.
 
 ### Load Scenario Files
 

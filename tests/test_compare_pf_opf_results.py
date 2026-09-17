@@ -62,7 +62,13 @@ class TestComparePF_OPF_Results:
         )
 
         # Compare results
-        results_match = compare_pf_results(net, self.jl, case_name, fast, solver_type)
+        results_match = compare_pf_results(
+            net,
+            self.jl,
+            case_name,
+            fast=fast,
+            solver_type=solver_type,
+        )
 
         # Assert that results match
         assert results_match, (
