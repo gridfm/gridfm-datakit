@@ -42,7 +42,14 @@ class LoadedNetwork:
 
 
 def convert_net(network: Network) -> LoadedNetwork:
-    """Convert a gridfm_datakit Network to lightsim2grid."""
+    """Convert a gridfm_datakit Network to lightsim2grid.
+
+    Args:
+        network: The network to convert.
+
+    Returns:
+        The lightsim2grid LSGrid, the network itself and the index maps between the two.
+    """
     conv = to_lightsim2grid(network)
     return LoadedNetwork(
         ls_net=conv.ls_net,

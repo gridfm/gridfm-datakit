@@ -28,8 +28,23 @@ def run_ls_pf(
 ) -> Dict[str, Any]:
     """Run an AC (or DC) power flow with lightsim2grid and format the results.
 
+    The power flow starts from the voltages stored in ``net.buses`` (see
+    :func:`gridfm_datakit.lightsim2grid.convert.initial_voltage`).
+
+    Args:
+        ls_net: The lightsim2grid LSGrid, in sync with ``net``.
+        net: The network the LSGrid was built from or updated with.
+        mapping_l2g: Index maps between ``net`` and ``ls_net``.
+        dc: Run a DC power flow instead of an AC one.
+        max_iter: Maximum number of iterations.
+        tol: Convergence tolerance.
+
+    Returns:
+        The power flow results in PowerModels' format (see :func:`get_pf_res`), with the
+        solving time in ``"solve_time"``.
+
     Raises:
-        ValueError: if the power flow did not converge.
+        ValueError: If the power flow did not converge.
     """
     v_init = initial_voltage(net)
     start_time = time.perf_counter()
@@ -58,7 +73,9 @@ def get_pf_res(
         Power flow results in a nested Dict format, similar to PowerModel's power flow results
     """
     if v.shape[0] == 0:
-        raise ValueError("Power flow computation failed: lightsim2grid did not converge")
+        raise ValueError(
+            "Power flow computation failed: lightsim2grid did not converge",
+        )
 
     base_mva = float(net.baseMVA)
     n_branches = net.branches.shape[0]

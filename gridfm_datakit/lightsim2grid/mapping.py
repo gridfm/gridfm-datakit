@@ -40,7 +40,15 @@ class MappingL2G:
 
 
 def build_l2g_maps(net: Network) -> MappingL2G:
-    """Build the index maps of the LSGrid that :func:`to_lightsim2grid` creates from ``net``."""
+    """Build the index maps of the LSGrid that :func:`to_lightsim2grid` creates from ``net``.
+
+    Args:
+        net: The network the LSGrid is built from.
+
+    Returns:
+        The maps: which ``net.branches`` rows are powerlines and transformers in
+        lightsim2grid, and the bus index of every lightsim2grid bus.
+    """
     is_trafo = (net.branches[:, TAP] != 0) | (net.branches[:, SHIFT] != 0)
     return MappingL2G(
         line_rows=np.flatnonzero(~is_trafo),

@@ -185,10 +185,19 @@ def test_in_place_update_applies_changes_below_lightsim2grid_tolerance():
     updated = l2g.update_lightsim2grid(p, converted)
     assert updated is converted  # went in place
     fresh = l2g.to_lightsim2grid(p)
-    for got, expected in zip(updated.ls_net.get_generators(), fresh.ls_net.get_generators()):
+    for got, expected in zip(
+        updated.ls_net.get_generators(),
+        fresh.ls_net.get_generators(),
+    ):
         assert got.target_vm_pu == expected.target_vm_pu
         assert got.target_p_mw == expected.target_p_mw
-    a = _solution_arrays(l2g.run_ls_pf(updated.ls_net, p, updated.mapping_l2g, tol=1e-12), p)
-    b = _solution_arrays(l2g.run_ls_pf(fresh.ls_net, p, fresh.mapping_l2g, tol=1e-12), p)
+    a = _solution_arrays(
+        l2g.run_ls_pf(updated.ls_net, p, updated.mapping_l2g, tol=1e-12),
+        p,
+    )
+    b = _solution_arrays(
+        l2g.run_ls_pf(fresh.ls_net, p, fresh.mapping_l2g, tol=1e-12),
+        p,
+    )
     for u, v in zip(a, b):
         np.testing.assert_allclose(u, v, atol=1e-11)

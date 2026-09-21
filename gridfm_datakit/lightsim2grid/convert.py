@@ -41,6 +41,15 @@ def to_lightsim2grid(net: Network) -> ConvertedNetwork:
     from ``net.buses`` / ``net.gens`` / ``net.branches``, so the result is
     valid for one perturbed copy of the network only. Use
     :func:`update_lightsim2grid` to re-synchronise it with another one.
+
+    Args:
+        net: The network to convert.
+
+    Returns:
+        The LSGrid, its index maps to ``net`` and a snapshot of what it was built from.
+
+    Raises:
+        ImportError: If lightsim2grid is not available.
     """
     check_lightsim2grid_available()
     mpc = {
@@ -62,16 +71,25 @@ def to_lightsim2grid(net: Network) -> ConvertedNetwork:
     return ConvertedNetwork(
         ls_net=ls_net,
         mapping_l2g=mapping,
-        state=_snapshot(net, mapping),
+        state=_snapshot(net),
     )
 
 
 def _structure(net: Network) -> tuple:
-    """What can only be changed by rebuilding the LSGrid."""
+    """What can only be changed by rebuilding the LSGrid.
+
+    Args:
+        net: The network to read.
+
+    Returns:
+        Copies of the bus types and shunts, of the branch ends, taps and shifts, of the
+        generator buses, of which buses have a load, and the in-service slack generators.
+    """
     bus_type = np.zeros(net.buses.shape[0])
     bus_type[net.buses[:, BUS_I].astype(int)] = net.buses[:, BUS_TYPE]
     slack = np.flatnonzero(
-        (net.gens[:, GEN_STATUS] > 0) & (bus_type[net.gens[:, GEN_BUS].astype(int)] == REF),
+        (net.gens[:, GEN_STATUS] > 0)
+        & (bus_type[net.gens[:, GEN_BUS].astype(int)] == REF),
     )
     return (
         net.buses[:, [BUS_I, BUS_TYPE, GS, BS]].copy(),
@@ -82,11 +100,17 @@ def _structure(net: Network) -> tuple:
     )
 
 
-def _snapshot(net: Network, mapping: MappingL2G) -> Dict[str, Any]:
+def _snapshot(net: Network) -> Dict[str, Any]:
     """Copy of everything of ``net`` that the LSGrid was built from.
 
     ``structure`` holds what can only be changed by rebuilding the LSGrid; the
     other entries are what :func:`update_lightsim2grid` can push in place.
+
+    Args:
+        net: The network the LSGrid was built from.
+
+    Returns:
+        The snapshot, as a dict of arrays.
     """
     structure = _structure(net)
     has_load = structure[3]
@@ -100,7 +124,15 @@ def _snapshot(net: Network, mapping: MappingL2G) -> Dict[str, Any]:
 
 
 def _same_structure(net: Network, state: Dict[str, Any]) -> bool:
-    """Whether the LSGrid of ``state`` can be updated in place to match ``net``."""
+    """Whether the LSGrid of ``state`` can be updated in place to match ``net``.
+
+    Args:
+        net: The network the LSGrid should match.
+        state: The snapshot of the LSGrid (see :func:`_snapshot`).
+
+    Returns:
+        True if nothing that requires rebuilding the LSGrid changed.
+    """
     return all(
         np.array_equal(a, b) for a, b in zip(_structure(net), state["structure"])
     )
@@ -119,6 +151,14 @@ def update_lightsim2grid(
     It is rebuilt only if something it cannot update changed (topology, taps
     and shifts, shunts, bus types, which buses have a load, the slack
     generators). ``converted`` is modified and returned.
+
+    Args:
+        net: The network the LSGrid has to match.
+        converted: The result of a previous call, or None to build the LSGrid.
+
+    Returns:
+        ``converted`` updated in place, or a new :class:`ConvertedNetwork` if the LSGrid
+        had to be built or rebuilt.
     """
     if converted is None or not _same_structure(net, converted.state):
         return to_lightsim2grid(net)
@@ -143,6 +183,12 @@ def _set_exact(setter: Any, el_id: int, old: float, new: float) -> None:
     lightsim2grid setters, which would leave the LSGrid up to that far from
     ``net``, and make the data depend on which perturbations came before. Such a
     change is applied through a detour, in two steps that are both large enough.
+
+    Args:
+        setter: A lightsim2grid ``change_*`` method, taking an element id and a value.
+        el_id: Id of the element, in the lightsim2grid ordering.
+        old: Value currently stored in the LSGrid.
+        new: Value to store.
     """
     if abs(new - old) <= _LS_TOL_EQUAL_FLOAT:
         setter(el_id, float(new) + 10 * _LS_TOL_EQUAL_FLOAT)
@@ -155,6 +201,19 @@ def _update_in_place(
     mapping: MappingL2G,
     old: Dict[str, Any],
 ) -> None:
+    """Push into the LSGrid what changed in ``net`` since it was last synchronised.
+
+    Only the parameters that :func:`_same_structure` allows to change are handled:
+    branch impedances, admittances and statuses, generator statuses and set points,
+    and loads. ``old`` is updated with the new values at the end, and is left
+    untouched if an exception is raised before that (the caller then rebuilds).
+
+    Args:
+        ls_net: The lightsim2grid LSGrid to update.
+        net: The network the LSGrid has to match.
+        mapping: Index maps between ``net`` and ``ls_net``.
+        old: Snapshot of what was last pushed to ``ls_net``, updated in place.
+    """
     branch = net.branches[:, [BR_R, BR_X, BR_B, BR_STATUS]]
 
     # series impedance and charging admittance (the LSGrid has no per-element setter)
@@ -199,7 +258,14 @@ def _update_in_place(
 
 
 def initial_voltage(net: Network) -> np.ndarray:
-    """Complex initial voltage (one entry per lightsim2grid bus) from ``net.buses``."""
+    """Complex initial voltage (one entry per lightsim2grid bus) from ``net.buses``.
+
+    Args:
+        net: The network, whose bus voltage magnitudes (pu) and angles (degrees) are used.
+
+    Returns:
+        The complex voltages in pu, in the order of ``net.buses``.
+    """
     return (net.buses[:, VM] * np.exp(1j * np.deg2rad(net.buses[:, VA]))).astype(
         complex,
     )
