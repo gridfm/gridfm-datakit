@@ -83,6 +83,10 @@ powsybl = [
   "pypowsybl"
 ]
 
+lightsim2grid = [
+  "lightsim2grid>=1.1.0"
+]
+
 dynamic = [
   "pypowsybl",
   "zarr",

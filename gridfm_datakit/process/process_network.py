@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
+import gridfm_datakit.lightsim2grid as lightsim2grid
 import gridfm_datakit.powsybl as powsybl
 from gridfm_datakit.network import Network, branch_vectors, makeYbus
 from gridfm_datakit.perturbations.admittance_perturbation import AdmittanceGenerator
@@ -1068,9 +1069,9 @@ def process_scenario_pf_mode(
         produces the generator set-points before topology perturbation.
     pf_solver:
         Which engine to use for the power flow solve after topology
-        perturbation.  Must be ``'powermodel'`` (default) or
-        ``'powsybl'``.  OPF is always solved by PowerModels regardless
-        of this value.
+        perturbation.  Must be ``'powermodel'`` (default),
+        ``'powsybl'`` or ``'lightsim2grid'``.  OPF is always solved by
+        PowerModels regardless of this value.
 
     Keyword-only arguments (only required when ``pf_solver='powsybl'``)
     -------------------------------------------------------------------
@@ -1133,6 +1134,9 @@ def process_scenario_pf_mode(
         base_variant_id = pp_net.get_working_variant_id()
         lf_params = powsybl.get_default_lf_params()
 
+    if pf_solver == "lightsim2grid":
+        lightsim2grid.check_lightsim2grid_available()
+
     # to get PF points that can violate some OPF inequality constraints (to train PF solvers that can handle points outside of normal operating limits), we apply the topology perturbation after OPF.
     # The setpoints are then no longer adapted to the new topology, and might lead to e.g. abranch overload or a voltage magnitude violation once we drop an element.
     for pert_index, perturbation in enumerate(perturbations):
@@ -1153,6 +1157,50 @@ def process_scenario_pf_mode(
                 with open(error_log_file, "a") as f:
                     f.write(
                         f"Caught an exception at scenario {scenario_index} when solving in run_pf function: {e}\n",
+                    )
+                continue
+
+        if pf_solver == "lightsim2grid":
+            try:
+                # kept in meta so the same LSGrid is updated in place across the
+                # perturbations (and scenarios) handled by this worker
+                converted = lightsim2grid.update_lightsim2grid(
+                    perturbation,
+                    None if meta is None else meta.get("ls_converted"),
+                )
+                if meta is not None:
+                    meta["ls_converted"] = converted
+            except Exception as e:
+                with open(error_log_file, "a") as f:
+                    f.write(
+                        f"Caught an exception at scenario {scenario_index} when building the lightsim2grid model: {e}\n",
+                    )
+                continue
+
+            res_dcpf = None
+            if include_dc_res:
+                try:
+                    res_dcpf = lightsim2grid.run_ls_pf(
+                        converted.ls_net,
+                        perturbation,
+                        converted.mapping_l2g,
+                        dc=True,
+                    )
+                except Exception as e:
+                    with open(error_log_file, "a") as f:
+                        f.write(
+                            f"Caught an exception at scenario {scenario_index} when solving dcpf function with lightsim2grid solver: {e}\n",
+                        )
+            try:
+                res = lightsim2grid.run_ls_pf(
+                    converted.ls_net,
+                    perturbation,
+                    converted.mapping_l2g,
+                )
+            except Exception as e:
+                with open(error_log_file, "a") as f:
+                    f.write(
+                        f"Caught an exception at scenario {scenario_index} when solving in run_pf function with lightsim2grid solver: {e}\n",
                     )
                 continue
 
@@ -1366,7 +1414,7 @@ def process_scenario_chunk(
         solver_log_dir: Directory for solver logs.
         max_iter: Maximum iterations for the solver.
         seed: Global random seed for reproducibility.
-        pf_solver: PF solver to use in pf mode; either 'powermodel' or 'powsybl'.
+        pf_solver: PF solver to use in pf mode; one of 'powermodel', 'powsybl' or 'lightsim2grid'.
             OPF is always solved by PowerModels regardless of this value.
         meta: metadata dict; when pf_solver='powsybl', must contain 'network_path'
             and 'mapping_p2g'. 'pp_net' is loaded fresh per worker from 'network_path'.

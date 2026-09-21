@@ -12,6 +12,7 @@ import numpy as np
 import yaml
 from tqdm import tqdm
 
+import gridfm_datakit.lightsim2grid as lightsim2grid
 import gridfm_datakit.powsybl as powsybl
 from gridfm_datakit.network import (
     Network,
@@ -129,10 +130,13 @@ def _setup_environment(
     # In OPF mode the value is read and stored on args but is never consulted
     # during execution — it is kept here purely for consistency and logging.
     pf_solver = getattr(args.settings, "pf_solver", "powermodel")
-    if pf_solver not in ("powermodel", "powsybl"):
+    if pf_solver not in ("powermodel", "powsybl", "lightsim2grid"):
         raise ValueError(
-            f"settings.pf_solver must be 'powermodel' or 'powsybl', got {pf_solver!r}",
+            "settings.pf_solver must be 'powermodel', 'powsybl' or 'lightsim2grid', "
+            f"got {pf_solver!r}",
         )
+    if pf_solver == "lightsim2grid":
+        lightsim2grid.check_lightsim2grid_available()
     args.settings.pf_solver = pf_solver
 
     opf_formulation = getattr(args.settings, "opf_formulation", "polar")
