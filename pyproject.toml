@@ -83,6 +83,9 @@ powsybl = [
   "pypowsybl"
 ]
 
+# TODO: move the lower bound to the first lightsim2grid release with update_powerlines_parameters /
+# update_trafos_parameters (branch dev_gfm_datakit). Older versions work, but rebuild the model for
+# every power flow. See docs/installation.md.
 lightsim2grid = [
   "lightsim2grid>=1.1.0"
 ]

@@ -49,7 +49,9 @@ is also reused from one scenario to the next.
     `pf_solver: lightsim2grid` needs a lightsim2grid providing
     `lightsim2grid.network.init_from_matpower`. Pushing changes into the model needs the
     `update_powerlines_parameters` and `update_trafos_parameters` methods; without them the
-    model is rebuilt for every power flow, which gives the same results more slowly.
+    model is rebuilt for every power flow, which gives the same results more slowly. Until a
+    lightsim2grid release has them, they are available by
+    [installing lightsim2grid from source](../installation.md#optional-lightsim2grid-power-flow-solver).
 
 ### Differences with PowerModels
 
