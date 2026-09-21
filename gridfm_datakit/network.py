@@ -98,11 +98,16 @@ def correct_network(network_path: str, force: bool = False) -> str:
 
         # Julia script as a list of lines. silence() suppresses PowerModels'
         # Info/Warn chatter from parse_file/export_matpower.
+        # Convert Windows backslashes to forward slashes so Julia does not
+        # interpret them as escape sequences inside the string literal.
+        jl_network_path = str(network_path).replace("\\", "/")
+        jl_tmp_path = str(tmp_path).replace("\\", "/")
+
         julia_code = [
             "using PowerModels",
             "PowerModels.silence()",
-            f'data = PowerModels.parse_file("{network_path}")',
-            f'PowerModels.export_matpower("{tmp_path}", data)',
+            f'data = PowerModels.parse_file("{jl_network_path}")',
+            f'PowerModels.export_matpower("{jl_tmp_path}", data)',
         ]
 
         # Run Julia
