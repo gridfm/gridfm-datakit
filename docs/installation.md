@@ -16,6 +16,16 @@ pip install gridfm-datakit
 gridfm_datakit setup_pm
 ```
 
+### Optional: lightsim2grid power flow solver
+
+The `lightsim2grid` extra installs [lightsim2grid](https://github.com/Grid2op/lightsim2grid), an
+alternative to PowerModels for solving the power flow (`settings.pf_solver: lightsim2grid`, see
+[Power flow solver](manual/power_flow_solver.md)):
+
+```bash
+pip install 'gridfm-datakit[lightsim2grid]'
+```
+
 ### Optional: dynamic (time-domain) simulation
 
 Dynamic simulation needs two extra things on top of the base install. See the

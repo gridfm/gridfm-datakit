@@ -77,6 +77,7 @@ settings:
   include_dc_res: true # If true, also stores the results of dc power flow and dc optimal power flow
   pf_fast: true # Whether to use fast PF solver by default (compute_ac_pf from powermodels.jl); if false, uses Ipopt-based PF. Some networks e.g. case10000_goc do not work with pf_fast: true
   dcpf_fast: true # Whether to use fast DC PF solver (compute_dc_pf from powermodels.jl); if false, uses optimizer-based DC PF
+  pf_solver: "powermodel" # Engine solving the power flow in pf mode; options: powermodel, powsybl, lightsim2grid (the OPF is always solved by PowerModels)
   enable_solver_logs: false # If true, write OPF/PF solver logs to {data_dir}/solver_log; PF fast ignores logging
 
 ```
@@ -97,6 +98,7 @@ The `mode` parameter controls how the power flow scenarios are generated and val
 - **Use Case**: Training data for power flow, contingency analysis, etc
 - **Performance**: Faster as it avoids re-solving OPF for each perturbed scenario
 - **PF Solver Choice**: Controlled by `settings.pf_fast`. If `true`, uses the fast `compute_ac_pf` path. If `false`, uses the Ipopt-based AC PF which is slower for smaller grids but has better convergence properties for large grids.
+- **PF Engine**: `settings.pf_solver` selects the engine: `powermodel` (default), `powsybl` or `lightsim2grid`. See [Power flow solver](power_flow_solver.md).
 
 ## Data Validation
 
