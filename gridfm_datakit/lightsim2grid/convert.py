@@ -166,8 +166,10 @@ def update_lightsim2grid(
     ls_net, mapping, old = converted.ls_net, converted.mapping_l2g, converted.state
     try:
         _update_in_place(ls_net, net, mapping, old)
-    except Exception:
-        # half-updated: nothing about the LSGrid can be trusted anymore
+    except AttributeError:
+        # a released lightsim2grid without update_powerlines_parameters /
+        # update_trafos_parameters: half-updated, nothing about the LSGrid can
+        # be trusted anymore, fall back to rebuilding it from scratch
         return to_lightsim2grid(net)
     return converted
 

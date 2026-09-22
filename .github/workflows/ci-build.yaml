@@ -155,7 +155,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip wheel
-          pip install -e ".[test,dynamic,powsybl]"
+          pip install -e ".[test,dynamic,powsybl,lightsim2grid]"
 
       - name: Set up Julia packages (PowerModels)
         run: python -c "from juliacall import Main as jl; jl.seval('using PowerModels, Ipopt, Memento')"
@@ -165,8 +165,8 @@ jobs:
           "$HOME/dynawo/dynawo.sh" version
           python -c "from gridfm_datakit.dynamic.dynawo.api import check_dynawo_available; check_dynawo_available()"
 
-      - name: Dynawo and powsybl tests
-        run: pytest tests/dynamic tests/powsybl -v
+      - name: Dynawo, powsybl and lightsim2grid tests
+        run: pytest tests/dynamic tests/powsybl tests/lightsim2grid -v
 
   codeql:
     name: CodeQL (Python)
