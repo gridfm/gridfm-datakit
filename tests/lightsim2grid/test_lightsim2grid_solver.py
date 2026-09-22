@@ -121,6 +121,14 @@ def _perturbed(net, rng, step):
 def test_in_place_update_matches_a_rebuild():
     """Updating the LSGrid in place, across perturbations, must give exactly what a fresh LSGrid gives."""
     net = load_net_from_file(str(_GRID))
+    # TODO(lightsim2grid>=X): a released lightsim2grid has no update_powerlines_parameters /
+    # update_trafos_parameters yet (see the TODO on the lightsim2grid extra in pyproject.toml), so
+    # here every branch-parameter change falls back to a rebuild instead of going in place. Once a
+    # release has them, this starts asserting n_rebuilt == 1 automatically.
+    supports_in_place = hasattr(
+        l2g.to_lightsim2grid(net).ls_net,
+        "update_powerlines_parameters",
+    )
     rng = np.random.default_rng(0)
     converted = None
     n_compared = n_rebuilt = 0
@@ -149,7 +157,8 @@ def test_in_place_update_matches_a_rebuild():
             for updated, rebuilt in zip(*results):
                 np.testing.assert_allclose(updated, rebuilt, atol=1e-10, equal_nan=True)
     assert n_compared > 40
-    assert n_rebuilt == 1  # only the initial build: everything else went in place
+    if supports_in_place:
+        assert n_rebuilt == 1  # only the initial build: everything else went in place
 
 
 def test_structural_change_triggers_a_rebuild():
