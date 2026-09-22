@@ -761,6 +761,7 @@ class _DynamicDataWriter:
     def _write_metadata(self) -> None:
         config_hash = hashlib.md5(
             json.dumps(self.config.to_dict(), sort_keys=True, default=str).encode(),
+            usedforsecurity=False,
         ).hexdigest()
 
         metadata = {
