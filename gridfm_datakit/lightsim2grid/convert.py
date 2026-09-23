@@ -218,12 +218,15 @@ def _update_in_place(
     """
     branch = net.branches[:, [BR_R, BR_X, BR_B, BR_STATUS]]
 
-    # series impedance and charging admittance (the LSGrid has no per-element setter)
-    for rows, update, split_b in (
-        (mapping.line_rows, ls_net.update_powerlines_parameters, True),
-        (mapping.trafo_rows, ls_net.update_trafos_parameters, False),
+    # series impedance and charging admittance (the LSGrid has no per-element setter).
+    # The update method is looked up only when needed: a released lightsim2grid does not
+    # have it, and only a change of these parameters has to fall back to a rebuild.
+    for rows, update_name, split_b in (
+        (mapping.line_rows, "update_powerlines_parameters", True),
+        (mapping.trafo_rows, "update_trafos_parameters", False),
     ):
         if rows.size and not np.array_equal(branch[rows, :3], old["branch"][rows, :3]):
+            update = getattr(ls_net, update_name)
             r, x, b = branch[rows, 0], branch[rows, 1], 1j * branch[rows, 2]
             if split_b:  # a line: the charging is split in two halves
                 update(r, x, b / 2, b / 2)
