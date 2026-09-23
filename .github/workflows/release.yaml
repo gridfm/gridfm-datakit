@@ -10,7 +10,7 @@ jobs:
     name: Publish release to PyPI
     runs-on: ubuntu-latest
 
-    if: startsWith(github.ref, 'refs/tags/') && matches(github.ref_name, '^v[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+)?$')
+    if: startsWith(github.ref, 'refs/tags/v')
 
     environment:
       name: pypi
@@ -20,6 +20,15 @@ jobs:
       id-token: write
 
     steps:
+      - name: Validate tag is a release version
+        run: |
+          re='^v[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+)?$'
+          if [[ ! "$GITHUB_REF_NAME" =~ $re ]]; then
+            echo "::error::Tag '$GITHUB_REF_NAME' is not a release version (expected vMAJOR.MINOR.PATCH with an optional aN/bN/rcN suffix)."
+            exit 1
+          fi
+          echo "Tag '$GITHUB_REF_NAME' is a valid release version."
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
