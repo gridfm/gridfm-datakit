@@ -6,6 +6,8 @@ Tests the Network class and load functions with matpowercaseframes integration
 import pytest
 import numpy as np
 from gridfm_datakit.network import load_net_from_pglib, Network
+from gridfm_datakit.utils.idx_brch import BR_STATUS
+from gridfm_datakit.utils.idx_gen import GEN_STATUS
 
 
 class TestNetwork:
@@ -90,6 +92,28 @@ class TestNetwork:
         assert isinstance(network.version(), (int, float, np.number, str)), (
             "Version should be numeric or string"
         )
+
+    def test_copy_for_perturbation_copies_only_mutable_state(self):
+        """Scenario copies isolate mutable matrices and reuse static metadata."""
+        network = load_net_from_pglib("case24_ieee_rts")
+        copied = network.copy_for_perturbation()
+
+        for attribute in ("buses", "gens", "branches", "gencosts"):
+            original_array = getattr(network, attribute)
+            copied_array = getattr(copied, attribute)
+            np.testing.assert_array_equal(copied_array, original_array)
+            assert not np.shares_memory(copied_array, original_array)
+
+        assert copied.mpc is network.mpc
+        assert copied.bus_index_mapping is network.bus_index_mapping
+        assert copied.reverse_bus_index_mapping is network.reverse_bus_index_mapping
+        assert copied._solver_cache is network._solver_cache
+
+        copied.buses[0, 2] += 1
+        copied.gens[0, 1] += 1
+        copied.branches[0, 10] = 0
+        copied.gencosts[0, -1] += 1
+        assert copied != network
 
     def test_network_bus_data(self):
         """Test specific bus matrix data structure"""
@@ -273,11 +297,11 @@ class TestNetwork:
 
         # Test deactivating a generator
         network.deactivate_gens(np.array([0]))
-        assert network.gens[0, 7] == 0, "Generator should be deactivated"
+        assert network.gens[0, GEN_STATUS] == 0, "Generator should be deactivated"
 
         # Test deactivating a branch
         network.deactivate_branches(np.array([0]))
-        assert network.branches[0, 10] == 0, "Branch should be deactivated"
+        assert network.branches[0, BR_STATUS] == 0, "Branch should be deactivated"
 
         # Test that idx_gens_in_service and idx_branches_in_service reflect the changes
         assert 0 not in network.idx_gens_in_service, (

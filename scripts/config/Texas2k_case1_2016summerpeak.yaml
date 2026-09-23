@@ -23,6 +23,10 @@ topology_perturbation:
   k: 1 # Maximum number of components to drop in each perturbation
   n_topology_variants: 20 # Number of unique perturbed topologies per scenario
   elements: [branch, gen] # elements to perturb. options: branch, gen
+  # Optional for type: "random": entry i is the probability of sampling i outages.
+  # If omitted, the generator samples uniformly between 1 and k.
+  # Example for k: 1 -> 10% N-0 and 90% N-1.
+  # outage_count_probabilities: [0.1, 0.9]
 
 generation_perturbation:
   type: "cost_permutation" # Type of generation perturbation; options: cost_permutation, cost_perturbation, none
@@ -41,8 +45,9 @@ settings:
   overwrite: true # If true, overwrites existing files, if false, appends to files
   mode: "pf" # Mode of the script; options: pf, opf. pf: power flow data where one or more operating limits – the inequality constraints defined in OPF, e.g., voltage magnitude or branch limits – may be violated. opf:  generates datapoints for training OPF solvers, with cost-optimal dispatches that satisfy all operating limits (OPF-feasible)
   include_dc_res: true # If true, also stores the results of dc power flow or dc optimal power flow
-  enable_solver_logs: false # If true, write OPF/PF logs to {data_dir}/solver_log; PF fast and DCPF fast do not log.
+  enable_solver_logs: false # If true, write OPF/PF/DCPF logs (incl. fast paths) to {data_dir}/solver_log.
   pf_fast: true # Whether to use fast PF solver by default (compute_ac_pf from powermodels.jl); if false, uses Ipopt-based PF. Some networks (typically large ones e.g. case10000_goc) do not work with pf_fast: true. pf_fast is faster and more accurate than the Ipopt-based PF.
   dcpf_fast: true # Whether to use fast DCPF solver by default (compute_dc_pf from PowerModels.jl)
+  opf_formulation: "polar" # "rectangular" is faster on this grid but produced a materially different operating point in benchmarks; keep polar unless that tradeoff is intentional.
   max_iter: 200 # Max iterations for Ipopt-based solvers
   seed: null # Seed for random number generation. If null, a random seed is generated (RECOMMENDED). To get the same data across runs, set the seed and note that ALL OTHER PARAMETERS IN THE CONFIG FILE MUST BE THE SAME.

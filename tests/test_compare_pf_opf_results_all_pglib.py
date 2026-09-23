@@ -94,10 +94,14 @@ class TestComparePF_OPF_Results_AllPGLib:
         cls.jl = init_julia(max_iter=150)
 
     @pytest.mark.parametrize(
-        "case_name,solver_type",
-        [(c, s) for c in PGLIB_CASES for s in ("pf", "opf")],
+        "case_name,solver_type,fast",
+        [
+            (c, s, f)
+            for c in PGLIB_CASES
+            for s, f in (("pf", True), ("pf", False), ("opf", False))
+        ],
     )
-    def test_compare_results_all_pglib(self, case_name, solver_type):
+    def test_compare_results_all_pglib(self, case_name, solver_type, fast):
         solver_name = "PF" if solver_type == "pf" else "OPF"
         print(f"\n[All-PGLib] Testing {solver_name} result comparison for {case_name}…")
 
@@ -108,8 +112,15 @@ class TestComparePF_OPF_Results_AllPGLib:
         )
 
         # Compare results
-        results_match = compare_pf_results(net, self.jl, case_name, solver_type)
+        results_match = compare_pf_results(
+            net,
+            self.jl,
+            case_name,
+            fast=fast,
+            solver_type=solver_type,
+        )
 
         assert results_match, (
-            f"{solver_name} results from temp file don't match original case file for {case_name}"
+            f"{solver_name} results from temp file don't match original case file "
+            f"for {case_name} with fast={fast}"
         )

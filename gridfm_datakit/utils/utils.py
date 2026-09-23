@@ -1,12 +1,47 @@
 import os
+import time
+import errno
 import psutil
-from typing import TextIO
+from typing import List, Optional, TextIO
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 import pandas as pd
 
 
 n_scenario_per_partition = 200  # Number of scenarios per partition
+
+
+def write_parquet(
+    df: pd.DataFrame,
+    path: str,
+    partition_cols: Optional[List[str]] = None,
+) -> None:
+    """Write a DataFrame to parquet with space-optimized settings.
+
+    Uses zstd compression (smaller and faster to write than the snappy
+    default) and BYTE_STREAM_SPLIT encoding for float columns, which
+    groups the bytes of each float across values so zstd can exploit the
+    shared exponent/sign bytes of physical quantities.
+
+    Args:
+        df: DataFrame to write.
+        path: Output file path (directory when partition_cols is set).
+        partition_cols: Columns to partition the dataset by.
+    """
+    float_cols = [
+        c
+        for c in df.columns
+        if df[c].dtype.kind == "f" and c not in (partition_cols or [])
+    ]
+    df.to_parquet(
+        path,
+        partition_cols=partition_cols,
+        engine="pyarrow",
+        index=False,
+        compression="zstd",
+        use_dictionary=False,
+        column_encoding={c: "BYTE_STREAM_SPLIT" for c in float_cols},
+    )
 
 
 def get_num_scenarios(data_dir: str) -> int:
@@ -41,6 +76,39 @@ def get_num_scenarios(data_dir: str) -> int:
         )
 
 
+def _retry_on_eagain(func, retries: int = 50, delay: float = 0.01):
+    """Call ``func`` retrying on ``EAGAIN``/``BlockingIOError``.
+
+    When many worker processes share a stdout/pipe (e.g. heavy multiprocessing),
+    the file descriptor can be non-blocking and a write/flush may raise
+    ``BlockingIOError`` ([Errno 11]). Retry briefly instead of propagating the
+    error, which would otherwise fail data generation.
+
+    The common (no-error) path is a single ``try`` with no loop or allocation,
+    so this adds negligible overhead; the retry loop only runs after a failure.
+    """
+    try:
+        return func()
+    except OSError as e:
+        if not (isinstance(e, BlockingIOError) or e.errno == errno.EAGAIN):
+            raise
+    # Slow path: only reached when the first attempt hit EAGAIN.
+    for _ in range(retries - 1):
+        time.sleep(delay)
+        try:
+            return func()
+        except OSError as e:
+            if not (isinstance(e, BlockingIOError) or e.errno == errno.EAGAIN):
+                raise
+    # Final attempt; let a persistent failure propagate.
+    return func()
+
+
+def _blocking_write(stream, data) -> None:
+    """Write to a stream, tolerating ``EAGAIN``/``BlockingIOError``."""
+    _retry_on_eagain(lambda: stream.write(data))
+
+
 def write_ram_usage_distributed(tqdm_log: TextIO) -> None:
     process = psutil.Process(os.getpid())  # Parent process
     mem_usage = process.memory_info().rss / 1024**2  # Parent memory in MB
@@ -49,7 +117,10 @@ def write_ram_usage_distributed(tqdm_log: TextIO) -> None:
     for child in process.children(recursive=True):
         mem_usage += child.memory_info().rss / 1024**2
 
-    tqdm_log.write(f"Total RAM usage (Parent + Children): {mem_usage:.2f} MB\n")
+    _blocking_write(
+        tqdm_log,
+        f"Total RAM usage (Parent + Children): {mem_usage:.2f} MB\n",
+    )
 
 
 class Tee:
@@ -58,12 +129,12 @@ class Tee:
 
     def write(self, data):
         for s in self.streams:
-            s.write(data)
-            s.flush()
+            _blocking_write(s, data)
+            _retry_on_eagain(s.flush)
 
     def flush(self):
         for s in self.streams:
-            s.flush()
+            _retry_on_eagain(s.flush)
 
 
 def read_partitions(

@@ -9,15 +9,41 @@
 
 ![Docs](https://img.shields.io/badge/docs-available-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-76%25-yellow)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12594/badge)](https://www.bestpractices.dev/projects/12594)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/gridfm/gridfm-datakit/badge)](https://scorecard.dev/viewer/?uri=github.com/gridfm/gridfm-datakit)
 ![Python](https://img.shields.io/badge/python-3.10%20%E2%80%93%203.12-blue)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 
 
+## Citation
+
+If you use `gridfm-datakit` in your research, please cite both:
+
+```bibtex
+@article{puech2025gridfmdatakitv1pythonlibraryscalable,
+  title={gridfm-datakit-v1: A Python Library for Scalable and Realistic Power Flow and Optimal Power Flow Data Generation},
+  author={Alban Puech and Matteo Mazzonelli and Celia Cintas and Tamara R. Govindasamy and Mangaliso Mngomezulu and Jonas Weiss and Matteo Baù and Anna Varbella and François Mirallès and Kibaek Kim and Le Xie and Hendrik F. Hamann and Etienne Vos and Thomas Brunschwiler},
+  journal={arXiv preprint arXiv:2512.14658},
+  year={2025},
+  url={https://arxiv.org/abs/2512.14658}
+}
+
+
+@article{puech2026gencounifiedneural,
+  title={GENCO - A Unified Neural Solver Embedded in a Development Framework for Steady-State Grid Analysis},
+  author={Alban Puech and Matteo Mazzonelli and Tamara R. Govindasamy and Mangaliso Mngomezulu and Héctor Maeso-García and Thomas Tolhurst and Javad Bayazi and Ali Moeini and Naomi Simumba and Celia Cintas and David Nelischer and Romeo Kienzler and Jonas Weiss and Anna Varbella and Florian Dörfler and Gabriela Hug and Martin Mevissen and Juan Bernabé-Moreno and François Mirallès and Hendrik F. Hamann and Etienne Vos and Thomas Brunschwiler},
+  journal={arXiv preprint arXiv:2608.09921},
+  year={2026},
+  url={https://arxiv.org/abs/2608.09921}
+}
+```
+
+
 ---
 
-# GridFM DataKit
+# GridFM datakit
 
-**GridFM DataKit** (`gridfm-datakit`) is a Python library for generating realistic, diverse, and scalable synthetic datasets for power flow (PF) and optimal power flow (OPF) machine learning solvers. It unifies state-of-the-art methods for perturbing loads, generator dispatches, network topologies, and branch parameters, addressing limitations of existing data generation libraries.
+**GridFM datakit** (`gridfm-datakit`) is a Python library for generating realistic, diverse, and scalable synthetic datasets for power flow (PF) and optimal power flow (OPF) machine learning solvers. It unifies state-of-the-art methods for perturbing loads, generator dispatches, network topologies, and branch parameters, addressing limitations of existing data generation libraries.
 
 ## Key Features
 
@@ -36,24 +62,7 @@
   <br/>
 </p>
 
-## Citation
-
-Please cite the library when using it in your work:
-
-```bibtex
-@misc{puech2025gridfmdatakitv1pythonlibraryscalable,
-      title={gridfm-datakit-v1: A Python Library for Scalable and Realistic Power Flow and Optimal Power Flow Data Generation},
-      author={Alban Puech and Matteo Mazzonelli and Celia Cintas and Tamara R. Govindasamy and Mangaliso Mngomezulu and Jonas Weiss and Matteo Baù and Anna Varbella and François Mirallès and Kibaek Kim and Le Xie and Hendrik F. Hamann and Etienne Vos and Thomas Brunschwiler},
-      year={2025},
-      eprint={2512.14658},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG},
-      url={https://arxiv.org/abs/2512.14658},
-}
-```
-
 ---
-
 
 # Installation
 
@@ -186,6 +195,7 @@ settings:
   enable_solver_logs: true # If true, write OPF/PF logs to {data_dir}/solver_log; PF fast and DCPF fast do not log.
   pf_fast: true # Whether to use fast PF solver by default (compute_ac_pf from powermodels.jl); if false, uses Ipopt-based PF. Some networks (typically large ones e.g. case10000_goc) do not work with pf_fast: true. pf_fast is faster and more accurate than the Ipopt-based PF.
   dcpf_fast: true # Whether to use fast DCPF solver by default (compute_dc_pf from PowerModels.jl)
+  opf_formulation: "polar" # AC OPF coordinates: polar preserves historical results; rectangular is often substantially faster on large grids but can reach a different local optimum because AC OPF is nonconvex.
   max_iter: 200 # Max iterations for Ipopt-based solvers
   seed: null # Seed for random number generation. If null, a random seed is generated (RECOMMENDED). To get the same data across runs, set the seed and note that ALL OTHER PARAMETERS IN THE CONFIG FILE MUST BE THE SAME.
 

@@ -1,11 +1,28 @@
-import numpy as np
-import copy
-from itertools import combinations
 from abc import ABC, abstractmethod
+from itertools import combinations
+from math import comb
 import warnings
-from typing import Generator, List, Union
+from typing import Generator, List, Mapping, Optional, Sequence, Union
+
+import numpy as np
+
 from gridfm_datakit.network import Network
 from gridfm_datakit.utils.idx_gen import GEN_BUS
+
+
+class _LazyComponentCombinations:
+    """Reusable iterable over N-k combinations without storing every tuple."""
+
+    def __init__(self, components: np.ndarray, k: int) -> None:
+        self.components = components
+        self.k = min(k, len(components))
+
+    def __iter__(self):
+        for count in range(self.k + 1):
+            yield from combinations(self.components, count)
+
+    def __len__(self) -> int:
+        return sum(comb(len(self.components), count) for count in range(self.k + 1))
 
 
 # Abstract base class for topology generation
@@ -47,7 +64,7 @@ class NoPerturbationGenerator(TopologyGenerator):
         Yields:
             The original power network.
         """
-        yield copy.deepcopy(net)
+        yield net.copy_for_perturbation()
 
 
 class NMinusKGenerator(TopologyGenerator):
@@ -61,10 +78,10 @@ class NMinusKGenerator(TopologyGenerator):
     Attributes:
         k: Maximum number of components to drop.
         components_to_drop: List of tuples containing component indices and types.
-        component_combinations: List of all possible combinations of components to drop.
+        component_combinations: Lazy iterable over all combinations to drop.
     """
 
-    def __init__(self, k: int, base_net: dict) -> None:
+    def __init__(self, k: int, base_net: Network) -> None:
         """Initialize the N-k generator.
 
         Args:
@@ -78,7 +95,7 @@ class NMinusKGenerator(TopologyGenerator):
         super().__init__()
         if k > 1:
             warnings.warn("k>1. This may result in slow data generation process.")
-        if k == 0:
+        if k <= 0:
             raise ValueError(
                 'k must be greater than 0. Use "none" as argument for the generator_type if you don\'t want to generate any perturbation',
             )
@@ -87,10 +104,13 @@ class NMinusKGenerator(TopologyGenerator):
         # Prepare the list of components to drop
         self.components_to_drop = base_net.idx_branches_in_service
 
-        # Generate all combinations of at most k components
-        self.component_combinations = []
-        for r in range(self.k + 1):
-            self.component_combinations.extend(combinations(self.components_to_drop, r))
+        # Generate combinations lazily. Materializing N-2 contingencies is
+        # quadratic in the branch count and can consume gigabytes before the
+        # first topology is processed.
+        self.component_combinations = _LazyComponentCombinations(
+            self.components_to_drop,
+            self.k,
+        )
 
         print(
             f"Number of possible topologies with at most {self.k} dropped components: {len(self.component_combinations)}",
@@ -110,12 +130,15 @@ class NMinusKGenerator(TopologyGenerator):
             A perturbed network topology with at most k components removed.
         """
         for selected_components in self.component_combinations:
-            perturbed_topology = copy.deepcopy(net)
+            perturbed_topology = net.copy_for_perturbation()
 
             perturbed_topology.deactivate_branches(selected_components)
 
             # Check network feasibility and yield the topology
-            if perturbed_topology.check_single_connected_component():
+            if (
+                not selected_components
+                or perturbed_topology.check_single_connected_component()
+            ):
                 yield perturbed_topology
 
 
@@ -136,7 +159,9 @@ class RandomComponentDropGenerator(TopologyGenerator):
         n_topology_variants: int,
         k: int,
         base_net: Network,
-        elements: List[str] = ["branch", "gen"],
+        elements: Optional[List[str]] = None,
+        outage_count_probabilities: Sequence[float] | Mapping[int, float] | None = None,
+        max_generation_attempts: int | None = None,
     ) -> None:
         """Initialize the random component drop generator.
 
@@ -145,10 +170,26 @@ class RandomComponentDropGenerator(TopologyGenerator):
             k: Maximum number of components to drop.
             base_net: The base power network.
             elements: List of element types to consider for dropping.
+            outage_count_probabilities: Optional probabilities over outage counts.
+                Index or key `i` means probability of sampling `i` outages.
+            max_generation_attempts: Optional cap on sampled topology attempts
+                before failing if too many sampled topologies are infeasible.
+                If not provided, a default limit of
+                ``max(500, 50 * n_topology_variants)`` is used.
         """
         super().__init__()
         self.n_topology_variants = n_topology_variants
         self.k = k
+        elements = ["branch", "gen"] if elements is None else elements
+
+        # Only "branch" and "gen" are recognized; flag anything else early so a
+        # typo (e.g. "line"/"trafo") does not silently drop nothing.
+        unknown = set(elements) - {"branch", "gen"}
+        if unknown:
+            raise ValueError(
+                f"Unknown element type(s) for topology perturbation: {sorted(unknown)}. "
+                'Supported element types are "branch" and "gen".',
+            )
 
         # Create a list of all components that can be dropped
         self.components_to_drop = []
@@ -163,6 +204,16 @@ class RandomComponentDropGenerator(TopologyGenerator):
                 if base_net.gens[idx, GEN_BUS] != base_net.ref_bus_idx
             )
 
+        # Preserve the current 1..k uniform sampling when no explicit count
+        # probabilities are provided, but allow configurable sampling over 0..k.
+        self.outage_count_values, self.outage_count_probabilities = (
+            self._normalize_outage_count_probabilities(k, outage_count_probabilities)
+        )
+        self.max_generation_attempts = self._resolve_max_generation_attempts(
+            n_topology_variants,
+            max_generation_attempts,
+        )
+
     def generate(
         self,
         net: Network,
@@ -176,20 +227,24 @@ class RandomComponentDropGenerator(TopologyGenerator):
             A perturbed network topology.
         """
         n_generated_topologies = 0
+        n_attempts = 0
 
         # Stop after we generated n_topology_variants
         while n_generated_topologies < self.n_topology_variants:
-            perturbed_topology = copy.deepcopy(net)
+            if n_attempts >= self.max_generation_attempts:
+                raise RuntimeError(
+                    "Unable to generate "
+                    f"{self.n_topology_variants} feasible topologies within "
+                    f"{self.max_generation_attempts} attempts. "
+                    "Consider reducing k or relaxing outage_count_probabilities.",
+                )
+            n_attempts += 1
 
-            # draw the number of components to drop from a uniform distribution
-            r = np.random.randint(
-                1,
-                self.k + 1,
-            )  # TODO: decide if we want to be able to set 0 components out of service
+            r = self._sample_outage_count()
 
             # Randomly select r<=k components to drop
             components = tuple(
-                np.random.choice(range(len(self.components_to_drop)), r, replace=False),
+                np.random.choice(len(self.components_to_drop), r, replace=False),
             )
 
             # Convert indices back to actual components
@@ -206,6 +261,7 @@ class RandomComponentDropGenerator(TopologyGenerator):
             ]
 
             # Drop selected lines and transformers, turn off generators and static generators
+            perturbed_topology = net.copy_for_perturbation()
             perturbed_topology.deactivate_branches(branches_to_drop)
             perturbed_topology.deactivate_gens(gens_to_drop)
 
@@ -213,3 +269,85 @@ class RandomComponentDropGenerator(TopologyGenerator):
             if perturbed_topology.check_single_connected_component():
                 yield perturbed_topology
                 n_generated_topologies += 1
+
+    def _sample_outage_count(self) -> int:
+        if self.outage_count_probabilities is None:
+            return int(np.random.randint(1, self.k + 1))
+        return int(
+            np.random.choice(
+                self.outage_count_values,
+                p=self.outage_count_probabilities,
+            ),
+        )
+
+    @staticmethod
+    def _resolve_max_generation_attempts(
+        n_topology_variants: int,
+        max_generation_attempts: int | None,
+    ) -> int:
+        if max_generation_attempts is None:
+            return max(500, 50 * max(1, int(n_topology_variants)))
+        if int(max_generation_attempts) <= 0:
+            raise ValueError("max_generation_attempts must be greater than 0.")
+        return int(max_generation_attempts)
+
+    @staticmethod
+    def _normalize_outage_count_probabilities(
+        k: int,
+        probabilities: Sequence[float] | Mapping[int, float] | None,
+    ) -> tuple[np.ndarray | None, np.ndarray | None]:
+        """Validate optional outage-count probabilities for random topology sampling."""
+
+        if probabilities is None:
+            return None, None
+
+        if isinstance(probabilities, Mapping):
+            allowed_counts = np.arange(k + 1, dtype=int)
+            probability_values = np.zeros(k + 1, dtype=float)
+            for raw_count, raw_probability in probabilities.items():
+                count = int(raw_count)
+                if count < 0 or count > k:
+                    raise ValueError(
+                        f"Outage count {count} is outside the supported range 0..{k}.",
+                    )
+                probability_values[count] = float(raw_probability)
+            return RandomComponentDropGenerator._validate_outage_count_probabilities(
+                allowed_counts,
+                probability_values,
+            )
+
+        probability_values = np.asarray(probabilities, dtype=float)
+        if probability_values.ndim != 1:
+            raise ValueError(
+                "outage_count_probabilities must be a one-dimensional sequence.",
+            )
+        if len(probability_values) != k + 1:
+            raise ValueError(
+                "outage_count_probabilities sequence must have length k + 1 so index i maps to i outages.",
+            )
+        allowed_counts = np.arange(k + 1, dtype=int)
+        return RandomComponentDropGenerator._validate_outage_count_probabilities(
+            allowed_counts,
+            probability_values,
+        )
+
+    @staticmethod
+    def _validate_outage_count_probabilities(
+        counts: np.ndarray,
+        probability_values: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        if np.any(probability_values < 0.0):
+            raise ValueError("outage_count_probabilities must be non-negative.")
+        total_probability = float(probability_values.sum())
+        if not np.isclose(total_probability, 1.0, atol=1e-8):
+            raise ValueError(
+                "outage_count_probabilities must sum to 1.0 within numerical tolerance.",
+            )
+        if not np.any(probability_values > 0.0):
+            raise ValueError(
+                "outage_count_probabilities must contain at least one positive value.",
+            )
+        return counts.astype(int, copy=True), probability_values.astype(
+            float,
+            copy=True,
+        )

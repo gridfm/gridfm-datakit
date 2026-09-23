@@ -13,31 +13,29 @@ name = "gridfm-datakit"
 description = "Data Generation Kit"
 readme = "README.md"
 license = "Apache-2.0"
-version = "1.0.3"
+version = "1.1.0"
 requires-python = ">=3.10,<3.13"
 
 dependencies = [
-    "ipykernel",
-    "matplotlib",
-    "matpowercaseframes",
-    "nbformat",
-    "numba",
-    "numpy",
-    "pandas",
-    "pathlib",
-    "plotly",
-    "pyaml",
-    "requests",
-    "urllib3<2.0.0",
-    "ipywidgets",
-    "ipyfilechooser",
-    "scipy",
-    "juliacall",
-    "networkx",
-    "tqdm",
-    "pyarrow",
-    # Enforce Python <= 3.11 on Windows
-    "gridfm-datakit-winblock ; sys_platform == 'win32' and python_version >= '3.12'"
+  "ipykernel",
+  "matplotlib",
+  "matpowercaseframes",
+  "nbformat",
+  "numpy",
+  "pandas",
+  "plotly",
+  "pyyaml",
+  "requests",
+  "urllib3>=2.6.0", # fix security issue
+  "ipywidgets",
+  "ipyfilechooser",
+  "scipy",
+  # Floor, not exact pin: 0.9.34+ supports Julia >=1.10.3 (incl. 1.12). The
+  # reproducible Julia environment is pinned in gridfm_datakit/juliapkg.json.
+  "juliacall>=0.9.34",
+  "tqdm",
+  "pyarrow",
+  "platformdirs",
 ]
 
 authors = [
@@ -79,4 +77,13 @@ test = [
   "pytest-cov",
   "pyinstrument",
   "pytest-xdist"
+]
+
+powsybl = [
+  "pypowsybl"
+]
+
+dynamic = [
+  "pypowsybl",
+  "zarr",
 ]

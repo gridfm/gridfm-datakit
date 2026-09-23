@@ -24,6 +24,10 @@ gridfm-datakit generate path/to/config.yaml
 
 Refer to the sections [Network](network.md), [Load Scenarios](load_scenarios.md), and [Topology perturbations](topology_perturbations.md) for a description of the configuration parameters.
 
+To generate time-domain trajectories instead of power flow snapshots, add a
+`dynamic:` block to the config; the same `generate` command then runs the
+dynamic pipeline. See [Dynamic Simulation](dynamic_simulation.md).
+
 Sample configuration files are provided in `scripts/config`, e.g. `default.yaml`:
 
 ```yaml
@@ -52,6 +56,7 @@ topology_perturbation:
   k: 2 # Maximum number of components to drop in each perturbation
   n_topology_variants: 10 # Number of unique perturbed topologies per scenario
   elements: [branch, gen] # elements to perturb. options: branch, gen
+  outage_count_probabilities: [0.1, 0.8, 0.1] # Optional: P(N-0), P(N-1), P(N-2)
 
 generation_perturbation:
   type: "cost_permutation" # Type of generation perturbation; options: cost_permutation, cost_perturbation, none
