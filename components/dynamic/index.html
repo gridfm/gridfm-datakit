@@ -1,0 +1,4148 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../generate/">
+      
+      
+        <link rel="next" href="../validation/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../figs/KIT_logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Dynamic - gridfm-datakit</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+      <link rel="stylesheet" href="https://unpkg.com/katex@0/dist/katex.min.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="white" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#dynamic-simulation" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="gridfm-datakit" class="md-header__button md-logo" aria-label="gridfm-datakit" data-md-component="logo">
+      
+  <img src="../../figs/KIT_logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            gridfm-datakit
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Dynamic
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/gridfm/gridfm-datakit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="gridfm-datakit" class="md-nav__button md-logo" aria-label="gridfm-datakit" data-md-component="logo">
+      
+  <img src="../../figs/KIT_logo.png" alt="logo">
+
+    </a>
+    gridfm-datakit
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/gridfm/gridfm-datakit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../manual/getting_started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../manual/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../manual/load_scenarios/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Load Scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../manual/topology_perturbations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Topology Perturbations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../manual/generation_perturbations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generation Perturbations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../manual/admittance_perturbations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admittance Perturbations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../manual/dynamic_simulation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamic Simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../manual/outputs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Outputs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Components
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Components
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Perturbations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Perturbations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../load/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Load
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../topology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Topology
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../generator_perturbation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admittance_perturbation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admittance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Process
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Process
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../process_network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Process Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../solvers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Solvers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../save/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Save
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_5" id="__nav_4_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utils
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utils
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utils
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../stats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../power_balance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Power Balance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../param_handler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Param Handler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../generate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamic
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamic
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#entry-point" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Entry point
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Entry point">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#generate_dynamic_data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        generate_dynamic_data
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#entry-point" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Entry point
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Entry point">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#generate_dynamic_data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        generate_dynamic_data
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="dynamic-simulation">Dynamic Simulation<a class="headerlink" href="#dynamic-simulation" title="Permanent link">&para;</a></h1>
+<p>This module provides the time-domain (dynamic) data generation pipeline. See the
+<a href="../../manual/dynamic_simulation/">Dynamic Simulation manual page</a> for the
+configuration and output reference.</p>
+<h2 id="entry-point">Entry point<a class="headerlink" href="#entry-point" title="Permanent link">&para;</a></h2>
+<h3 id="generate_dynamic_data"><code>generate_dynamic_data</code><a class="headerlink" href="#generate_dynamic_data" title="Permanent link">&para;</a></h3>
+
+
+<div class="doc doc-object doc-function">
+
+
+
+<a id="gridfm_datakit.dynamic.generate_dynamic.generate_dynamic_data"></a>
+    <div class="doc doc-contents first">
+
+        <p>Generate dynamic simulation data from a YAML config.
+Accepted format includes: a path to the YAML file (str or os.PathLike), a
+dictionnary or a NestedNamespace.</p>
+<p>Runs the full pipeline:
+1. Validate config.
+2. Prepare network + load scenarios.
+3. Load and prepare Dynawo mappings.
+4. Build solver parameters.
+5. Run distributed dynamic simulations.
+6. Save static (Parquet) + dynamic (Zarr) outputs.</p>
+<h1 id="gridfm_datakit.dynamic.generate_dynamic.generate_dynamic_data--args">Args<a class="headerlink" href="#gridfm_datakit.dynamic.generate_dynamic.generate_dynamic_data--args" title="Permanent link">&para;</a></h1>
+<p>config : str | os.PathLike | dict | NestedNamespace
+    Path to a YAML config file, a plain dict, or a NestedNamespace.</p>
+<h1 id="gridfm_datakit.dynamic.generate_dynamic.generate_dynamic_data--returns">Returns<a class="headerlink" href="#gridfm_datakit.dynamic.generate_dynamic.generate_dynamic_data--returns" title="Permanent link">&para;</a></h1>
+<p>dict
+    Paths to all generated artifacts, all rooted at <code>settings.data_dir</code>:
+    the static keys (<code>bus_data</code>, <code>branch_data</code>, <code>gen_data</code>,
+    <code>y_bus_data</code>, <code>runtime_data</code>, <code>error_log</code>, <code>args_log</code>,
+    <code>solver_log_dir</code>, <code>scenarios</code>) plus <code>dynamic_results</code> (Zarr store)
+    and <code>metadata</code>. <code>dynamic_reports_dir</code> is present unless
+    <code>dynamic.logging.save_reports</code> is off, and <code>final_state_values</code> only
+    when the variables table declares FinalStateValue rows.</p>
+<h1 id="gridfm_datakit.dynamic.generate_dynamic.generate_dynamic_data--raises">Raises<a class="headerlink" href="#gridfm_datakit.dynamic.generate_dynamic.generate_dynamic_data--raises" title="Permanent link">&para;</a></h1>
+<p>TypeError
+    If <code>config</code> is none of the accepted forms.
+ValueError
+    If <code>network.reader != "powsybl"</code>, the <code>dynamic</code> block or
+    <code>dynamic.dynamic_solver</code> is missing, <code>load.scenarios</code> is below 1, or
+    the removed <code>dynamic.output_dir</code> key is still present.
+RuntimeError
+    If no sample survived, i.e. every scenario failed.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>gridfm_datakit/dynamic/generate_dynamic.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">generate_dynamic_data</span><span class="p">(</span>
+    <span class="n">config</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">PathLike</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">NestedNamespace</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Generate dynamic simulation data from a YAML config.</span>
+<span class="sd">    Accepted format includes: a path to the YAML file (str or os.PathLike), a</span>
+<span class="sd">    dictionnary or a NestedNamespace.</span>
+
+<span class="sd">    Runs the full pipeline:</span>
+<span class="sd">    1. Validate config.</span>
+<span class="sd">    2. Prepare network + load scenarios.</span>
+<span class="sd">    3. Load and prepare Dynawo mappings.</span>
+<span class="sd">    4. Build solver parameters.</span>
+<span class="sd">    5. Run distributed dynamic simulations.</span>
+<span class="sd">    6. Save static (Parquet) + dynamic (Zarr) outputs.</span>
+
+<span class="sd">    Args</span>
+<span class="sd">    ----</span>
+<span class="sd">    config : str | os.PathLike | dict | NestedNamespace</span>
+<span class="sd">        Path to a YAML config file, a plain dict, or a NestedNamespace.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    dict</span>
+<span class="sd">        Paths to all generated artifacts, all rooted at ``settings.data_dir``:</span>
+<span class="sd">        the static keys (``bus_data``, ``branch_data``, ``gen_data``,</span>
+<span class="sd">        ``y_bus_data``, ``runtime_data``, ``error_log``, ``args_log``,</span>
+<span class="sd">        ``solver_log_dir``, ``scenarios``) plus ``dynamic_results`` (Zarr store)</span>
+<span class="sd">        and ``metadata``. ``dynamic_reports_dir`` is present unless</span>
+<span class="sd">        ``dynamic.logging.save_reports`` is off, and ``final_state_values`` only</span>
+<span class="sd">        when the variables table declares FinalStateValue rows.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    TypeError</span>
+<span class="sd">        If ``config`` is none of the accepted forms.</span>
+<span class="sd">    ValueError</span>
+<span class="sd">        If ``network.reader != "powsybl"``, the ``dynamic`` block or</span>
+<span class="sd">        ``dynamic.dynamic_solver`` is missing, ``load.scenarios`` is below 1, or</span>
+<span class="sd">        the removed ``dynamic.output_dir`` key is still present.</span>
+<span class="sd">    RuntimeError</span>
+<span class="sd">        If no sample survived, i.e. every scenario failed.</span>
+<span class="sd">    """</span>
+
+    <span class="c1"># --- Step 0: load and validate config ---</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">_load_config</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+
+    <span class="n">_validate_dynamic_config</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+    <span class="n">_configure_logging</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+
+    <span class="c1"># --- Step 1: standard environment setup (reuse generate.py logic) ---</span>
+    <span class="n">args</span><span class="p">,</span> <span class="n">base_path</span><span class="p">,</span> <span class="n">file_paths</span><span class="p">,</span> <span class="n">seed</span> <span class="o">=</span> <span class="n">_setup_environment</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+    <span class="c1"># _setup_environment derives solver_log_dir (honouring enable_solver_logs)</span>
+    <span class="c1"># into file_paths; publish it on settings so the distributed dynamic loop</span>
+    <span class="c1"># (which reads config.settings.solver_log_dir) routes OPF + Dynawo native</span>
+    <span class="c1"># output to files instead of dropping it.</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">solver_log_dir</span> <span class="o">=</span> <span class="n">file_paths</span><span class="p">[</span><span class="s2">"solver_log_dir"</span><span class="p">]</span>
+
+    <span class="c1"># The dynamic pipeline reports progress per chunk through the</span>
+    <span class="c1"># "gridfm_datakit.dynamic" logger, not tqdm, so _setup_environment's tqdm.log</span>
+    <span class="c1"># stays empty and is not exported.</span>
+    <span class="c1">#</span>
+    <span class="c1"># It is only deleted when settings.overwrite is set: base_path has then just</span>
+    <span class="c1"># been wiped and recreated, so the file there is certainly ours. Otherwise</span>
+    <span class="c1"># base_path may be shared with an earlier *static* run whose accumulated</span>
+    <span class="c1"># tqdm.log must be left alone.</span>
+    <span class="n">tqdm_log</span> <span class="o">=</span> <span class="n">file_paths</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"tqdm_log"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">tqdm_log</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">settings</span><span class="p">,</span> <span class="s2">"overwrite"</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+        <span class="n">Path</span><span class="p">(</span><span class="n">tqdm_log</span><span class="p">)</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">missing_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># --- Step 2: network + scenarios (reuse generate.py logic) ---</span>
+    <span class="c1"># Only the scenarios and meta["network_path"] are used downstream: workers</span>
+    <span class="c1"># reload the network themselves from that path (see _process_dynamic_chunk).</span>
+    <span class="n">_</span><span class="p">,</span> <span class="n">scenarios</span><span class="p">,</span> <span class="n">meta</span> <span class="o">=</span> <span class="n">_prepare_network_and_scenarios</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">file_paths</span><span class="p">,</span> <span class="n">seed</span><span class="p">)</span>
+
+    <span class="c1"># --- Step 3: dynamic inputs ---</span>
+    <span class="n">dynamic_inputs</span> <span class="o">=</span> <span class="n">load_raw_inputs</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+
+    <span class="c1"># --- Step 4: output directory ---</span>
+    <span class="c1"># Single root: everything this run produces lives under settings.data_dir, in</span>
+    <span class="c1"># the same base_path (data_dir/&lt;network&gt;/raw) the static pipeline uses for its</span>
+    <span class="c1"># logs and scenarios. The dynamic artifacts go one level down, in dynamic/,</span>
+    <span class="c1"># because the static pipeline writes bus_data.parquet as a *partitioned</span>
+    <span class="c1"># directory* while we write it as a flat file: same name, different kind, so</span>
+    <span class="c1"># they must not share a directory.</span>
+    <span class="c1">#</span>
+    <span class="c1"># The writer owns this directory: it recreates it from scratch, so a re-run can</span>
+    <span class="c1"># never mix fresh artifacts with a previous run's leftovers.</span>
+    <span class="n">dynamic_solver</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">dynamic</span><span class="o">.</span><span class="n">dynamic_solver</span>
+    <span class="n">output_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">base_path</span><span class="p">)</span> <span class="o">/</span> <span class="s2">"dynamic"</span>
+
+    <span class="c1"># --- Steps 5 &amp; 6: simulate and save, one chunk at a time ---</span>
+    <span class="c1"># Each chunk is written and released before the next runs, so peak memory</span>
+    <span class="c1"># tracks settings.large_chunk_size rather than the whole dataset. Dynamic</span>
+    <span class="c1"># curves are far larger than static snapshots, which is why this streams</span>
+    <span class="c1"># instead of collecting every sample first.</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">gridfm_datakit.dynamic.process_dynamic</span><span class="w"> </span><span class="kn">import</span> <span class="n">iter_dynamic_simulations</span>
+
+    <span class="n">writer</span> <span class="o">=</span> <span class="n">_DynamicDataWriter</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="n">file_paths</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">seed</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">chunk_results</span> <span class="ow">in</span> <span class="n">iter_dynamic_simulations</span><span class="p">(</span>
+        <span class="n">network_path</span><span class="o">=</span><span class="n">meta</span><span class="p">[</span><span class="s2">"network_path"</span><span class="p">],</span>
+        <span class="n">scenarios</span><span class="o">=</span><span class="n">scenarios</span><span class="p">,</span>
+        <span class="n">dynamic_inputs</span><span class="o">=</span><span class="n">dynamic_inputs</span><span class="p">,</span>
+        <span class="n">dynamic_solver</span><span class="o">=</span><span class="n">dynamic_solver</span><span class="p">,</span>
+        <span class="n">config</span><span class="o">=</span><span class="n">args</span><span class="p">,</span>
+        <span class="n">error_log_file</span><span class="o">=</span><span class="n">file_paths</span><span class="p">[</span><span class="s2">"error_log"</span><span class="p">],</span>
+        <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="n">writer</span><span class="o">.</span><span class="n">write_chunk</span><span class="p">(</span><span class="n">chunk_results</span><span class="p">)</span>
+        <span class="k">del</span> <span class="n">chunk_results</span>
+        <span class="n">gc</span><span class="o">.</span><span class="n">collect</span><span class="p">()</span>
+    <span class="n">writer</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+    <span class="c1"># --- Step 7: optional validation ---</span>
+    <span class="n">_validate_outputs</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">file_paths</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">file_paths</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div><h2 id="inputs">Inputs<a class="headerlink" href="#inputs" title="Permanent link">&para;</a></h2>
+<h3 id="dynamicinputs"><code>DynamicInputs</code><a class="headerlink" href="#dynamicinputs" title="Permanent link">&para;</a></h3>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<a id="gridfm_datakit.dynamic.DynamicInputs"></a>
+    <div class="doc doc-contents first">
+
+
+
+        <p>Solver-agnostic container for dynamic simulation inputs.</p>
+<p>All three attributes are pandas DataFrames or list of pandas DataFrames so they remain compatible with
+pypowsybl.dynamic's native input format and are easy to inspect or
+serialize for debugging.</p>
+<h1 id="gridfm_datakit.dynamic.DynamicInputs--attributes">Attributes<a class="headerlink" href="#gridfm_datakit.dynamic.DynamicInputs--attributes" title="Permanent link">&para;</a></h1>
+<p>dynamic_models : list[pd.DataFrame]
+    List of 2 pandas DataFrames.
+    First one is for the dynamic models that equip static elements:
+        One row per network element to be equipped with a dynamic model.
+        Required columns: category_name, static_id, parameter_set_id, model_name
+        Note: unequipped static element will be given a default model
+    Second one is for the automation systems:
+        One row per automation system
+        Required columns: category_name, dynamic_model_id, parameter_set_id, params, model_name
+events : pd.DataFrame
+    One row per event in the simulation sequence.
+    Required columns: event_name, static_id, start_time, params
+variables : pd.DataFrame
+    One row per monitored output variables (curve or final state value).
+    Required columns: type, model_id, variables</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>gridfm_datakit/dynamic/__init__.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">DynamicInputs</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Solver-agnostic container for dynamic simulation inputs.</span>
+
+<span class="sd">    All three attributes are pandas DataFrames or list of pandas DataFrames so they remain compatible with</span>
+<span class="sd">    pypowsybl.dynamic's native input format and are easy to inspect or</span>
+<span class="sd">    serialize for debugging.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    dynamic_models : list[pd.DataFrame]</span>
+<span class="sd">        List of 2 pandas DataFrames.</span>
+<span class="sd">        First one is for the dynamic models that equip static elements:</span>
+<span class="sd">            One row per network element to be equipped with a dynamic model.</span>
+<span class="sd">            Required columns: category_name, static_id, parameter_set_id, model_name</span>
+<span class="sd">            Note: unequipped static element will be given a default model</span>
+<span class="sd">        Second one is for the automation systems:</span>
+<span class="sd">            One row per automation system</span>
+<span class="sd">            Required columns: category_name, dynamic_model_id, parameter_set_id, params, model_name</span>
+<span class="sd">    events : pd.DataFrame</span>
+<span class="sd">        One row per event in the simulation sequence.</span>
+<span class="sd">        Required columns: event_name, static_id, start_time, params</span>
+<span class="sd">    variables : pd.DataFrame</span>
+<span class="sd">        One row per monitored output variables (curve or final state value).</span>
+<span class="sd">        Required columns: type, model_id, variables</span>
+<span class="sd">    """</span>
+
+    <span class="n">dynamic_models</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">]</span>
+    <span class="n">events</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
+    <span class="n">variables</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div><h3 id="dynamicresults"><code>DynamicResults</code><a class="headerlink" href="#dynamicresults" title="Permanent link">&para;</a></h3>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<a id="gridfm_datakit.dynamic.DynamicResults"></a>
+    <div class="doc doc-contents first">
+
+
+
+        <p>Solver-agnostic container for dynamic simulation outputs.</p>
+<h1 id="gridfm_datakit.dynamic.DynamicResults--attributes">Attributes<a class="headerlink" href="#gridfm_datakit.dynamic.DynamicResults--attributes" title="Permanent link">&para;</a></h1>
+<p>dynamic_results : pandas.DataFrame
+    Curves for one sample, indexed by time: shape <strong>(n_timesteps, n_variables)</strong>,
+    one column per output variable. This is the solver's natural orientation
+    and is kept as-is through the pipeline.</p>
+<pre><code>Note the persistent store uses the *transposed* orientation: the writer in
+generate_dynamic transposes each sample to (n_variables, n_timesteps) and
+stacks them into a Zarr array of shape
+(n_scenarios, n_variables, n_timesteps).
+</code></pre>
+<p>report : Any
+    Dynamic simulation report including model build-up and problem resolution.
+final_state_values : Any, optional
+    Values of the variables declared as "FinalStateValue" in the variables
+    input table: one scalar per variable at the end of the simulation, rather
+    than a trajectory. pypowsybl returns a DataFrame indexed by the flattened
+    variable name with a single "values" column. None when the run monitors no
+    such variable, in which case no final_state_values.parquet is written.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>gridfm_datakit/dynamic/__init__.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">DynamicResults</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Solver-agnostic container for dynamic simulation outputs.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    dynamic_results : pandas.DataFrame</span>
+<span class="sd">        Curves for one sample, indexed by time: shape **(n_timesteps, n_variables)**,</span>
+<span class="sd">        one column per output variable. This is the solver's natural orientation</span>
+<span class="sd">        and is kept as-is through the pipeline.</span>
+
+<span class="sd">        Note the persistent store uses the *transposed* orientation: the writer in</span>
+<span class="sd">        generate_dynamic transposes each sample to (n_variables, n_timesteps) and</span>
+<span class="sd">        stacks them into a Zarr array of shape</span>
+<span class="sd">        (n_scenarios, n_variables, n_timesteps).</span>
+<span class="sd">    report : Any</span>
+<span class="sd">        Dynamic simulation report including model build-up and problem resolution.</span>
+<span class="sd">    final_state_values : Any, optional</span>
+<span class="sd">        Values of the variables declared as "FinalStateValue" in the variables</span>
+<span class="sd">        input table: one scalar per variable at the end of the simulation, rather</span>
+<span class="sd">        than a trajectory. pypowsybl returns a DataFrame indexed by the flattened</span>
+<span class="sd">        variable name with a single "values" column. None when the run monitors no</span>
+<span class="sd">        such variable, in which case no final_state_values.parquet is written.</span>
+<span class="sd">    """</span>
+
+    <span class="n">dynamic_results</span><span class="p">:</span> <span class="n">Any</span>  <span class="c1"># pandas.DataFrame, (n_timesteps, n_variables)</span>
+    <span class="n">report</span><span class="p">:</span> <span class="n">Any</span>
+    <span class="n">final_state_values</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div><h3 id="load_raw_inputs"><code>load_raw_inputs</code><a class="headerlink" href="#load_raw_inputs" title="Permanent link">&para;</a></h3>
+
+
+<div class="doc doc-object doc-function">
+
+
+
+<a id="gridfm_datakit.dynamic.load_raw_inputs"></a>
+    <div class="doc doc-contents first">
+
+        <p>Load dynamic simulation inputs from CSV files declared in the config.</p>
+<p>Reads the four CSV (or Parquet) files listed under config.dynamic and
+returns a DynamicInputs instance. When dynamic_solver == "dynawo", the
+minimum required columns for each DataFrame are validated.</p>
+<h1 id="gridfm_datakit.dynamic.load_raw_inputs--args">Args<a class="headerlink" href="#gridfm_datakit.dynamic.load_raw_inputs--args" title="Permanent link">&para;</a></h1>
+<p>args : NestedNamespace
+    Configuration object. <code>args.dynamic.input_files</code> must carry:
+    - static_element_dynamic_models_file     : path to the models CSV
+    - automation_systems_file                : path to the automation systems CSV
+    - events_file                            : path to the events CSV
+    - variables_file                         : path to the variables CSV
+    and <code>args.dynamic.dynamic_solver</code> the solver name ("dynawo" or future
+    alternatives); it defaults to "dynawo" when absent.</p>
+<h1 id="gridfm_datakit.dynamic.load_raw_inputs--returns">Returns<a class="headerlink" href="#gridfm_datakit.dynamic.load_raw_inputs--returns" title="Permanent link">&para;</a></h1>
+<p>DynamicInputs</p>
+<h1 id="gridfm_datakit.dynamic.load_raw_inputs--raises">Raises<a class="headerlink" href="#gridfm_datakit.dynamic.load_raw_inputs--raises" title="Permanent link">&para;</a></h1>
+<p>FileNotFoundError
+    If any of the four input files is missing.
+ValueError
+    If required columns are absent from a DataFrame, if a key column holds an
+    unsupported value, or if the variables table declares no "Curve" row
+    (Dynawo solver only).
+TypeError
+    If any of the input files is not of CSV or Parquet format.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>gridfm_datakit/dynamic/__init__.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">load_raw_inputs</span><span class="p">(</span>
+    <span class="n">args</span><span class="p">:</span> <span class="n">NestedNamespace</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DynamicInputs</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Load dynamic simulation inputs from CSV files declared in the config.</span>
+
+<span class="sd">    Reads the four CSV (or Parquet) files listed under config.dynamic and</span>
+<span class="sd">    returns a DynamicInputs instance. When dynamic_solver == "dynawo", the</span>
+<span class="sd">    minimum required columns for each DataFrame are validated.</span>
+
+<span class="sd">    Args</span>
+<span class="sd">    ----</span>
+<span class="sd">    args : NestedNamespace</span>
+<span class="sd">        Configuration object. ``args.dynamic.input_files`` must carry:</span>
+<span class="sd">        - static_element_dynamic_models_file     : path to the models CSV</span>
+<span class="sd">        - automation_systems_file                : path to the automation systems CSV</span>
+<span class="sd">        - events_file                            : path to the events CSV</span>
+<span class="sd">        - variables_file                         : path to the variables CSV</span>
+<span class="sd">        and ``args.dynamic.dynamic_solver`` the solver name ("dynawo" or future</span>
+<span class="sd">        alternatives); it defaults to "dynawo" when absent.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    DynamicInputs</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    FileNotFoundError</span>
+<span class="sd">        If any of the four input files is missing.</span>
+<span class="sd">    ValueError</span>
+<span class="sd">        If required columns are absent from a DataFrame, if a key column holds an</span>
+<span class="sd">        unsupported value, or if the variables table declares no "Curve" row</span>
+<span class="sd">        (Dynawo solver only).</span>
+<span class="sd">    TypeError</span>
+<span class="sd">        If any of the input files is not of CSV or Parquet format.</span>
+<span class="sd">    """</span>
+    <span class="n">dyn_input_cfg</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">dynamic</span><span class="o">.</span><span class="n">input_files</span>
+
+    <span class="n">dynamic_models</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">_load_table</span><span class="p">(</span><span class="n">dyn_input_cfg</span><span class="o">.</span><span class="n">static_element_dynamic_models_file</span><span class="p">),</span>
+        <span class="n">_load_table</span><span class="p">(</span><span class="n">dyn_input_cfg</span><span class="o">.</span><span class="n">automation_systems_file</span><span class="p">),</span>
+    <span class="p">]</span>
+
+    <span class="n">events</span> <span class="o">=</span> <span class="n">_load_table</span><span class="p">(</span><span class="n">dyn_input_cfg</span><span class="o">.</span><span class="n">events_file</span><span class="p">)</span>
+    <span class="n">variables</span> <span class="o">=</span> <span class="n">_load_table</span><span class="p">(</span><span class="n">dyn_input_cfg</span><span class="o">.</span><span class="n">variables_file</span><span class="p">)</span>
+
+    <span class="n">solver</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">dynamic</span><span class="p">,</span> <span class="s2">"dynamic_solver"</span><span class="p">,</span> <span class="s2">"dynawo"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">solver</span> <span class="o">==</span> <span class="s2">"dynawo"</span><span class="p">:</span>
+        <span class="n">_check_cols</span><span class="p">(</span>
+            <span class="n">dynamic_models</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="n">STATIC_ELEMENT_DYNAMIC_MODELS_REQUIRED_COLS</span><span class="p">,</span>
+            <span class="s2">"static_element_dynamic_models"</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">_check_cols</span><span class="p">(</span>
+            <span class="n">dynamic_models</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+            <span class="n">AUTOMATION_SYSTEMS_REQUIRED_COLS</span><span class="p">,</span>
+            <span class="s2">"automation_systems"</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">_check_cols</span><span class="p">(</span>
+            <span class="n">events</span><span class="p">,</span>
+            <span class="n">EVENTS_REQUIRED_COLS</span><span class="p">,</span>
+            <span class="s2">"events"</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">_check_cols</span><span class="p">(</span>
+            <span class="n">variables</span><span class="p">,</span>
+            <span class="n">VARIABLES_REQUIRED_COLS</span><span class="p">,</span>
+            <span class="s2">"variables"</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">dynamic_models</span> <span class="o">=</span> <span class="p">[</span><span class="n">_normalize_dtypes</span><span class="p">(</span><span class="n">df</span><span class="p">)</span> <span class="k">for</span> <span class="n">df</span> <span class="ow">in</span> <span class="n">dynamic_models</span><span class="p">]</span>
+        <span class="n">events</span> <span class="o">=</span> <span class="n">_normalize_dtypes</span><span class="p">(</span><span class="n">events</span><span class="p">)</span>
+        <span class="n">variables</span> <span class="o">=</span> <span class="n">_normalize_dtypes</span><span class="p">(</span><span class="n">variables</span><span class="p">)</span>
+        <span class="n">_validate_dynawo_values</span><span class="p">(</span><span class="n">dynamic_models</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">events</span><span class="p">,</span> <span class="n">variables</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">DynamicInputs</span><span class="p">(</span>
+        <span class="n">dynamic_models</span><span class="o">=</span><span class="n">dynamic_models</span><span class="p">,</span>
+        <span class="n">events</span><span class="o">=</span><span class="n">events</span><span class="p">,</span>
+        <span class="n">variables</span><span class="o">=</span><span class="n">variables</span><span class="p">,</span>
+    <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div><h2 id="processing">Processing<a class="headerlink" href="#processing" title="Permanent link">&para;</a></h2>
+<h3 id="iter_dynamic_simulations"><code>iter_dynamic_simulations</code><a class="headerlink" href="#iter_dynamic_simulations" title="Permanent link">&para;</a></h3>
+
+
+<div class="doc doc-object doc-function">
+
+
+
+<a id="gridfm_datakit.dynamic.process_dynamic.iter_dynamic_simulations"></a>
+    <div class="doc doc-contents first">
+
+        <p>Distributed outer loop for dynamic simulation data generation.</p>
+<p>Splits scenarios into chunks and dispatches each chunk to a worker
+process. Each worker initialises a Julia instance and a local copy of the
+pypowsybl network once, then reuses them for all scenarios in the chunk.</p>
+<p>Yields one large chunk's samples at a time so the caller can persist and drop
+them: holding every sample would make peak memory scale with the whole dataset
+rather than with <code>settings.large_chunk_size</code>, and dynamic curves are far
+larger than static snapshots. Use <code>process_dynamic_simulations</code> for the
+collected list.</p>
+<h1 id="gridfm_datakit.dynamic.process_dynamic.iter_dynamic_simulations--args">Args<a class="headerlink" href="#gridfm_datakit.dynamic.process_dynamic.iter_dynamic_simulations--args" title="Permanent link">&para;</a></h1>
+<p>network_path : str
+    Path to the network.
+scenarios : np.ndarray
+    Load scenarios array, shape (n_loads, n_scenarios, 2).
+dynamic_inputs: DynamicInputs
+    Dynamics inputs.
+dynamic_solver : str
+    Solver name ("dynawo" or future alternatives).
+config :
+    Full NestedNamespace config.
+error_log_file : str
+    Path to error log.
+seed : int
+    Global seed. Deterministically derived per-chunk seeds are computed
+    from this value.</p>
+<h1 id="gridfm_datakit.dynamic.process_dynamic.iter_dynamic_simulations--yields">Yields<a class="headerlink" href="#gridfm_datakit.dynamic.process_dynamic.iter_dynamic_simulations--yields" title="Permanent link">&para;</a></h1>
+<p>list of dict
+    One list per large chunk, holding one dict per successfully processed
+    (scenario, topology-perturbation) sample, each with keys <code>"pf_data"</code>,
+    <code>"dynamic_results"</code>, <code>"scenario_index"</code>, <code>"perturbation_index"</code>.
+    A chunk whose scenarios all failed yields an empty list.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>gridfm_datakit/dynamic/process_dynamic.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 55</span>
+<span class="normal"> 56</span>
+<span class="normal"> 57</span>
+<span class="normal"> 58</span>
+<span class="normal"> 59</span>
+<span class="normal"> 60</span>
+<span class="normal"> 61</span>
+<span class="normal"> 62</span>
+<span class="normal"> 63</span>
+<span class="normal"> 64</span>
+<span class="normal"> 65</span>
+<span class="normal"> 66</span>
+<span class="normal"> 67</span>
+<span class="normal"> 68</span>
+<span class="normal"> 69</span>
+<span class="normal"> 70</span>
+<span class="normal"> 71</span>
+<span class="normal"> 72</span>
+<span class="normal"> 73</span>
+<span class="normal"> 74</span>
+<span class="normal"> 75</span>
+<span class="normal"> 76</span>
+<span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">iter_dynamic_simulations</span><span class="p">(</span>
+    <span class="n">network_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">scenarios</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">dynamic_inputs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">dynamic_solver</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">config</span><span class="p">:</span> <span class="n">NestedNamespace</span><span class="p">,</span>
+    <span class="n">error_log_file</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]]:</span>
+<span class="w">    </span><span class="sd">"""Distributed outer loop for dynamic simulation data generation.</span>
+
+<span class="sd">    Splits scenarios into chunks and dispatches each chunk to a worker</span>
+<span class="sd">    process. Each worker initialises a Julia instance and a local copy of the</span>
+<span class="sd">    pypowsybl network once, then reuses them for all scenarios in the chunk.</span>
+
+<span class="sd">    Yields one large chunk's samples at a time so the caller can persist and drop</span>
+<span class="sd">    them: holding every sample would make peak memory scale with the whole dataset</span>
+<span class="sd">    rather than with ``settings.large_chunk_size``, and dynamic curves are far</span>
+<span class="sd">    larger than static snapshots. Use ``process_dynamic_simulations`` for the</span>
+<span class="sd">    collected list.</span>
+
+<span class="sd">    Args</span>
+<span class="sd">    ----</span>
+<span class="sd">    network_path : str</span>
+<span class="sd">        Path to the network.</span>
+<span class="sd">    scenarios : np.ndarray</span>
+<span class="sd">        Load scenarios array, shape (n_loads, n_scenarios, 2).</span>
+<span class="sd">    dynamic_inputs: DynamicInputs</span>
+<span class="sd">        Dynamics inputs.</span>
+<span class="sd">    dynamic_solver : str</span>
+<span class="sd">        Solver name ("dynawo" or future alternatives).</span>
+<span class="sd">    config :</span>
+<span class="sd">        Full NestedNamespace config.</span>
+<span class="sd">    error_log_file : str</span>
+<span class="sd">        Path to error log.</span>
+<span class="sd">    seed : int</span>
+<span class="sd">        Global seed. Deterministically derived per-chunk seeds are computed</span>
+<span class="sd">        from this value.</span>
+
+<span class="sd">    Yields</span>
+<span class="sd">    ------</span>
+<span class="sd">    list of dict</span>
+<span class="sd">        One list per large chunk, holding one dict per successfully processed</span>
+<span class="sd">        (scenario, topology-perturbation) sample, each with keys ``"pf_data"``,</span>
+<span class="sd">        ``"dynamic_results"``, ``"scenario_index"``, ``"perturbation_index"``.</span>
+<span class="sd">        A chunk whose scenarios all failed yields an empty list.</span>
+<span class="sd">    """</span>
+    <span class="n">n_scenarios</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">load</span><span class="o">.</span><span class="n">scenarios</span>
+    <span class="n">large_chunk_size</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">large_chunk_size</span>
+    <span class="n">num_processes</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">num_processes</span>
+    <span class="n">max_iter</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">max_iter</span>
+    <span class="n">solver_log_dir</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">settings</span><span class="p">,</span> <span class="s2">"solver_log_dir"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+    <span class="c1"># Perturbation generators, built once here (main process) from the config and</span>
+    <span class="c1"># the base network, then passed to workers (they are picklable, mirroring the</span>
+    <span class="c1"># static pipeline). Absent config blocks default to the identity ("none")</span>
+    <span class="c1"># generator, so a scenario expands to exactly one sample.</span>
+    <span class="n">base_net</span> <span class="o">=</span> <span class="n">load_net</span><span class="p">(</span><span class="n">network_path</span><span class="p">)</span><span class="o">.</span><span class="n">gfm_net</span>
+    <span class="n">_none</span> <span class="o">=</span> <span class="n">NestedNamespace</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s2">"none"</span><span class="p">)</span>
+    <span class="n">topology_generator</span> <span class="o">=</span> <span class="n">initialize_topology_generator</span><span class="p">(</span>
+        <span class="nb">getattr</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">"topology_perturbation"</span><span class="p">,</span> <span class="n">_none</span><span class="p">),</span>
+        <span class="n">base_net</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="c1"># generation_perturbation randomises generation *cost* and admittance_perturbation</span>
+    <span class="c1"># perturbs branch admittances, both pre-OPF. They therefore vary the initial</span>
+    <span class="c1"># operating point Dynawo starts from (which machines are dispatched and at what</span>
+    <span class="c1"># loading), and so do influence the trajectory. What they do NOT vary is the</span>
+    <span class="c1"># dynamic model set or the event sequence: those come from the CSV inputs and are</span>
+    <span class="c1"># identical across every sample. admittance_perturbation's r/x do reach the</span>
+    <span class="c1"># simulated network (update_powsybl writes them), but only topology_perturbation</span>
+    <span class="c1"># changes which elements are in service, so it alone changes the set of models</span>
+    <span class="c1"># Dynawo instantiates and alone expands a scenario into several samples. Wired</span>
+    <span class="c1"># for parity with the static pipeline; effect on dynamic outputs untested.</span>
+    <span class="n">generation_generator</span> <span class="o">=</span> <span class="n">initialize_generation_generator</span><span class="p">(</span>
+        <span class="nb">getattr</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">"generation_perturbation"</span><span class="p">,</span> <span class="n">_none</span><span class="p">),</span>
+        <span class="n">base_net</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">admittance_generator</span> <span class="o">=</span> <span class="n">initialize_admittance_generator</span><span class="p">(</span>
+        <span class="nb">getattr</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">"admittance_perturbation"</span><span class="p">,</span> <span class="n">_none</span><span class="p">),</span>
+        <span class="n">base_net</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">large_chunks</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array_split</span><span class="p">(</span>
+        <span class="nb">range</span><span class="p">(</span><span class="n">n_scenarios</span><span class="p">),</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">n_scenarios</span> <span class="o">/</span> <span class="n">large_chunk_size</span><span class="p">)),</span>
+    <span class="p">)</span>
+
+    <span class="n">n_samples</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="s2">"Dynamic generation: </span><span class="si">%d</span><span class="s2"> scenarios in </span><span class="si">%d</span><span class="s2"> chunk(s), </span><span class="si">%d</span><span class="s2"> worker(s)."</span><span class="p">,</span>
+        <span class="n">n_scenarios</span><span class="p">,</span>
+        <span class="nb">len</span><span class="p">(</span><span class="n">large_chunks</span><span class="p">),</span>
+        <span class="n">num_processes</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">large_chunk_index</span><span class="p">,</span> <span class="n">large_chunk</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">large_chunks</span><span class="p">):</span>
+        <span class="n">chunk_size</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">large_chunk</span><span class="p">)</span>
+        <span class="n">scenario_chunks</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array_split</span><span class="p">(</span>
+            <span class="n">large_chunk</span><span class="p">,</span>
+            <span class="nb">min</span><span class="p">(</span><span class="n">num_processes</span><span class="p">,</span> <span class="n">chunk_size</span><span class="p">),</span>
+        <span class="p">)</span>
+
+        <span class="n">tasks</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span>
+                <span class="n">chunk</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                <span class="n">chunk</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span>
+                <span class="n">scenarios</span><span class="p">,</span>
+                <span class="n">network_path</span><span class="p">,</span>
+                <span class="n">dynamic_inputs</span><span class="p">,</span>
+                <span class="n">dynamic_solver</span><span class="p">,</span>
+                <span class="n">error_log_file</span><span class="p">,</span>
+                <span class="n">max_iter</span><span class="p">,</span>
+                <span class="n">solver_log_dir</span><span class="p">,</span>
+                <span class="n">seed</span><span class="p">,</span>
+                <span class="n">config</span><span class="p">,</span>
+                <span class="n">topology_generator</span><span class="p">,</span>
+                <span class="n">generation_generator</span><span class="p">,</span>
+                <span class="n">admittance_generator</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">scenario_chunks</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span>
+        <span class="p">]</span>
+
+        <span class="n">_mp_ctx</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">get_context</span><span class="p">(</span><span class="s2">"spawn"</span><span class="p">)</span>
+        <span class="k">with</span> <span class="n">_mp_ctx</span><span class="o">.</span><span class="n">Pool</span><span class="p">(</span><span class="n">processes</span><span class="o">=</span><span class="n">num_processes</span><span class="p">)</span> <span class="k">as</span> <span class="n">pool</span><span class="p">:</span>
+            <span class="n">results</span> <span class="o">=</span> <span class="n">pool</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">_process_dynamic_chunk</span><span class="p">,</span> <span class="n">tasks</span><span class="p">)</span>
+
+        <span class="n">samples</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">chunk_results</span> <span class="ow">in</span> <span class="n">results</span><span class="p">:</span>
+            <span class="c1"># A worker that dies before its per-scenario loop returns [exception]</span>
+            <span class="c1"># (see _process_dynamic_chunk). Detect both a bare exception and the</span>
+            <span class="c1"># list-wrapped form so a failed chunk never yields non-result objects</span>
+            <span class="c1"># (which would later crash the writer).</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">chunk_results</span><span class="p">,</span> <span class="ne">Exception</span><span class="p">):</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">"Error in dynamic chunk: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span> <span class="n">chunk_results</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">scenario_result</span> <span class="ow">in</span> <span class="n">chunk_results</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">scenario_result</span><span class="p">,</span> <span class="ne">Exception</span><span class="p">):</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">"Error in dynamic chunk: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span> <span class="n">scenario_result</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">samples</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">scenario_result</span><span class="p">)</span>
+
+        <span class="n">n_samples</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">"Chunk </span><span class="si">%d</span><span class="s2">/</span><span class="si">%d</span><span class="s2"> done (</span><span class="si">%d</span><span class="s2"> scenarios), </span><span class="si">%d</span><span class="s2"> samples so far."</span><span class="p">,</span>
+            <span class="n">large_chunk_index</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">large_chunks</span><span class="p">),</span>
+            <span class="n">chunk_size</span><span class="p">,</span>
+            <span class="n">n_samples</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">yield</span> <span class="n">samples</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div><h3 id="process_dynamic_simulations"><code>process_dynamic_simulations</code><a class="headerlink" href="#process_dynamic_simulations" title="Permanent link">&para;</a></h3>
+
+
+<div class="doc doc-object doc-function">
+
+
+
+<a id="gridfm_datakit.dynamic.process_dynamic.process_dynamic_simulations"></a>
+    <div class="doc doc-contents first">
+
+        <p>Collect every sample from :func:<code>iter_dynamic_simulations</code> into one list.</p>
+<p>Convenience for callers that want the whole run in memory (tests, ad-hoc
+scripts). The pipeline streams instead; see generate_dynamic.generate_dynamic_data.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>gridfm_datakit/dynamic/process_dynamic.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span>
+<span class="normal">225</span>
+<span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span>
+<span class="normal">229</span>
+<span class="normal">230</span>
+<span class="normal">231</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">process_dynamic_simulations</span><span class="p">(</span>
+    <span class="n">network_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">scenarios</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">dynamic_inputs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">dynamic_solver</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">config</span><span class="p">:</span> <span class="n">NestedNamespace</span><span class="p">,</span>
+    <span class="n">error_log_file</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">"""Collect every sample from :func:`iter_dynamic_simulations` into one list.</span>
+
+<span class="sd">    Convenience for callers that want the whole run in memory (tests, ad-hoc</span>
+<span class="sd">    scripts). The pipeline streams instead; see generate_dynamic.generate_dynamic_data.</span>
+<span class="sd">    """</span>
+    <span class="k">return</span> <span class="p">[</span>
+        <span class="n">sample</span>
+        <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">iter_dynamic_simulations</span><span class="p">(</span>
+            <span class="n">network_path</span><span class="o">=</span><span class="n">network_path</span><span class="p">,</span>
+            <span class="n">scenarios</span><span class="o">=</span><span class="n">scenarios</span><span class="p">,</span>
+            <span class="n">dynamic_inputs</span><span class="o">=</span><span class="n">dynamic_inputs</span><span class="p">,</span>
+            <span class="n">dynamic_solver</span><span class="o">=</span><span class="n">dynamic_solver</span><span class="p">,</span>
+            <span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">,</span>
+            <span class="n">error_log_file</span><span class="o">=</span><span class="n">error_log_file</span><span class="p">,</span>
+            <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">for</span> <span class="n">sample</span> <span class="ow">in</span> <span class="n">chunk</span>
+    <span class="p">]</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div><h3 id="process_single_dynamic_simulation"><code>process_single_dynamic_simulation</code><a class="headerlink" href="#process_single_dynamic_simulation" title="Permanent link">&para;</a></h3>
+
+
+<div class="doc doc-object doc-function">
+
+
+
+<a id="gridfm_datakit.dynamic.process_dynamic.process_single_dynamic_simulation"></a>
+    <div class="doc doc-contents first">
+
+        <p>Process one load scenario, expanded over topology perturbations.</p>
+<p>The load scenario is applied, then generation and admittance perturbations
+(before OPF). Each resulting topology perturbation is processed independently:
+the balanced initial state is computed on the perturbed network (so OPF adapts
+the set-points to the topology and Dynawo initialises from a converged
+operating point), then the dynamic simulation is run. One sample is produced
+per <code>(scenario_index, perturbation_index)</code>.</p>
+<p>Absent generators default to identity, so a scenario yields exactly one
+sample, the pre-perturbation behaviour.</p>
+<p>Returns a list of result dicts (possibly empty if every perturbation failed).</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>gridfm_datakit/dynamic/process_dynamic.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">337</span>
+<span class="normal">338</span>
+<span class="normal">339</span>
+<span class="normal">340</span>
+<span class="normal">341</span>
+<span class="normal">342</span>
+<span class="normal">343</span>
+<span class="normal">344</span>
+<span class="normal">345</span>
+<span class="normal">346</span>
+<span class="normal">347</span>
+<span class="normal">348</span>
+<span class="normal">349</span>
+<span class="normal">350</span>
+<span class="normal">351</span>
+<span class="normal">352</span>
+<span class="normal">353</span>
+<span class="normal">354</span>
+<span class="normal">355</span>
+<span class="normal">356</span>
+<span class="normal">357</span>
+<span class="normal">358</span>
+<span class="normal">359</span>
+<span class="normal">360</span>
+<span class="normal">361</span>
+<span class="normal">362</span>
+<span class="normal">363</span>
+<span class="normal">364</span>
+<span class="normal">365</span>
+<span class="normal">366</span>
+<span class="normal">367</span>
+<span class="normal">368</span>
+<span class="normal">369</span>
+<span class="normal">370</span>
+<span class="normal">371</span>
+<span class="normal">372</span>
+<span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span>
+<span class="normal">384</span>
+<span class="normal">385</span>
+<span class="normal">386</span>
+<span class="normal">387</span>
+<span class="normal">388</span>
+<span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span>
+<span class="normal">394</span>
+<span class="normal">395</span>
+<span class="normal">396</span>
+<span class="normal">397</span>
+<span class="normal">398</span>
+<span class="normal">399</span>
+<span class="normal">400</span>
+<span class="normal">401</span>
+<span class="normal">402</span>
+<span class="normal">403</span>
+<span class="normal">404</span>
+<span class="normal">405</span>
+<span class="normal">406</span>
+<span class="normal">407</span>
+<span class="normal">408</span>
+<span class="normal">409</span>
+<span class="normal">410</span>
+<span class="normal">411</span>
+<span class="normal">412</span>
+<span class="normal">413</span>
+<span class="normal">414</span>
+<span class="normal">415</span>
+<span class="normal">416</span>
+<span class="normal">417</span>
+<span class="normal">418</span>
+<span class="normal">419</span>
+<span class="normal">420</span>
+<span class="normal">421</span>
+<span class="normal">422</span>
+<span class="normal">423</span>
+<span class="normal">424</span>
+<span class="normal">425</span>
+<span class="normal">426</span>
+<span class="normal">427</span>
+<span class="normal">428</span>
+<span class="normal">429</span>
+<span class="normal">430</span>
+<span class="normal">431</span>
+<span class="normal">432</span>
+<span class="normal">433</span>
+<span class="normal">434</span>
+<span class="normal">435</span>
+<span class="normal">436</span>
+<span class="normal">437</span>
+<span class="normal">438</span>
+<span class="normal">439</span>
+<span class="normal">440</span>
+<span class="normal">441</span>
+<span class="normal">442</span>
+<span class="normal">443</span>
+<span class="normal">444</span>
+<span class="normal">445</span>
+<span class="normal">446</span>
+<span class="normal">447</span>
+<span class="normal">448</span>
+<span class="normal">449</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">process_single_dynamic_simulation</span><span class="p">(</span>
+    <span class="n">pp_net</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">gfm_net</span><span class="p">:</span> <span class="n">Network</span><span class="p">,</span>
+    <span class="n">scenarios</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">scenario_index</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">p2g_maps</span><span class="p">,</span>
+    <span class="n">dynamic_mappings</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">dynamic_solver_params</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">dynamic_solver</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">julia</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">topology_generator</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">generation_generator</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">admittance_generator</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">error_log_file</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">lf_params</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">"""Process one load scenario, expanded over topology perturbations.</span>
+
+<span class="sd">    The load scenario is applied, then generation and admittance perturbations</span>
+<span class="sd">    (before OPF). Each resulting topology perturbation is processed independently:</span>
+<span class="sd">    the balanced initial state is computed on the perturbed network (so OPF adapts</span>
+<span class="sd">    the set-points to the topology and Dynawo initialises from a converged</span>
+<span class="sd">    operating point), then the dynamic simulation is run. One sample is produced</span>
+<span class="sd">    per ``(scenario_index, perturbation_index)``.</span>
+
+<span class="sd">    Absent generators default to identity, so a scenario yields exactly one</span>
+<span class="sd">    sample, the pre-perturbation behaviour.</span>
+
+<span class="sd">    Returns a list of result dicts (possibly empty if every perturbation failed).</span>
+<span class="sd">    """</span>
+    <span class="c1"># Work on a private copy so the shared per-worker network is not mutated.</span>
+    <span class="n">gfm_net</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">gfm_net</span><span class="p">)</span>
+    <span class="n">gfm_net</span><span class="o">.</span><span class="n">Pd</span> <span class="o">=</span> <span class="n">scenarios</span><span class="p">[:,</span> <span class="n">scenario_index</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+    <span class="n">gfm_net</span><span class="o">.</span><span class="n">Qd</span> <span class="o">=</span> <span class="n">scenarios</span><span class="p">[:,</span> <span class="n">scenario_index</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+
+    <span class="c1"># The three generators are handled differently because they have different</span>
+    <span class="c1"># cardinality, not by accident. This mirrors the static pipeline exactly</span>
+    <span class="c1"># (see process_network.process_scenario_*).</span>
+    <span class="c1">#</span>
+    <span class="c1">#   generation / admittance : 1 -&gt; 1. They consume a stream of networks and</span>
+    <span class="c1">#       yield one perturbed network per input, so we take next() once. They</span>
+    <span class="c1">#       modify the operating point the OPF then optimises.</span>
+    <span class="c1">#   topology                : 1 -&gt; N. It yields n_topology_variants outages</span>
+    <span class="c1">#       for a single network, so it is the only generator that expands one</span>
+    <span class="c1">#       load scenario into several samples, hence the loop below and hence</span>
+    <span class="c1">#       perturbation_index existing at all.</span>
+    <span class="c1">#</span>
+    <span class="c1"># Generation + admittance perturbations, applied before OPF.</span>
+    <span class="n">net_iter</span> <span class="o">=</span> <span class="nb">iter</span><span class="p">([</span><span class="n">gfm_net</span><span class="p">])</span>
+    <span class="k">if</span> <span class="n">generation_generator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">net_iter</span> <span class="o">=</span> <span class="n">generation_generator</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="n">net_iter</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">admittance_generator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">net_iter</span> <span class="o">=</span> <span class="n">admittance_generator</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="n">net_iter</span><span class="p">)</span>
+    <span class="n">perturbed_base</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">net_iter</span><span class="p">)</span>
+
+    <span class="c1"># Topology perturbations expand the scenario into one or more samples.</span>
+    <span class="k">if</span> <span class="n">topology_generator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">topologies</span> <span class="o">=</span> <span class="n">topology_generator</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="n">perturbed_base</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">topologies</span> <span class="o">=</span> <span class="p">[</span><span class="n">perturbed_base</span><span class="p">]</span>
+
+    <span class="n">base_variant_id</span> <span class="o">=</span> <span class="n">pp_net</span><span class="o">.</span><span class="n">get_working_variant_id</span><span class="p">()</span>
+    <span class="n">results</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">perturbation_index</span><span class="p">,</span> <span class="n">perturbed_net</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">topologies</span><span class="p">):</span>
+        <span class="n">variant_id</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"scenario_</span><span class="si">{</span><span class="n">scenario_index</span><span class="si">}</span><span class="s2">_perturbation_</span><span class="si">{</span><span class="n">perturbation_index</span><span class="si">}</span><span class="s2">"</span>
+        <span class="n">variant_created</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Inside the try: a failing clone_variant would otherwise escape this</span>
+            <span class="c1"># function entirely, bypassing the handler meant to keep one bad</span>
+            <span class="c1"># perturbation from dropping the whole scenario, and leave the working</span>
+            <span class="c1"># variant dangling for the rest of the worker's chunk.</span>
+            <span class="n">pp_net</span><span class="o">.</span><span class="n">clone_variant</span><span class="p">(</span><span class="n">base_variant_id</span><span class="p">,</span> <span class="n">variant_id</span><span class="p">)</span>
+            <span class="n">variant_created</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="n">pp_net</span><span class="o">.</span><span class="n">set_working_variant</span><span class="p">(</span><span class="n">variant_id</span><span class="p">)</span>
+
+            <span class="c1"># Step 1+2: balanced static state on the perturbed network</span>
+            <span class="n">_</span><span class="p">,</span> <span class="n">pf_data</span> <span class="o">=</span> <span class="n">_compute_balanced_static_state</span><span class="p">(</span>
+                <span class="n">pp_net</span><span class="o">=</span><span class="n">pp_net</span><span class="p">,</span>
+                <span class="n">gfm_net</span><span class="o">=</span><span class="n">perturbed_net</span><span class="p">,</span>
+                <span class="n">julia</span><span class="o">=</span><span class="n">julia</span><span class="p">,</span>
+                <span class="n">dynamic_solver</span><span class="o">=</span><span class="n">dynamic_solver</span><span class="p">,</span>
+                <span class="n">p2g_maps</span><span class="o">=</span><span class="n">p2g_maps</span><span class="p">,</span>
+                <span class="n">scenario_index</span><span class="o">=</span><span class="n">scenario_index</span><span class="p">,</span>
+                <span class="n">lf_params</span><span class="o">=</span><span class="n">lf_params</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Step 3: dynamic simulation</span>
+            <span class="n">dyn_results</span> <span class="o">=</span> <span class="n">_run_dynamic_simulation</span><span class="p">(</span>
+                <span class="n">pp_net</span><span class="p">,</span>
+                <span class="n">dynamic_mappings</span><span class="p">,</span>
+                <span class="n">dynamic_solver_params</span><span class="p">,</span>
+                <span class="n">dynamic_solver</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Step 4: combine + label with the (scenario, perturbation) key</span>
+            <span class="n">combined</span> <span class="o">=</span> <span class="n">_combine_pf_and_dyn_res</span><span class="p">(</span><span class="n">pf_data</span><span class="p">,</span> <span class="n">dyn_results</span><span class="p">)</span>
+            <span class="n">combined</span><span class="p">[</span><span class="s2">"scenario_index"</span><span class="p">]</span> <span class="o">=</span> <span class="n">scenario_index</span>
+            <span class="n">combined</span><span class="p">[</span><span class="s2">"perturbation_index"</span><span class="p">]</span> <span class="o">=</span> <span class="n">perturbation_index</span>
+            <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">combined</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="c1"># A single perturbation failing must not drop the whole scenario.</span>
+            <span class="n">_log_error</span><span class="p">(</span>
+                <span class="n">error_log_file</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s2">"[dynamic] scenario </span><span class="si">{</span><span class="n">scenario_index</span><span class="si">}</span><span class="s2"> perturbation "</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">perturbation_index</span><span class="si">}</span><span class="s2"> failed: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">traceback</span><span class="o">.</span><span class="n">format_exc</span><span class="p">()</span><span class="si">}</span><span class="se">\n</span><span class="s2">"</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="c1"># Step 5: clean up the per-perturbation variant (only if it was created)</span>
+            <span class="n">pp_net</span><span class="o">.</span><span class="n">set_working_variant</span><span class="p">(</span><span class="n">base_variant_id</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">variant_created</span><span class="p">:</span>
+                <span class="n">pp_net</span><span class="o">.</span><span class="n">remove_variant</span><span class="p">(</span><span class="n">variant_id</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">results</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div><h2 id="dynawo-backend">Dynawo backend<a class="headerlink" href="#dynawo-backend" title="Permanent link">&para;</a></h2>
+<h3 id="dynawomappings"><code>DynawoMappings</code><a class="headerlink" href="#dynawomappings" title="Permanent link">&para;</a></h3>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<a id="gridfm_datakit.dynamic.dynawo.DynawoMappings"></a>
+    <div class="doc doc-contents first">
+
+
+
+        <p>Dynawo-ready simulation inputs derived from DynamicInputs.
+3 mappings:
+    - dynamic model mapping -&gt; for both static equipments and automation systems
+    - event mapping -&gt; for events
+    - variable mapping -&gt; for the output variables</p>
+<h1 id="gridfm_datakit.dynamic.dynawo.DynawoMappings--attributes">Attributes<a class="headerlink" href="#gridfm_datakit.dynamic.dynawo.DynawoMappings--attributes" title="Permanent link">&para;</a></h1>
+<p>dynamic_model_mapping : pypowsybl.dynamic.ModelMapping
+event_mapping : pypowsybl.dynamic.EventMapping
+variable_mapping : pypowsybl.dynamic.OutputVariableMapping</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>gridfm_datakit/dynamic/dynawo/__init__.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">DynawoMappings</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Dynawo-ready simulation inputs derived from DynamicInputs.</span>
+<span class="sd">    3 mappings:</span>
+<span class="sd">        - dynamic model mapping -&gt; for both static equipments and automation systems</span>
+<span class="sd">        - event mapping -&gt; for events</span>
+<span class="sd">        - variable mapping -&gt; for the output variables</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    dynamic_model_mapping : pypowsybl.dynamic.ModelMapping</span>
+<span class="sd">    event_mapping : pypowsybl.dynamic.EventMapping</span>
+<span class="sd">    variable_mapping : pypowsybl.dynamic.OutputVariableMapping</span>
+<span class="sd">    """</span>
+
+    <span class="n">dynamic_model_mapping</span><span class="p">:</span> <span class="n">pp</span><span class="o">.</span><span class="n">dynamic</span><span class="o">.</span><span class="n">ModelMapping</span>
+    <span class="n">event_mapping</span><span class="p">:</span> <span class="n">pp</span><span class="o">.</span><span class="n">dynamic</span><span class="o">.</span><span class="n">EventMapping</span>
+    <span class="n">variable_mapping</span><span class="p">:</span> <span class="n">pp</span><span class="o">.</span><span class="n">dynamic</span><span class="o">.</span><span class="n">OutputVariableMapping</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div><h3 id="generate_dynawo_mappings"><code>generate_dynawo_mappings</code><a class="headerlink" href="#generate_dynawo_mappings" title="Permanent link">&para;</a></h3>
+
+
+<div class="doc doc-object doc-function">
+
+
+
+<a id="gridfm_datakit.dynamic.dynawo.generate_dynawo_mappings"></a>
+    <div class="doc doc-contents first">
+
+        <p>Convert generic DynamicInputs into Dynawo-compatible DynawoMappings.</p>
+<p>The conversion builds the Dynawo-specific mapping objects by parsing the generic
+DynamicInputs dataframes.</p>
+<p>Args
+    dynamic_inputs: DynamicInputs, generic inputs loaded by load_raw_inputs().</p>
+<p>Returns
+    DynawoMappings: simulation-ready Dynawo mappings</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>gridfm_datakit/dynamic/dynawo/__init__.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span>
+<span class="normal">74</span>
+<span class="normal">75</span>
+<span class="normal">76</span>
+<span class="normal">77</span>
+<span class="normal">78</span>
+<span class="normal">79</span>
+<span class="normal">80</span>
+<span class="normal">81</span>
+<span class="normal">82</span>
+<span class="normal">83</span>
+<span class="normal">84</span>
+<span class="normal">85</span>
+<span class="normal">86</span>
+<span class="normal">87</span>
+<span class="normal">88</span>
+<span class="normal">89</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">generate_dynawo_mappings</span><span class="p">(</span><span class="n">dynamic_inputs</span><span class="p">:</span> <span class="n">DynamicInputs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DynawoMappings</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Convert generic DynamicInputs into Dynawo-compatible DynawoMappings.</span>
+
+<span class="sd">    The conversion builds the Dynawo-specific mapping objects by parsing the generic</span>
+<span class="sd">    DynamicInputs dataframes.</span>
+
+<span class="sd">    Args</span>
+<span class="sd">        dynamic_inputs: DynamicInputs, generic inputs loaded by load_raw_inputs().</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">        DynawoMappings: simulation-ready Dynawo mappings</span>
+<span class="sd">    """</span>
+
+    <span class="n">dynamic_model_mapping</span> <span class="o">=</span> <span class="n">_map_dynamic_models_dynawo</span><span class="p">(</span><span class="n">dynamic_inputs</span><span class="o">.</span><span class="n">dynamic_models</span><span class="p">)</span>
+    <span class="n">event_mapping</span> <span class="o">=</span> <span class="n">_map_events_dynawo</span><span class="p">(</span><span class="n">dynamic_inputs</span><span class="o">.</span><span class="n">events</span><span class="p">)</span>
+    <span class="n">variable_mapping</span> <span class="o">=</span> <span class="n">_map_variables_dynawo</span><span class="p">(</span><span class="n">dynamic_inputs</span><span class="o">.</span><span class="n">variables</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">DynawoMappings</span><span class="p">(</span>
+        <span class="n">dynamic_model_mapping</span><span class="o">=</span><span class="n">dynamic_model_mapping</span><span class="p">,</span>
+        <span class="n">event_mapping</span><span class="o">=</span><span class="n">event_mapping</span><span class="p">,</span>
+        <span class="n">variable_mapping</span><span class="o">=</span><span class="n">variable_mapping</span><span class="p">,</span>
+    <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div><h3 id="get_dynawo_simulation_parameters"><code>get_dynawo_simulation_parameters</code><a class="headerlink" href="#get_dynawo_simulation_parameters" title="Permanent link">&para;</a></h3>
+
+
+<div class="doc doc-object doc-function">
+
+
+
+<a id="gridfm_datakit.dynamic.dynawo.get_dynawo_simulation_parameters"></a>
+    <div class="doc doc-contents first">
+
+        <p>Prepares the parameters for Dynawo simulation.</p>
+<h1 id="gridfm_datakit.dynamic.dynawo.get_dynawo_simulation_parameters--raises">Raises<a class="headerlink" href="#gridfm_datakit.dynamic.dynawo.get_dynawo_simulation_parameters--raises" title="Permanent link">&para;</a></h1>
+<p>ValueError
+    If a required key is missing, or an unsupported one is present.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>gridfm_datakit/dynamic/dynawo/__init__.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_dynawo_simulation_parameters</span><span class="p">(</span><span class="n">args</span><span class="p">:</span> <span class="n">NestedNamespace</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pp</span><span class="o">.</span><span class="n">dynamic</span><span class="o">.</span><span class="n">Parameters</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Prepares the parameters for Dynawo simulation.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    ValueError</span>
+<span class="sd">        If a required key is missing, or an unsupported one is present.</span>
+<span class="sd">    """</span>
+    <span class="n">dict_parameters</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">dynamic</span><span class="o">.</span><span class="n">solver_parameters</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+
+    <span class="c1"># This runs per worker, so a bad key fails every chunk. Both checks are what</span>
+    <span class="c1"># make that failure name the offending setting instead of surfacing as a bare</span>
+    <span class="c1"># KeyError from inside the provider.</span>
+    <span class="n">missing</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">({</span><span class="s2">"start_time"</span><span class="p">,</span> <span class="s2">"stop_time"</span><span class="p">}</span> <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="n">dict_parameters</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">missing</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"dynamic.solver_parameters: missing required key(s) </span><span class="si">{</span><span class="n">missing</span><span class="si">}</span><span class="s2">. "</span>
+            <span class="s2">"Both bound the simulation window, in seconds."</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="n">unknown</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span>
+        <span class="nb">set</span><span class="p">(</span><span class="n">dict_parameters</span><span class="p">)</span>
+        <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="n">SIMULATION_PARAMETERS_MAPPING</span><span class="p">)</span>
+        <span class="o">-</span> <span class="p">{</span><span class="s2">"start_time"</span><span class="p">,</span> <span class="s2">"stop_time"</span><span class="p">},</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">unknown</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"dynamic.solver_parameters: unsupported key(s) </span><span class="si">{</span><span class="n">unknown</span><span class="si">}</span><span class="s2">. Accepted: "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">SIMULATION_PARAMETERS_MAPPING</span><span class="p">)</span><span class="si">}</span><span class="s2"> (plus start_time, stop_time)."</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="c1"># provider_parameters only accept strings</span>
+    <span class="n">provider_parameters</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="n">SIMULATION_PARAMETERS_MAPPING</span><span class="p">[</span><span class="n">key</span><span class="p">]:</span> <span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">dict_parameters</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"start_time"</span><span class="p">,</span> <span class="s2">"stop_time"</span><span class="p">]</span> <span class="ow">and</span> <span class="n">value</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"none"</span><span class="p">,</span> <span class="s2">""</span><span class="p">])</span>
+    <span class="p">}</span>
+
+    <span class="k">return</span> <span class="n">pp</span><span class="o">.</span><span class="n">dynamic</span><span class="o">.</span><span class="n">Parameters</span><span class="p">(</span>
+        <span class="n">start_time</span><span class="o">=</span><span class="n">dict_parameters</span><span class="p">[</span><span class="s2">"start_time"</span><span class="p">],</span>
+        <span class="n">stop_time</span><span class="o">=</span><span class="n">dict_parameters</span><span class="p">[</span><span class="s2">"stop_time"</span><span class="p">],</span>
+        <span class="n">provider_parameters</span><span class="o">=</span><span class="n">provider_parameters</span><span class="p">,</span>
+    <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div><h3 id="get_dynawo_loadflow_parameters"><code>get_dynawo_loadflow_parameters</code><a class="headerlink" href="#get_dynawo_loadflow_parameters" title="Permanent link">&para;</a></h3>
+
+
+<div class="doc doc-object doc-function">
+
+
+
+<a id="gridfm_datakit.dynamic.dynawo.get_dynawo_loadflow_parameters"></a>
+    <div class="doc doc-contents first">
+
+        <p>Build the AC load flow parameters for the balanced initial state.</p>
+<p>The defaults deliberately differ from <code>powsybl.get_default_lf_params()</code>,
+which the static pipeline uses. Dynawo initialises each synchronous machine
+from the power flow solution, so the slack must sit on a machine that carries
+a dynamic model: <code>slackBusSelectionMode=LARGEST_GENERATOR</code> puts it there,
+and <code>read_slack_bus</code>/<code>write_slack_bus</code> keep that choice explicit and
+visible in the network. OpenLoadFlow's own default (MOST_MESHED) can select a
+bus with no generator at all, leaving Dynawo to initialise from a state its
+machine models cannot reproduce.</p>
+<p>Every default is overridable through the optional <code>dynamic.loadflow_parameters</code>
+config block.</p>
+<h1 id="gridfm_datakit.dynamic.dynawo.get_dynawo_loadflow_parameters--raises">Raises<a class="headerlink" href="#gridfm_datakit.dynamic.dynawo.get_dynawo_loadflow_parameters--raises" title="Permanent link">&para;</a></h1>
+<p>ValueError
+    If the config block contains an unsupported key.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>gridfm_datakit/dynamic/dynawo/__init__.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_dynawo_loadflow_parameters</span><span class="p">(</span><span class="n">args</span><span class="p">:</span> <span class="n">NestedNamespace</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pp</span><span class="o">.</span><span class="n">loadflow</span><span class="o">.</span><span class="n">Parameters</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Build the AC load flow parameters for the balanced initial state.</span>
+
+<span class="sd">    The defaults deliberately differ from ``powsybl.get_default_lf_params()``,</span>
+<span class="sd">    which the static pipeline uses. Dynawo initialises each synchronous machine</span>
+<span class="sd">    from the power flow solution, so the slack must sit on a machine that carries</span>
+<span class="sd">    a dynamic model: ``slackBusSelectionMode=LARGEST_GENERATOR`` puts it there,</span>
+<span class="sd">    and ``read_slack_bus``/``write_slack_bus`` keep that choice explicit and</span>
+<span class="sd">    visible in the network. OpenLoadFlow's own default (MOST_MESHED) can select a</span>
+<span class="sd">    bus with no generator at all, leaving Dynawo to initialise from a state its</span>
+<span class="sd">    machine models cannot reproduce.</span>
+
+<span class="sd">    Every default is overridable through the optional ``dynamic.loadflow_parameters``</span>
+<span class="sd">    config block.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    ValueError</span>
+<span class="sd">        If the config block contains an unsupported key.</span>
+<span class="sd">    """</span>
+    <span class="n">cfg</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s2">"dynamic"</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> <span class="s2">"loadflow_parameters"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">overrides</span> <span class="o">=</span> <span class="n">cfg</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span> <span class="k">if</span> <span class="n">cfg</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">{}</span>
+
+    <span class="n">unknown</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">overrides</span><span class="p">)</span> <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="n">LOADFLOW_PARAMETERS_DEFAULTS</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">unknown</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"dynamic.loadflow_parameters: unsupported key(s) </span><span class="si">{</span><span class="n">unknown</span><span class="si">}</span><span class="s2">. "</span>
+            <span class="sa">f</span><span class="s2">"Accepted: </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">LOADFLOW_PARAMETERS_DEFAULTS</span><span class="p">)</span><span class="si">}</span><span class="s2">."</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="n">params</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">LOADFLOW_PARAMETERS_DEFAULTS</span><span class="p">,</span> <span class="o">**</span><span class="n">overrides</span><span class="p">}</span>
+    <span class="c1"># provider_parameters is a free-form pass-through to OpenLoadFlow, which only</span>
+    <span class="c1"># accepts strings.</span>
+    <span class="n">provider_parameters</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="nb">str</span><span class="p">(</span><span class="n">key</span><span class="p">):</span> <span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="p">(</span><span class="n">params</span><span class="p">[</span><span class="s2">"provider_parameters"</span><span class="p">]</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+    <span class="p">}</span>
+
+    <span class="k">return</span> <span class="n">pp</span><span class="o">.</span><span class="n">loadflow</span><span class="o">.</span><span class="n">Parameters</span><span class="p">(</span>
+        <span class="n">distributed_slack</span><span class="o">=</span><span class="nb">bool</span><span class="p">(</span><span class="n">params</span><span class="p">[</span><span class="s2">"distributed_slack"</span><span class="p">]),</span>
+        <span class="n">read_slack_bus</span><span class="o">=</span><span class="nb">bool</span><span class="p">(</span><span class="n">params</span><span class="p">[</span><span class="s2">"read_slack_bus"</span><span class="p">]),</span>
+        <span class="n">write_slack_bus</span><span class="o">=</span><span class="nb">bool</span><span class="p">(</span><span class="n">params</span><span class="p">[</span><span class="s2">"write_slack_bus"</span><span class="p">]),</span>
+        <span class="n">provider_parameters</span><span class="o">=</span><span class="n">provider_parameters</span><span class="p">,</span>
+    <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div><h3 id="compute_balanced_static_state_dynawo"><code>compute_balanced_static_state_dynawo</code><a class="headerlink" href="#compute_balanced_static_state_dynawo" title="Permanent link">&para;</a></h3>
+
+
+<div class="doc doc-object doc-function">
+
+
+
+<a id="gridfm_datakit.dynamic.dynawo.simulate.compute_balanced_static_state_dynawo"></a>
+    <div class="doc doc-contents first">
+
+        <p>Compute the balanced initial conditions for a dynamic simulation.</p>
+<p>Runs the four-step sequence required to produce a consistent initial
+state for Dynawo:</p>
+<ol>
+<li><strong>OPF</strong> via Julia/PowerModels on the randomised gfm network
+   → optimal dispatch for the current scenario.</li>
+<li><strong>update_powsybl</strong> (powsybl submodule)
+   → applies OPF results (Pg, Vm setpoints) onto the pypowsybl object
+   with correct per-unit conventions.</li>
+<li><strong>AC-PF</strong> via pypowsybl OpenLoadFlow
+   → verifies convergence and produces the balanced initial state.</li>
+<li><strong>get_pf_res / pf_post_processing</strong> (powsybl submodule)
+   → formats pypowsybl PF results in the gridfm column schema
+   with ID-based bus index assignment.</li>
+</ol>
+<h1 id="gridfm_datakit.dynamic.dynawo.simulate.compute_balanced_static_state_dynawo--args">Args<a class="headerlink" href="#gridfm_datakit.dynamic.dynawo.simulate.compute_balanced_static_state_dynawo--args" title="Permanent link">&para;</a></h1>
+<p>pp_net:
+    pypowsybl network.
+    The caller must pass a per-worker <em>clone/variant</em> to avoid
+    cross-scenario contamination
+gfm_net:
+    randomised gridfm network for the current scenario
+    (with applied load scenario and perturbations)
+julia:
+    Initialised Julia interface (from "init_julia")
+p2g_maps:
+    Pypowsybl-to-gridfm index maps for <code>pp_net</code> (from
+    <code>powsybl.build_p2g_maps</code>), passed in rather than rebuilt per scenario
+scenario_index: int
+    Used to label the results row (matches <code>pf_post_processing</code>'s
+    <code>scenario_index</code> argument)
+lf_params:
+    <code>pypowsybl.loadflow.Parameters</code> for step 3 (from
+    <code>get_dynawo_loadflow_parameters</code>). Defaults to the dynamic-appropriate
+    settings in <code>LOADFLOW_PARAMETERS_DEFAULTS</code> when None.</p>
+<h1 id="gridfm_datakit.dynamic.dynawo.simulate.compute_balanced_static_state_dynawo--returns">Returns<a class="headerlink" href="#gridfm_datakit.dynamic.dynawo.simulate.compute_balanced_static_state_dynawo--returns" title="Permanent link">&para;</a></h1>
+<p>pp_net:
+    The updated pypowsybl network, balanced and ready for dynamic
+    simulation.
+pf_data: dict
+    Power flow results in gridfm column schema with keys:
+    <code>"bus"</code>, <code>"gen"</code>, <code>"branch"</code>, <code>"Y_bus"</code>, <code>"runtime"</code></p>
+<h1 id="gridfm_datakit.dynamic.dynawo.simulate.compute_balanced_static_state_dynawo--raises">Raises<a class="headerlink" href="#gridfm_datakit.dynamic.dynawo.simulate.compute_balanced_static_state_dynawo--raises" title="Permanent link">&para;</a></h1>
+<p>RuntimeError
+    If OPF fails to converge.
+ValueError
+    If the AC power flow does not converge.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>gridfm_datakit/dynamic/dynawo/simulate.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 42</span>
+<span class="normal"> 43</span>
+<span class="normal"> 44</span>
+<span class="normal"> 45</span>
+<span class="normal"> 46</span>
+<span class="normal"> 47</span>
+<span class="normal"> 48</span>
+<span class="normal"> 49</span>
+<span class="normal"> 50</span>
+<span class="normal"> 51</span>
+<span class="normal"> 52</span>
+<span class="normal"> 53</span>
+<span class="normal"> 54</span>
+<span class="normal"> 55</span>
+<span class="normal"> 56</span>
+<span class="normal"> 57</span>
+<span class="normal"> 58</span>
+<span class="normal"> 59</span>
+<span class="normal"> 60</span>
+<span class="normal"> 61</span>
+<span class="normal"> 62</span>
+<span class="normal"> 63</span>
+<span class="normal"> 64</span>
+<span class="normal"> 65</span>
+<span class="normal"> 66</span>
+<span class="normal"> 67</span>
+<span class="normal"> 68</span>
+<span class="normal"> 69</span>
+<span class="normal"> 70</span>
+<span class="normal"> 71</span>
+<span class="normal"> 72</span>
+<span class="normal"> 73</span>
+<span class="normal"> 74</span>
+<span class="normal"> 75</span>
+<span class="normal"> 76</span>
+<span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">compute_balanced_static_state_dynawo</span><span class="p">(</span>
+    <span class="n">pp_net</span><span class="p">:</span> <span class="n">pp</span><span class="o">.</span><span class="n">network</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span>
+    <span class="n">gfm_net</span><span class="p">:</span> <span class="n">Network</span><span class="p">,</span>
+    <span class="n">julia</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">p2g_maps</span><span class="p">,</span>
+    <span class="n">scenario_index</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="n">lf_params</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">"""Compute the balanced initial conditions for a dynamic simulation.</span>
+
+<span class="sd">    Runs the four-step sequence required to produce a consistent initial</span>
+<span class="sd">    state for Dynawo:</span>
+
+<span class="sd">    1. **OPF** via Julia/PowerModels on the randomised gfm network</span>
+<span class="sd">       → optimal dispatch for the current scenario.</span>
+<span class="sd">    2. **update_powsybl** (powsybl submodule)</span>
+<span class="sd">       → applies OPF results (Pg, Vm setpoints) onto the pypowsybl object</span>
+<span class="sd">       with correct per-unit conventions.</span>
+<span class="sd">    3. **AC-PF** via pypowsybl OpenLoadFlow</span>
+<span class="sd">       → verifies convergence and produces the balanced initial state.</span>
+<span class="sd">    4. **get_pf_res / pf_post_processing** (powsybl submodule)</span>
+<span class="sd">       → formats pypowsybl PF results in the gridfm column schema</span>
+<span class="sd">       with ID-based bus index assignment.</span>
+
+<span class="sd">    Args</span>
+<span class="sd">    ----</span>
+<span class="sd">    pp_net:</span>
+<span class="sd">        pypowsybl network.</span>
+<span class="sd">        The caller must pass a per-worker *clone/variant* to avoid</span>
+<span class="sd">        cross-scenario contamination</span>
+<span class="sd">    gfm_net:</span>
+<span class="sd">        randomised gridfm network for the current scenario</span>
+<span class="sd">        (with applied load scenario and perturbations)</span>
+<span class="sd">    julia:</span>
+<span class="sd">        Initialised Julia interface (from "init_julia")</span>
+<span class="sd">    p2g_maps:</span>
+<span class="sd">        Pypowsybl-to-gridfm index maps for ``pp_net`` (from</span>
+<span class="sd">        ``powsybl.build_p2g_maps``), passed in rather than rebuilt per scenario</span>
+<span class="sd">    scenario_index: int</span>
+<span class="sd">        Used to label the results row (matches ``pf_post_processing``'s</span>
+<span class="sd">        ``scenario_index`` argument)</span>
+<span class="sd">    lf_params:</span>
+<span class="sd">        ``pypowsybl.loadflow.Parameters`` for step 3 (from</span>
+<span class="sd">        ``get_dynawo_loadflow_parameters``). Defaults to the dynamic-appropriate</span>
+<span class="sd">        settings in ``LOADFLOW_PARAMETERS_DEFAULTS`` when None.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    pp_net:</span>
+<span class="sd">        The updated pypowsybl network, balanced and ready for dynamic</span>
+<span class="sd">        simulation.</span>
+<span class="sd">    pf_data: dict</span>
+<span class="sd">        Power flow results in gridfm column schema with keys:</span>
+<span class="sd">        ``"bus"``, ``"gen"``, ``"branch"``, ``"Y_bus"``, ``"runtime"``</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    RuntimeError</span>
+<span class="sd">        If OPF fails to converge.</span>
+<span class="sd">    ValueError</span>
+<span class="sd">        If the AC power flow does not converge.</span>
+<span class="sd">    """</span>
+    <span class="c1"># Step 1: run OPF on the gfm network to get optimal dispatch</span>
+    <span class="n">opf_res</span> <span class="o">=</span> <span class="n">run_opf</span><span class="p">(</span><span class="n">gfm_net</span><span class="p">,</span> <span class="n">julia</span><span class="p">)</span>
+
+    <span class="c1"># Step 2: apply OPF setpoints to gfm_net, then push to pypowsybl</span>
+    <span class="n">gfm_net_pf</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">gfm_net</span><span class="p">)</span>
+    <span class="n">gfm_net_pf</span> <span class="o">=</span> <span class="n">pf_preprocessing</span><span class="p">(</span><span class="n">gfm_net_pf</span><span class="p">,</span> <span class="n">opf_res</span><span class="p">)</span>
+
+    <span class="c1"># mapping_p2g = powsybl.build_p2g_maps(gfm_net_pf, pp_net); received as args to avoid repeated computation</span>
+    <span class="n">powsybl</span><span class="o">.</span><span class="n">update_powsybl</span><span class="p">(</span><span class="n">pp_net</span><span class="p">,</span> <span class="n">gfm_net_pf</span><span class="p">,</span> <span class="n">p2g_maps</span><span class="p">)</span>
+
+    <span class="c1"># Step 3: run AC-PF via pypowsybl OpenLoadFlow.</span>
+    <span class="c1"># These parameters deliberately differ from the static pipeline's</span>
+    <span class="c1"># get_default_lf_params(): Dynawo initialises its synchronous machines from</span>
+    <span class="c1"># this solution, so the slack has to sit on a machine that carries a dynamic</span>
+    <span class="c1"># model. See get_dynawo_loadflow_parameters.</span>
+    <span class="k">if</span> <span class="n">lf_params</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">gridfm_datakit.dynamic.dynawo</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_dynawo_loadflow_parameters</span>
+
+        <span class="n">lf_params</span> <span class="o">=</span> <span class="n">get_dynawo_loadflow_parameters</span><span class="p">(</span><span class="n">NestedNamespace</span><span class="p">())</span>
+    <span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
+    <span class="n">pf_metadata</span> <span class="o">=</span> <span class="n">powsybl</span><span class="o">.</span><span class="n">pypowsybl</span><span class="o">.</span><span class="n">loadflow</span><span class="o">.</span><span class="n">run_ac</span><span class="p">(</span><span class="n">pp_net</span><span class="p">,</span> <span class="n">lf_params</span><span class="p">)</span>
+    <span class="n">solve_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">t0</span>
+
+    <span class="c1"># Step 4: format results in gridfm column schema (ID-based bus assignment)</span>
+    <span class="n">pf_res</span> <span class="o">=</span> <span class="n">powsybl</span><span class="o">.</span><span class="n">get_pf_res</span><span class="p">(</span><span class="n">pp_net</span><span class="p">,</span> <span class="n">solve_time</span><span class="p">,</span> <span class="n">pf_metadata</span><span class="p">,</span> <span class="n">p2g_maps</span><span class="p">)</span>
+    <span class="n">pf_data</span> <span class="o">=</span> <span class="n">pf_post_processing</span><span class="p">(</span>
+        <span class="n">scenario_index</span><span class="p">,</span>
+        <span class="n">gfm_net_pf</span><span class="p">,</span>
+        <span class="n">pf_res</span><span class="p">,</span>
+        <span class="n">res_dc</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">include_dc_res</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">pp_net</span><span class="p">,</span> <span class="n">pf_data</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div><h3 id="run_dynawo_simulation"><code>run_dynawo_simulation</code><a class="headerlink" href="#run_dynawo_simulation" title="Permanent link">&para;</a></h3>
+
+
+<div class="doc doc-object doc-function">
+
+
+
+<a id="gridfm_datakit.dynamic.dynawo.simulate.run_dynawo_simulation"></a>
+    <div class="doc doc-contents first">
+
+        <p>Apply Dynawo mappings to a balanced pypowsybl network and run the simulation.</p>
+<h1 id="gridfm_datakit.dynamic.dynawo.simulate.run_dynawo_simulation--args">Args<a class="headerlink" href="#gridfm_datakit.dynamic.dynawo.simulate.run_dynawo_simulation--args" title="Permanent link">&para;</a></h1>
+<p>pp_net :
+    Balanced pypowsybl network (output of <code>compute_balanced_static_state_dynawo</code>).
+dynawo_mapping : DynawoMappings
+    Validated Dynawo-ready mappings (models, events, variables).
+parameters :
+    <code>pypowsybl.dynamic.Parameters</code> object (from <code>get_dynawo_simulation_parameters</code>).
+drop_duplicate_timestep :
+    Whether drop duplicate timestep in the output timeseries, True by default.</p>
+<h1 id="gridfm_datakit.dynamic.dynawo.simulate.run_dynawo_simulation--returns">Returns<a class="headerlink" href="#gridfm_datakit.dynamic.dynawo.simulate.run_dynawo_simulation--returns" title="Permanent link">&para;</a></h1>
+<p>DynamicResults
+    Solver-agnostic container holding the curves as a pandas DataFrame
+    indexed by time with shape <strong>(n_timesteps, n_variables)</strong>, plus the solver
+    status report string and the final state values. The transpose to
+    (n_variables, n_timesteps) happens only when writing the Zarr store.</p>
+<h1 id="gridfm_datakit.dynamic.dynawo.simulate.run_dynawo_simulation--raises">Raises<a class="headerlink" href="#gridfm_datakit.dynamic.dynawo.simulate.run_dynawo_simulation--raises" title="Permanent link">&para;</a></h1>
+<p>RuntimeError
+    If the status is not SUCCESS, or if a dynamic model was not instantiated.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>gridfm_datakit/dynamic/dynawo/simulate.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span>
+<span class="normal">225</span>
+<span class="normal">226</span>
+<span class="normal">227</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">run_dynawo_simulation</span><span class="p">(</span>
+    <span class="n">pp_net</span><span class="p">:</span> <span class="n">pp</span><span class="o">.</span><span class="n">network</span><span class="o">.</span><span class="n">Network</span><span class="p">,</span>
+    <span class="n">dynawo_mapping</span><span class="p">:</span> <span class="n">DynawoMappings</span><span class="p">,</span>
+    <span class="n">parameters</span><span class="p">:</span> <span class="n">pp</span><span class="o">.</span><span class="n">dynamic</span><span class="o">.</span><span class="n">Parameters</span><span class="p">,</span>
+    <span class="n">drop_duplicate_timestep</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Apply Dynawo mappings to a balanced pypowsybl network and run the simulation.</span>
+
+<span class="sd">    Args</span>
+<span class="sd">    ----</span>
+<span class="sd">    pp_net :</span>
+<span class="sd">        Balanced pypowsybl network (output of ``compute_balanced_static_state_dynawo``).</span>
+<span class="sd">    dynawo_mapping : DynawoMappings</span>
+<span class="sd">        Validated Dynawo-ready mappings (models, events, variables).</span>
+<span class="sd">    parameters :</span>
+<span class="sd">        ``pypowsybl.dynamic.Parameters`` object (from ``get_dynawo_simulation_parameters``).</span>
+<span class="sd">    drop_duplicate_timestep :</span>
+<span class="sd">        Whether drop duplicate timestep in the output timeseries, True by default.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    DynamicResults</span>
+<span class="sd">        Solver-agnostic container holding the curves as a pandas DataFrame</span>
+<span class="sd">        indexed by time with shape **(n_timesteps, n_variables)**, plus the solver</span>
+<span class="sd">        status report string and the final state values. The transpose to</span>
+<span class="sd">        (n_variables, n_timesteps) happens only when writing the Zarr store.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    RuntimeError</span>
+<span class="sd">        If the status is not SUCCESS, or if a dynamic model was not instantiated.</span>
+<span class="sd">    """</span>
+    <span class="c1"># Setup</span>
+    <span class="n">sim</span> <span class="o">=</span> <span class="n">pp</span><span class="o">.</span><span class="n">dynamic</span><span class="o">.</span><span class="n">Simulation</span><span class="p">()</span>
+    <span class="n">report_node</span> <span class="o">=</span> <span class="n">pp</span><span class="o">.</span><span class="n">report</span><span class="o">.</span><span class="n">ReportNode</span><span class="p">()</span>
+
+    <span class="c1"># Run simulation. Dynawo writes prolific native output (OpenModelica banners,</span>
+    <span class="c1"># solver iterations) straight to fd 1/2; route it through the process-wide</span>
+    <span class="c1"># log router's "dynawo" channel so it obeys the same verbosity/file policy as</span>
+    <span class="c1"># the OPF/PF solvers. No-op when no router is installed (e.g. ad-hoc scripts).</span>
+    <span class="k">with</span> <span class="n">solver_capture</span><span class="p">(</span><span class="s2">"dynawo"</span><span class="p">):</span>
+        <span class="n">dyn_res</span> <span class="o">=</span> <span class="n">sim</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+            <span class="n">pp_net</span><span class="p">,</span>
+            <span class="n">dynawo_mapping</span><span class="o">.</span><span class="n">dynamic_model_mapping</span><span class="p">,</span>
+            <span class="n">dynawo_mapping</span><span class="o">.</span><span class="n">event_mapping</span><span class="p">,</span>
+            <span class="n">dynawo_mapping</span><span class="o">.</span><span class="n">variable_mapping</span><span class="p">,</span>
+            <span class="n">parameters</span><span class="o">=</span><span class="n">parameters</span><span class="p">,</span>
+            <span class="n">report_node</span><span class="o">=</span><span class="n">report_node</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Dynawo does NOT raise when the simulation fails: sim.run() returns a result</span>
+    <span class="c1"># whose status is FAILURE and whose curves are empty or truncated. Left</span>
+    <span class="c1"># unchecked, a diverged/aborted run would be stored as a valid trajectory (or</span>
+    <span class="c1"># blow up the Zarr writer with a zero-width array). Raise instead: the caller</span>
+    <span class="c1"># logs it and drops the sample, exactly like an OPF/PF divergence.</span>
+    <span class="k">if</span> <span class="n">dyn_res</span><span class="o">.</span><span class="n">status</span><span class="p">()</span><span class="o">.</span><span class="n">name</span> <span class="o">!=</span> <span class="s2">"SUCCESS"</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"Dynawo simulation failed (</span><span class="si">{</span><span class="n">dyn_res</span><span class="o">.</span><span class="n">status</span><span class="p">()</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">): </span><span class="si">{</span><span class="n">dyn_res</span><span class="o">.</span><span class="n">status_text</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="c1"># A model Dynawo cannot instantiate is skipped, and the run still reports</span>
+    <span class="c1"># SUCCESS: the sample would be a trajectory of a different system than the</span>
+    <span class="c1"># input tables describe. The report is the only trace.</span>
+    <span class="n">report</span> <span class="o">=</span> <span class="n">report_node</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span>
+    <span class="n">failed</span> <span class="o">=</span> <span class="n">_failed_model_instantiations</span><span class="p">(</span><span class="n">report</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">failed</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"Dynawo failed to instantiate </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">failed</span><span class="p">)</span><span class="si">}</span><span class="s2"> dynamic model(s): </span><span class="si">{</span><span class="n">failed</span><span class="si">}</span><span class="s2">. "</span>
+            <span class="s2">"The simulation still reports SUCCESS but runs without them. Check the "</span>
+            <span class="s2">"static_id / model_name / category_name of these rows against the "</span>
+            <span class="s2">"network's element IDs."</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Format results. FinalStateValue rows of the variables table are returned</span>
+    <span class="c1"># separately from the curves and stored as a per-sample scalar table, so they</span>
+    <span class="c1"># are carried through here rather than dropped.</span>
+    <span class="n">formated_dyn_res</span> <span class="o">=</span> <span class="n">_format_dynamic_res</span><span class="p">(</span><span class="n">dyn_res</span><span class="p">,</span> <span class="n">drop_duplicate_timestep</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">DynamicResults</span><span class="p">(</span>
+        <span class="n">formated_dyn_res</span><span class="p">,</span>
+        <span class="n">report</span><span class="p">,</span>
+        <span class="n">final_state_values</span><span class="o">=</span><span class="n">dyn_res</span><span class="o">.</span><span class="n">final_state_values</span><span class="p">(),</span>
+    <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div><h2 id="availability-checks">Availability checks<a class="headerlink" href="#availability-checks" title="Permanent link">&para;</a></h2>
+<h3 id="is_dynawo_available"><code>is_dynawo_available</code><a class="headerlink" href="#is_dynawo_available" title="Permanent link">&para;</a></h3>
+
+
+<div class="doc doc-object doc-function">
+
+
+
+<a id="gridfm_datakit.dynamic.dynawo.api.is_dynawo_available"></a>
+    <div class="doc doc-contents first">
+
+        <p>Return True if pypowsybl.dynamic AND a local Dynawo installation are usable.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>gridfm_datakit/dynamic/dynawo/api.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">is_dynawo_available</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Return True if pypowsybl.dynamic AND a local Dynawo installation are usable."""</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">is_pypowsybl_dynamic_available</span><span class="p">():</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">return</span> <span class="n">_dynawo_unavailable_reason</span><span class="p">()</span> <span class="ow">is</span> <span class="kc">None</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div><h3 id="check_dynawo_available"><code>check_dynawo_available</code><a class="headerlink" href="#check_dynawo_available" title="Permanent link">&para;</a></h3>
+
+
+<div class="doc doc-object doc-function">
+
+
+
+<a id="gridfm_datakit.dynamic.dynawo.api.check_dynawo_available"></a>
+    <div class="doc doc-contents first">
+
+        <p>Raise if the Dynawo backend cannot run, explaining exactly what is missing.</p>
+<p>Called before launching simulations so a missing installation surfaces as an
+actionable message instead of an opaque "DynawoSimulationProvider could not
+be instantiated" from deep inside the solver.</p>
+<h1 id="gridfm_datakit.dynamic.dynawo.api.check_dynawo_available--raises">Raises<a class="headerlink" href="#gridfm_datakit.dynamic.dynawo.api.check_dynawo_available--raises" title="Permanent link">&para;</a></h1>
+<p>ImportError
+    If pypowsybl.dynamic is not installed.
+RuntimeError
+    If no usable local Dynawo installation is declared to powsybl.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>gridfm_datakit/dynamic/dynawo/api.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">check_dynawo_available</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Raise if the Dynawo backend cannot run, explaining exactly what is missing.</span>
+
+<span class="sd">    Called before launching simulations so a missing installation surfaces as an</span>
+<span class="sd">    actionable message instead of an opaque "DynawoSimulationProvider could not</span>
+<span class="sd">    be instantiated" from deep inside the solver.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    ImportError</span>
+<span class="sd">        If pypowsybl.dynamic is not installed.</span>
+<span class="sd">    RuntimeError</span>
+<span class="sd">        If no usable local Dynawo installation is declared to powsybl.</span>
+<span class="sd">    """</span>
+    <span class="n">check_pypowsybl_dynamic_available</span><span class="p">()</span>
+    <span class="n">reason</span> <span class="o">=</span> <span class="n">_dynawo_unavailable_reason</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">reason</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"Dynawo backend unavailable: </span><span class="si">{</span><span class="n">reason</span><span class="si">}</span><span class="s2">.</span><span class="se">\n\n</span><span class="s2">"</span>
+            <span class="o">+</span> <span class="n">_INSTALL_HINT</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">config_dir</span><span class="o">=</span><span class="n">_powsybl_config_dir</span><span class="p">()),</span>
+        <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div><h2 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h2>
+<h3 id="validate_dynamic_data"><code>validate_dynamic_data</code><a class="headerlink" href="#validate_dynamic_data" title="Permanent link">&para;</a></h3>
+
+
+<div class="doc doc-object doc-function">
+
+
+
+<a id="gridfm_datakit.validation.validate_dynamic_data"></a>
+    <div class="doc doc-contents first">
+
+        <p>Run the static-data validation suite on the dynamic pipeline's PF snapshot.</p>
+<p>The dynamic pipeline stores the same physical quantities as the static one, but
+lays them out differently, so validate_generated_data cannot read them directly:</p>
+<ul>
+<li>flat single-file parquet, not partitioned directories (no <code>n_scenarios.txt</code>);</li>
+<li>a sample is keyed by the pair (scenario_index, perturbation_index), because a
+  topology perturbation expands one load scenario into several samples, whereas
+  the static schema has a single <code>scenario</code> column.</li>
+</ul>
+<p>This loader bridges the two: it reads the flat files and adds a dense
+<code>scenario</code> column by ranking the distinct (scenario_index, perturbation_index)
+pairs, so each dynamic sample becomes one "scenario" from the checks' point of
+view. The checks themselves are shared verbatim with the static pipeline.</p>
+<p>Note this validates the <em>static snapshot</em> (the initial operating point Dynawo
+starts from): the bus/branch/gen/Y-bus/runtime tables. It does not validate the
+time-series curves in the Zarr store.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>file_paths</code>
+            </td>
+            <td>
+                  <code><span title="typing.Dict">Dict</span>[<span title="str">str</span>, <span title="str">str</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Paths as returned by generate_dynamic_data (needs "bus_data",
+"branch_data", "gen_data", "y_bus_data", optionally "runtime_data").</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>mode</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Operating mode ("opf" or "pf"). The dynamic pipeline balances with an
+OPF but stores an AC-PF solution, so the default is "pf".</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;pf&#39;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>sn_mva</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Base MVA used to scale power quantities.</p>
+              </div>
+            </td>
+            <td>
+                  <code>100.0</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>True if all validations pass.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="AssertionError">AssertionError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If any validation fails.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>gridfm_datakit/validation.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">315</span>
+<span class="normal">316</span>
+<span class="normal">317</span>
+<span class="normal">318</span>
+<span class="normal">319</span>
+<span class="normal">320</span>
+<span class="normal">321</span>
+<span class="normal">322</span>
+<span class="normal">323</span>
+<span class="normal">324</span>
+<span class="normal">325</span>
+<span class="normal">326</span>
+<span class="normal">327</span>
+<span class="normal">328</span>
+<span class="normal">329</span>
+<span class="normal">330</span>
+<span class="normal">331</span>
+<span class="normal">332</span>
+<span class="normal">333</span>
+<span class="normal">334</span>
+<span class="normal">335</span>
+<span class="normal">336</span>
+<span class="normal">337</span>
+<span class="normal">338</span>
+<span class="normal">339</span>
+<span class="normal">340</span>
+<span class="normal">341</span>
+<span class="normal">342</span>
+<span class="normal">343</span>
+<span class="normal">344</span>
+<span class="normal">345</span>
+<span class="normal">346</span>
+<span class="normal">347</span>
+<span class="normal">348</span>
+<span class="normal">349</span>
+<span class="normal">350</span>
+<span class="normal">351</span>
+<span class="normal">352</span>
+<span class="normal">353</span>
+<span class="normal">354</span>
+<span class="normal">355</span>
+<span class="normal">356</span>
+<span class="normal">357</span>
+<span class="normal">358</span>
+<span class="normal">359</span>
+<span class="normal">360</span>
+<span class="normal">361</span>
+<span class="normal">362</span>
+<span class="normal">363</span>
+<span class="normal">364</span>
+<span class="normal">365</span>
+<span class="normal">366</span>
+<span class="normal">367</span>
+<span class="normal">368</span>
+<span class="normal">369</span>
+<span class="normal">370</span>
+<span class="normal">371</span>
+<span class="normal">372</span>
+<span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span>
+<span class="normal">384</span>
+<span class="normal">385</span>
+<span class="normal">386</span>
+<span class="normal">387</span>
+<span class="normal">388</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">validate_dynamic_data</span><span class="p">(</span>
+    <span class="n">file_paths</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span>
+    <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"pf"</span><span class="p">,</span>
+    <span class="n">sn_mva</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">100.0</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Run the static-data validation suite on the dynamic pipeline's PF snapshot.</span>
+
+<span class="sd">    The dynamic pipeline stores the same physical quantities as the static one, but</span>
+<span class="sd">    lays them out differently, so validate_generated_data cannot read them directly:</span>
+
+<span class="sd">    * flat single-file parquet, not partitioned directories (no ``n_scenarios.txt``);</span>
+<span class="sd">    * a sample is keyed by the pair (scenario_index, perturbation_index), because a</span>
+<span class="sd">      topology perturbation expands one load scenario into several samples, whereas</span>
+<span class="sd">      the static schema has a single ``scenario`` column.</span>
+
+<span class="sd">    This loader bridges the two: it reads the flat files and adds a dense</span>
+<span class="sd">    ``scenario`` column by ranking the distinct (scenario_index, perturbation_index)</span>
+<span class="sd">    pairs, so each dynamic sample becomes one "scenario" from the checks' point of</span>
+<span class="sd">    view. The checks themselves are shared verbatim with the static pipeline.</span>
+
+<span class="sd">    Note this validates the *static snapshot* (the initial operating point Dynawo</span>
+<span class="sd">    starts from): the bus/branch/gen/Y-bus/runtime tables. It does not validate the</span>
+<span class="sd">    time-series curves in the Zarr store.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        file_paths: Paths as returned by generate_dynamic_data (needs "bus_data",</span>
+<span class="sd">            "branch_data", "gen_data", "y_bus_data", optionally "runtime_data").</span>
+<span class="sd">        mode: Operating mode ("opf" or "pf"). The dynamic pipeline balances with an</span>
+<span class="sd">            OPF but stores an AC-PF solution, so the default is "pf".</span>
+<span class="sd">        sn_mva: Base MVA used to scale power quantities.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        True if all validations pass.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        AssertionError: If any validation fails.</span>
+<span class="sd">    """</span>
+    <span class="n">KEY</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"scenario_index"</span><span class="p">,</span> <span class="s2">"perturbation_index"</span><span class="p">]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_read</span><span class="p">(</span><span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_parquet</span><span class="p">(</span><span class="n">file_paths</span><span class="p">[</span><span class="n">key</span><span class="p">],</span> <span class="n">engine</span><span class="o">=</span><span class="s2">"pyarrow"</span><span class="p">)</span>
+        <span class="c1"># One dense "scenario" per distinct sample, consistent across every table:</span>
+        <span class="c1"># the checks assume a single integer key and compare its set across files.</span>
+        <span class="n">df</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="s2">"scenario"</span><span class="p">,</span> <span class="n">df</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="n">KEY</span><span class="p">)</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">sample_ids</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">KEY</span><span class="p">)</span>
+
+    <span class="c1"># Build the sample -&gt; dense id map once, from the bus table (every table carries</span>
+    <span class="c1"># the same set of samples), so the id is stable across all five files.</span>
+    <span class="n">bus_keys</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_parquet</span><span class="p">(</span><span class="n">file_paths</span><span class="p">[</span><span class="s2">"bus_data"</span><span class="p">],</span> <span class="n">columns</span><span class="o">=</span><span class="n">KEY</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="s2">"pyarrow"</span><span class="p">)</span>
+    <span class="n">unique_keys</span> <span class="o">=</span> <span class="n">bus_keys</span><span class="o">.</span><span class="n">drop_duplicates</span><span class="p">()</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="n">KEY</span><span class="p">)</span>
+    <span class="n">sample_ids</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">s</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">p</span><span class="p">)):</span> <span class="n">i</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">p</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span>
+            <span class="nb">zip</span><span class="p">(</span><span class="n">unique_keys</span><span class="p">[</span><span class="s2">"scenario_index"</span><span class="p">],</span> <span class="n">unique_keys</span><span class="p">[</span><span class="s2">"perturbation_index"</span><span class="p">]),</span>
+        <span class="p">)</span>
+    <span class="p">}</span>
+
+    <span class="n">generated_data</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"bus_data"</span><span class="p">:</span> <span class="n">_read</span><span class="p">(</span><span class="s2">"bus_data"</span><span class="p">),</span>
+        <span class="s2">"branch_data"</span><span class="p">:</span> <span class="n">_read</span><span class="p">(</span><span class="s2">"branch_data"</span><span class="p">),</span>
+        <span class="s2">"gen_data"</span><span class="p">:</span> <span class="n">_read</span><span class="p">(</span><span class="s2">"gen_data"</span><span class="p">),</span>
+        <span class="s2">"y_bus_data"</span><span class="p">:</span> <span class="n">_read</span><span class="p">(</span><span class="s2">"y_bus_data"</span><span class="p">),</span>
+        <span class="s2">"runtime_data"</span><span class="p">:</span> <span class="p">(</span>
+            <span class="n">_read</span><span class="p">(</span><span class="s2">"runtime_data"</span><span class="p">)</span> <span class="k">if</span> <span class="s2">"runtime_data"</span> <span class="ow">in</span> <span class="n">file_paths</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="p">),</span>
+        <span class="s2">"mode"</span><span class="p">:</span> <span class="n">mode</span><span class="p">,</span>
+        <span class="s2">"file_paths"</span><span class="p">:</span> <span class="n">file_paths</span><span class="p">,</span>
+    <span class="p">}</span>
+
+    <span class="nb">print</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">"Validating dynamic static snapshot: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">sample_ids</span><span class="p">)</span><span class="si">}</span><span class="s2"> samples "</span>
+        <span class="sa">f</span><span class="s2">"(</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">generated_data</span><span class="p">[</span><span class="s1">'bus_data'</span><span class="p">])</span><span class="si">}</span><span class="s2"> bus rows)"</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">_run_validation_checks</span><span class="p">(</span><span class="n">generated_data</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">sn_mva</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.indexes", "navigation.tracking", "toc.follow", "toc.follow", "search.suggest", "navigation.instant", "navigation.instant.progress"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/katex.js"></script>
+      
+        <script src="https://unpkg.com/katex@0/dist/katex.min.js"></script>
+      
+        <script src="https://unpkg.com/katex@0/dist/contrib/auto-render.min.js"></script>
+      
+    
+  </body>
+</html>

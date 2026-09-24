@@ -1,0 +1,3120 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../admittance_perturbations/">
+      
+      
+        <link rel="next" href="../outputs/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../figs/KIT_logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Dynamic Simulation - gridfm-datakit</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+      <link rel="stylesheet" href="https://unpkg.com/katex@0/dist/katex.min.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="white" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#dynamic-simulation" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="gridfm-datakit" class="md-header__button md-logo" aria-label="gridfm-datakit" data-md-component="logo">
+      
+  <img src="../../figs/KIT_logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            gridfm-datakit
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Dynamic Simulation
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/gridfm/gridfm-datakit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="gridfm-datakit" class="md-nav__button md-logo" aria-label="gridfm-datakit" data-md-component="logo">
+      
+  <img src="../../figs/KIT_logo.png" alt="logo">
+
+    </a>
+    gridfm-datakit
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/gridfm/gridfm-datakit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting_started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../load_scenarios/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Load Scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../topology_perturbations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Topology Perturbations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../generation_perturbations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generation Perturbations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admittance_perturbations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admittance Perturbations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamic Simulation
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamic Simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-a-run-does" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a run does
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Prerequisites">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-the-python-extra" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. The Python extra
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-a-local-dynawo-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. A local Dynawo installation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checking-the-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checking the installation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#network-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Network requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-four-input-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The four input tables
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The four input tables">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#static_element_dynamic_models_file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        static_element_dynamic_models_file
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#automation_systems_file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        automation_systems_file
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#events_file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        events_file
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#variables_file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        variables_file
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-dynawo-parameter-file-par" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Dynawo parameter file (.par)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dynamicsolver_parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dynamic.solver_parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dynamicloadflow_parameters-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dynamic.loadflow_parameters (optional)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dynamiclogging-and-dynamicvalidate-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dynamic.logging and dynamic.validate (optional)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#settings-that-behave-differently" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings that behave differently
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#full-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#perturbations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Perturbations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Perturbations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-generation_perturbation-does-not-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why generation_perturbation does not work
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#outputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outputs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Outputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#static-snapshot-parquet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Static snapshot (Parquet)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#trajectories-dynamic_resultszarr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trajectories (dynamic_results.zarr)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#final_state_valuesparquet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        final_state_values.parquet
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        reports/
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metadatajson" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        metadata.json
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#joining-features-to-labels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Joining features to labels
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#failure-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failure handling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Failure handling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../outputs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Outputs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Components
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Components
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Perturbations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Perturbations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/load/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Load
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/topology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Topology
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/generator_perturbation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/admittance_perturbation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admittance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Process
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Process
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/process_network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Process Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/solvers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Solvers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/save/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Save
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_5" id="__nav_4_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utils
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Utils
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utils
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/stats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/power_balance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Power Balance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/param_handler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Param Handler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/generate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/dynamic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamic
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../components/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-a-run-does" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a run does
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Prerequisites">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-the-python-extra" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. The Python extra
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-a-local-dynawo-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. A local Dynawo installation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checking-the-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checking the installation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#network-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Network requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-four-input-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The four input tables
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The four input tables">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#static_element_dynamic_models_file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        static_element_dynamic_models_file
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#automation_systems_file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        automation_systems_file
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#events_file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        events_file
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#variables_file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        variables_file
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-dynawo-parameter-file-par" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Dynawo parameter file (.par)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dynamicsolver_parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dynamic.solver_parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dynamicloadflow_parameters-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dynamic.loadflow_parameters (optional)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dynamiclogging-and-dynamicvalidate-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dynamic.logging and dynamic.validate (optional)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#settings-that-behave-differently" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings that behave differently
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#full-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#perturbations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Perturbations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Perturbations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-generation_perturbation-does-not-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why generation_perturbation does not work
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#outputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outputs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Outputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#static-snapshot-parquet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Static snapshot (Parquet)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#trajectories-dynamic_resultszarr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trajectories (dynamic_results.zarr)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#final_state_valuesparquet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        final_state_values.parquet
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        reports/
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metadatajson" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        metadata.json
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#joining-features-to-labels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Joining features to labels
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#failure-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failure handling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Failure handling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="dynamic-simulation">Dynamic Simulation<a class="headerlink" href="#dynamic-simulation" title="Permanent link">&para;</a></h1>
+<p>The dynamic pipeline extends the static one with a time-domain (RMS/phasor)
+simulation step. Instead of a single power flow snapshot per scenario, it
+produces a <strong>trajectory</strong>: the response of the grid to a disturbance, sampled
+over the simulation window.</p>
+<p>The time-domain solver is <a href="https://dynawo.github.io/">Dynaωo</a>, driven through
+<code>pypowsybl.dynamic</code>. It is currently the only backend
+(<code>dynamic.dynamic_solver: dynawo</code>).</p>
+<h2 id="what-a-run-does">What a run does<a class="headerlink" href="#what-a-run-does" title="Permanent link">&para;</a></h2>
+<p>For every load scenario, and for every topology perturbation of it:</p>
+<ol>
+<li><strong>Load scenario</strong> is applied to the network (same generators as the static
+   pipeline), followed by the generation and admittance perturbations.</li>
+<li><strong>OPF</strong> is solved with PowerModels.jl → an optimal dispatch.</li>
+<li><strong>Set-points are pushed to pypowsybl</strong>, then an <strong>AC power flow</strong> is solved
+   with OpenLoadFlow. This is the <em>balanced initial state</em>: Dynawo initialises
+   the grid state from it.</li>
+<li><strong>Dynawo runs the time-domain simulation</strong> on that balanced network, applying
+   the events declared in the input tables and recording the monitored
+   variables.</li>
+<li>The static snapshot (Parquet) and the trajectory (Zarr) are written, both
+   tagged with the same <code>(scenario_index, perturbation_index)</code> key.</li>
+</ol>
+<p>Each <code>(scenario, perturbation)</code> pair is one <strong>sample</strong>. Load scenarios are
+distributed across worker processes (the perturbations of a single scenario run
+sequentially inside one worker), and results are written incrementally, one large
+chunk at a time, so peak memory tracks <code>settings.large_chunk_size</code> rather than
+the size of the whole dataset.</p>
+<div class="admonition warning">
+<p class="admonition-title">The dynamic model set is fixed across samples</p>
+<p>The dynamic models, automation systems and events come from the CSV input
+tables and are <strong>identical for every sample</strong>. What varies from sample to
+sample is the operating point Dynawo starts from, plus, with
+<code>topology_perturbation</code> enabled, which elements are in service and hence
+which of those dynamic models Dynawo instantiates.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title"><code>generation_perturbation</code> does not work here</p>
+<p>Step 1 accepts the block, but it cannot do its job. Dynamic runs require
+<code>reader: powsybl</code>, and pypowsybl carries no generator cost data in any format
+it reads, so every generator is loaded with the same placeholder cost
+(<code>c2=0, c1=1, c0=0</code>). See <a href="#perturbations">Perturbations</a>.</p>
+</div>
+<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
+<p>Two independent things are required, and each fails differently.</p>
+<h3 id="1-the-python-extra">1. The Python extra<a class="headerlink" href="#1-the-python-extra" title="Permanent link">&para;</a></h3>
+<pre><code class="language-bash">pip install 'gridfm-datakit[dynamic]'
+</code></pre>
+<p>This pulls in <code>pypowsybl</code> (the <code>pypowsybl.dynamic</code> API) and <code>zarr</code> (the
+time-series store). Julia/PowerModels is still needed for the OPF step; see
+<a href="../../installation/">Installation</a>.</p>
+<h3 id="2-a-local-dynawo-installation">2. A local Dynawo installation<a class="headerlink" href="#2-a-local-dynawo-installation" title="Permanent link">&para;</a></h3>
+<p>Dynawo is a native solver and is <strong>not bundled with pypowsybl</strong>:
+<code>import pypowsybl.dynamic</code> succeeds without it. Download a release from
+<a href="https://dynawo.github.io/install/">dynawo.github.io/install</a> and extract it,
+e.g. to <code>~/dynawo</code>:</p>
+<pre><code class="language-bash">DYNAWO_VERSION=1.7.0
+curl -fsSL -o /tmp/dynawo.zip \
+  &quot;https://github.com/dynawo/dynawo/releases/download/v${DYNAWO_VERSION}/Dynawo_Linux_v${DYNAWO_VERSION}.zip&quot;
+unzip -q /tmp/dynawo.zip -d &quot;$HOME&quot;
+</code></pre>
+<p>Then declare it to powsybl in <code>~/.itools/config.yml</code>:</p>
+<pre><code class="language-yaml">dynawo:
+  homeDir: /home/&lt;user&gt;/dynawo
+  debug: false
+</code></pre>
+<p>Set <code>POWSYBL_CONFIG_DIR</code> (and optionally <code>POWSYBL_CONFIG_NAME</code>) to use a
+different location; <code>.yml</code>, <code>.yaml</code> and <code>.xml</code> config files are all recognised.</p>
+<h3 id="checking-the-installation">Checking the installation<a class="headerlink" href="#checking-the-installation" title="Permanent link">&para;</a></h3>
+<pre><code class="language-bash">~/dynawo/dynawo.sh version
+python -c &quot;from gridfm_datakit.dynamic.dynawo.api import check_dynawo_available; check_dynawo_available()&quot;
+</code></pre>
+<p>The same check runs automatically at the start of every dynamic run, before any
+worker is spawned, so a missing installation surfaces as an actionable message
+instead of an opaque <code>DynawoSimulationProvider could not be instantiated</code> from
+deep inside the solver.</p>
+<h2 id="network-requirements">Network requirements<a class="headerlink" href="#network-requirements" title="Permanent link">&para;</a></h2>
+<p>Dynamic simulations require the <strong>powsybl reader</strong>:</p>
+<pre><code class="language-yaml">network:
+  name: IEEE14
+  reader: powsybl        # required, the run is rejected otherwise
+  source: file
+  file: grids/IEEE14.iidm
+</code></pre>
+<p>The dynamic model mappings are keyed on the network's <strong>element IDs</strong>, so the
+network file must be one whose IDs you can reference from the input tables, in
+practice an XIIDM/IIDM or CGMES file. Loading a MATPOWER <code>.m</code> case works, but
+its element IDs are generated during conversion and are not stable to write
+mappings against.</p>
+<div class="admonition danger">
+<p class="admonition-title">Use the IDs from the network file, not from <code>get_*()</code></p>
+<p><code>pypowsybl.network.get_generators()</code> and friends can return slightly
+contaminated IDs (typically with an extra <code>_</code>). Writing those into the input
+tables produces a dynamic model Dynawo cannot instantiate. Read the IDs from
+the network file itself.</p>
+</div>
+<h2 id="the-four-input-tables">The four input tables<a class="headerlink" href="#the-four-input-tables" title="Permanent link">&para;</a></h2>
+<p>The dynamic behaviour is described by four CSV (or Parquet) files, declared
+under <code>dynamic.input_files</code>. CSV delimiters are sniffed, so <code>,</code>, <code>;</code> and tab are
+all accepted. The required columns of all four tables are validated up front.</p>
+<p>Values are checked only where a typo would otherwise be swallowed: the
+<code>category_name</code> of <code>automation_systems</code>, the <code>event_name</code> of <code>events</code> and the
+<code>type</code> of <code>variables</code> are matched against the accepted sets, and a bad one is
+reported alongside them. Everything else (<code>model_name</code>, <code>static_id</code>, <code>model_id</code>
+and the <code>category_name</code> of <code>static_element_dynamic_models</code>) is handed to Dynawo
+as written and can only fail there, as a failed model instantiation.</p>
+<h3 id="static_element_dynamic_models_file"><code>static_element_dynamic_models_file</code><a class="headerlink" href="#static_element_dynamic_models_file" title="Permanent link">&para;</a></h3>
+<p>One row per network element to equip with a dynamic model. Elements not listed
+here are given Dynawo's default model.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>category_name</code></td>
+<td>Category of the dynamic model, e.g. <code>SynchronousGenerator</code>, <code>LoadOneTransformerTapChanger</code></td>
+</tr>
+<tr>
+<td><code>static_id</code></td>
+<td>Element ID in the network file</td>
+</tr>
+<tr>
+<td><code>parameter_set_id</code></td>
+<td><code>set id</code> of a parameter group in the <code>.par</code> file</td>
+</tr>
+<tr>
+<td><code>model_name</code></td>
+<td>Dynawo model name, e.g. <code>GeneratorSynchronousFourWindingsProportionalRegulations</code></td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-csv">category_name,static_id,parameter_set_id,model_name
+SynchronousGenerator,_GEN____1_SM,Generator1,GeneratorSynchronousFourWindingsProportionalRegulations
+SynchronousGenerator,_GEN____6_SM,Generator6,GeneratorSynchronousThreeWindingsProportionalRegulations
+LoadOneTransformerTapChanger,_LOAD___6_EC,GenericLoadOneTransfo,LoadOneTransformerTapChanger
+</code></pre>
+<h3 id="automation_systems_file"><code>automation_systems_file</code><a class="headerlink" href="#automation_systems_file" title="Permanent link">&para;</a></h3>
+<p>One row per automation system. These are not attached to a static element, so
+they carry their own identifier and a free-form parameter string.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>category_name</code></td>
+<td>Automation-system category (see table below)</td>
+</tr>
+<tr>
+<td><code>dynamic_model_id</code></td>
+<td>Identifier you give the automation system; usable as a <code>model_id</code> in <code>variables</code></td>
+</tr>
+<tr>
+<td><code>parameter_set_id</code></td>
+<td><code>set id</code> in the <code>.par</code> file</td>
+</tr>
+<tr>
+<td><code>params</code></td>
+<td><code>key1=value1;key2=value2;…</code>, with keys that depend on the category</td>
+</tr>
+<tr>
+<td><code>model_name</code></td>
+<td>Dynawo model name, e.g. <code>UnderVoltage</code></td>
+</tr>
+</tbody>
+</table>
+<p>Accepted <code>category_name</code> values and the <code>params</code> keys each one expects:</p>
+<table>
+<thead>
+<tr>
+<th><code>category_name</code></th>
+<th><code>params</code> keys</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OverloadManagementSystem</code></td>
+<td><code>controlled_branch</code>, <code>i_measurement</code>, <code>i_measurement_side</code></td>
+</tr>
+<tr>
+<td><code>TwoLevelOverloadManagementSystem</code></td>
+<td><code>controlled_branch</code>, <code>i_measurement_1</code>, <code>i_measurement_1_side</code>, <code>i_measurement_2</code>, <code>i_measurement_2_side</code></td>
+</tr>
+<tr>
+<td><code>PhaseShifterBlockingI</code></td>
+<td><code>phase_shifter_id</code></td>
+</tr>
+<tr>
+<td><code>PhaseShifterI</code></td>
+<td><code>transformer</code></td>
+</tr>
+<tr>
+<td><code>PhaseShifterP</code></td>
+<td><code>transformer</code></td>
+</tr>
+<tr>
+<td><code>TapChanger</code></td>
+<td><code>static_id</code>, <code>side</code></td>
+</tr>
+<tr>
+<td><code>TapChangerBlocking</code></td>
+<td><code>rfo_df</code>, <code>mp1_df</code>, <code>mp2_df</code>, <code>mp3_df</code>, <code>mp4_df</code>, <code>mp5_df</code> (<strong>not usable, see below</strong>)</td>
+</tr>
+<tr>
+<td><code>UnderVoltageAutomationSystem</code></td>
+<td><code>generator</code></td>
+</tr>
+</tbody>
+</table>
+<div class="admonition danger">
+<p class="admonition-title"><code>TapChangerBlocking</code> cannot be configured from CSV</p>
+<p>Its six parameters are DataFrames (hence the <code>_df</code> suffix), and the <code>params</code>
+column only expresses flat <code>key=value</code> scalars. There is no convention yet
+for describing a DataFrame in it.</p>
+<p>The category is still <em>accepted</em> by the input validation, so a row using it
+passes the up-front checks and then fails further down. Supporting it means
+first fixing a serialisation convention for those columns.</p>
+</div>
+<pre><code class="language-csv">category_name,dynamic_model_id,parameter_set_id,params,model_name
+UnderVoltageAutomationSystem,UVA,UnderVoltageAutomatonGenerator3,generator=_GEN____3_SM;,UnderVoltage
+</code></pre>
+<p>A run with no automation system still needs the file. Write the header row only.</p>
+<h3 id="events_file"><code>events_file</code><a class="headerlink" href="#events_file" title="Permanent link">&para;</a></h3>
+<p>The disturbance sequence. This is what makes the trajectory non-trivial.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>event_name</code></td>
+<td>Event type (see table below)</td>
+</tr>
+<tr>
+<td><code>static_id</code></td>
+<td>ID of the element the event applies to</td>
+</tr>
+<tr>
+<td><code>start_time</code></td>
+<td>Event time, in seconds of simulation time</td>
+</tr>
+<tr>
+<td><code>params</code></td>
+<td><code>key1=value1;…</code>, with keys that depend on the event type</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th><code>event_name</code></th>
+<th><code>params</code> keys</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ActivePowerVariation</code></td>
+<td><code>delta_p</code></td>
+</tr>
+<tr>
+<td><code>ReactivePowerVariation</code></td>
+<td><code>delta_q</code></td>
+</tr>
+<tr>
+<td><code>ReferenceVoltageVariation</code></td>
+<td><code>delta_u</code></td>
+</tr>
+<tr>
+<td><code>NodeFault</code></td>
+<td><code>fault_time</code>, <code>r_pu</code>, <code>x_pu</code></td>
+</tr>
+<tr>
+<td><code>Disconnect</code></td>
+<td><code>disconnect_only</code> (optional; leave the value empty to disconnect the whole element)</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-csv">event_name,static_id,start_time,params
+Disconnect,_GEN____2_SM,50,disconnect_only=;
+</code></pre>
+<p><code>start_time</code> must lie inside the <code>[start_time, stop_time]</code> window of
+<code>dynamic.solver_parameters</code>, otherwise the event never fires.</p>
+<h3 id="variables_file"><code>variables_file</code><a class="headerlink" href="#variables_file" title="Permanent link">&para;</a></h3>
+<p>What to record. One row per monitored variable; repeat <code>model_id</code> to monitor
+several variables of the same element.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type</code></td>
+<td><code>Curve</code> (full time series) or <code>FinalStateValue</code> (end-of-simulation scalar)</td>
+</tr>
+<tr>
+<td><code>model_id</code></td>
+<td>ID of the monitored element, or the <code>dynamic_model_id</code> of an automation system</td>
+</tr>
+<tr>
+<td><code>variables</code></td>
+<td>One variable name per row; see below for where the available names are listed</td>
+</tr>
+</tbody>
+</table>
+<p>The variables a model exposes are listed in its description file, shipped with
+Dynawo under <code>&lt;dynawo_home&gt;/ddb/</code>. That file is named after the <strong>Dynawo model
+library</strong>, which is usually, but not always, the <code>model_name</code> written in the
+input tables: pypowsybl's <code>UnderVoltage</code> is Dynawo's <code>UnderVoltageAutomaton</code>, so
+its variables are in <code>ddb/UnderVoltageAutomaton.desc.xml</code>. The prefix of the
+variable names is the reliable hint (<code>underVoltageAutomaton_…</code>).</p>
+<pre><code class="language-csv">type,model_id,variables
+Curve,_BUS____2_TN,U_value
+Curve,UVA,underVoltageAutomaton_UMinPu
+Curve,_GEN____1_SM,generator_efdPu_value
+FinalStateValue,_GEN____1_SM,generator_UPu
+</code></pre>
+<div class="admonition note">
+<p class="admonition-title">At least one <code>Curve</code> row is required</p>
+<p>The time-series store is built from <code>Curve</code> rows only. A table with none is
+rejected up front. Without that check the simulation runs, monitors nothing,
+and fails much later in the writer, after all the compute.</p>
+<p><code>FinalStateValue</code> rows are optional. When present they are written to a
+separate per-sample scalar table, not to the Zarr store.</p>
+</div>
+<h2 id="the-dynawo-parameter-file-par">The Dynawo parameter file (<code>.par</code>)<a class="headerlink" href="#the-dynawo-parameter-file-par" title="Permanent link">&para;</a></h2>
+<p>Every <code>parameter_set_id</code> in the input tables refers to a <code>&lt;set id="..."&gt;</code> block
+in a Dynawo <code>.par</code> file, an XML file holding the physical parameters of the
+models (machine constants, regulator gains, tap-changer settings), the network
+parameters, and the solver settings. It is referenced from
+<code>dynamic.solver_parameters</code>, and Dynawo distributions ship examples under
+<code>&lt;dynawo_home&gt;/examples/</code>.</p>
+<p>To find out which parameters a given model requires, read the description file
+Dynawo ships for it under <code>&lt;dynawo_home&gt;/ddb/</code>, one per model library, listing
+its parameters and the variables it exposes. For instance, the set <code>Generator1</code>
+referenced above must supply what
+<code>ddb/GeneratorSynchronousFourWindingsProportionalRegulations.desc.xml</code> declares.</p>
+<p><code>scripts/dynamic_example/grids/IEEE14.par</code> is a working example. Its <code>set id</code>s
+are <code>Network</code>, <code>SimplifiedSolver</code>, <code>Generator1</code>, <code>Generator2</code>, <code>Generator3</code>,
+<code>Generator6</code>, <code>Generator8</code>, <code>GenericLoadOneTransfo</code>, <code>GenericLoadTwoTransfos</code>,
+<code>OmegaRef</code>, <code>GeneratorDisconnection</code> and <code>UnderVoltageAutomatonGenerator3</code>. The
+example input tables reference a subset of those; <code>Network</code> and
+<code>SimplifiedSolver</code> are reached through <code>dynamic.solver_parameters</code> instead, and a
+<code>.par</code> may carry sets that a given run never uses.</p>
+<h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
+<h3 id="dynamicsolver_parameters"><code>dynamic.solver_parameters</code><a class="headerlink" href="#dynamicsolver_parameters" title="Permanent link">&para;</a></h3>
+<p><code>start_time</code> and <code>stop_time</code> (both in seconds) are <strong>required</strong>. Every other key
+is optional and is passed through to the Dynawo provider:</p>
+<table>
+<thead>
+<tr>
+<th>Config key</th>
+<th>Dynawo provider parameter</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>parameters_file</code></td>
+<td><code>parametersFile</code></td>
+</tr>
+<tr>
+<td><code>network_parameters_file</code></td>
+<td><code>network.parametersFile</code></td>
+</tr>
+<tr>
+<td><code>network_parameters_id</code></td>
+<td><code>network.parametersId</code></td>
+</tr>
+<tr>
+<td><code>solver_type</code></td>
+<td><code>solver.type</code> (<code>SIM</code> for the fixed-step simplified solver, <code>IDA</code> for the variable-step one)</td>
+</tr>
+<tr>
+<td><code>solver_parameters_file</code></td>
+<td><code>solver.parametersFile</code></td>
+</tr>
+<tr>
+<td><code>solver_parameters_id</code></td>
+<td><code>solver.parametersId</code></td>
+</tr>
+<tr>
+<td><code>precision</code></td>
+<td><code>precision</code></td>
+</tr>
+</tbody>
+</table>
+<p>A missing required key or an unsupported one is rejected, naming the accepted
+set. Values of <code>none</code> or <code>""</code> are dropped rather than forwarded.</p>
+<div class="admonition note">
+<p class="admonition-title">These parameters are validated inside the workers</p>
+<p>Unlike the Dynawo availability check, <code>dynamic.solver_parameters</code> and
+<code>dynamic.loadflow_parameters</code> are only built once a worker starts. A bad key
+therefore fails every chunk: the parent logs
+<code>Error in dynamic chunk: dynamic.solver_parameters: unsupported key(s) …</code>
+and the run ends with <code>Dynamic generation produced no samples</code>. The first
+message is the one that names the offending key.</p>
+</div>
+<h3 id="dynamicloadflow_parameters-optional"><code>dynamic.loadflow_parameters</code> (optional)<a class="headerlink" href="#dynamicloadflow_parameters-optional" title="Permanent link">&para;</a></h3>
+<p>Governs the AC power flow that produces the balanced initial state. The defaults
+deliberately differ from the static pipeline's:</p>
+<pre><code class="language-yaml">dynamic:
+  loadflow_parameters:
+    distributed_slack: false
+    read_slack_bus: true
+    write_slack_bus: true
+    provider_parameters:
+      slackBusSelectionMode: LARGEST_GENERATOR
+</code></pre>
+<p>Dynawo initialises each synchronous machine from this solution, so the slack has
+to sit on a machine that carries a dynamic model. OpenLoadFlow's own default
+(<code>MOST_MESHED</code>) can select a bus with no generator at all, leaving Dynawo to
+initialise from a state its machine models cannot reproduce. <code>provider_parameters</code>
+is a free-form pass-through to OpenLoadFlow; the other three keys are the only
+top-level ones accepted.</p>
+<h3 id="dynamiclogging-and-dynamicvalidate-optional"><code>dynamic.logging</code> and <code>dynamic.validate</code> (optional)<a class="headerlink" href="#dynamiclogging-and-dynamicvalidate-optional" title="Permanent link">&para;</a></h3>
+<pre><code class="language-yaml">dynamic:
+  validate: false          # run the static validation suite on the PF snapshot after the run
+  logging:
+    verbosity: info        # silent | error | warning | info | debug
+    save_reports: true     # persist each simulation's Dynawo report
+</code></pre>
+<p>The values above are the defaults, so the whole block can be omitted.</p>
+<p><code>validate</code> is off by default: it re-reads every Parquet table, which is wasteful
+on a large run. It covers only the <strong>static snapshot</strong>, the initial operating
+point. The trajectories in the Zarr store are not validated.</p>
+<p><code>verbosity</code> sets the threshold of the <code>gridfm_datakit.dynamic</code> progress logger
+only; it does not quieten the solvers, which <code>settings.enable_solver_logs</code>
+governs. <code>silent</code> is the quietest setting but still lets errors through, since it
+maps onto the same level as <code>error</code>.</p>
+<h3 id="settings-that-behave-differently">Settings that behave differently<a class="headerlink" href="#settings-that-behave-differently" title="Permanent link">&para;</a></h3>
+<p>The <code>settings:</code> block is the static one, with these caveats:</p>
+<ul>
+<li><code>settings.large_chunk_size</code> bounds peak memory: a chunk is written and
+  released before the next runs. Dynamic curves are far larger than static
+  snapshots, so this matters more here than in the static pipeline.</li>
+<li><code>settings.include_dc_res</code> is not honoured; the dynamic pipeline never computes
+  DC results.</li>
+<li><code>settings.pf_solver</code>, <code>settings.pf_fast</code> and <code>settings.dcpf_fast</code> are inert:
+  OPF is always PowerModels and the initial-state AC power flow is always
+  OpenLoadFlow.</li>
+<li><code>settings.enable_solver_logs</code> routes OPF/PF <strong>and</strong> Dynawo's native output
+  (OpenModelica banners, solver iterations) to <code>raw/solver_log/</code>. Turning it on
+  also raises the Julia solver verbosity to DEBUG, which un-silences
+  PowerModels; PowerModels logs through its own Julia-level logger, which the
+  file router does not reliably capture, so <code>[ PowerModels | Info/Warn ]</code> lines
+  can spill onto the console. The Dynawo per-simulation reports are saved
+  regardless of this setting.</li>
+<li><code>dynamic.output_dir</code> <strong>no longer exists</strong>. Outputs are rooted at
+  <code>settings.data_dir</code> like the static pipeline; a config still carrying the key
+  is rejected rather than silently writing somewhere unexpected.</li>
+</ul>
+<h3 id="full-example">Full example<a class="headerlink" href="#full-example" title="Permanent link">&para;</a></h3>
+<pre><code class="language-yaml">network:
+  name: IEEE14
+  reader: powsybl
+  source: file
+  file: grids/IEEE14.iidm
+
+load:
+  generator: agg_load_profile
+  agg_profile: default
+  scenarios: 6
+  sigma: 0.2
+  change_reactive_power: true
+  global_range: 0.4
+  max_scaling_factor: 4.0
+  step_size: 0.05
+  start_scaling_factor: 0.8
+
+topology_perturbation:
+  type: none               # random | n_minus_k | none
+
+dynamic:
+  dynamic_solver: dynawo
+  input_files:
+    static_element_dynamic_models_file: inputs/static_element_dynamic_models.csv
+    automation_systems_file: inputs/automation_systems.csv
+    events_file: inputs/events.csv
+    variables_file: inputs/variables.csv
+  solver_parameters:
+    start_time: 0.0
+    stop_time: 500.0
+    parameters_file: grids/IEEE14.par
+    network_parameters_file: grids/IEEE14.par
+    network_parameters_id: Network
+    solver_type: SIM
+    solver_parameters_file: grids/IEEE14.par
+    solver_parameters_id: SimplifiedSolver
+  validate: false
+  logging:
+    verbosity: info
+    save_reports: true
+
+settings:
+  num_processes: 2
+  data_dir: out
+  large_chunk_size: 3
+  overwrite: true
+  mode: pf
+  include_dc_res: false
+  enable_solver_logs: false
+  pf_fast: false
+  dcpf_fast: false
+  max_iter: 200
+  pf_solver: powsybl
+  seed: 42
+</code></pre>
+<h2 id="running">Running<a class="headerlink" href="#running" title="Permanent link">&para;</a></h2>
+<p>A config carrying a <code>dynamic:</code> block selects the dynamic pipeline. There is no
+separate subcommand:</p>
+<pre><code class="language-bash">gridfm_datakit generate path/to/dynamic_config.yaml
+</code></pre>
+<p>Note that the CLI does not resolve relative paths in the config against the
+config's own folder, so paths must be absolute or relative to the working
+directory.</p>
+<p>From Python:</p>
+<pre><code class="language-python">from gridfm_datakit.dynamic.generate_dynamic import generate_dynamic_data
+
+file_paths = generate_dynamic_data(&quot;dynamic_config.yaml&quot;)  # or a dict / NestedNamespace
+</code></pre>
+<p>A ready-to-run end-to-end example lives in <code>scripts/dynamic_example/</code>
+(IEEE14, generator <code>_GEN____2_SM</code> disconnected at <code>t = 50 s</code>). Its <code>run.py</code>
+resolves the folder-relative paths and enables logging:</p>
+<pre><code class="language-bash">python scripts/dynamic_example/run.py
+</code></pre>
+<p>Progress is reported per chunk through the <code>gridfm_datakit.dynamic</code> logger:</p>
+<pre><code>HH:MM:SS INFO    gridfm_datakit.dynamic | Dynamic generation: 6 scenarios in 2 chunk(s), 2 worker(s).
+HH:MM:SS INFO    gridfm_datakit.dynamic | Chunk 1/2 done (3 scenarios), 3 samples so far.
+HH:MM:SS INFO    gridfm_datakit.dynamic | Chunk 2/2 done (3 scenarios), 6 samples so far.
+HH:MM:SS INFO    gridfm_datakit.dynamic | Saved 6 samples to .../out/IEEE14/raw/dynamic (6 with dynamic results, 6 reports).
+</code></pre>
+<p>(That layout comes from <code>run.py</code>'s <code>logging.basicConfig</code>. With no application
+logging configured, the library attaches its own handler and prefixes each line
+with <code>[dynamic]</code> instead.)</p>
+<h2 id="perturbations">Perturbations<a class="headerlink" href="#perturbations" title="Permanent link">&para;</a></h2>
+<p>All the static perturbation blocks are accepted, but they do not contribute
+equally to <em>dynamic</em> diversity:</p>
+<table>
+<thead>
+<tr>
+<th>Block</th>
+<th>Acts</th>
+<th>Effect on the trajectory</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>load</code> scenarios</td>
+<td>before OPF</td>
+<td>Different loading, hence a different initial operating point</td>
+</tr>
+<tr>
+<td><code>generation_perturbation</code></td>
+<td>before OPF</td>
+<td><strong>Does not work here</strong>, see below</td>
+</tr>
+<tr>
+<td><code>admittance_perturbation</code></td>
+<td>before OPF</td>
+<td>Perturbs branch <code>r</code>/<code>x</code>. These are pushed to pypowsybl together with the OPF set-points, so they change the network Dynawo simulates, not just the dispatch</td>
+</tr>
+<tr>
+<td><code>topology_perturbation</code></td>
+<td>before OPF</td>
+<td><strong>The only one that changes which elements are in service</strong>, hence the only one that changes the set of dynamic models Dynawo instantiates. One Dynawo run per perturbed topology</td>
+</tr>
+</tbody>
+</table>
+<h3 id="why-generation_perturbation-does-not-work">Why <code>generation_perturbation</code> does not work<a class="headerlink" href="#why-generation_perturbation-does-not-work" title="Permanent link">&para;</a></h3>
+<p>It perturbs generator <strong>cost</strong> functions, and under <code>reader: powsybl</code>, which
+dynamic runs require, there are none to perturb. pypowsybl does not carry cost
+data in any format it reads, so every generator is loaded with the same
+placeholder cost <code>(c2=0, c1=1, c0=0)</code>. Both strategies degenerate:</p>
+<table>
+<thead>
+<tr>
+<th><code>type</code></th>
+<th>Behaviour under <code>reader: powsybl</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cost_permutation</code></td>
+<td><strong>Strict no-op.</strong> It permutes cost rows that are all identical, so the dispatch is bit-for-bit unchanged.</td>
+</tr>
+<tr>
+<td><code>cost_perturbation</code></td>
+<td>Scales each coefficient by a random factor. <code>c2</code> and <code>c0</code> stay 0, <code>c1</code> becomes a random per-generator value, so the dispatch <em>does</em> change, but the spread is <strong>synthetic</strong>, drawn around a placeholder $1/MWh and unrelated to the network's real economics.</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition danger">
+<p class="admonition-title">A MATPOWER <code>.m</code> file's costs are silently discarded</p>
+<p>This is the surprising case: <code>.m</code> files <em>do</em> carry a <code>gencost</code> block, but
+<code>reader: powsybl</code> drops it. The file is converted through pypowsybl, which
+has no cost concept, and the costs come back as the placeholder above.</p>
+<p>This is deliberate, not an oversight. pypowsybl gives no guarantee that the
+generator row order it produces matches the <code>.m</code> file's, so injecting the
+costs could attach them to the wrong generators. Neutral defaults were judged
+safer than silently wrong economics. The consequence is that a user who wrote
+real costs into their case file still gets the degenerate behaviour above.</p>
+</div>
+<p>Neither gives the cost diversity the block exists to provide. Use
+<code>topology_perturbation</code> and the load scenarios for dynamic diversity instead.</p>
+<p><code>admittance_perturbation</code> is wired for parity with the static pipeline. Its
+perturbed line and transformer impedances do reach the simulated network,
+since <code>update_powsybl</code> writes <code>r</code> and <code>x</code> alongside the OPF set-points, so it
+moves the trajectory and not only the dispatch. Its effect on the dynamic outputs is
+nonetheless unvalidated, and unlike <code>topology_perturbation</code> it yields one sample
+per scenario rather than expanding it.</p>
+<p>Only <code>topology_perturbation</code> expands one load scenario into several samples,
+which is why <code>perturbation_index</code> exists at all. Each perturbation runs in its
+own pypowsybl network variant, and a failing perturbation is logged and dropped
+without taking the rest of the scenario with it.</p>
+<h2 id="outputs">Outputs<a class="headerlink" href="#outputs" title="Permanent link">&para;</a></h2>
+<p>Everything a run produces lives under one root, <code>settings.data_dir</code>, reusing the
+static pipeline's <code>{data_dir}/{network.name}/raw/</code>:</p>
+<pre><code>{settings.data_dir}/{network.name}/raw/
+├── args.log, error.log
+├── scenarios_{generator}.{parquet,html,log}
+├── solver_log/                        only when settings.enable_solver_logs
+└── dynamic/
+    ├── bus_data.parquet
+    ├── branch_data.parquet
+    ├── gen_data.parquet
+    ├── y_bus_data.parquet
+    ├── runtime_data.parquet
+    ├── final_state_values.parquet     only when FinalStateValue rows are monitored
+    ├── dynamic_results.zarr/
+    ├── reports/
+    └── metadata.json
+</code></pre>
+<p>The dynamic artifacts sit in a <code>dynamic/</code> subfolder rather than directly in
+<code>raw/</code> because the static pipeline writes <code>bus_data.parquet</code> as a <em>partitioned
+directory</em> while the dynamic pipeline writes it as a flat file: same name,
+different kind, so they must not share a directory. <code>raw/dynamic/</code> is owned by
+the pipeline and recreated on every run, so it never mixes fresh artifacts with
+a previous run's leftovers.</p>
+<h3 id="static-snapshot-parquet">Static snapshot (Parquet)<a class="headerlink" href="#static-snapshot-parquet" title="Permanent link">&para;</a></h3>
+<p>The initial operating point Dynawo started from, in the same column schemas as
+the static pipeline (<a href="../outputs/">Outputs</a>) with two differences:</p>
+<ul>
+<li>The files are <strong>flat Parquet files</strong>, not partitioned directories.</li>
+<li>The static pipeline's <code>scenario</code> / <code>load_scenario_idx</code> columns are replaced by
+  the pair <strong><code>scenario_index</code>, <code>perturbation_index</code></strong>, inserted as the first two
+  columns. <code>load_scenario_idx</code> cannot tell two topology perturbations of one
+  load scenario apart; this pair can.</li>
+</ul>
+<h3 id="trajectories-dynamic_resultszarr">Trajectories (<code>dynamic_results.zarr</code>)<a class="headerlink" href="#trajectories-dynamic_resultszarr" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Array</th>
+<th>Shape</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>curves</code></td>
+<td><code>(n_samples_with_curves, n_variables, n_timesteps)</code></td>
+<td>The monitored <code>Curve</code> variables, NaN-padded along the time axis</td>
+</tr>
+<tr>
+<td><code>time</code></td>
+<td><code>(n_samples_with_curves, n_timesteps)</code></td>
+<td>Simulation time in <strong>seconds</strong>, per sample, NaN-padded to match</td>
+</tr>
+<tr>
+<td><code>scenario_index</code></td>
+<td><code>(n_samples_with_curves,)</code></td>
+<td>Join key: the load scenario each slice came from</td>
+</tr>
+<tr>
+<td><code>perturbation_index</code></td>
+<td><code>(n_samples_with_curves,)</code></td>
+<td>Join key: the topology perturbation each slice came from</td>
+</tr>
+</tbody>
+</table>
+<p>Axis 0 is the number of samples that produced curves, reported in
+<code>metadata.json</code> as <code>n_samples_with_curves</code>. Take the length from there rather
+than from <code>n_samples</code>, which counts the samples written to the Parquet snapshot.</p>
+<p>Variable names are the flattened <code>&lt;model_id&gt;_&lt;variable&gt;</code> names pypowsybl
+returns (e.g. <code>_GEN____1_SM_generator_efdPu_value</code>), listed in order in
+<code>metadata.json</code> under <code>variable_names</code>. Dynawo does <strong>not</strong> return variables in
+registration order, so read the names rather than assuming the order of the
+input table.</p>
+<div class="admonition note">
+<p class="admonition-title">Never assume a shared time axis</p>
+<p>A variable-step solver (<code>solver_type: IDA</code>) gives each run its own time grid
+and its own number of timesteps. The store is sized to the longest run seen;
+shorter samples keep the NaN fill, and their valid length is recorded per
+sample in <code>metadata.json</code> under <code>timesteps_per_scenario</code>. Read the <code>time</code>
+array instead of reconstructing a uniform grid from <code>start_time</code>/<code>stop_time</code>.</p>
+</div>
+<h3 id="final_state_valuesparquet"><code>final_state_values.parquet</code><a class="headerlink" href="#final_state_valuesparquet" title="Permanent link">&para;</a></h3>
+<p>One row per sample, keyed by <code>(scenario_index, perturbation_index)</code>, with one
+column per monitored <code>FinalStateValue</code> variable. Written only when the run
+declares such rows. The column set is fixed by the first chunk that carries
+values; a later sample reporting a different set is reindexed onto it (unknown
+names dropped, missing ones become <code>NaN</code>).</p>
+<h3 id="reports"><code>reports/</code><a class="headerlink" href="#reports" title="Permanent link">&para;</a></h3>
+<p>One JSON file per sample, <code>scenario_{i}_perturbation_{j}.json</code>, holding
+pypowsybl's <code>ReportNode</code>, covering the model build-up and problem resolution. This is
+the documented way to diagnose a failed or degenerate run. Controlled by
+<code>dynamic.logging.save_reports</code>. Report verbosity can be raised through the
+Dynawo simulation parameter <code>log.levelFilter</code>.</p>
+<h3 id="metadatajson"><code>metadata.json</code><a class="headerlink" href="#metadatajson" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>generated_at</code>, <code>seed</code>, <code>config_hash</code></td>
+<td>Provenance</td>
+</tr>
+<tr>
+<td><code>n_samples</code></td>
+<td>Number of <strong>samples</strong>, not load scenarios: larger than <code>load.scenarios</code> as soon as a scenario expands into more than one topology, smaller when samples failed</td>
+</tr>
+<tr>
+<td><code>n_samples_with_curves</code></td>
+<td>Length of axis 0 of <code>curves</code></td>
+</tr>
+<tr>
+<td><code>variable_names</code>, <code>n_variables</code></td>
+<td>Axis 1 of <code>curves</code>, in order</td>
+</tr>
+<tr>
+<td><code>n_timesteps</code>, <code>timesteps_per_scenario</code>, <code>time_units</code></td>
+<td>Axis 2 of <code>curves</code>; the per-sample valid (unpadded) length</td>
+</tr>
+<tr>
+<td><code>static_scenario_index</code>, <code>static_perturbation_index</code></td>
+<td>Join keys present in the Parquet snapshot</td>
+</tr>
+<tr>
+<td><code>dynamic_scenario_index</code>, <code>dynamic_perturbation_index</code></td>
+<td>Join keys present in the Zarr store</td>
+</tr>
+<tr>
+<td><code>final_state_value_names</code></td>
+<td>Columns of <code>final_state_values.parquet</code>, in order</td>
+</tr>
+<tr>
+<td><code>reports</code></td>
+<td>Report file names</td>
+</tr>
+</tbody>
+</table>
+<h3 id="joining-features-to-labels">Joining features to labels<a class="headerlink" href="#joining-features-to-labels" title="Permanent link">&para;</a></h3>
+<p>A sample reaches the outputs only when every step succeeded: a failed OPF, a
+failed power flow or a failed Dynawo run drops the whole sample, its static rows
+included. So a curves slice index is <strong>not</strong> a scenario number: failed samples
+leave gaps, and a run with <code>topology_perturbation</code> has several slices per load
+scenario. <strong>Always join on the <code>(scenario_index, perturbation_index)</code> key pair,
+never on row or slice position.</strong></p>
+<pre><code class="language-python">import json
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import zarr
+
+root = Path(&quot;out/IEEE14/raw/dynamic&quot;)
+meta = json.loads((root / &quot;metadata.json&quot;).read_text())
+store = zarr.open(str(root / &quot;dynamic_results.zarr&quot;), mode=&quot;r&quot;)
+bus = pd.read_parquet(root / &quot;bus_data.parquet&quot;)
+
+keys = list(zip(np.asarray(store[&quot;scenario_index&quot;]), np.asarray(store[&quot;perturbation_index&quot;])))
+slice_of = {(int(s), int(p)): i for i, (s, p) in enumerate(keys)}
+
+i = slice_of[(0, 0)]
+n = meta[&quot;timesteps_per_scenario&quot;][i]          # drop the NaN padding
+t = store[&quot;time&quot;][i, :n]                       # seconds
+u = store[&quot;curves&quot;][i, meta[&quot;variable_names&quot;].index(&quot;_BUS____2_TN_U_value&quot;), :n]
+initial_state = bus[(bus.scenario_index == 0) &amp; (bus.perturbation_index == 0)]
+</code></pre>
+<h2 id="failure-handling">Failure handling<a class="headerlink" href="#failure-handling" title="Permanent link">&para;</a></h2>
+<p>Failures are contained at the smallest scope that makes sense, so one bad sample
+never aborts a run. Per-perturbation and per-scenario failures are appended to
+<code>raw/error.log</code> with their traceback. A worker that dies before reaching its
+scenario loop never gets to write there, so the parent reports it through the
+progress logger instead:</p>
+<table>
+<thead>
+<tr>
+<th>Failure</th>
+<th>Behaviour</th>
+<th>Reported in</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>One topology perturbation fails</td>
+<td>The scenario's other perturbations continue</td>
+<td><code>raw/error.log</code></td>
+</tr>
+<tr>
+<td>One scenario fails</td>
+<td>The rest of the chunk continues</td>
+<td><code>raw/error.log</code></td>
+</tr>
+<tr>
+<td>A whole worker dies</td>
+<td>The other workers and chunks continue</td>
+<td>progress logger, as <code>Error in dynamic chunk: …</code></td>
+</tr>
+<tr>
+<td><strong>Every</strong> sample fails</td>
+<td><code>close()</code> raises <code>RuntimeError</code></td>
+<td>the raised error</td>
+</tr>
+</tbody>
+</table>
+<p>When every sample fails, <code>raw/dynamic/</code> is never created, since the writer only
+makes it on the first chunk that carries a sample, so no half-written output is
+left behind. Whether the <em>previous</em> run's data survives is decided earlier and
+elsewhere: <code>settings.overwrite: true</code> deletes the whole <code>{data_dir}/{name}/raw/</code>
+tree at startup, before any simulation runs.</p>
+<p>Two silent failure modes are turned into hard errors on purpose, because Dynawo
+reports neither:</p>
+<ul>
+<li><strong>A failed simulation is not raised by Dynawo.</strong> <code>sim.run()</code> returns a result
+  whose status is <code>FAILURE</code> with empty or truncated curves. The pipeline checks
+  the status and drops the sample instead of storing a diverged run as a valid
+  trajectory.</li>
+<li><strong>A model Dynawo cannot instantiate is skipped, and the run still reports
+  <code>SUCCESS</code>.</strong> The sample would then be a trajectory of a <em>different system</em>
+  than the input tables describe. The pipeline parses the report for failed
+  instantiations and raises, naming the offending models.</li>
+</ul>
+<h3 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Cause</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Dynawo backend unavailable: …</code></td>
+<td>No <code>~/.itools/config.yml</code>, no <code>dynawo.homeDir</code> entry, or <code>homeDir</code> does not contain <code>dynawo.sh</code> / <code>bin/dynawo</code></td>
+</tr>
+<tr>
+<td><code>Dynamic simulations require network.reader='powsybl'</code></td>
+<td>Set <code>reader: powsybl</code> in the <code>network</code> block</td>
+</tr>
+<tr>
+<td><code>Dynawo failed to instantiate N dynamic model(s)</code></td>
+<td>A <code>static_id</code>, <code>model_name</code> or <code>category_name</code> does not match the network's element IDs or a Dynawo model. Check the IDs against the network file, not against <code>get_*()</code> output</td>
+</tr>
+<tr>
+<td><code>variables: no row of type 'Curve'</code></td>
+<td>The time-series store needs at least one <code>Curve</code> row</td>
+</tr>
+<tr>
+<td><code>automation_systems: unsupported category_name …</code></td>
+<td>Typo in a key column; the message lists the accepted values</td>
+</tr>
+<tr>
+<td><code>dynamic.solver_parameters: missing required key(s)</code></td>
+<td><code>start_time</code> / <code>stop_time</code> are mandatory</td>
+</tr>
+<tr>
+<td><code>Error in dynamic chunk: …</code> on every chunk</td>
+<td>A per-worker setup step failed identically everywhere, most often a bad key in <code>dynamic.solver_parameters</code> or <code>dynamic.loadflow_parameters</code>. The message carries the underlying error</td>
+</tr>
+<tr>
+<td><code>Dynamic generation produced no samples: every scenario failed</code></td>
+<td>Read <code>raw/error.log</code> for the per-scenario cause, and the <code>Error in dynamic chunk</code> lines above it for worker-level ones. No reports are written in this case, since <code>raw/dynamic/</code> is never created</td>
+</tr>
+<tr>
+<td>Trajectory looks like the base case</td>
+<td>Check that <code>events.csv</code> <code>start_time</code> falls inside <code>[start_time, stop_time]</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="current-limitations">Current limitations<a class="headerlink" href="#current-limitations" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Dynawo is the only backend. <code>dynamic_solver</code> is the extension point, but any
+  other value raises <code>NotImplementedError</code>.</li>
+<li>The dynamic model set, automation systems and events are the same for every
+  sample. What varies is the operating point, the branch impedances (with
+  <code>admittance_perturbation</code>) and the topology (with <code>topology_perturbation</code>).</li>
+<li><code>generation_perturbation</code> does not work: the powsybl reader supplies no real
+  generator costs for it to perturb.</li>
+<li>The <code>TapChangerBlocking</code> automation system cannot be configured from the CSV
+  inputs; its parameters are DataFrames and the <code>params</code> column holds scalars.</li>
+<li><code>dynamic.validate</code> covers the static snapshot only; the trajectories are not
+  validated.</li>
+<li>The CLI <code>validate</code>, <code>stats</code> and <code>plots</code> commands read the static pipeline's
+  partitioned layout and do not accept <code>raw/dynamic/</code>.</li>
+<li>All samples in a run must monitor the same variables, since they share one Zarr
+  store, and a mismatch is rejected rather than written as a corrupt array.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.indexes", "navigation.tracking", "toc.follow", "toc.follow", "search.suggest", "navigation.instant", "navigation.instant.progress"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/katex.js"></script>
+      
+        <script src="https://unpkg.com/katex@0/dist/katex.min.js"></script>
+      
+        <script src="https://unpkg.com/katex@0/dist/contrib/auto-render.min.js"></script>
+      
+    
+  </body>
+</html>
