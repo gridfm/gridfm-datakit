@@ -147,14 +147,15 @@ def get_dynawo_simulation_parameters(args: NestedNamespace) -> pp.dynamic.Parame
 def get_dynawo_loadflow_parameters(args: NestedNamespace) -> pp.loadflow.Parameters:
     """Build the AC load flow parameters for the balanced initial state.
 
-    The defaults deliberately differ from ``powsybl.get_default_lf_params()``,
-    which the static pipeline uses. Dynawo initialises each synchronous machine
-    from the power flow solution, so the slack must sit on a machine that carries
-    a dynamic model: ``slackBusSelectionMode=LARGEST_GENERATOR`` puts it there,
-    and ``read_slack_bus``/``write_slack_bus`` keep that choice explicit and
-    visible in the network. OpenLoadFlow's own default (MOST_MESHED) can select a
-    bus with no generator at all, leaving Dynawo to initialise from a state its
-    machine models cannot reproduce.
+    The defaults match ``powsybl.get_default_lf_params()``, which the static
+    pipeline uses, but are pinned here rather than inherited: the dynamic pipeline
+    needs them whatever the static default becomes. Dynawo initialises each
+    synchronous machine from the power flow solution, so the slack must sit on a
+    machine that carries a dynamic model: ``slackBusSelectionMode=LARGEST_GENERATOR``
+    puts it there, and ``read_slack_bus``/``write_slack_bus`` keep that choice
+    explicit and visible in the network. OpenLoadFlow's own default (MOST_MESHED)
+    can select a bus with no generator at all, leaving Dynawo to initialise from a
+    state its machine models cannot reproduce.
 
     Every default is overridable through the optional ``dynamic.loadflow_parameters``
     config block.

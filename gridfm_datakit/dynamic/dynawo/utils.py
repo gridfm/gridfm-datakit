@@ -34,8 +34,8 @@ VARIABLE_TYPES = ["Curve", "FinalStateValue"]
 
 # Defaults for the AC load flow that produces the balanced initial state, and the
 # full set of keys accepted under the optional "dynamic.loadflow_parameters"
-# config block. See get_dynawo_loadflow_parameters for why these differ from the
-# static pipeline's get_default_lf_params().
+# config block. See get_dynawo_loadflow_parameters for why the dynamic pipeline
+# pins these rather than inheriting the static pipeline's get_default_lf_params().
 LOADFLOW_PARAMETERS_DEFAULTS = {
     "distributed_slack": False,
     "read_slack_bus": True,

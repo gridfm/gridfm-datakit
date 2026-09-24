@@ -112,7 +112,7 @@ def compute_balanced_static_state_dynawo(
     powsybl.update_powsybl(pp_net, gfm_net_pf, p2g_maps)
 
     # Step 3: run AC-PF via pypowsybl OpenLoadFlow.
-    # These parameters deliberately differ from the static pipeline's
+    # These parameters are pinned independently of the static pipeline's
     # get_default_lf_params(): Dynawo initialises its synchronous machines from
     # this solution, so the slack has to sit on a machine that carries a dynamic
     # model. See get_dynawo_loadflow_parameters.
