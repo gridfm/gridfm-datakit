@@ -47,6 +47,7 @@ They live at `scripts/runtime/outputs_julia/full_matrix/`. Do not edit the 56 CS
 | `wall_at_best_p_long.csv` | Long form of both (loading-ratio figure) |
 | `wall_at_best_p.md` | Human-readable best-`p` table |
 | [`environment_versions.md`](outputs_julia/full_matrix/environment_versions.md) | Julia, PowerModels, Ipopt, MUMPS, threads, and hardware of the original run |
+| [`outputs_genco/environment_versions.md`](outputs_genco/environment_versions.md) | GENCO GPU venv dump (Python, PyTorch, CUDA) from the same LSF/H100/7xx template |
 | [`methodology_parameters.md`](outputs_julia/full_matrix/methodology_parameters.md) | Shared, GENCO, and PowerModels parameters used for the matrix |
 | [`lsf_job_wall_times.md`](outputs_julia/full_matrix/lsf_job_wall_times.md) | LSF job IDs, wall, and peak RAM of the four paper jobs |
 
@@ -138,6 +139,9 @@ the CLI over the finetuning tree.
   flags in `pure_julia/env.sh`).
 - Original hardware: AMD EPYC 9634, 84 cores. Details:
   [`outputs_julia/full_matrix/environment_versions.md`](outputs_julia/full_matrix/environment_versions.md).
+- GENCO GPU pins (Python 3.12.9, PyTorch 2.8.0+cu128, CUDA 12.8) from a matching
+  empty H100/7xx LSF job:
+  [`outputs_genco/environment_versions.md`](outputs_genco/environment_versions.md).
 - Observed job RAM: small ~205 GB, large ~870 GB. See
   [`outputs_julia/full_matrix/lsf_job_wall_times.md`](outputs_julia/full_matrix/lsf_job_wall_times.md).
 - Full parameter table:
