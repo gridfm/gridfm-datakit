@@ -142,6 +142,8 @@ the CLI over the finetuning tree.
 - GENCO GPU pins (Python 3.12.9, PyTorch 2.8.0+cu128, CUDA 12.8) from a matching
   empty H100/7xx LSF job:
   [`outputs_genco/environment_versions.md`](outputs_genco/environment_versions.md).
+  The four PF GPU jobs are submitted from gridfm-graphkit
+  `scripts/runtime/submit_pf_matrix.sh` (PF only; OPF GENCO reuses those timings).
 - Observed job RAM: small ~205 GB, large ~870 GB. See
   [`outputs_julia/full_matrix/lsf_job_wall_times.md`](outputs_julia/full_matrix/lsf_job_wall_times.md).
 - Full parameter table:
