@@ -2,8 +2,8 @@
 
 This branch is a snapshot of the code and scripts used for two papers:
 
-- **[GENCO](https://arxiv.org/abs/2608.09921)** — classical-solver runtime experiments: [`scripts/runtime/README.md`](scripts/runtime/README.md). The rest of the code needed (model, training, GPU numbers) is in [gridfm-graphkit `genco-paper-repro`](https://github.com/gridfm/gridfm-graphkit/tree/genco-paper-repro).
-- **[gridfm-datakit technical report](https://arxiv.org/abs/2512.14658)** — diversity plots: [`scripts/datakit_report/README.md`](scripts/datakit_report/README.md).
+- **[GENCO](https://arxiv.org/abs/2608.09921)** — [PowerModels runtime](https://github.com/albanpuech/GENCO/blob/main/repro/Runtime_5.4.2-3/powermodels.md) and [GPU runtime](https://github.com/albanpuech/GENCO/blob/main/repro/Runtime_5.4.2-3/genco.md). Model code is in [gridfm-graphkit `genco-paper-repro`](https://github.com/gridfm/gridfm-graphkit/tree/genco-paper-repro).
+- **[gridfm-datakit technical report](https://arxiv.org/abs/2512.14658)** — diversity plots: [albanpuech/gridfm-datakit-technical-report](https://github.com/albanpuech/gridfm-datakit-technical-report). Scripts stay in [`scripts/datakit_report/`](scripts/datakit_report/).
 
 ---
 
