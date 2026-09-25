@@ -12,6 +12,7 @@ nav:
       - Topology Perturbations: manual/topology_perturbations.md
       - Generation Perturbations: manual/generation_perturbations.md
       - Admittance Perturbations: manual/admittance_perturbations.md
+      - Power Flow Solver: manual/power_flow_solver.md
       - Dynamic Simulation: manual/dynamic_simulation.md
       - Outputs: manual/outputs.md
   - Components:
@@ -24,6 +25,7 @@ nav:
     - Process:
       - Process Network: components/process_network.md
       - Solvers: components/solvers.md
+      - LightSim2grid: components/lightsim2grid.md
     - Save: components/save.md
     - Utils:
       - Utils: components/utils.md
