@@ -729,7 +729,7 @@ function validate_config(cfg)
         data_base = cfg.data_base
         (data_base isa AbstractString && !isempty(strip(data_base))) || error(
             "per-solve-load setup requires --data-base or GRIDFM_DATA_BASE. " *
-            "Download https://huggingface.co/datasets/gridfm/reproducibility-powermodels-setup2 " *
+            "Download https://huggingface.co/datasets/gridfm/genco-powermodels-runtime " *
             "and export GRIDFM_DATA_BASE to that directory.",
         )
         isdir(data_base) || error("data base not found: $data_base")

@@ -16,7 +16,7 @@ function gridfm_data_base()
     path = strip(get(ENV, "GRIDFM_DATA_BASE", ""))
     isempty(path) && error(
         "GRIDFM_DATA_BASE is not set. Download " *
-        "https://huggingface.co/datasets/gridfm/reproducibility-powermodels-setup2 " *
+        "https://huggingface.co/datasets/gridfm/genco-powermodels-runtime " *
         "and export GRIDFM_DATA_BASE to that directory. " *
         "Expected: \$GRIDFM_DATA_BASE/{pf,opf}/<network>/powermodels/" *
         "scenario_*_corrected.json",

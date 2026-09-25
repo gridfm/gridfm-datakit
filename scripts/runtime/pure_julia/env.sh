@@ -24,7 +24,7 @@ export MKL_NUM_THREADS="${MKL_NUM_THREADS:-1}"
 require_gridfm_data_base() {
   if [[ -z "${GRIDFM_DATA_BASE:-}" ]]; then
     echo "error: GRIDFM_DATA_BASE is not set." >&2
-    echo "Download https://huggingface.co/datasets/gridfm/reproducibility-powermodels-setup2" >&2
+    echo "Download https://huggingface.co/datasets/gridfm/genco-powermodels-runtime" >&2
     echo "and export GRIDFM_DATA_BASE=/path/to/that/tree." >&2
     echo "Expected: \$GRIDFM_DATA_BASE/{pf,opf}/<network>/powermodels/scenario_*_corrected.json" >&2
     exit 1
