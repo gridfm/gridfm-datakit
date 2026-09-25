@@ -47,7 +47,13 @@ import copy
 from typing import Dict, Tuple, Any
 import tempfile
 from juliapkg.state import STATE
-from juliapkg.deps import run_julia, executable
+from juliapkg.deps import executable
+
+try:
+    # juliapkg >= 0.1.24 renamed run_julia to run_script (signature unchanged).
+    from juliapkg.deps import run_script as run_julia
+except ImportError:  # juliapkg < 0.1.24
+    from juliapkg.deps import run_julia
 
 
 def correct_network(network_path: str, force: bool = False) -> str:
