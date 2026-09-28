@@ -471,6 +471,7 @@ class _DynamicDataWriter:
         """Append one chunk of samples, then let the caller drop them."""
         if not results:
             return
+        self._validate_curve_variables(results)
         self._start()
         self._write_static(results)
         self._write_curves(results)
@@ -601,12 +602,74 @@ class _DynamicDataWriter:
 
     # -- curves ------------------------------------------------------------
 
+    def _validate_curve_variables(self, results: List[Dict[str, Any]]) -> None:
+        """Validate this chunk's variable names before writing any output.
+
+        The first dynamic sample establishes the canonical variable-axis order.
+        Later samples may return those variables in another order, but must have
+        exactly the same unique names. The canonical order is committed only
+        after the whole chunk passes validation, so a bad chunk cannot partially
+        append its static rows before failing.
+        """
+        expected_names = list(self.variable_names)
+        for result in results:
+            dynamic_results = result.get("dynamic_results")
+            if dynamic_results is None or dynamic_results.dynamic_results is None:
+                continue
+            variable_names = list(dynamic_results.dynamic_results.columns)
+            sample_key = (
+                result["scenario_index"],
+                result.get("perturbation_index", 0),
+            )
+            duplicate_names = (
+                dynamic_results.dynamic_results.columns[
+                    dynamic_results.dynamic_results.columns.duplicated()
+                ]
+                .unique()
+                .tolist()
+            )
+            if duplicate_names:
+                raise ValueError(
+                    f"Dynamic sample {sample_key} has duplicate variable names "
+                    f"and cannot be aligned unambiguously: {duplicate_names}.",
+                )
+            if not variable_names:
+                raise ValueError(
+                    "Dynamic simulations produced no monitored variables (empty "
+                    "curves). Check the 'Curve' rows of the variables input table.",
+                )
+            if not expected_names:
+                expected_names = variable_names
+            elif len(variable_names) != len(expected_names):
+                raise ValueError(
+                    "Dynamic samples disagree on the number of variables: "
+                    f"sample {sample_key}; found "
+                    f"{sorted({len(expected_names), len(variable_names)})}. All "
+                    "scenarios must monitor the same variables to share one Zarr "
+                    "store.",
+                )
+            elif set(variable_names) != set(expected_names):
+                missing = [
+                    name for name in expected_names if name not in variable_names
+                ]
+                unexpected = [
+                    name for name in variable_names if name not in expected_names
+                ]
+                raise ValueError(
+                    f"Dynamic sample {sample_key} disagrees on variable names: "
+                    f"missing {missing}, unexpected {unexpected}. All scenarios "
+                    "must monitor the same variables to share one Zarr store.",
+                )
+        self.variable_names = expected_names
+
     def _write_curves(self, results: List[Dict[str, Any]]) -> None:
         """Append this chunk's trajectories to the Zarr store.
 
         Collected as (n_variables, n_timesteps), so the store stacks to
         (n_samples, n_variables, n_timesteps). Dynawo returns curves as a
-        (n_timesteps, n_variables) DataFrame, so transpose here.
+        (n_timesteps, n_variables) DataFrame, so transpose here. The first
+        sample defines the variable-axis order; later samples are aligned to it
+        by column name before conversion to an array.
         """
         arrays, times, scenarios, perturbations = [], [], [], []
         for result in results:
@@ -614,12 +677,13 @@ class _DynamicDataWriter:
             if dynamic_results is None or dynamic_results.dynamic_results is None:
                 continue
             curves = dynamic_results.dynamic_results
+            variable_names = list(curves.columns)
+            if variable_names != self.variable_names:
+                curves = curves.loc[:, self.variable_names]
             arrays.append(np.asarray(curves, dtype="float64").T)
             times.append(_time_axis_seconds(curves))
             scenarios.append(result["scenario_index"])
             perturbations.append(result.get("perturbation_index", 0))
-            if not self.variable_names:
-                self.variable_names = list(curves.columns)
         if not arrays:
             return
 
