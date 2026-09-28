@@ -579,7 +579,10 @@ Variable names are the flattened `<model_id>_<variable>` names pypowsybl
 returns (e.g. `_GEN____1_SM_generator_efdPu_value`), listed in order in
 `metadata.json` under `variable_names`. Dynawo does **not** return variables in
 registration order, so read the names rather than assuming the order of the
-input table.
+input table. The first sample with curves establishes the stored variable
+order. Later samples with the same unique names are reordered to match it;
+missing, unexpected, or duplicate names raise `ValueError` before any part of
+the chunk is appended.
 
 !!! note "Never assume a shared time axis"
     A variable-step solver (`solver_type: IDA`) gives each run its own time grid
