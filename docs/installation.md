@@ -16,6 +16,33 @@ pip install gridfm-datakit
 gridfm_datakit setup_pm
 ```
 
+### Optional: lightsim2grid power flow solver
+
+The `lightsim2grid` extra installs [lightsim2grid](https://github.com/Grid2op/lightsim2grid), an
+alternative to PowerModels for solving the power flow (`settings.pf_solver: lightsim2grid`, see
+[Power flow solver](manual/power_flow_solver.md)):
+
+```bash
+pip install 'gridfm-datakit[lightsim2grid]'
+```
+
+!!! warning "In the meantime: install lightsim2grid from source"
+    The methods that let gridfm-datakit update the impedances of the lightsim2grid model in
+    place (`update_powerlines_parameters` and `update_trafos_parameters`) are not in a
+    lightsim2grid release yet. They are on the
+    [`dev_gfm_datakit`](https://github.com/grid2op/lightsim2grid/tree/dev_gfm_datakit) branch.
+    Until a release has them, install lightsim2grid from that branch, then gridfm-datakit:
+
+    ```bash
+    pip install 'lightsim2grid @ git+https://github.com/grid2op/lightsim2grid.git@dev_gfm_datakit'
+    pip install 'gridfm-datakit[lightsim2grid]'
+    ```
+
+    This compiles C++ code, so it needs a C++ compiler and takes a few minutes. Without these
+    methods `pf_solver: lightsim2grid` still gives the same results, but the model is rebuilt for
+    every power flow, which is slower. Once a release contains them, the extra alone will be
+    enough and this note will be removed.
+
 ### Optional: dynamic (time-domain) simulation
 
 Dynamic simulation needs two extra things on top of the base install. See the
