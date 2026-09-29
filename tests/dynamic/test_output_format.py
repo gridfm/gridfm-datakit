@@ -159,11 +159,15 @@ def test_variable_count_mismatch_raises(tmp_path):
     """Samples monitoring different variables cannot share one Zarr store."""
     out = tmp_path / "dyn"
     out.mkdir(parents=True)
-    with pytest.raises(ValueError, match="disagree on the number of variables"):
+    with pytest.raises(
+        ValueError,
+        match=r"variable names: missing \['v2'\], unexpected \[\]",
+    ):
         _write([_result(0, n_variables=3), _result(1, n_variables=2)], out)
 
 
-def test_variable_order_is_aligned_by_name(tmp_path):
+@pytest.mark.parametrize("chunked", [False, True])
+def test_variable_order_is_aligned_by_name(tmp_path, chunked):
     """A solver-specific column order must not change the variable-axis meaning."""
     first = _result(0, n_timesteps=2, n_variables=2)
     second = _result(1, n_timesteps=2, n_variables=2)
@@ -174,7 +178,10 @@ def test_variable_order_is_aligned_by_name(tmp_path):
         {"angle": [30.0, 40.0], "voltage": [3.0, 4.0]},
     )
 
-    _, grp, meta = _save_chunked([[first], [second]], tmp_path)
+    if chunked:
+        _, grp, meta = _save_chunked([[first], [second]], tmp_path)
+    else:
+        _, grp, meta = _save([first, second], tmp_path)
 
     assert meta["variable_names"] == ["voltage", "angle"]
     np.testing.assert_array_equal(grp["curves"][1, 0], [3.0, 4.0])

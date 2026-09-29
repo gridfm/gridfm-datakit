@@ -610,6 +610,13 @@ class _DynamicDataWriter:
         exactly the same unique names. The canonical order is committed only
         after the whole chunk passes validation, so a bad chunk cannot partially
         append its static rows before failing.
+
+        Args:
+            results: Dynamic simulation results for one output chunk.
+
+        Raises:
+            ValueError: If a sample has no variables, duplicate variable names,
+                or names that differ from the canonical variable schema.
         """
         expected_names = list(self.variable_names)
         for result in results:
@@ -640,14 +647,6 @@ class _DynamicDataWriter:
                 )
             if not expected_names:
                 expected_names = variable_names
-            elif len(variable_names) != len(expected_names):
-                raise ValueError(
-                    "Dynamic samples disagree on the number of variables: "
-                    f"sample {sample_key}; found "
-                    f"{sorted({len(expected_names), len(variable_names)})}. All "
-                    "scenarios must monitor the same variables to share one Zarr "
-                    "store.",
-                )
             elif set(variable_names) != set(expected_names):
                 missing = [
                     name for name in expected_names if name not in variable_names
@@ -688,27 +687,6 @@ class _DynamicDataWriter:
             return
 
         n_variables = arrays[0].shape[0]
-        # Every sample must monitor the same variables, else axis 1 of the store
-        # is meaningless. Fail loudly rather than emit a corrupt array (an
-        # unchecked mismatch surfaces as an opaque broadcast/zero-division error).
-        seen = {array.shape[0] for array in arrays} | (
-            {self.n_variables} if self._curves is not None else set()
-        )
-        if len(seen - {n_variables}) > 0:
-            raise ValueError(
-                f"Dynamic samples disagree on the number of variables: found "
-                f"{sorted(seen)}. All scenarios must monitor the same variables "
-                "to share one Zarr store.",
-            )
-        # Defence in depth. load_raw_inputs already rejects a variables table with
-        # no "Curve" row, but any other route to empty curves would reach zarr as a
-        # zero-width array and surface as an opaque ZeroDivisionError.
-        if n_variables == 0:
-            raise ValueError(
-                "Dynamic simulations produced no monitored variables (empty curves). "
-                "Check the 'Curve' rows of the variables input table.",
-            )
-
         chunk_max_timesteps = max(array.shape[1] for array in arrays)
         self._ensure_curves_store(n_variables, chunk_max_timesteps)
 

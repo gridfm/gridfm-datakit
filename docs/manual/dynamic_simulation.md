@@ -582,7 +582,9 @@ registration order, so read the names rather than assuming the order of the
 input table. The first sample with curves establishes the stored variable
 order. Later samples with the same unique names are reordered to match it;
 missing, unexpected, or duplicate names raise `ValueError` before any part of
-the chunk is appended.
+the chunk is appended. If a topology perturbation removes an element whose
+curve is monitored, the returned variable-name set changes; `write_chunk`
+raises and the generation run stops rather than dropping only that sample.
 
 !!! note "Never assume a shared time axis"
     A variable-step solver (`solver_type: IDA`) gives each run its own time grid
