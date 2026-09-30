@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert the first N scenarios from finetuning pf/opf datasets to PowerModels JSON."""
+"""Convert the first N pf/opf scenarios from parquet to PowerModels JSON."""
 
 import argparse
 from os import cpu_count
