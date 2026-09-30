@@ -178,8 +178,8 @@ def test_setup_environment_rejects_incompatible_powsybl_reader_before_overwrite(
     with pytest.raises(
         ValueError,
         match=(
-            r"configuration: settings\.pf_solver='powsybl' requires "
-            r"network\.reader='powsybl' in PF mode"
+            r"configuration: settings\.pf_solver='powsybl' is incompatible "
+            r"with network\.reader='native' in PF mode; missing capabilities:"
         ),
     ):
         _setup_environment(config)
@@ -197,6 +197,18 @@ def test_validate_static_config_does_not_require_powsybl_reader_for_opf() -> Non
     validated = validate_static_config(config)
 
     assert validated["network"]["reader"] == "native"
+
+
+def test_validate_static_config_accepts_powsybl_reader_for_powsybl_pf() -> None:
+    """A PF backend must be accepted when its reader provides all capabilities."""
+    config = _default_config()
+    config["settings"]["mode"] = "pf"
+    config["settings"]["pf_solver"] = "powsybl"
+    config["network"]["reader"] = "powsybl"
+
+    validated = validate_static_config(config)
+
+    assert validated["settings"]["pf_solver"] == "powsybl"
 
 
 def test_validate_static_config_supplies_execution_defaults() -> None:

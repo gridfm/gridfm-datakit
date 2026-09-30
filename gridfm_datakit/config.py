@@ -1,9 +1,13 @@
 """Validation models for gridfm-datakit configuration."""
 
+from dataclasses import dataclass
+from enum import Enum
 from math import isclose
-from typing import Annotated, Any, Dict, Literal, Mapping, Optional, Union
+from typing import Annotated, Any, Dict, Literal, Mapping, Optional, Protocol, Union
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+
+from gridfm_datakit.utils.random_seed import _DEFAULT_SEED_POLICY, _SeedPolicy
 
 
 _PositiveInt = Annotated[int, Field(gt=0)]
@@ -12,10 +16,10 @@ _NonNegativeFloat = Annotated[float, Field(ge=0)]
 _Probability = Annotated[float, Field(ge=0, le=1)]
 _NonEmptyString = Annotated[str, Field(min_length=1)]
 _TopologyElement = Literal["branch", "gen"]
-_MAX_NUMPY_SEED = 2**32 - 1
-_DISTRIBUTED_SEED_STRIDE = 20_000
-_AUTO_SEED_UPPER_BOUND = 50_000
-_Seed = Annotated[int, Field(ge=0, le=_MAX_NUMPY_SEED)]
+_Seed = Annotated[
+    int,
+    Field(ge=_DEFAULT_SEED_POLICY.min_seed, le=_DEFAULT_SEED_POLICY.max_seed),
+]
 
 
 class _ConfigModel(BaseModel):
@@ -247,37 +251,117 @@ class _StaticGenerationConfig(_ConfigModel):
     admittance_perturbation: _StaticAdmittancePerturbationConfig
     settings: _StaticSettingsConfig
 
-    @model_validator(mode="after")
-    def validate_pf_solver_network_reader(self) -> "_StaticGenerationConfig":
-        """Require the network representation needed by the PowSyBl PF solver."""
-        if (
-            self.settings.mode == "pf"
-            and self.settings.pf_solver == "powsybl"
-            and self.network.reader != "powsybl"
-        ):
-            raise ValueError(
-                "settings.pf_solver='powsybl' requires "
-                "network.reader='powsybl' in PF mode because the native reader "
-                "does not initialize a PowSyBl network or its index mappings",
-            )
-        return self
 
-    @model_validator(mode="after")
-    def validate_derived_seed_range(self) -> "_StaticGenerationConfig":
-        """Keep every seed derived by the distributed path in NumPy's range."""
-        seed = self.settings.seed
-        if seed is None:
-            # _setup_environment draws auto seeds from [0, 50_000). Validate
-            # against the largest possible draw so every generated seed is safe.
-            seed = _AUTO_SEED_UPPER_BOUND - 1
-        max_derived_seed = seed * _DISTRIBUTED_SEED_STRIDE + self.load.scenarios
-        if max_derived_seed > _MAX_NUMPY_SEED:
-            raise ValueError(
-                "settings.seed and load.scenarios produce a derived random seed "
-                f"of {max_derived_seed}, exceeding NumPy's maximum seed "
-                f"{_MAX_NUMPY_SEED}",
-            )
-        return self
+@dataclass(frozen=True)
+class _ConfigIssue:
+    """Describe one semantic configuration error."""
+
+    location: str
+    message: str
+
+
+class _StaticConfigRule(Protocol):
+    """Interface implemented by cross-field configuration rules."""
+
+    def check(self, config: _StaticGenerationConfig) -> tuple[_ConfigIssue, ...]:
+        """Return every issue found by this rule."""
+        ...
+
+
+class _NetworkCapability(Enum):
+    """Network representations that readers can provide to solver backends."""
+
+    GRIDFM_NETWORK = "GridFM network"
+    POWSYBL_NETWORK = "PowSyBl network"
+    POWSYBL_INDEX_MAPPING = "PowSyBl-to-GridFM index mapping"
+
+
+_READER_CAPABILITIES = {
+    "native": frozenset({_NetworkCapability.GRIDFM_NETWORK}),
+    "powsybl": frozenset(
+        {
+            _NetworkCapability.GRIDFM_NETWORK,
+            _NetworkCapability.POWSYBL_NETWORK,
+            _NetworkCapability.POWSYBL_INDEX_MAPPING,
+        },
+    ),
+}
+
+_PF_SOLVER_REQUIREMENTS = {
+    "powermodel": frozenset({_NetworkCapability.GRIDFM_NETWORK}),
+    "powsybl": frozenset(
+        {
+            _NetworkCapability.POWSYBL_NETWORK,
+            _NetworkCapability.POWSYBL_INDEX_MAPPING,
+        },
+    ),
+}
+
+
+class _PfBackendCapabilityRule:
+    """Require the selected reader to provide the PF backend's inputs."""
+
+    def check(self, config: _StaticGenerationConfig) -> tuple[_ConfigIssue, ...]:
+        """Report capabilities missing from a PF reader/solver combination."""
+        if config.settings.mode != "pf":
+            return ()
+
+        provided = _READER_CAPABILITIES[config.network.reader]
+        required = _PF_SOLVER_REQUIREMENTS[config.settings.pf_solver]
+        missing = required - provided
+        if not missing:
+            return ()
+
+        missing_names = ", ".join(sorted(capability.value for capability in missing))
+        return (
+            _ConfigIssue(
+                location="configuration",
+                message=(
+                    f"settings.pf_solver={config.settings.pf_solver!r} is "
+                    f"incompatible with network.reader={config.network.reader!r} "
+                    f"in PF mode; missing capabilities: {missing_names}"
+                ),
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class _DerivedSeedRule:
+    """Keep every possible distributed seed in NumPy's supported range."""
+
+    policy: _SeedPolicy = _DEFAULT_SEED_POLICY
+
+    def check(self, config: _StaticGenerationConfig) -> tuple[_ConfigIssue, ...]:
+        """Report an overflow in the largest derived chunk seed."""
+        max_derived_seed = self.policy.maximum_distributed_seed(
+            config.settings.seed,
+            config.load.scenarios,
+        )
+        if max_derived_seed <= self.policy.max_seed:
+            return ()
+        return (
+            _ConfigIssue(
+                location="configuration",
+                message=(
+                    "settings.seed and load.scenarios produce a derived random "
+                    f"seed of {max_derived_seed}, exceeding NumPy's maximum seed "
+                    f"{self.policy.max_seed}"
+                ),
+            ),
+        )
+
+
+_STATIC_CONFIG_RULES: tuple[_StaticConfigRule, ...] = (
+    _PfBackendCapabilityRule(),
+    _DerivedSeedRule(),
+)
+
+
+def _check_static_config_rules(
+    config: _StaticGenerationConfig,
+) -> tuple[_ConfigIssue, ...]:
+    """Run all registered semantic rules for a parsed static configuration."""
+    return tuple(issue for rule in _STATIC_CONFIG_RULES for issue in rule.check(config))
 
 
 _DISCRIMINATOR_VALUES = {
@@ -322,4 +406,11 @@ def validate_static_config(config: Mapping[str, Any]) -> Dict[str, Any]:
         raise ValueError(
             "Invalid static configuration:\n" + "\n".join(messages),
         ) from exc
+
+    issues = _check_static_config_rules(validated)
+    if issues:
+        messages = [f"- {issue.location}: {issue.message}" for issue in issues]
+        raise ValueError(
+            "Invalid static configuration:\n" + "\n".join(messages),
+        )
     return validated.model_dump(exclude_none=True)
