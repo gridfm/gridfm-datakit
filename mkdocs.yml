@@ -12,6 +12,7 @@ nav:
       - Topology Perturbations: manual/topology_perturbations.md
       - Generation Perturbations: manual/generation_perturbations.md
       - Admittance Perturbations: manual/admittance_perturbations.md
+      - PowSyBl: manual/powsybl.md
       - Dynamic Simulation: manual/dynamic_simulation.md
       - Outputs: manual/outputs.md
   - Components:

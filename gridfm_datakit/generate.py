@@ -123,7 +123,7 @@ def _setup_environment(
     # Resolve and validate the PF solver setting.
     #
     # pf_solver controls which engine is used to solve the power flow equations
-    # in PF mode.  It is completely independent of network.source/reader.
+    # in PF mode.  pf_solver 'powsybl' requires network.reader 'powsybl'.
     #
     # OPF is always solved by PowerModels (Julia) regardless of this setting.
     # In OPF mode the value is read and stored on args but is never consulted
