@@ -692,7 +692,7 @@ reports neither:
 
 | Symptom | Cause |
 | --- | --- |
-| `Dynawo backend unavailable: …` | No `~/.itools/config.yml`, no `dynawo.homeDir` entry, or `homeDir` does not contain `dynawo.sh` / `bin/dynawo` |
+| `Dynawo backend unavailable: …` | No `~/.itools/config.yml`, no `dynawo.homeDir` entry, or `homeDir` does not contain `dynawo.sh` / `bin/dynawo` (`dynawo.cmd` on Windows) |
 | `Dynamic simulations require network.reader='powsybl'` | Set `reader: powsybl` in the `network` block |
 | `Dynawo failed to instantiate N dynamic model(s)` | A `static_id`, `model_name` or `category_name` does not match the network's element IDs or a Dynawo model. Check the IDs against the network file, not against `get_*()` output |
 | `variables: no row of type 'Curve'` | The time-series store needs at least one `Curve` row |
