@@ -57,7 +57,7 @@ controls *where* it comes from):
 - `native` (default): the built-in MATPOWER reader.
 - `powsybl`: parsed by pypowsybl, which additionally supports XIIDM, CGMES,
   PSS/E (`.raw`), UCTE (`.uct`) and MATPOWER binary (`.mat`). Requires
-  `pip install 'gridfm-datakit[powsybl]'`.
+  `pip install 'gridfm-datakit[powsybl]'`. See [PowSyBl](powsybl.md).
 
 With `reader: powsybl` and `source: file`, the optional `file` key points
 directly at the network file (extension included) and takes precedence over
