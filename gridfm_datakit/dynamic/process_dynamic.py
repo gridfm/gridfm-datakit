@@ -455,7 +455,7 @@ def _log_error(error_log_file, message: str) -> None:
         print(message)
         return
     try:
-        with open(error_log_file, "a") as f:
+        with open(error_log_file, "a", encoding="utf-8") as f:
             f.write(message)
     except OSError:
         print(message)

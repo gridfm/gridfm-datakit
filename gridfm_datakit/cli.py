@@ -46,7 +46,7 @@ def _config_has_dynamic_block(config_path: str) -> bool:
     pipeline would silently ignore.
     """
     try:
-        with open(config_path, "r") as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             config = yaml.safe_load(f)
     except (OSError, yaml.YAMLError):
         # Let the pipeline itself report the problem, with its own error message.
@@ -75,7 +75,7 @@ def _read_run_config(data_path: Path) -> tuple[str, dict | None]:
     config_path = data_path / "config.yaml"
     if config_path.exists():
         try:
-            with open(config_path, "r") as f:
+            with open(config_path, "r", encoding="utf-8") as f:
                 return "config.yaml", yaml.safe_load(f)
         except Exception as e:
             print(f"   Could not read config.yaml: {e}")
@@ -83,7 +83,7 @@ def _read_run_config(data_path: Path) -> tuple[str, dict | None]:
     args_log = data_path / "args.log"
     if args_log.exists():
         try:
-            with open(args_log, "r") as f:
+            with open(args_log, "r", encoding="utf-8") as f:
                 blocks = f.read().split(_RUN_HEADER)
             for block in reversed(blocks):
                 _, _, body = block.partition("\n")

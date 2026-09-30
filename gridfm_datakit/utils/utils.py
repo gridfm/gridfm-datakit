@@ -60,7 +60,7 @@ def get_num_scenarios(data_dir: str) -> int:
     """
     n_scenarios_file = os.path.join(data_dir, "n_scenarios.txt")
     if os.path.exists(n_scenarios_file):
-        with open(n_scenarios_file, "r") as f:
+        with open(n_scenarios_file, "r", encoding="utf-8") as f:
             return int(f.read().strip())
 
     else:
