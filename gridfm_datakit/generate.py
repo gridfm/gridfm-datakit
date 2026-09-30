@@ -41,7 +41,7 @@ from gridfm_datakit.utils.param_handler import (
     initialize_generation_generator,
     initialize_topology_generator,
 )
-from gridfm_datakit.utils.random_seed import custom_seed
+from gridfm_datakit.utils.random_seed import _DEFAULT_SEED_POLICY, custom_seed
 from gridfm_datakit.utils.utils import Tee, write_parquet, write_ram_usage_distributed
 
 
@@ -117,11 +117,7 @@ def _setup_environment(
     else:
         # Generate a unique seed for non-reproducible but independent scenarios
         # This ensures scenarios are i.i.d. within a run, but different across runs
-        import secrets
-
-        seed = secrets.randbelow(50_000)
-        # Static configuration validation checks the largest possible draw here
-        # against NumPy's inclusive 2**32 - 1 seed limit.
+        seed = _DEFAULT_SEED_POLICY.random_base_seed()
         print(f"No seed provided. Using seed={seed}")
 
     # Dynamic generation retains its dedicated validator for now. Static
@@ -385,7 +381,7 @@ def generate_power_flow_data(
 
     # Process scenarios sequentially with deterministic seed
     # Use custom_seed to control randomness for reproducibility
-    with custom_seed(seed + 1):
+    with custom_seed(_DEFAULT_SEED_POLICY.sequential_seed(seed)):
         with open(file_paths["tqdm_log"], "a") as f:
             with tqdm(
                 total=args.load.scenarios,

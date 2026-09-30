@@ -59,7 +59,7 @@ from gridfm_datakit.utils.idx_bus import (
 )
 from gridfm_datakit.utils.idx_cost import COST, NCOST
 from gridfm_datakit.utils.idx_gen import GEN_BUS, PMAX, PMIN, QMAX, QMIN, VG
-from gridfm_datakit.utils.random_seed import custom_seed
+from gridfm_datakit.utils.random_seed import _DEFAULT_SEED_POLICY, custom_seed
 from gridfm_datakit.process.solver_output import (
     SolverOutputConfig,
     build_router,
@@ -1407,15 +1407,11 @@ def process_scenario_chunk(
 
         global_start_idx = start_idx + scenario_index_offset
 
-        # Use custom_seed to set seed based on the global start index for this chunk
-        # This ensures each chunk gets a unique but deterministic seed
-        # we multiply by 20_000 to ensure there is no collision with other runs where the seed would be close to each other
-        # example (assuming we have chunks of length 1, hence an increment of 1 between start indices)
-        # Run A: base seed = 42 → scenario seeds = 42, 43, 44, …, 10041 (for 10,000 scenarios)
-        # Run B: base seed = 120 → scenario seeds = 120, 121, 122, …, 10119
-        # These sets overlap on seeds 120..10041 (so 9,922 overlapping seeds).
-        # we also add 1 in case the seed is 0, to not have collision witht he seed used for the load perturbations
-        with custom_seed(seed * 20_000 + global_start_idx + 1):
+        # Derive a deterministic seed from the chunk's global offset. The shared
+        # policy also keeps it distinct from the base seed used for load scenarios.
+        with custom_seed(
+            _DEFAULT_SEED_POLICY.distributed_seed(seed, global_start_idx),
+        ):
             for scenario_data_index in range(start_idx, end_idx):
                 scenario_index = scenario_data_index + scenario_index_offset
                 if mode == "opf":
