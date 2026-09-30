@@ -1,7 +1,6 @@
 # PowSyBl
 
-[PowSyBl](https://www.powsybl.org/) can read the grid and solve the power flow.
-The optimal power flow always runs in PowerModels, so Julia is still needed.
+[PowSyBl](https://www.powsybl.org/) can read the grid and solve the power flow. The optimal power flow always runs in PowerModels, so Julia is still needed.
 
 ```bash
 pip install 'gridfm-datakit[powsybl]'
@@ -10,32 +9,20 @@ gridfm_datakit setup_pm
 
 ## Reading the grid
 
-`network.reader: powsybl` reads the grid with pypowsybl. This is how to load
-XIIDM, CGMES, PSS/E (`.raw`), UCTE (`.uct`) and MATPOWER files.
+`network.reader: powsybl` reads the grid with pypowsybl. This is how to load XIIDM, CGMES, PSS/E (`.raw`), UCTE (`.uct`) and MATPOWER files.
 
-- For a local file, set `source: file` and put the path to the file, extension
-  included, in `file`.
-- For a PGLib case, set `source: pglib` and put the case name without the
-  `pglib_opf_` prefix in `name`.
+- For a local file, set `source: file` and put the path to the file, extension included, in `file`.
+- For a PGLib case, set `source: pglib` and put the case name without the `pglib_opf_` prefix in `name`.
 
 ## Solving the power flow
 
-`settings.pf_solver: powsybl` solves the power flow with
-[Open Load Flow](https://powsybl.readthedocs.io/projects/powsybl-open-loadflow/),
-after PowerModels has chosen the generator set-points. Use it only in
-`mode: pf`, and only together with `reader: powsybl`. With `reader: native` the
-run stops with `Network seems to not be initialized for PowSyBl solver`. In
-`mode: opf` the setting is ignored.
+`settings.pf_solver: powsybl` solves the power flow with [Open Load Flow](https://powsybl.readthedocs.io/projects/powsybl-open-loadflow/), after PowerModels has chosen the generator set-points. Use it only in `mode: pf`, and only together with `reader: powsybl`. With `reader: native` the run stops with `Network seems to not be initialized for PowSyBl solver`. In `mode: opf` the setting is ignored.
 
-Leaving `pf_solver` at `powermodel`, the default, still solves with
-PowerModels. That is fine if PowSyBl was only needed to read the file.
+Leaving `pf_solver` at `powermodel`, the default, still solves with PowerModels. That is fine if PowSyBl was only needed to read the file.
 
 ## Generator costs
 
-PowSyBl does not read generator costs, including from PGLib. Every generator is
-given the same cost, `c2=0`, `c1=1`, `c0=0`, so the optimal power flow has no
-preference for one generator over another. Set `generation_perturbation` to
-`none`.
+PowSyBl does not read generator costs, including from PGLib. Every generator is given the same cost, `c2=0`, `c1=1`, `c0=0`, so the optimal power flow has no preference for one generator over another. Set `generation_perturbation` to `none`.
 
 ## Examples
 

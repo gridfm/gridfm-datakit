@@ -18,8 +18,7 @@ gridfm_datakit setup_pm
 
 ### Optional: PowSyBl
 
-To read XIIDM, CGMES, PSS/E or UCTE files, or to solve the power flow with
-PowSyBl, install the `powsybl` extra. See the [PowSyBl](manual/powsybl.md) page.
+To read XIIDM, CGMES, PSS/E or UCTE files, or to solve the power flow with PowSyBl, install the `powsybl` extra. See the [PowSyBl](manual/powsybl.md) page.
 
 ```bash
 pip install 'gridfm-datakit[powsybl]'
