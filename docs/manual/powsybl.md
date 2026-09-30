@@ -16,9 +16,9 @@ gridfm_datakit setup_pm
 
 ## Solving the power flow
 
-`settings.pf_solver: powsybl` solves the power flow with [Open Load Flow](https://powsybl.readthedocs.io/projects/powsybl-open-loadflow/), after PowerModels has chosen the generator set-points. Use it only in `mode: pf`, and only together with `reader: powsybl`. With `reader: native` the run stops with `Network seems to not be initialized for PowSyBl solver`. In `mode: opf` the setting is ignored.
+`settings.pf_solver: powsybl` solves the power flow with [Open Load Flow](https://powsybl.readthedocs.io/projects/powsybl-open-loadflow/) instead of PowerModels. The generator set-points still come from the PowerModels optimal power flow. It requires `mode: pf` and `reader: powsybl`, and has no effect in `mode: opf`.
 
-Leaving `pf_solver` at `powermodel`, the default, still solves with PowerModels. That is fine if PowSyBl was only needed to read the file.
+The default, `pf_solver: powermodel`, works with both readers.
 
 ## Generator costs
 
