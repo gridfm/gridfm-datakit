@@ -109,15 +109,15 @@ jobs:
       matrix:
         python-version: ['3.10', '3.11', '3.13', '3.14']
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Julia 1.12
-        uses: julia-actions/setup-julia@v1
+        uses: julia-actions/setup-julia@v3
         with:
           version: '1.12'
 
       - name: Cache Julia depot
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.julia
           key: julia-depot-${{ runner.os }}-julia1.12-${{ hashFiles('gridfm_datakit/juliapkg.json') }}
@@ -125,7 +125,7 @@ jobs:
             julia-depot-${{ runner.os }}-julia1.12-
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
