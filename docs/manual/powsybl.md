@@ -24,7 +24,7 @@ The default, `pf_solver: powermodel`, works with both readers.
 
 PowSyBl does not read generator costs, including from PGLib. Every generator is given the same cost, `c2=0`, `c1=1`, `c0=0`, so the optimal power flow has no preference for one generator over another.
 
-Both generation perturbations still run. `cost_permutation` swaps identical costs and has no effect. `cost_perturbation` scales the cost of each generator by its own random factor, so the dispatch varies, but around costs that do not come from the grid. `none` is recommended.
+`cost_permutation` has no effect, since all costs are identical. `cost_perturbation` gives each generator its own random cost, so the dispatch varies, but not according to the real costs of the grid. Use `none`.
 
 ## Examples
 
