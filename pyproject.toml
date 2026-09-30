@@ -24,6 +24,7 @@ dependencies = [
   "numpy",
   "pandas",
   "plotly",
+  "pydantic>=2,<3",
   "pyyaml",
   "requests",
   "urllib3>=2.6.0", # fix security issue

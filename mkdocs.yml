@@ -30,6 +30,7 @@ nav:
       - Stats: components/stats.md
       - Power Balance: components/power_balance.md
       - Param Handler: components/param_handler.md
+    - Configuration: components/config.md
     - Generate: components/generate.md
     - Dynamic: components/dynamic.md
     - Validation: components/validation.md

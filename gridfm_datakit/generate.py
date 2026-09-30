@@ -13,6 +13,7 @@ import yaml
 from tqdm import tqdm
 
 import gridfm_datakit.powsybl as powsybl
+from gridfm_datakit.config import validate_static_config
 from gridfm_datakit.network import (
     Network,
     get_pglib_file_path,
@@ -78,19 +79,33 @@ def _setup_environment(
 
     Returns:
         Tuple of (args, base_path, file_paths, seed)
+
+    Raises:
+        TypeError: If config is not a path, dictionary, or NestedNamespace.
+        ValueError: If a static configuration is invalid.
     """
-    # Load config from file if a path is provided
     if isinstance(config, str):
         with open(config, "r") as f:
             config = yaml.safe_load(f)
+    elif isinstance(config, NestedNamespace):
+        config = config.to_dict()
+    elif not isinstance(config, dict):
+        raise TypeError(
+            "config must be a YAML path, a dictionary, or a NestedNamespace, "
+            f"got {type(config).__name__}",
+        )
 
-    # Convert dict to NestedNamespace if needed
-    if isinstance(config, dict):
-        args = NestedNamespace(**config)
-    else:
-        args = config
+    if not isinstance(config, dict):
+        raise ValueError(
+            f"Configuration must contain a YAML mapping, got {type(config).__name__}",
+        )
 
-        # Set global seed if provided, otherwise generate a unique seed for this generation
+    is_dynamic_config = bool(config.get("dynamic"))
+    if not is_dynamic_config:
+        config = validate_static_config(config)
+    args = NestedNamespace(**config)
+
+    # Set global seed if provided, otherwise generate a unique seed for this generation
     if (
         hasattr(args.settings, "seed")
         and args.settings.seed is not None
@@ -105,43 +120,35 @@ def _setup_environment(
         import secrets
 
         seed = secrets.randbelow(50_000)
-        # chunk_seed = seed * 20000 + start_idx + 1 < 2^31 - 1
-        # seed < (2,147,483,647 - n_scenarios) / 20,000 ~= 100_000 so taking 50_000 to be safe
+        # Static configuration validation checks the largest possible draw here
+        # against NumPy's inclusive 2**32 - 1 seed limit.
         print(f"No seed provided. Using seed={seed}")
 
-    # Resolve and validate the network reader.
-    #
-    # reader controls HOW the network file is parsed (independent of pf_solver).
-    # source controls WHERE to get the file: 'pglib' (download) or 'file' (local).
-    reader = getattr(args.network, "reader", "native")
-    if reader not in ("native", "powsybl"):
-        raise ValueError(
-            f"network.reader must be 'native' or 'powsybl', got {reader!r}",
-        )
-    args.network.reader = reader
+    # Dynamic generation retains its dedicated validator for now. Static
+    # configurations receive these defaults from the Pydantic schema above.
+    if is_dynamic_config:
+        reader = getattr(args.network, "reader", "native")
+        if reader not in ("native", "powsybl"):
+            raise ValueError(
+                f"network.reader must be 'native' or 'powsybl', got {reader!r}",
+            )
+        args.network.reader = reader
 
-    # Resolve and validate the PF solver setting.
-    #
-    # pf_solver controls which engine is used to solve the power flow equations
-    # in PF mode.  It is completely independent of network.source/reader.
-    #
-    # OPF is always solved by PowerModels (Julia) regardless of this setting.
-    # In OPF mode the value is read and stored on args but is never consulted
-    # during execution — it is kept here purely for consistency and logging.
-    pf_solver = getattr(args.settings, "pf_solver", "powermodel")
-    if pf_solver not in ("powermodel", "powsybl"):
-        raise ValueError(
-            f"settings.pf_solver must be 'powermodel' or 'powsybl', got {pf_solver!r}",
-        )
-    args.settings.pf_solver = pf_solver
+        pf_solver = getattr(args.settings, "pf_solver", "powermodel")
+        if pf_solver not in ("powermodel", "powsybl"):
+            raise ValueError(
+                "settings.pf_solver must be 'powermodel' or 'powsybl', "
+                f"got {pf_solver!r}",
+            )
+        args.settings.pf_solver = pf_solver
 
-    opf_formulation = getattr(args.settings, "opf_formulation", "polar")
-    if opf_formulation not in ("polar", "rectangular"):
-        raise ValueError(
-            "settings.opf_formulation must be 'polar' or 'rectangular', "
-            f"got {opf_formulation!r}",
-        )
-    args.settings.opf_formulation = opf_formulation
+        opf_formulation = getattr(args.settings, "opf_formulation", "polar")
+        if opf_formulation not in ("polar", "rectangular"):
+            raise ValueError(
+                "settings.opf_formulation must be 'polar' or 'rectangular', "
+                f"got {opf_formulation!r}",
+            )
+        args.settings.opf_formulation = opf_formulation
 
     # Setup output directory
     base_path = os.path.join(args.settings.data_dir, args.network.name, "raw")
@@ -478,19 +485,9 @@ def generate_power_flow_data_distributed(
     # Setup environment
     args, base_path, file_paths, seed = _setup_environment(config)
 
-    # check if mode is valid
-    if args.settings.mode not in ["opf", "pf"]:
-        raise ValueError("Invalid mode!")
-
     scenario_count = args.load.scenarios
     large_chunk_size = args.settings.large_chunk_size
     configured_processes = args.settings.num_processes
-    if scenario_count <= 0:
-        raise ValueError("load.scenarios must be positive")
-    if large_chunk_size <= 0:
-        raise ValueError("settings.large_chunk_size must be positive")
-    if configured_processes <= 0:
-        raise ValueError("settings.num_processes must be positive")
 
     # Prepare network and scenarios
     net, scenarios, meta = _prepare_network_and_scenarios(args, file_paths, seed)
