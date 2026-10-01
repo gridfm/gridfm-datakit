@@ -11,7 +11,7 @@
 ![Coverage](https://img.shields.io/badge/coverage-76%25-yellow)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12594/badge)](https://www.bestpractices.dev/projects/12594)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/gridfm/gridfm-datakit/badge)](https://scorecard.dev/viewer/?uri=github.com/gridfm/gridfm-datakit)
-![Python](https://img.shields.io/badge/python-3.10%20%E2%80%93%203.12-blue)
+![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 
 
@@ -68,7 +68,7 @@ If you use `gridfm-datakit` in your research, please cite both:
 
 1. ⭐ Star the repository on GitHub to support the project!
 
-2. Make sure you have Python 3.10, 3.11, or 3.12 installed. ⚠️ Windows users: Python 3.12 is not supported. Use Python 3.10.11 or 3.11.9.
+2. Make sure you have Python 3.10 or later installed.
 
 3. Install gridfm-datakit
 
