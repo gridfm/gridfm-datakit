@@ -76,7 +76,7 @@ def test_setup_environment_rejects_unknown_opf_formulation(conf):
     conf.settings.opf_formulation = "unsupported"
     with pytest.raises(
         ValueError,
-        match="settings.opf_formulation must be 'polar' or 'rectangular'",
+        match=r"settings\.opf_formulation: Input should be 'polar' or 'rectangular'",
     ):
         _setup_environment(conf)
 
@@ -110,12 +110,12 @@ def test_fail_prepare_network_and_scenarios_config(conf):
     Tests if preparing network and scenarios fails with an invalid grid source in the configuration file
     """
     args, base_path, file_paths, seed = _setup_environment(conf)
-    conf.network.source = "invalid_source"  # Set invalid source
+    args.network.source = "invalid_source"  # Set invalid source
     with pytest.raises(
         ValueError,
-        match=f"network.source must be 'pglib' or 'file', got {conf.network.source!r}",
+        match=f"network.source must be 'pglib' or 'file', got {args.network.source!r}",
     ):
-        net, scenarios, _ = _prepare_network_and_scenarios(conf, file_paths, seed)
+        net, scenarios, _ = _prepare_network_and_scenarios(args, file_paths, seed)
 
 
 # Test save network function
@@ -213,22 +213,11 @@ def test_setup_environment_overwrite_behavior():
     - Call _setup_environment with overwrite=True: marker should be removed
     """
     with tempfile.TemporaryDirectory() as tmpdir:
-        config = {
-            "settings": {
-                "data_dir": tmpdir,
-                "overwrite": False,
-                "include_dc_res": False,
-                "enable_solver_logs": False,
-                "pf_fast": False,
-                "mode": "opf",
-            },
-            "network": {"name": "case24_ieee_rts"},
-            # minimal required sections for downstream functions
-            "load": {"generator": "agg_load_profile", "scenarios": 1},
-            "topology_perturbation": {"type": "none"},
-            "generation_perturbation": {"type": "none"},
-            "admittance_perturbation": {"type": "none"},
-        }
+        with open("tests/config/default_without_perturbation_test.yaml", "r") as f:
+            config = yaml.safe_load(f)
+        config["settings"]["data_dir"] = tmpdir
+        config["settings"]["overwrite"] = False
+        config["load"]["scenarios"] = 1
 
         # First setup creates directories
         args, base_path, file_paths, seed = _setup_environment(config)
