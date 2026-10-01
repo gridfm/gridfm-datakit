@@ -186,7 +186,7 @@ class LogChannel:
         if self.to_console:
             print(text, end="" if text.endswith("\n") else "\n", flush=True)
         elif self.path is not None:
-            with open(self.path, "a") as f:
+            with open(self.path, "a", encoding="utf-8") as f:
                 f.write(text if text.endswith("\n") else text + "\n")
         # discard -> nothing
 
