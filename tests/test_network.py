@@ -6,8 +6,20 @@ Tests the Network class and load functions with matpowercaseframes integration
 import pytest
 import numpy as np
 from gridfm_datakit.network import load_net_from_pglib, Network
-from gridfm_datakit.utils.idx_brch import BR_STATUS
-from gridfm_datakit.utils.idx_gen import GEN_STATUS
+from gridfm_datakit.utils.idx_brch import BR_STATUS, BR_X, F_BUS, T_BUS
+from gridfm_datakit.utils.idx_bus import (
+    BASE_KV,
+    BUS_I,
+    BUS_TYPE,
+    PQ,
+    PV,
+    REF,
+    VM,
+    VMAX,
+    VMIN,
+)
+from gridfm_datakit.utils.idx_cost import MODEL, NCOST, POLYNOMIAL
+from gridfm_datakit.utils.idx_gen import GEN_BUS, GEN_STATUS, MBASE, PMAX, VG
 
 
 class TestNetwork:
@@ -351,3 +363,76 @@ class TestNetwork:
             # Clean up temporary file
             if os.path.exists(tmp_filename):
                 os.unlink(tmp_filename)
+
+
+def _unsorted_sparse_mpc():
+    bus = np.zeros((3, 13))
+    bus[:, BUS_I] = [900, 5, 61]
+    bus[:, BUS_TYPE] = [PV, REF, PV]
+    bus[:, VM] = 1.0
+    bus[:, BASE_KV] = 100.0
+    bus[:, VMAX] = 1.1
+    bus[:, VMIN] = 0.9
+
+    gen = np.zeros((3, 21))
+    gen[:, GEN_BUS] = [900, 5, 61]
+    gen[:, GEN_STATUS] = 1
+    gen[:, VG] = 1.0
+    gen[:, MBASE] = 100.0
+    gen[:, PMAX] = 100.0
+
+    branch = np.zeros((2, 13))
+    branch[:, F_BUS] = [900, 5]
+    branch[:, T_BUS] = [5, 61]
+    branch[:, BR_X] = 0.1
+    branch[:, BR_STATUS] = 1
+
+    gencost = np.zeros((3, 7))
+    gencost[:, MODEL] = POLYNOMIAL
+    gencost[:, NCOST] = 3
+
+    return {
+        "baseMVA": 100.0,
+        "bus": bus,
+        "gen": gen,
+        "branch": branch,
+        "gencost": gencost,
+    }
+
+
+class TestDeactivateGensBusOrdering:
+    """Bus-ordering behaviour of deactivate_gens when bus rows are not sorted by ID"""
+
+    def test_bus_ids_are_dense_after_construction(self):
+        """Sparse input bus IDs are remapped onto 0..n_buses-1, so ID indexing stays in range"""
+        network = Network(_unsorted_sparse_mpc())
+        bus_ids = network.buses[:, BUS_I].astype(int)
+
+        assert np.array_equal(np.sort(bus_ids), np.arange(network.buses.shape[0])), (
+            "bus IDs should be a permutation of 0..n_buses-1"
+        )
+        assert not np.array_equal(bus_ids, np.sort(bus_ids)), (
+            "fixture should keep bus rows out of ID order"
+        )
+
+    def test_deactivate_gens_flips_the_bus_that_lost_its_generator(self):
+        """The PV bus losing its last generator becomes PQ even when rows are not ID ordered"""
+        network = Network(_unsorted_sparse_mpc())
+        bus_ids = network.buses[:, BUS_I].astype(int)
+
+        target_row = 0
+        target_gens = np.where(
+            network.gens[:, GEN_BUS].astype(int) == bus_ids[target_row],
+        )[0]
+        network.deactivate_gens(target_gens)
+
+        assert network.buses[target_row, BUS_TYPE] == PQ, (
+            "PV bus with no in-service generator should become PQ"
+        )
+
+        for row in range(network.buses.shape[0]):
+            if row == target_row or network.buses[row, BUS_TYPE] == REF:
+                continue
+            assert network.buses[row, BUS_TYPE] == PV, (
+                "PV bus that still has a generator should stay PV"
+            )
