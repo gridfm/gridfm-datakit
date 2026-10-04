@@ -43,6 +43,14 @@ pip install 'gridfm-datakit[lightsim2grid]'
     every power flow, which is slower. Once a release contains them, the extra alone will be
     enough and this note will be removed.
 
+### Optional: PowSyBl
+
+To read XIIDM, CGMES, PSS/E or UCTE files, or to solve the power flow with PowSyBl, install the `powsybl` extra. See the [PowSyBl](manual/powsybl.md) page.
+
+```bash
+pip install 'gridfm-datakit[powsybl]'
+```
+
 ### Optional: dynamic (time-domain) simulation
 
 Dynamic simulation needs two extra things on top of the base install. See the

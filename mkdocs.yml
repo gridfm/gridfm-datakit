@@ -13,6 +13,7 @@ nav:
       - Generation Perturbations: manual/generation_perturbations.md
       - Admittance Perturbations: manual/admittance_perturbations.md
       - Power Flow Solver: manual/power_flow_solver.md
+      - PowSyBl: manual/powsybl.md
       - Dynamic Simulation: manual/dynamic_simulation.md
       - Outputs: manual/outputs.md
   - Components:

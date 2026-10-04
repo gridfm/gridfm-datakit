@@ -159,8 +159,80 @@ def test_variable_count_mismatch_raises(tmp_path):
     """Samples monitoring different variables cannot share one Zarr store."""
     out = tmp_path / "dyn"
     out.mkdir(parents=True)
-    with pytest.raises(ValueError, match="disagree on the number of variables"):
+    with pytest.raises(
+        ValueError,
+        match=r"variable names: missing \['v2'\], unexpected \[\]",
+    ):
         _write([_result(0, n_variables=3), _result(1, n_variables=2)], out)
+
+
+@pytest.mark.parametrize("chunked", [False, True])
+def test_variable_order_is_aligned_by_name(tmp_path, chunked):
+    """A solver-specific column order must not change the variable-axis meaning."""
+    first = _result(0, n_timesteps=2, n_variables=2)
+    second = _result(1, n_timesteps=2, n_variables=2)
+    first["dynamic_results"].dynamic_results = pd.DataFrame(
+        {"voltage": [1.0, 2.0], "angle": [10.0, 20.0]},
+    )
+    second["dynamic_results"].dynamic_results = pd.DataFrame(
+        {"angle": [30.0, 40.0], "voltage": [3.0, 4.0]},
+    )
+
+    if chunked:
+        _, grp, meta = _save_chunked([[first], [second]], tmp_path)
+    else:
+        _, grp, meta = _save([first, second], tmp_path)
+
+    assert meta["variable_names"] == ["voltage", "angle"]
+    np.testing.assert_array_equal(grp["curves"][1, 0], [3.0, 4.0])
+    np.testing.assert_array_equal(grp["curves"][1, 1], [30.0, 40.0])
+
+
+def test_variable_name_mismatch_raises(tmp_path):
+    """Equal-width samples with different variables must not be silently mislabeled."""
+    out = tmp_path / "dyn"
+    out.mkdir(parents=True)
+    first = _result(0, n_variables=2)
+    second = _result(1, n_variables=2)
+    second["dynamic_results"].dynamic_results.columns = ["v0", "other"]
+
+    with pytest.raises(
+        ValueError,
+        match=r"variable names: missing \['v1'\], unexpected \['other'\]",
+    ):
+        _write([first, second], out)
+
+
+def test_variable_name_mismatch_does_not_partially_write_chunk(tmp_path):
+    """A rejected later chunk must not append its static or dynamic rows."""
+    out = tmp_path / "dyn"
+    writer = _DynamicDataWriter(out, {}, NestedNamespace(dummy=1), 0)
+    writer.write_chunk([_result(0, n_variables=2)])
+    mismatch = _result(1, n_variables=2)
+    mismatch["dynamic_results"].dynamic_results.columns = ["v0", "other"]
+
+    with pytest.raises(ValueError, match="disagrees on variable names"):
+        writer.write_chunk([mismatch])
+    writer.close()
+
+    curves = zarr.open(str(out / "dynamic_results.zarr"), mode="r")["curves"]
+    bus = pd.read_parquet(out / "bus_data.parquet")
+    metadata = json.loads((out / "metadata.json").read_text())
+    assert curves.shape[0] == 1
+    assert bus["scenario_index"].unique().tolist() == [0]
+    assert metadata["n_samples"] == 1
+    assert metadata["static_scenario_index"] == [0]
+
+
+def test_duplicate_variable_names_raise(tmp_path):
+    """Duplicate names cannot be aligned to a unique variable axis."""
+    out = tmp_path / "dyn"
+    out.mkdir(parents=True)
+    sample = _result(0, n_variables=2)
+    sample["dynamic_results"].dynamic_results.columns = ["v0", "v0"]
+
+    with pytest.raises(ValueError, match="duplicate variable names"):
+        _write([sample], out)
 
 
 def test_static_snapshot_is_at_parity_with_static_pipeline(tmp_path):
