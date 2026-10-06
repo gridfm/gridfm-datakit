@@ -1,3 +1,4 @@
+import hashlib
 import yaml
 import os
 import shutil
@@ -26,9 +27,12 @@ def run_generation(config_params):
         args.load.scenarios = 5
         args.settings.large_chunk_size = 5
         args.settings.num_processes = 2
-        args.settings.data_dir = (
-            f"./tests/test_data_perturbations/{config_params['test_name']}"
-        )
+        # Use a short hash as the directory name to avoid hitting the
+        # Windows MAX_PATH (260-char) limit with long combination names.
+        short_id = hashlib.sha1(
+            config_params["test_name"].encode(), usedforsecurity=False
+        ).hexdigest()[:12]
+        args.settings.data_dir = f"./tests/test_data_perturbations/{short_id}"
 
         # Generate data
         file_paths = generate_power_flow_data_distributed(args)
