@@ -76,6 +76,7 @@ test = [
   "pytest",
   "pytest-cov",
   "pyinstrument",
+  "pytest-timeout",
   "pytest-xdist"
 ]
 
@@ -95,3 +96,7 @@ dynamic = [
   "pypowsybl",
   "zarr",
 ]
+
+[tool.pytest.ini_options]
+timeout = 900
+timeout_method = "thread"
