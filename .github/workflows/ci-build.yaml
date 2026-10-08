@@ -74,14 +74,8 @@ jobs:
           restore-keys: |
             pip-${{ runner.os }}-
 
-      - name: Create virtualenv
-        run: |
-          python -m venv .venv
-          source .venv/bin/activate
-
       - name: Install Python dependencies
         run: |
-          source .venv/bin/activate
           python -m pip install --upgrade pip wheel
           pip install -e ".[test]"
 
@@ -92,12 +86,10 @@ jobs:
       # versions don't resolve together. Near-instant on a cache hit.
       - name: Set up Julia packages (PowerModels)
         run: |
-          source .venv/bin/activate
           python -c "from juliacall import Main as jl; jl.seval('using PowerModels, Ipopt, Memento')"
 
       - name: Unit tests
         run: |
-          source .venv/bin/activate
           export SKIP_LARGE_GRIDS=1
           pytest --cov=. tests/ -v -s
 
