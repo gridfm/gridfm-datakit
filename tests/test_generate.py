@@ -5,7 +5,6 @@ Test cases for generating data from gridfm_datakit.generate module
 import pytest
 import os
 
-import shutil
 import tempfile
 import yaml
 import pandas as pd
@@ -20,7 +19,7 @@ from gridfm_datakit.generate import (
 
 
 @pytest.fixture(params=["opf", "pf"])
-def conf(request):
+def conf(request, tmp_path):
     """
     Loads configuration files for both opf and pf modes.
     This fixture reads the configuration files and returns both for parametrized testing.
@@ -34,9 +33,7 @@ def conf(request):
     with open(path, "r") as f:
         base_config = yaml.safe_load(f)
         args = NestedNamespace(**base_config)
-    # Isolate outputs per xdist worker
-    worker = os.environ.get("PYTEST_XDIST_WORKER", "local")
-    args.settings.data_dir = f"./tests/test_data_{request.param}_mode_{worker}"
+    args.settings.data_dir = str(tmp_path)
     return args
 
 
@@ -119,7 +116,7 @@ def test_fail_prepare_network_and_scenarios_config(conf):
 
 
 # Test save network function
-def test_save_generated_data():
+def test_save_generated_data(tmp_path):
     """
     Tests if saving generated data works correctly by processing a single scenario
     and verifying that output files are created with correct structure.
@@ -130,8 +127,7 @@ def test_save_generated_data():
     with open(config_path, "r") as f:
         cfg = yaml.safe_load(f)
     args = NestedNamespace(**cfg)
-    worker = os.environ.get("PYTEST_XDIST_WORKER", "local")
-    args.settings.data_dir = f"./tests/test_data_without_perturbation_{worker}"
+    args.settings.data_dir = str(tmp_path)
     file_paths = generate_power_flow_data_distributed(args)
     print(file_paths)
 
@@ -175,32 +171,6 @@ def test_fail_generate_pf_data():
     config = "scripts/config/non_existent_config.yaml"
     with pytest.raises(FileNotFoundError):
         generate_power_flow_data(config)
-
-
-# Clean up generated files after tests
-@pytest.fixture(scope="session", autouse=True)
-def cleanup_generated_files():
-    """
-    Cleans up generated files after tests.
-    This fixture runs after all tests in the module have completed.
-    """
-    yield  # This allows tests to run first
-
-    # Only clean up directories that were actually created by these tests
-    worker = os.environ.get("PYTEST_XDIST_WORKER", "local")
-    cleanup_paths = [
-        f"./tests/test_data_without_perturbation_{worker}",
-        f"./tests/test_data_pf_mode_{worker}",
-        f"./tests/test_data_opf_mode_{worker}",
-    ]
-
-    for path in cleanup_paths:
-        try:
-            if os.path.exists(path):
-                shutil.rmtree(path)
-                print(f"Cleaned up: {path}")
-        except Exception as e:
-            print(f"Warning: Could not clean up {path}: {e}")
 
 
 def test_setup_environment_overwrite_behavior():
@@ -373,8 +343,6 @@ def test_reproducibility_with_same_seed():
         # Also check the scenarios file
         scenarios_1 = pd.read_parquet(file_paths_1["scenarios"], engine="pyarrow")
         scenarios_2 = pd.read_parquet(file_paths_2["scenarios"], engine="pyarrow")
-
-        os.makedirs("tests/test_data", exist_ok=True)
 
         pd.testing.assert_frame_equal(
             scenarios_1,
