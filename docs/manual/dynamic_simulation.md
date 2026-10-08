@@ -308,7 +308,8 @@ set. Values of `none` or `""` are dropped rather than forwarded.
 ### `dynamic.loadflow_parameters` (optional)
 
 Governs the AC power flow that produces the balanced initial state. The defaults
-deliberately differ from the static pipeline's:
+match the static pipeline's `get_default_lf_params()`, but are pinned here so the
+dynamic pipeline keeps them whatever the static default becomes:
 
 ```yaml
 dynamic:
