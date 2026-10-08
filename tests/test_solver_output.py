@@ -87,6 +87,10 @@ class TestRedirectCStdio:
     # Write straight to fd 1/2 (and via libc), not print(): the whole point is
     # capturing fd-level output that bypasses Python's sys.stdout.
 
+    @pytest.mark.skipif(
+        os.name == "nt",
+        reason="ctypes.CDLL(None) does not load libc on Windows",
+    )
     def test_redirects_c_level_writes_to_file(self, tmp_path, capfd):
         libc = ctypes.CDLL(None)
         log = tmp_path / "out.log"
