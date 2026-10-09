@@ -59,6 +59,16 @@ from gridfm_datakit.utils.idx_cost import MODEL, NCOST, POLYNOMIAL
 from gridfm_datakit.utils.idx_gen import GEN_BUS, GEN_STATUS, PG, QG
 
 
+def _julia_string(value: str) -> str:
+    """Return ``value`` as a Julia string literal.
+
+    Backslashes, quotes and ``$`` are escaped, so Windows paths and paths
+    containing interpolation characters reach Julia unchanged.
+    """
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"').replace("$", "\\$")
+    return f'"{escaped}"'
+
+
 def correct_network(network_path: str, force: bool = False) -> str:
     """
     Load a MATPOWER network using PowerModels via run_julia
@@ -101,8 +111,8 @@ def correct_network(network_path: str, force: bool = False) -> str:
         julia_code = [
             "using PowerModels",
             "PowerModels.silence()",
-            f'data = PowerModels.parse_file("{network_path}")',
-            f'PowerModels.export_matpower("{tmp_path}", data)',
+            f"data = PowerModels.parse_file({_julia_string(network_path)})",
+            f"PowerModels.export_matpower({_julia_string(tmp_path)}, data)",
         ]
 
         # Run Julia
