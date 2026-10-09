@@ -132,6 +132,13 @@ def _read_dynawo_home_dir(config_file: Path) -> Optional[str]:
     return match.group(1).strip("\"'") if match else None
 
 
+def _dynawo_launchers(os_name: str = os.name) -> tuple:
+    """Return the launchers powsybl-dynawo invokes, relative to dynawo.homeDir."""
+    if os_name == "nt":
+        return ("dynawo.cmd",)
+    return ("dynawo.sh", "bin/dynawo")
+
+
 def _dynawo_unavailable_reason() -> Optional[str]:
     """Return why Dynawo cannot run, or None if the installation looks usable."""
     config_file = _find_powsybl_config_file()
@@ -151,10 +158,11 @@ def _dynawo_unavailable_reason() -> Optional[str]:
 
     # The launcher powsybl-dynawo invokes. Its absence means homeDir points at
     # something that is not a Dynawo installation.
-    if not (home / "dynawo.sh").is_file() and not (home / "bin" / "dynawo").is_file():
+    launchers = _dynawo_launchers()
+    if not any((home / launcher).is_file() for launcher in launchers):
         return (
             f"dynawo.homeDir '{home}' (from {config_file}) contains no Dynawo "
-            f"launcher (expected 'dynawo.sh' or 'bin/dynawo')"
+            f"launcher (expected one of {', '.join(launchers)})"
         )
 
     return None
