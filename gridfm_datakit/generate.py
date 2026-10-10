@@ -82,7 +82,7 @@ def _setup_environment(
     """
     # Load config from file if a path is provided
     if isinstance(config, str):
-        with open(config, "r") as f:
+        with open(config, "r", encoding="utf-8") as f:
             config = yaml.safe_load(f)
 
     # Convert dict to NestedNamespace if needed
@@ -195,12 +195,12 @@ def _setup_environment(
         file_paths["scenarios_log"],
         file_paths["args_log"],
     ]:
-        with open(log_file, "a") as f:
+        with open(log_file, "a", encoding="utf-8") as f:
             f.write(f"\nNew generation started at {timestamp}\n")
             if log_file == file_paths["args_log"]:
                 yaml.safe_dump(args.to_dict(), f)
 
-    with open(file_paths["config"], "w") as f:
+    with open(file_paths["config"], "w", encoding="utf-8") as f:
         yaml.safe_dump(args.to_dict(), f)
 
     return args, base_path, file_paths, seed
@@ -383,7 +383,7 @@ def generate_power_flow_data(
     # Process scenarios sequentially with deterministic seed
     # Use custom_seed to control randomness for reproducibility
     with custom_seed(seed + 1):
-        with open(file_paths["tqdm_log"], "a") as f:
+        with open(file_paths["tqdm_log"], "a", encoding="utf-8") as f:
             with tqdm(
                 total=args.load.scenarios,
                 desc="Processing scenarios",
@@ -546,7 +546,7 @@ def generate_power_flow_data_distributed(
         args.settings.opf_formulation,
     )
 
-    with open(file_paths["tqdm_log"], "a") as f:
+    with open(file_paths["tqdm_log"], "a", encoding="utf-8") as f:
         with tqdm(
             total=scenario_count,
             desc="Processing scenarios",

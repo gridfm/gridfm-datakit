@@ -589,7 +589,7 @@ class Network:
         branches[:, F_BUS] = rev[branches[:, F_BUS].astype(int)]
         branches[:, T_BUS] = rev[branches[:, T_BUS].astype(int)]
 
-        with open(filename, "w") as f:
+        with open(filename, "w", encoding="utf-8") as f:
             f.write("function mpc = case_from_dict\n")
             f.write("% Automatically generated MATPOWER case file\n\n")
 
