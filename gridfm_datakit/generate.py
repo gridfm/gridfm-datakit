@@ -4,8 +4,12 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 import multiprocessing
 import os
 import shutil
-import gc, tempfile
-import sys, time, queue, signal
+import gc
+import tempfile
+import sys
+import time
+import queue
+import signal
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -1147,12 +1151,4 @@ def generate_power_flow_data_distributed_multiprocessing(
     finally:
         manager.shutdown()
 
-    if profiler.is_enabled():
-        report_path = profiler.write_report()
-
-        if report_path is not None:
-            print(
-                f"Profiling report written to {report_path}"
-            )
-    
     return file_paths
