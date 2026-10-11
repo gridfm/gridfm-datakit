@@ -75,6 +75,9 @@ def init_julia(
     print_level: Optional[int] = None,
     output: Optional[SolverOutputConfig] = None,
     opf_formulation: str = "polar",
+    coinhsl_enabled: bool = False,
+    coinhsl_linear_solver: str = "",
+    coinhsl_hsllib: str = "",
 ) -> Any:
     """Initialize Julia interface with PowerModels.jl.
 
@@ -1384,6 +1387,10 @@ def process_scenario_chunk(
     seed: int,
     pf_solver: str = "powermodel",
     meta: Optional[Dict] = None,
+    coinhsl_enabled: bool = True,
+    coinhsl_linear_solver: str = "",
+    coinhsl_hsllib: str = "",
+    skip_scenarios: Optional[set] = None,
     *,
     scenario_index_offset: int = 0,
     opf_formulation: str = "polar",
@@ -1616,3 +1623,137 @@ def process_scenario_opf_mode(
             ),
         )
     return local_processed_data
+
+
+def process_scenario_chunk_multiprocessing(
+    mode: str,
+    start_idx: int,
+    end_idx: int,
+    scenarios: np.ndarray,
+    net: Network,
+    progress_queue: Queue,
+    topology_generator: TopologyGenerator,
+    generation_generator: GenerationGenerator,
+    admittance_generator: AdmittanceGenerator,
+    error_log_path: str,
+    include_dc_res: bool,
+    pf_fast: bool,
+    dcpf_fast: bool,
+    solver_log_dir: str,
+    max_iter: int,
+    seed: int,
+    pf_solver: str = "powermodel",
+    meta: Optional[Dict] = None,
+    coinhsl_enabled: bool = True,
+    coinhsl_linear_solver: str = "",
+    coinhsl_hsllib: str = "",
+    skip_scenarios: Optional[set] = None,
+) -> Tuple[
+    Union[None, Exception],
+    Union[None, str],
+    Optional[List[np.ndarray]],
+]:
+    """Process a chunk of scenarios for distributed processing."""
+
+    worker_pid = os.getpid()
+    current_scenario_index = None
+
+    if skip_scenarios is None:
+        skip_scenarios = set()
+
+    try:
+        jl = init_julia(
+            max_iter,
+            solver_log_dir,
+            coinhsl_enabled=coinhsl_enabled,
+            coinhsl_linear_solver=coinhsl_linear_solver,
+            coinhsl_hsllib=coinhsl_hsllib,
+        )
+
+        if (
+            pf_solver == "powsybl"
+            and meta
+            and "network_path" in meta
+            and "pp_net" not in meta
+        ):
+            import gridfm_datakit.powsybl as _powsybl
+
+            loaded_net = _powsybl.load_net(meta["network_path"])
+
+            meta = dict(meta)
+            meta["pp_net"] = loaded_net.pp_net
+
+        local_processed_data = []
+
+        with custom_seed(seed * 20_000 + start_idx + 1):
+            for scenario_index in range(start_idx, end_idx):
+                # Do not retry scenarios that previously timed out.
+                if scenario_index in skip_scenarios:
+                    continue
+
+                current_scenario_index = scenario_index
+
+                progress_queue.put(
+                    ("start", worker_pid, scenario_index,)
+                )
+
+                if mode == "opf":
+                    local_processed_data = (
+                        process_scenario_opf_mode(
+                            net,
+                            scenarios,
+                            scenario_index,
+                            topology_generator,
+                            generation_generator,
+                            admittance_generator,
+                            local_processed_data,
+                            error_log_path,
+                            include_dc_res,
+                            jl,
+                        )
+                    )
+
+                elif mode == "pf":
+                    local_processed_data = (
+                        process_scenario_pf_mode(
+                            net,
+                            scenarios,
+                            scenario_index,
+                            topology_generator,
+                            generation_generator,
+                            admittance_generator,
+                            local_processed_data,
+                            error_log_path,
+                            include_dc_res,
+                            pf_fast,
+                            dcpf_fast,
+                            jl,
+                            pf_solver,
+                            meta=meta,
+                        )
+                    )
+
+                else:
+                    raise ValueError(f"Invalid mode: {mode}")
+
+                progress_queue.put(
+                    ("done", worker_pid, scenario_index, )
+                )
+
+                current_scenario_index = None
+
+        return (
+            None,
+            None,
+            local_processed_data,
+        )
+    except Exception as e:
+        with open(error_log_path, "a") as f:
+            f.write("Caught an exception in process_scenario_chunk_multiprocessing function: "f"{e}\n")
+            f.write(tb)
+            f.write("\n")
+        progress_queue.put(
+            ("error", worker_pid, current_scenario_index,)
+        )
+        return (e, traceback.format_exc(), None,)
+
