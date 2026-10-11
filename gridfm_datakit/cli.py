@@ -8,6 +8,7 @@ from pathlib import Path
 from multiprocessing import Pool
 from gridfm_datakit.generate import (
     generate_power_flow_data_distributed,
+    generate_power_flow_data_distributed_multiprocessing,
 )
 from gridfm_datakit.validation import validate_generated_data
 from gridfm_datakit.utils.stats import plot_stats, plot_feature_distributions
@@ -55,6 +56,27 @@ def _config_has_dynamic_block(config_path: str) -> bool:
 
 
 _RUN_HEADER = "\nNew generation started at "
+
+
+def _config_has_multiprocessing(config_path: str) -> bool:
+    """Return True if the config contains is_multiprocessing.
+
+    This decides whether the legacy path (ProcessPoolExecutor) is taken
+    or multiprocessing.Manager with timeout is invoked
+    """
+    try:
+        with open(config_path, "r") as f:
+            config = yaml.safe_load(f)
+    except (OSError, yaml.YAMLError):
+        return {}
+
+    # Set defaults for optional settings
+    settings = config.get("settings", {})
+    settings.setdefault("is_multiprocessing", False)
+    
+    if_multiprocessing = config.get("settings", {}).get("is_multiprocessing", False)
+    return if_multiprocessing
+
 
 
 def _read_run_config(data_path: Path) -> tuple[str, dict | None]:
@@ -352,8 +374,12 @@ Examples:
             print(f"Generating dynamic simulation data from {args.config}...")
             file_paths = generate_dynamic_data(args.config)
         else:
-            print(f"Generating power flow data from {args.config}...")
-            file_paths = generate_power_flow_data_distributed(args.config)
+            if _config_has_multiprocessing(args.config):
+                print(f"Generating power flow data with multiprocessing Manager from {args.config}...")
+                file_paths = generate_power_flow_data_distributed_multiprocessing(args.config)
+            else:
+                print(f"Generating power flow data with ProcessPoolExecutor from {args.config}...")
+                file_paths = generate_power_flow_data_distributed(args.config)
 
         print("\nData generation complete!")
         print("Generated files:")
