@@ -1748,6 +1748,7 @@ def process_scenario_chunk_multiprocessing(
             local_processed_data,
         )
     except Exception as e:
+        tb = traceback.format_exc()
         with open(error_log_path, "a") as f:
             f.write("Caught an exception in process_scenario_chunk_multiprocessing function: "f"{e}\n")
             f.write(tb)
@@ -1755,5 +1756,5 @@ def process_scenario_chunk_multiprocessing(
         progress_queue.put(
             ("error", worker_pid, current_scenario_index,)
         )
-        return (e, traceback.format_exc(), None,)
+        return (e, tb, None,)
 

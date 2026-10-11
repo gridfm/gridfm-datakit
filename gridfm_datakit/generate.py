@@ -696,12 +696,8 @@ def generate_power_flow_data_distributed_multiprocessing(
         - scenarios_{generator}.html: Load scenario plots
         - scenarios_{generator}.log: Load scenario generation notes
     """
-    t0 = time.time()
     # Setup environment
     args, base_path, file_paths, seed = _setup_environment(config)
-
-    print('\n Time for _setup_environment',time.time()-t0,flush=True)
-    t0 = time.time()
 
     # check if mode is valid
     if args.settings.mode not in ["opf", "pf"]:
@@ -731,14 +727,8 @@ def generate_power_flow_data_distributed_multiprocessing(
     # Prepare network and scenarios
     net, scenarios, meta = _prepare_network_and_scenarios(args, file_paths, seed)
 
-    print('\n Time for _prepare_network_and_scenarios',time.time()-t0,flush=True)
-    t0 = time.time()
-
     # Initialize topology generator
     topology_generator = initialize_topology_generator(args.topology_perturbation, net)
-
-    print('\n Time for initialize_topology_generator',time.time()-t0,flush=True)
-    t0 = time.time()
 
     # Initialize generation generator
     generation_generator = initialize_generation_generator(
@@ -746,17 +736,11 @@ def generate_power_flow_data_distributed_multiprocessing(
         net,
     )
 
-    print('\n Time for initialize_generation_generator',time.time()-t0,flush=True)
-    t0 = time.time()
-
     # Initialize admittance generator
     admittance_generator = initialize_admittance_generator(
         args.admittance_perturbation,
         net,
     )
-
-    print('\n Time for initialize_admittance_generator',time.time()-t0,flush=True)
-    t0 = time.time()
 
     # Setup multiprocessing
     mp_ctx = multiprocessing.get_context("spawn")
@@ -1088,21 +1072,10 @@ def generate_power_flow_data_distributed_multiprocessing(
                             local_results = []
 
                             for result in results:
-                                (
-                                    error,
-                                    tb,
-                                    local_processed_data,
-                                ) = result.get()
+                                (error, tb, local_processed_data) = result.get()
 
-                                if isinstance(
-                                    error,
-                                    Exception,
-                                ):
-                                    print(
-                                        "Error in "
-                                        "process_scenario_chunk: "
-                                        f"{error}"
-                                    )
+                                if isinstance(error, Exception):
+                                    print("Error in process_scenario_chunk: "f"{error}")
 
                                     if tb:
                                         print(tb)
@@ -1145,9 +1118,7 @@ def generate_power_flow_data_distributed_multiprocessing(
 
                     # Log skipped scenarios for visibility.
                     if skipped_scenarios:
-                        skipped_sorted = sorted(
-                            skipped_scenarios
-                        )
+                        skipped_sorted = sorted(skipped_scenarios)
 
                         message = (
                             f"Large chunk {large_chunk_index} "
@@ -1165,27 +1136,16 @@ def generate_power_flow_data_distributed_multiprocessing(
                         dir=base_path,
                         delete=False,
                     ) as tmp:
-                        tmp.write(
-                            str(large_chunk_index)
-                        )
+                        tmp.write(str(large_chunk_index))
                         tmp_path = tmp.name
 
-                    os.replace(
-                        tmp_path,
-                        checkpoint_file,
-                    )
+                    os.replace(tmp_path, checkpoint_file)
 
                     del processed_data
                     gc.collect()
 
     finally:
         manager.shutdown()
-
-    print(
-        "\n Time for data generation",
-        time.time() - t0,
-        flush=True,
-    )
 
     if profiler.is_enabled():
         report_path = profiler.write_report()

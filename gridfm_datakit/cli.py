@@ -68,7 +68,7 @@ def _config_has_multiprocessing(config_path: str) -> bool:
         with open(config_path, "r") as f:
             config = yaml.safe_load(f)
     except (OSError, yaml.YAMLError):
-        return {}
+        return False
 
     # Set defaults for optional settings
     settings = config.get("settings", {})
