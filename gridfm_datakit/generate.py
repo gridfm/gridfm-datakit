@@ -33,7 +33,6 @@ from gridfm_datakit.process.process_network import (
     _initialize_scenario_worker,
     _process_scenario_worker,
     init_julia,
-    process_scenario_chunk,
     process_scenario_chunk_multiprocessing,
     process_scenario_opf_mode,
     process_scenario_pf_mode,
@@ -145,7 +144,7 @@ def _setup_environment(
     # If it is a checkpoint resume, i.e., overwrite=False then reuse seed
     if args.settings.overwrite is False:
         with open(rng_seed_path, "r") as f:
-            seed = int(f.readline()) 
+            seed = int(f.readline())
         print(f"Global random seed set to: {seed} due to checkpoint")
     else:
         # Set global seed if provided, otherwise generate a unique seed for this generation
@@ -708,16 +707,15 @@ def generate_power_flow_data_distributed_multiprocessing(
         raise ValueError("Invalid mode!")
 
     # read scenario timeout from configuration
-    scenario_timeout = getattr(args.settings,"scenario_timeout_sec",None)
+    scenario_timeout = getattr(args.settings, "scenario_timeout_sec", None)
     if scenario_timeout is not None:
         scenario_timeout = float(scenario_timeout)
 
         if scenario_timeout <= 0:
             raise ValueError(
-                "settings.scenario_timeout_sec must be "
-                "greater than zero or None"
+                "settings.scenario_timeout_sec must be greater than zero or None",
             )
-    
+
     scenario_count = args.load.scenarios
     large_chunk_size = args.settings.large_chunk_size
     configured_processes = args.settings.num_processes
@@ -753,7 +751,7 @@ def generate_power_flow_data_distributed_multiprocessing(
 
     # Process scenarios in chunks - limit to first 64 scenarios for actual processing
     # while keeping full scenarios array for interpolation purposes
-    n_scenarios_to_process = args.load.scenarios #min(args.load.scenarios, 64)
+    n_scenarios_to_process = args.load.scenarios  # min(args.load.scenarios, 64)
     large_chunks = np.array_split(
         range(n_scenarios_to_process),
         np.ceil(n_scenarios_to_process / args.settings.large_chunk_size).astype(int),
@@ -769,7 +767,6 @@ def generate_power_flow_data_distributed_multiprocessing(
                 start_chunk_index = int(content) + 1
                 print(f"Resuming from large chunk index {start_chunk_index}")
 
-
     try:
         with (
             open(file_paths["tqdm_log"], "a") as f,
@@ -781,10 +778,7 @@ def generate_power_flow_data_distributed_multiprocessing(
                 file=Tee(sys.stdout, f),
                 miniters=5,
             ) as pbar:
-
-                for large_chunk_index, large_chunk in enumerate(
-                    large_chunks
-                ):
+                for large_chunk_index, large_chunk in enumerate(large_chunks):
                     # Already checkpointed.
                     if large_chunk_index < start_chunk_index:
                         pbar.update(len(large_chunk))
@@ -796,30 +790,49 @@ def generate_power_flow_data_distributed_multiprocessing(
 
                     scenario_chunks = np.array_split(
                         large_chunk,
-                        min(args.settings.num_processes, chunk_size,),
+                        min(
+                            args.settings.num_processes,
+                            chunk_size,
+                        ),
                     )
 
                     worker_meta = {k: v for k, v in meta.items() if k != "pp_net"}
 
                     # CoinHSL settings
-                    coinhsl_config = getattr(args.settings,"coinhsl",None,)
+                    coinhsl_config = getattr(
+                        args.settings,
+                        "coinhsl",
+                        None,
+                    )
 
                     coinhsl_enabled = False
                     coinhsl_linear_solver = ""
                     coinhsl_hsllib = ""
 
                     if coinhsl_config is not None:
-                        coinhsl_enabled = getattr(coinhsl_config, "enabled", False,)
+                        coinhsl_enabled = getattr(
+                            coinhsl_config,
+                            "enabled",
+                            False,
+                        )
 
                         if coinhsl_enabled:
-                            coinhsl_linear_solver = getattr(coinhsl_config, "linear_solver", "ma57",)
+                            coinhsl_linear_solver = getattr(
+                                coinhsl_config,
+                                "linear_solver",
+                                "ma57",
+                            )
 
-                            coinhsl_hsllib = getattr(coinhsl_config, "hsllib",
+                            coinhsl_hsllib = getattr(
+                                coinhsl_config,
+                                "hsllib",
                                 ("/lib/x86_64-linux-gnu/libcoinhsl.so"),
                             )
 
                             if not os.path.exists(coinhsl_hsllib):
-                                raise FileNotFoundError("CoinHSL library not found at: "f"{coinhsl_hsllib}")
+                                raise FileNotFoundError(
+                                    f"CoinHSL library not found at: {coinhsl_hsllib}",
+                                )
 
                     # This survives retries of THIS large chunk.
                     # Any scenario added here will be skipped by
@@ -831,7 +844,6 @@ def generate_power_flow_data_distributed_multiprocessing(
                     # Retry current large chunk until all non-skipped
                     # scenarios complete successfully.
                     while processed_data is None:
-
                         # Rebuild tasks every retry because
                         # skipped_scenarios may have changed.
                         #
@@ -867,9 +879,7 @@ def generate_power_flow_data_distributed_multiprocessing(
                             for chunk in scenario_chunks
                         ]
 
-                        pool = mp_ctx.Pool(
-                            processes=args.settings.num_processes
-                        )
+                        pool = mp_ctx.Pool(processes=args.settings.num_processes)
 
                         pool_closed = False
                         pool_terminated = False
@@ -898,17 +908,19 @@ def generate_power_flow_data_distributed_multiprocessing(
                             active_scenarios = {}
 
                             # Timed-out scenarios are not expected to emit "done" during this or future attempts.
-                            expected_completions = (chunk_size - len(skipped_scenarios))
+                            expected_completions = chunk_size - len(skipped_scenarios)
 
                             # Watch workers/scenarios
-                            while (completed_this_attempt < expected_completions):
+                            while completed_this_attempt < expected_completions:
                                 try:
-                                    (event,worker_pid,scenario_index,) = progress_queue.get(timeout=0.5)
+                                    (
+                                        event,
+                                        worker_pid,
+                                        scenario_index,
+                                    ) = progress_queue.get(timeout=0.5)
 
                                     if event == "start":
-                                        active_scenarios[
-                                            worker_pid
-                                        ] = (
+                                        active_scenarios[worker_pid] = (
                                             scenario_index,
                                             time.monotonic(),
                                         )
@@ -929,16 +941,13 @@ def generate_power_flow_data_distributed_multiprocessing(
                                         )
 
                                         failed_pid = worker_pid
-                                        failed_scenario = (
-                                            scenario_index
-                                        )
+                                        failed_scenario = scenario_index
                                         worker_failed = True
                                         break
 
                                     else:
                                         raise RuntimeError(
-                                            "Unknown worker progress "
-                                            f"event: {event!r}"
+                                            f"Unknown worker progress event: {event!r}",
                                         )
 
                                 except queue.Empty:
@@ -954,24 +963,13 @@ def generate_power_flow_data_distributed_multiprocessing(
                                             scenario_index,
                                             start_time,
                                         ),
-                                    ) in list(
-                                        active_scenarios.items()
-                                    ):
-                                        elapsed = (
-                                            now - start_time
-                                        )
+                                    ) in list(active_scenarios.items()):
+                                        elapsed = now - start_time
 
-                                        if (
-                                            elapsed
-                                            > scenario_timeout
-                                        ):
+                                        if elapsed > scenario_timeout:
                                             timed_out = True
-                                            timed_out_pid = (
-                                                worker_pid
-                                            )
-                                            timed_out_scenario = (
-                                                scenario_index
-                                            )
+                                            timed_out_pid = worker_pid
+                                            timed_out_scenario = scenario_index
 
                                             message = (
                                                 f"Large chunk "
@@ -1013,12 +1011,11 @@ def generate_power_flow_data_distributed_multiprocessing(
 
                             # Normal worker exception
                             if worker_failed:
-                                message = (f"Worker pid={failed_pid} "f"failed")
+                                message = f"Worker pid={failed_pid} failed"
 
                                 if failed_scenario is not None:
                                     message += (
-                                        " while processing scenario "
-                                        f"{failed_scenario}"
+                                        f" while processing scenario {failed_scenario}"
                                     )
 
                                 message += ". See error log.\n"
@@ -1057,9 +1054,7 @@ def generate_power_flow_data_distributed_multiprocessing(
                                 # attempt will be recomputed, so remove
                                 # it from tqdm.
                                 if completed_this_attempt:
-                                    pbar.n -= (
-                                        completed_this_attempt
-                                    )
+                                    pbar.n -= completed_this_attempt
                                     pbar.refresh()
 
                                 # The timed-out scenario itself is now
@@ -1079,20 +1074,17 @@ def generate_power_flow_data_distributed_multiprocessing(
                                 (error, tb, local_processed_data) = result.get()
 
                                 if isinstance(error, Exception):
-                                    print("Error in process_scenario_chunk: "f"{error}")
+                                    print(f"Error in process_scenario_chunk: {error}")
 
                                     if tb:
                                         print(tb)
 
                                     raise RuntimeError(
-                                        "process_scenario_chunk "
-                                        f"failed: {error}"
+                                        f"process_scenario_chunk failed: {error}",
                                     ) from error
 
                                 if local_processed_data:
-                                    local_results.extend(
-                                        local_processed_data
-                                    )
+                                    local_results.extend(local_processed_data)
 
                             pool.close()
                             pool.join()
@@ -1104,10 +1096,7 @@ def generate_power_flow_data_distributed_multiprocessing(
                         finally:
                             # Ensure no worker survives an unexpected
                             # exception in the parent.
-                            if (
-                                not pool_closed
-                                and not pool_terminated
-                            ):
+                            if not pool_closed and not pool_terminated:
                                 pool.terminate()
                                 pool.join()
 

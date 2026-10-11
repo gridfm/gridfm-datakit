@@ -73,10 +73,9 @@ def _config_has_multiprocessing(config_path: str) -> bool:
     # Set defaults for optional settings
     settings = config.get("settings", {})
     settings.setdefault("is_multiprocessing", False)
-    
+
     if_multiprocessing = config.get("settings", {}).get("is_multiprocessing", False)
     return if_multiprocessing
-
 
 
 def _read_run_config(data_path: Path) -> tuple[str, dict | None]:
@@ -375,10 +374,16 @@ Examples:
             file_paths = generate_dynamic_data(args.config)
         else:
             if _config_has_multiprocessing(args.config):
-                print(f"Generating power flow data with multiprocessing Manager from {args.config}...")
-                file_paths = generate_power_flow_data_distributed_multiprocessing(args.config)
+                print(
+                    f"Generating power flow data with multiprocessing Manager from {args.config}...",
+                )
+                file_paths = generate_power_flow_data_distributed_multiprocessing(
+                    args.config,
+                )
             else:
-                print(f"Generating power flow data with ProcessPoolExecutor from {args.config}...")
+                print(
+                    f"Generating power flow data with ProcessPoolExecutor from {args.config}...",
+                )
                 file_paths = generate_power_flow_data_distributed(args.config)
 
         print("\nData generation complete!")

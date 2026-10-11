@@ -1694,50 +1694,54 @@ def process_scenario_chunk_multiprocessing(
                 current_scenario_index = scenario_index
 
                 progress_queue.put(
-                    ("start", worker_pid, scenario_index,)
+                    (
+                        "start",
+                        worker_pid,
+                        scenario_index,
+                    ),
                 )
 
                 if mode == "opf":
-                    local_processed_data = (
-                        process_scenario_opf_mode(
-                            net,
-                            scenarios,
-                            scenario_index,
-                            topology_generator,
-                            generation_generator,
-                            admittance_generator,
-                            local_processed_data,
-                            error_log_path,
-                            include_dc_res,
-                            jl,
-                        )
+                    local_processed_data = process_scenario_opf_mode(
+                        net,
+                        scenarios,
+                        scenario_index,
+                        topology_generator,
+                        generation_generator,
+                        admittance_generator,
+                        local_processed_data,
+                        error_log_path,
+                        include_dc_res,
+                        jl,
                     )
 
                 elif mode == "pf":
-                    local_processed_data = (
-                        process_scenario_pf_mode(
-                            net,
-                            scenarios,
-                            scenario_index,
-                            topology_generator,
-                            generation_generator,
-                            admittance_generator,
-                            local_processed_data,
-                            error_log_path,
-                            include_dc_res,
-                            pf_fast,
-                            dcpf_fast,
-                            jl,
-                            pf_solver,
-                            meta=meta,
-                        )
+                    local_processed_data = process_scenario_pf_mode(
+                        net,
+                        scenarios,
+                        scenario_index,
+                        topology_generator,
+                        generation_generator,
+                        admittance_generator,
+                        local_processed_data,
+                        error_log_path,
+                        include_dc_res,
+                        pf_fast,
+                        dcpf_fast,
+                        jl,
+                        pf_solver,
+                        meta=meta,
                     )
 
                 else:
                     raise ValueError(f"Invalid mode: {mode}")
 
                 progress_queue.put(
-                    ("done", worker_pid, scenario_index, )
+                    (
+                        "done",
+                        worker_pid,
+                        scenario_index,
+                    ),
                 )
 
                 current_scenario_index = None
@@ -1750,11 +1754,21 @@ def process_scenario_chunk_multiprocessing(
     except Exception as e:
         tb = traceback.format_exc()
         with open(error_log_path, "a") as f:
-            f.write("Caught an exception in process_scenario_chunk_multiprocessing function: "f"{e}\n")
+            f.write(
+                "Caught an exception in process_scenario_chunk_multiprocessing function: "
+                f"{e}\n",
+            )
             f.write(tb)
             f.write("\n")
         progress_queue.put(
-            ("error", worker_pid, current_scenario_index,)
+            (
+                "error",
+                worker_pid,
+                current_scenario_index,
+            ),
         )
-        return (e, tb, None,)
-
+        return (
+            e,
+            tb,
+            None,
+        )
