@@ -24,6 +24,10 @@ This module provides the interface between a
 
 ::: gridfm_datakit.lightsim2grid.preprocess.get_pf_res
 
+### `get_ybus`
+
+::: gridfm_datakit.lightsim2grid.preprocess.get_ybus
+
 ### `build_l2g_maps`
 
 ::: gridfm_datakit.lightsim2grid.mapping.build_l2g_maps
