@@ -198,12 +198,10 @@ class Network:
                 f"{self.original_bus_indices.tolist()}",
             )
         self.bus_index_mapping = {
-            int(orig_idx): row
-            for row, orig_idx in enumerate(self.original_bus_indices)
+            int(orig_idx): row for row, orig_idx in enumerate(self.original_bus_indices)
         }
         self.reverse_bus_index_mapping = {
-            row: int(orig_idx)
-            for row, orig_idx in enumerate(self.original_bus_indices)
+            row: int(orig_idx) for row, orig_idx in enumerate(self.original_bus_indices)
         }
 
         # Convert bus indices to continuous (0-based) for internal processing.
