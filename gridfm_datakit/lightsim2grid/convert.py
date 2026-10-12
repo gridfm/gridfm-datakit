@@ -82,7 +82,7 @@ def _structure(net: Network) -> tuple:
         net: The network to read.
 
     Returns:
-        Copies of the bus types and shunts, of the branch ends, taps and shifts, of the
+        Copies of the bus ids and shunts, of the branch ends, taps and shifts, of the
         generator buses, of which buses have a load, and the in-service slack generators.
     """
     bus_type = np.zeros(net.buses.shape[0])
@@ -92,7 +92,7 @@ def _structure(net: Network) -> tuple:
         & (bus_type[net.gens[:, GEN_BUS].astype(int)] == REF),
     )
     return (
-        net.buses[:, [BUS_I, BUS_TYPE, GS, BS]].copy(),
+        net.buses[:, [BUS_I, GS, BS]].copy(),
         net.branches[:, [F_BUS, T_BUS, TAP, SHIFT]].copy(),
         net.gens[:, GEN_BUS].copy(),
         ((net.buses[:, PD] != 0) | (net.buses[:, QD] != 0)),  # which buses have a load
@@ -149,7 +149,7 @@ def update_lightsim2grid(
     was last synchronised (branch parameters and statuses, generator statuses
     and set points, loads), which lets lightsim2grid keep its solver caches.
     It is rebuilt only if something it cannot update changed (topology, taps
-    and shifts, shunts, bus types, which buses have a load, the slack
+    and shifts, shunts, which buses have a load, the slack
     generators). ``converted`` is modified and returned.
 
     Args:
