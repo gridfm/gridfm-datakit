@@ -123,7 +123,11 @@ def test_post_processing_with_the_lightsim2grid_ybus_matches_makeybus():
     kwargs = {"as_arrays": True}
     res = l2g.run_ls_pf(converted.ls_net, net, converted.mapping_l2g, **kwargs)
     res_dc = l2g.run_ls_pf(
-        converted.ls_net, net, converted.mapping_l2g, dc=True, **kwargs
+        converted.ls_net,
+        net,
+        converted.mapping_l2g,
+        dc=True,
+        **kwargs,
     )
     with_ls_ybus = pf_post_processing(0, net, res, res_dc, True)
     res["solution"].pop("Ybus")  # falls back to makeYbus
