@@ -25,6 +25,7 @@ def run_ls_pf(
     dc: bool = False,
     max_iter: int = 50,
     tol: float = 1e-8,
+    as_arrays: bool = False,
 ) -> Dict[str, Any]:
     """Run an AC (or DC) power flow with lightsim2grid and format the results.
 
@@ -38,6 +39,8 @@ def run_ls_pf(
         dc: Run a DC power flow instead of an AC one.
         max_iter: Maximum number of iterations.
         tol: Convergence tolerance.
+        as_arrays: Return the results as dense arrays under ``["solution"]["arrays"]``
+            instead of per-element dicts (see :func:`get_pf_res`).
 
     Returns:
         The power flow results in PowerModels' format (see :func:`get_pf_res`), with the
@@ -50,7 +53,7 @@ def run_ls_pf(
     start_time = time.perf_counter()
     v = (ls_net.dc_pf if dc else ls_net.ac_pf)(v_init, max_iter, tol)
     solve_time = time.perf_counter() - start_time
-    return get_pf_res(ls_net, v, solve_time, net, mapping_l2g)
+    return get_pf_res(ls_net, v, solve_time, net, mapping_l2g, as_arrays=as_arrays)
 
 
 def get_pf_res(
@@ -59,6 +62,7 @@ def get_pf_res(
     solve_time: float,
     net: Network,
     mapping_l2g: MappingL2G,
+    as_arrays: bool = False,
 ) -> Dict[Any, Any]:
     """Format lightsim2grid power flow results for the pf_post_process function.
 
@@ -68,6 +72,10 @@ def get_pf_res(
         solve_time: power flow solving time
         net: gridfm Network the LSGrid was built from
         mapping_l2g: lightsim2grid-to-gridfm index maps
+        as_arrays: Skip the per-element dicts (which ``_solution_arrays`` would only turn
+            back into arrays): ``["solution"]["arrays"]`` then holds the
+            ``(branch_flows, gen_pq, bus_vmva)`` triple that ``_solution_arrays``
+            would extract (in-service branches and generators, buses by bus index).
 
     Returns:
         Power flow results in a nested Dict format, similar to PowerModel's power flow results
@@ -99,6 +107,23 @@ def get_pf_res(
 
     reverse = net.reverse_bus_index_mapping
     vm, va = np.abs(v), np.angle(v)
+
+    if as_arrays:
+        bus_vmva = np.empty((net.buses.shape[0], 2))
+        bus_vmva[net.buses[:, BUS_I].astype(int)] = np.column_stack((vm, va))
+        return {
+            "solution": {
+                "baseMVA": base_mva,
+                "per_unit": True,
+                "pf": True,
+                "arrays": (
+                    flows[net.idx_branches_in_service],
+                    np.column_stack((gen_p, gen_q))[net.idx_gens_in_service],
+                    bus_vmva,
+                ),
+            },
+            "solve_time": solve_time,
+        }
 
     return {
         "solution": {

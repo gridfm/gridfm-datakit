@@ -594,6 +594,9 @@ def _solution_arrays(
     boundary; plain-dict results (powsybl) use Python loops.
     """
     sol = res["solution"]
+    if isinstance(sol, dict) and "arrays" in sol:
+        # already dense (e.g. lightsim2grid with as_arrays=True)
+        return sol["arrays"]
     ids_branch = net.idx_branches_in_service
     ids_gen = net.idx_gens_in_service
     n_buses = net.buses.shape[0]
@@ -782,7 +785,10 @@ def pf_post_processing(
     X_branch[:, 3] = np.real(net.branches[:, T_BUS])
 
     # pf, qf, pt, qt
-    if res["solution"]["pf"]:
+    # (solutions that already hold dense arrays have no per-element dicts to count)
+    if "arrays" in res["solution"]:
+        pass
+    elif res["solution"]["pf"]:
         # when solving pf, the flow of all branches is computed, so the number of branches in solution should match the number of branches in network
         assert len(res["solution"]["branch"]) == n_branches, (
             "Number of branches in solution should match number of branches in network"
@@ -848,9 +854,9 @@ def pf_post_processing(
     X_bus[:, 3] = net.buses[:, QD]
 
     # --- Generator injections
-    assert len(res["solution"]["gen"]) == len(net.idx_gens_in_service), (
-        "Number of generators in solution should match number of generators in network"
-    )
+    assert "arrays" in res["solution"] or len(res["solution"]["gen"]) == len(
+        net.idx_gens_in_service,
+    ), "Number of generators in solution should match number of generators in network"
     gen_pq = gen_pq * net.baseMVA
     pg_gen = gen_pq[:, 0]
     qg_gen = gen_pq[:, 1]
@@ -870,7 +876,7 @@ def pf_post_processing(
     if include_dc_res:
         if res_dc is not None:
             # check if "gen" key is in res_dc["solution"]
-            if "gen" in res_dc["solution"]:
+            if "gen" in res_dc["solution"] or "arrays" in res_dc["solution"]:
                 pg_gen_dc = gen_pq_dc[:, 0] * net.baseMVA
             else:
                 pg_gen_dc = apply_slack_single_gen(net, pg_gen, Pg_bus, pf_dc, pt_dc)
@@ -884,7 +890,7 @@ def pf_post_processing(
 
     # Voltage. Extraction (_solution_arrays) raises on any missing expected
     # bus key, so together with this length check the key sets must match.
-    assert len(res["solution"]["bus"]) == n_buses, (
+    assert "arrays" in res["solution"] or len(res["solution"]["bus"]) == n_buses, (
         "Buses in solution should match buses in network"
     )
 
@@ -1185,6 +1191,7 @@ def process_scenario_pf_mode(
                         perturbation,
                         converted.mapping_l2g,
                         dc=True,
+                        as_arrays=True,
                     )
                 except Exception as e:
                     with open(error_log_file, "a") as f:
@@ -1196,6 +1203,7 @@ def process_scenario_pf_mode(
                     converted.ls_net,
                     perturbation,
                     converted.mapping_l2g,
+                    as_arrays=True,
                 )
             except Exception as e:
                 with open(error_log_file, "a") as f:
