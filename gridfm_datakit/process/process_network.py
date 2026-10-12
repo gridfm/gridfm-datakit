@@ -980,7 +980,10 @@ def pf_post_processing(
             X_gen[net.idx_gens_in_service, 14] = np.nan
 
     # --- Y-bus ---
-    Y_bus, Yf, Yt = makeYbus(net.baseMVA, net.buses, net.branches, branch_vecs)
+    # lightsim2grid already built it for its power flow
+    Y_bus = res["solution"].get("Ybus")
+    if Y_bus is None:
+        Y_bus, _, _ = makeYbus(net.baseMVA, net.buses, net.branches, branch_vecs)
 
     # Non-zero entries in row-major order, read straight from the CSR storage
     # (makeYbus already eliminated the explicit zeros).
