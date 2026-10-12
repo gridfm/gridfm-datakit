@@ -808,7 +808,8 @@ def pf_post_processing(
     X_branch[:, 10] = net.branches[:, BR_B]
 
     # admittances
-    Ytt, Yff, Yft, Ytf = branch_vectors(net.branches, net.branches.shape[0])
+    branch_vecs = branch_vectors(net.branches, net.branches.shape[0])
+    Ytt, Yff, Yft, Ytf = branch_vecs
     X_branch[:, 11] = np.real(Yff)
     X_branch[:, 12] = np.imag(Yff)
     X_branch[:, 13] = np.real(Yft)
@@ -979,22 +980,21 @@ def pf_post_processing(
             X_gen[net.idx_gens_in_service, 14] = np.nan
 
     # --- Y-bus ---
-    Y_bus, Yf, Yt = makeYbus(net.baseMVA, net.buses, net.branches)
+    Y_bus, Yf, Yt = makeYbus(net.baseMVA, net.buses, net.branches, branch_vecs)
 
-    i, j = np.nonzero(Y_bus)
+    # Non-zero entries in row-major order, read straight from the CSR storage
+    # (makeYbus already eliminated the explicit zeros).
     # note that Y_bus[i,j] can be != 0 even if a branch from i to j is not in service because there might be other branches connected to the same buses
+    Y_bus = Y_bus.tocsr()
+    Y_bus.sort_indices()
+    Y_coo = Y_bus.tocoo()
 
-    s = Y_bus[i, j]
-    G = np.real(s)
-    B = np.imag(s)
-
-    edge_index = np.column_stack((i, j))
-    edge_attr = np.stack((G, B)).T
-    Y_bus = np.zeros(
-        (edge_index.shape[0], edge_attr.shape[1] + edge_index.shape[1] + 1),
-    )
+    Y_bus = np.zeros((Y_coo.nnz, 5))
     Y_bus[:, 0] = scenario_index
-    Y_bus[:, 1:] = np.column_stack((edge_index, edge_attr))
+    Y_bus[:, 1] = Y_coo.row
+    Y_bus[:, 2] = Y_coo.col
+    Y_bus[:, 3] = Y_coo.data.real
+    Y_bus[:, 4] = Y_coo.data.imag
 
     # ---- runtime data ----
     n_cols = (

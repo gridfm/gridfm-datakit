@@ -796,6 +796,7 @@ def makeYbus(
     baseMVA: float,
     bus: np.ndarray,
     branch: np.ndarray,
+    branch_vecs: Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None = None,
 ) -> Tuple[csr_matrix, csr_matrix, csr_matrix]:
     """Build the bus admittance matrix and branch admittance matrices.
 
@@ -809,6 +810,8 @@ def makeYbus(
         baseMVA: Base MVA for the power system.
         bus: Bus data array.
         branch: Branch data array.
+        branch_vecs: Optional result of ``branch_vectors(branch, branch.shape[0])``,
+            to avoid computing it twice when the caller already has it.
 
     Returns:
         Tuple containing:
@@ -826,7 +829,9 @@ def makeYbus(
     #      |    | = |          | * |    |
     #      | It |   | Ytf  Ytt |   | Vt |
     #
-    Ytt, Yff, Yft, Ytf = branch_vectors(branch, nl)
+    Ytt, Yff, Yft, Ytf = (
+        branch_vectors(branch, nl) if branch_vecs is None else branch_vecs
+    )
     # compute shunt admittance
     # if Psh is the real power consumed by the shunt at V = 1.0 p.u.
     # and Qsh is the reactive power injected by the shunt at V = 1.0 p.u.
