@@ -710,7 +710,7 @@ def apply_slack_single_gen(
         Updated generator outputs, with the first slack-bus generator adjusted.
     """
 
-    pd_slack = net.Pd[net.ref_bus_idx]
+    pd_slack = net.Pd[net.ref_bus_row]  # Pd is indexed by bus row
     pg_slack = Pg_bus[net.ref_bus_idx]
 
     # branches with slack as from/to bus

@@ -164,7 +164,8 @@ class Network:
         original_bus_indices: Original bus indices from MATPOWER file.
         bus_index_mapping: Mapping from original to continuous bus indices.
         reverse_bus_index_mapping: Mapping from continuous to original bus indices.
-        ref_bus_idx: Index of the reference bus.
+        ref_bus_idx: Bus id (BUS_I, continuous indexing) of the reference bus.
+        ref_bus_row: Row of the reference bus in ``buses``.
     """
 
     def __init__(self, mpc: Dict[str, Any]) -> None:
@@ -230,7 +231,10 @@ class Network:
         assert np.sum(self.buses[:, BUS_TYPE] == REF) == 1, (
             "There should be exactly one reference bus"
         )
-        self.ref_bus_idx = np.where(self.buses[:, BUS_TYPE] == REF)[0][0]
+        # Row of the reference bus in ``buses`` and its bus id. They differ when the
+        # case file does not list the buses sorted by id.
+        self.ref_bus_row = int(np.where(self.buses[:, BUS_TYPE] == REF)[0][0])
+        self.ref_bus_idx = int(self.buses[self.ref_bus_row, BUS_I])
 
         # Static solver metadata is computed lazily and shared by the cheap
         # scenario copies.  The electrical matrices themselves remain isolated.

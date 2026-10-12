@@ -577,3 +577,66 @@ class TestTopologyPerturbation:
         assert original_network.check_single_connected_component(), (
             "Original network should still be connected"
         )
+
+
+def _unsorted_bus_network():
+    """3-bus case whose buses are listed out of id order (5, 2, 9).
+
+    Bus 5 is the reference bus: it sits in row 0, but its continuous id is 1.
+    """
+    from gridfm_datakit.network import Network
+
+    bus = np.array(
+        [
+            # BUS_I TYPE PD QD GS BS AREA VM VA BASE_KV ZONE VMAX VMIN
+            [5, 3, 0.0, 0.0, 0, 0, 1, 1.0, 0.0, 100, 1, 1.1, 0.9],
+            [2, 2, 50.0, 10.0, 0, 0, 1, 1.0, 0.0, 100, 1, 1.1, 0.9],
+            [9, 1, 80.0, 20.0, 0, 0, 1, 1.0, 0.0, 100, 1, 1.1, 0.9],
+        ],
+        dtype=float,
+    )
+    gen = np.zeros((2, 21))
+    gen[:, 0] = [5, 2]  # GEN_BUS
+    gen[:, 5] = 1.0  # VG
+    gen[:, 6] = 100.0  # MBASE
+    gen[:, 7] = 1  # GEN_STATUS
+    gen[:, 8] = 200.0  # PMAX
+    gen[:, 3] = 100.0  # QMAX
+    gen[:, 4] = -100.0  # QMIN
+    branch = np.zeros((2, 13))
+    branch[:, 0:2] = [[5, 2], [2, 9]]
+    branch[:, 2] = 0.01  # BR_R
+    branch[:, 3] = 0.1  # BR_X
+    branch[:, 10] = 1  # BR_STATUS
+    branch[:, 11] = -360
+    branch[:, 12] = 360
+    gencost = np.array([[2, 0, 0, 3, 0.01, 10.0, 0.0]] * 2)
+    return Network(
+        {
+            "version": "2",
+            "baseMVA": 100.0,
+            "bus": bus,
+            "gen": gen,
+            "branch": branch,
+            "gencost": gencost,
+        },
+    )
+
+
+def test_ref_bus_idx_is_bus_id_when_buses_unsorted():
+    net = _unsorted_bus_network()
+    assert net.ref_bus_row == 0
+    assert net.ref_bus_idx == 1  # continuous id of bus 5
+    assert net.reverse_bus_index_mapping[net.ref_bus_idx] == 5
+
+
+def test_slack_gen_not_droppable_when_buses_unsorted():
+    net = _unsorted_bus_network()
+    generator = RandomComponentDropGenerator(
+        n_topology_variants=1,
+        k=1,
+        base_net=net,
+        elements=["gen"],
+    )
+    # gen 0 is on the reference bus (5), gen 1 on bus 2
+    assert generator.components_to_drop == [(1, "gen")]
