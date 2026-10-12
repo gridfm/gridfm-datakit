@@ -594,12 +594,25 @@ def _solution_arrays(
     boundary; plain-dict results (powsybl) use Python loops.
     """
     sol = res["solution"]
-    if isinstance(sol, dict) and "arrays" in sol:
-        # already dense (e.g. lightsim2grid with as_arrays=True)
-        return sol["arrays"]
     ids_branch = net.idx_branches_in_service
     ids_gen = net.idx_gens_in_service
     n_buses = net.buses.shape[0]
+    if isinstance(sol, dict) and "arrays" in sol:
+        # already dense (e.g. lightsim2grid with as_arrays=True): no per-element
+        # dicts to check the keys of, so check the shapes instead
+        branch_flows, gen_pq, bus_vmva = sol["arrays"]
+        assert branch_flows.shape == (len(ids_branch), 4), (
+            f"Branch flows of shape {branch_flows.shape}, expected "
+            f"({len(ids_branch)}, 4) for the in-service branches"
+        )
+        assert gen_pq.shape == (len(ids_gen), 2), (
+            f"Generator injections of shape {gen_pq.shape}, expected "
+            f"({len(ids_gen)}, 2) for the in-service generators"
+        )
+        assert bus_vmva.shape == (n_buses, 2), (
+            f"Bus voltages of shape {bus_vmva.shape}, expected ({n_buses}, 2)"
+        )
+        return branch_flows, gen_pq, bus_vmva
 
     if isinstance(sol, dict):
         branch_flows = np.array(
@@ -785,7 +798,8 @@ def pf_post_processing(
     X_branch[:, 3] = np.real(net.branches[:, T_BUS])
 
     # pf, qf, pt, qt
-    # (solutions that already hold dense arrays have no per-element dicts to count)
+    # (solutions that already hold dense arrays have no per-element dicts to count:
+    # _solution_arrays checks their shapes against the in-service elements instead)
     if "arrays" in res["solution"]:
         pass
     elif res["solution"]["pf"]:

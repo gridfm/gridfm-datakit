@@ -79,6 +79,39 @@ def test_klu_solvers_are_selected_when_available():
     assert converted.ls_net.get_dc_algo_type().name == "DC_KLU"
 
 
+def test_the_chosen_algorithms_are_logged_once(caplog, monkeypatch):
+    from gridfm_datakit.lightsim2grid import convert
+
+    monkeypatch.setattr(convert, "_logged_algorithms", set())
+    with caplog.at_level("INFO", logger=convert.logger.name):
+        converted = l2g.to_lightsim2grid(_load_net())
+        l2g.to_lightsim2grid(_load_net())  # same choice: not logged again
+    messages = [r.getMessage() for r in caplog.records if r.name == convert.logger.name]
+    assert len(messages) == 1
+    assert converted.ls_net.get_algo_type().name in messages[0]
+    assert converted.ls_net.get_dc_algo_type().name in messages[0]
+
+
+def test_array_results_of_the_wrong_shape_are_rejected():
+    net = _net_with_generator_off()
+    converted = l2g.to_lightsim2grid(net)
+    result = l2g.run_ls_pf(
+        converted.ls_net,
+        net,
+        converted.mapping_l2g,
+        as_arrays=True,
+    )
+    branch_flows, gen_pq, bus_vmva = result["solution"]["arrays"]
+    for wrong in (
+        (branch_flows[:-1], gen_pq, bus_vmva),
+        (branch_flows, gen_pq[:-1], bus_vmva),
+        (branch_flows, gen_pq, bus_vmva[:-1]),
+    ):
+        result["solution"]["arrays"] = wrong
+        with pytest.raises(AssertionError, match="shape"):
+            _solution_arrays(result, net)
+
+
 @pytest.mark.parametrize("dc", [False, True])
 def test_array_results_equal_the_dict_results(dc):
     net = _net_with_generator_off()

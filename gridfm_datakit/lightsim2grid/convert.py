@@ -1,5 +1,6 @@
 """Conversion of a gridfm_datakit Network to a lightsim2grid LSGrid."""
 
+import logging
 import warnings
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
@@ -22,6 +23,12 @@ from gridfm_datakit.utils.idx_gen import GEN_BUS, GEN_STATUS, PG, VG
 
 from .api import check_lightsim2grid_available, lightsim2grid_network
 from .mapping import MappingL2G, build_l2g_maps
+
+logger = logging.getLogger(__name__)
+
+# (AC, DC) algorithm names already logged by this process: the LSGrid is rebuilt
+# on every topology change, so only log a choice the first time it is made
+_logged_algorithms: set = set()
 
 
 @dataclass
@@ -46,12 +53,32 @@ def _use_klu(ls_net: Any) -> None:
         ls_net: The lightsim2grid LSGrid to configure, in place.
     """
     available_algorithms = getattr(ls_net, "available_default_algorithms", None)
-    if available_algorithms is None:  # a lightsim2grid too old to choose an algorithm
+    if available_algorithms is not None:  # else a lightsim2grid too old to choose one
+        available = {algorithm.name: algorithm for algorithm in available_algorithms()}
+        for name in ("NR_KLU", "DC_KLU"):
+            if name in available:
+                ls_net.change_algorithm(available[name])
+    _log_algorithms(ls_net)
+
+
+def _log_algorithms(ls_net: Any) -> None:
+    """Log the AC and DC algorithms the LSGrid will use, once per process and choice.
+
+    Args:
+        ls_net: The lightsim2grid LSGrid, after :func:`_use_klu`.
+    """
+    algorithms = tuple(
+        getattr(getattr(ls_net, getter, lambda: None)(), "name", "default")
+        for getter in ("get_algo_type", "get_dc_algo_type")
+    )
+    if algorithms in _logged_algorithms:
         return
-    available = {algorithm.name: algorithm for algorithm in available_algorithms()}
-    for name in ("NR_KLU", "DC_KLU"):
-        if name in available:
-            ls_net.change_algorithm(available[name])
+    _logged_algorithms.add(algorithms)
+    logger.info(
+        "lightsim2grid power flow algorithms: AC %s, DC %s%s",
+        *algorithms,
+        "" if "KLU" in algorithms[0] else " (KLU not available in this build)",
+    )
 
 
 def to_lightsim2grid(net: Network) -> ConvertedNetwork:
