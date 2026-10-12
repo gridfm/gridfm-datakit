@@ -484,14 +484,31 @@ class Network:
             bool: True if there is exactly one connected component, False otherwise
         """
         n_buses = self.buses.shape[0]
-        in_service = self.branches[:, BR_STATUS] == 1
-        from_buses = self.branches[in_service, F_BUS].astype(np.int64, copy=False)
-        to_buses = self.branches[in_service, T_BUS].astype(np.int64, copy=False)
+        # The branch ends never change between perturbations: the branches sorted by
+        # origin bus are kept in the (shared) solver cache, which makes the CSR
+        # adjacency of the in-service branches a masking, without any sorting.
+        f, t = self.branches[:, F_BUS], self.branches[:, T_BUS]
+        cached = self._solver_cache.get("connectivity")
+        if cached is None or not (
+            np.array_equal(cached[0], f) and np.array_equal(cached[1], t)
+        ):
+            order = np.argsort(f, kind="stable")
+            cached = (
+                f.copy(),
+                t.copy(),
+                order,
+                f[order].astype(np.int64),
+                t[order].astype(np.int64),
+            )
+            self._solver_cache["connectivity"] = cached
+        _, _, order, from_sorted, to_sorted = cached
+        keep = (self.branches[:, BR_STATUS] == 1)[order]
+        indices = to_sorted[keep]
+        indptr = np.concatenate(
+            ([0], np.cumsum(np.bincount(from_sorted[keep], minlength=n_buses))),
+        )
         adjacency = csr_matrix(
-            (
-                np.ones(from_buses.size, dtype=np.uint8),
-                (from_buses, to_buses),
-            ),
+            (np.ones(indices.size, dtype=np.uint8), indices, indptr),
             shape=(n_buses, n_buses),
         )
         return (
