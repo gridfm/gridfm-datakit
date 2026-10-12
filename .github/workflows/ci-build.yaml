@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v7
@@ -31,7 +31,7 @@ jobs:
     timeout-minutes: 10
     container: python:3.12-slim
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install bandit
         run: pip install bandit
@@ -43,7 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Julia 1.12
         uses: julia-actions/setup-julia@v3
@@ -54,7 +54,7 @@ jobs:
       # importantly, the precompile cache). Keyed on the pinned solver versions
       # so it only rebuilds when juliapkg.json changes.
       - name: Cache Julia depot
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.julia
           key: julia-depot-${{ runner.os }}-julia1.12-${{ hashFiles('gridfm_datakit/juliapkg.json') }}
@@ -67,7 +67,7 @@ jobs:
           python-version: '3.12'
 
       - name: Cache pip
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/pip
           key: pip-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
@@ -99,7 +99,7 @@ jobs:
     env:
       DYNAWO_VERSION: '1.7.0'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Julia 1.12
         uses: julia-actions/setup-julia@v3
@@ -107,7 +107,7 @@ jobs:
           version: '1.12'
 
       - name: Cache Julia depot
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.julia
           key: julia-depot-${{ runner.os }}-julia1.12-${{ hashFiles('gridfm_datakit/juliapkg.json') }}
@@ -120,7 +120,7 @@ jobs:
           python-version: '3.12'
 
       - name: Cache pip
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/pip
           key: pip-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
@@ -134,7 +134,7 @@ jobs:
 
       - name: Cache Dynawo
         id: cache-dynawo
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/dynawo
           key: dynawo-${{ runner.os }}-${{ env.DYNAWO_VERSION }}
