@@ -152,7 +152,8 @@ class Network:
     This class handles power system networks loaded from MATPOWER case files,
     providing functionality for bus index mapping, power flow calculations,
     and data export. It automatically handles non-continuous bus indexing
-    by mapping to continuous indices for internal processing.
+    by mapping to continuous indices for internal processing. Those ids follow
+    the bus-table order, so bus id ``i`` is row ``i``.
 
     Attributes:
         mpc: Original MATPOWER case dictionary.
@@ -161,10 +162,10 @@ class Network:
         gens: Generator data array with continuous indexing.
         branches: Branch data array with continuous indexing.
         gencosts: Generator cost data array.
-        original_bus_indices: Original bus indices from MATPOWER file.
+        original_bus_indices: Original bus indices from MATPOWER file, in table order.
         bus_index_mapping: Mapping from original to continuous bus indices.
         reverse_bus_index_mapping: Mapping from continuous to original bus indices.
-        ref_bus_idx: Index of the reference bus.
+        ref_bus_idx: Continuous id of the reference bus. This is also its row.
     """
 
     def __init__(self, mpc: Dict[str, Any]) -> None:
@@ -187,21 +188,33 @@ class Network:
         # Store original bus indices before conversion (these are 1-based from MATPOWER)
         self.original_bus_indices = self.buses[:, BUS_I].astype(int).copy()
 
-        # Create mapping from original bus indices to continuous indices (0, 1, 2, ..., n_bus-1)
-        unique_bus_indices = np.unique(self.original_bus_indices)
+        # Number buses in table order. Sorting the original ids (np.unique)
+        # makes the continuous id differ from the row whenever the case does
+        # not list buses in increasing order, and Pd / bus type / Vm are
+        # stored by row while generator and branch ends are stored by id.
+        if len(np.unique(self.original_bus_indices)) != len(self.original_bus_indices):
+            raise ValueError(
+                "Duplicate bus numbers in the bus table: "
+                f"{self.original_bus_indices.tolist()}",
+            )
         self.bus_index_mapping = {
-            int(orig_idx): new_idx
-            for new_idx, orig_idx in enumerate(unique_bus_indices)
+            int(orig_idx): row
+            for row, orig_idx in enumerate(self.original_bus_indices)
         }
         self.reverse_bus_index_mapping = {
-            new_idx: int(orig_idx)
-            for orig_idx, new_idx in self.bus_index_mapping.items()
+            row: int(orig_idx)
+            for row, orig_idx in enumerate(self.original_bus_indices)
         }
 
-        # Convert bus indices to continuous (0-based) for internal processing
+        # Convert bus indices to continuous (0-based) for internal processing.
+        # After this, buses[:, BUS_I] is 0 .. n-1.
         self.buses[:, BUS_I] = np.array(
             [self.bus_index_mapping[int(idx)] for idx in self.buses[:, BUS_I]],
         )
+        assert np.array_equal(
+            self.buses[:, BUS_I],
+            np.arange(len(self.buses)),
+        ), "Continuous bus id must equal the bus row"
         self.gens[:, GEN_BUS] = np.array(
             [self.bus_index_mapping[int(idx)] for idx in self.gens[:, GEN_BUS]],
         )
@@ -230,7 +243,8 @@ class Network:
         assert np.sum(self.buses[:, BUS_TYPE] == REF) == 1, (
             "There should be exactly one reference bus"
         )
-        self.ref_bus_idx = np.where(self.buses[:, BUS_TYPE] == REF)[0][0]
+        # The reference bus id equals its row, because ids follow table order.
+        self.ref_bus_idx = int(np.where(self.buses[:, BUS_TYPE] == REF)[0][0])
 
         # Static solver metadata is computed lazily and shared by the cheap
         # scenario copies.  The electrical matrices themselves remain isolated.
