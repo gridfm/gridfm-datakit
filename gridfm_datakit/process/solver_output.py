@@ -40,7 +40,9 @@ from enum import IntEnum
 from typing import Dict, Iterator, Optional
 
 try:
-    _LIBC: Optional[ctypes.CDLL] = ctypes.CDLL(None)
+    _LIBC: Optional[ctypes.CDLL] = ctypes.CDLL(
+        "ucrtbase" if sys.platform == "win32" else None,
+    )
 except Exception:  # pragma: no cover - platform without a loadable libc
     _LIBC = None
 
