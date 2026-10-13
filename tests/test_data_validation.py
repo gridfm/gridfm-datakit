@@ -7,7 +7,6 @@ validation functions to ensure physical consistency across different networks an
 
 import pytest
 import yaml
-import shutil
 import os
 from gridfm_datakit.generate import generate_power_flow_data_distributed
 from gridfm_datakit.validation import validate_generated_data
@@ -52,33 +51,17 @@ param_ids = [f"{name}-{mode}" for name, _ in configs for mode in ["opf", "pf"]]
 
 
 @pytest.mark.parametrize("args,mode", param_combinations, ids=param_ids)
-def test_data_validation(args, mode):
+def test_data_validation(args, mode, tmp_path):
     """Test each config file by generating data and running validation in both PF and OPF modes."""
 
     args.load.scenarios = 5
     args.settings.mode = mode
     args.topology_perturbation.n_topology_variants = 5
-    # Isolate outputs per xdist worker to avoid cross-worker cleanup and clashes
-    worker = os.environ.get("PYTEST_XDIST_WORKER", "local")
-    base_dir = f"./tests/test_data_validation_{worker}"
-    args.settings.data_dir = f"{base_dir}/{args.network.name}_{mode}"
+    args.settings.data_dir = str(tmp_path)
 
     # Generate and validate data
     file_paths = generate_power_flow_data_distributed(args)
     validate_generated_data(file_paths, mode, 100.0, n_partitions=10)
-
-
-@pytest.fixture(scope="session", autouse=True)
-def cleanup():
-    """Clean up test data after tests complete."""
-    yield
-
-    # clean this worker's output directory only
-    worker = os.environ.get("PYTEST_XDIST_WORKER", "local")
-    base_dir = f"./tests/test_data_validation_{worker}"
-    if os.path.exists(base_dir):
-        shutil.rmtree(base_dir, ignore_errors=True)
-        print(f"Cleaned up: {base_dir}")
 
 
 if __name__ == "__main__":

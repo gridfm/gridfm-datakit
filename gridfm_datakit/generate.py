@@ -12,6 +12,7 @@ import numpy as np
 import yaml
 from tqdm import tqdm
 
+import gridfm_datakit.lightsim2grid as lightsim2grid
 import gridfm_datakit.powsybl as powsybl
 from gridfm_datakit.config import validate_static_config
 from gridfm_datakit.network import (
@@ -130,10 +131,13 @@ def _setup_environment(
             )
         args.network.reader = reader
 
+        # pf_solver controls which engine solves the power flow in PF mode.
+        # 'powsybl' requires network.reader 'powsybl'. OPF is always solved
+        # by PowerModels, so this value is only stored in OPF mode.
         pf_solver = getattr(args.settings, "pf_solver", "powermodel")
-        if pf_solver not in ("powermodel", "powsybl"):
+        if pf_solver not in ("powermodel", "powsybl", "lightsim2grid"):
             raise ValueError(
-                "settings.pf_solver must be 'powermodel' or 'powsybl', "
+                "settings.pf_solver must be 'powermodel', 'powsybl' or 'lightsim2grid', "
                 f"got {pf_solver!r}",
             )
         args.settings.pf_solver = pf_solver
@@ -145,6 +149,12 @@ def _setup_environment(
                 f"got {opf_formulation!r}",
             )
         args.settings.opf_formulation = opf_formulation
+
+    # Static configs are checked by the schema. This still has to run for both
+    # paths: the schema cannot tell whether the package is installed, and the
+    # check must happen before an existing output directory is removed.
+    if args.settings.pf_solver == "lightsim2grid":
+        lightsim2grid.check_lightsim2grid_available()
 
     # Setup output directory
     base_path = os.path.join(args.settings.data_dir, args.network.name, "raw")

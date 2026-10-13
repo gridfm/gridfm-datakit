@@ -1,6 +1,5 @@
 import yaml
 import os
-import shutil
 from gridfm_datakit.utils.param_handler import NestedNamespace
 from gridfm_datakit.generate import generate_power_flow_data_distributed
 from concurrent.futures import ProcessPoolExecutor
@@ -17,6 +16,7 @@ def run_generation(config_params):
         args = NestedNamespace(**config_dict)
 
         # Apply perturbation settings
+        args.load.generator = config_params["load_generator"]
         args.topology_perturbation.type = config_params["topology_type"]
         args.generation_perturbation.type = config_params["generation_type"]
         args.admittance_perturbation.type = config_params["admittance_type"]
@@ -26,17 +26,11 @@ def run_generation(config_params):
         args.load.scenarios = 5
         args.settings.large_chunk_size = 5
         args.settings.num_processes = 2
-        args.settings.data_dir = (
-            f"./tests/test_data_perturbations/{config_params['test_name']}"
-        )
+        args.settings.data_dir = config_params["data_dir"]
 
         # Generate data
         file_paths = generate_power_flow_data_distributed(args)
         validate_generated_data(file_paths, args.settings.mode, 100.0, n_partitions=10)
-
-        # Clean up
-        if os.path.exists(args.settings.data_dir):
-            shutil.rmtree(args.settings.data_dir)
 
         return config_params["test_name"], "OK"
 
@@ -44,7 +38,7 @@ def run_generation(config_params):
         return config_params["test_name"], f"FAIL: {e}"
 
 
-def test_all_perturbation_combinations():
+def test_all_perturbation_combinations(tmp_path):
     """Test all possible combinations of perturbation types."""
 
     # Define all possible perturbation types
@@ -131,6 +125,9 @@ def test_all_perturbation_combinations():
             },
         )
 
+    for config in test_configs:
+        config["data_dir"] = str(tmp_path / config["test_name"])
+
     print(f"Testing {len(test_configs)} perturbation combinations...")
 
     # Run tests in parallel. Each generation internally spawns its own pool of
@@ -147,11 +144,6 @@ def test_all_perturbation_combinations():
         print(f"{test_name}: {status}")
         if status != "OK":
             failed_tests.append((test_name, status))
-
-    # Clean up any remaining test data
-    test_dir = "./tests/test_data_perturbations"
-    if os.path.exists(test_dir):
-        shutil.rmtree(test_dir)
 
     # Assert all tests passed
     if failed_tests:

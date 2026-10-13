@@ -77,10 +77,10 @@ settings:
   overwrite: true # If true, overwrites existing files, if false, appends to files
   mode: "pf" # Mode of the script; options: pf, opf. pf: power flow data where one or more operating limits – the inequality constraints defined in OPF, e.g., voltage magnitude or branch limits – may be violated. opf: generates datapoints for training OPF solvers, with cost-optimal dispatches that satisfy all operating limits (OPF-feasible)
   include_dc_res: true # If true, also stores the results of dc power flow and dc optimal power flow
-  pf_solver: "powermodel" # PF backend; options: powermodel, powsybl. powsybl requires network.reader: powsybl
+  pf_solver: "powermodel" # Engine solving the power flow in pf mode; options: powermodel, powsybl, lightsim2grid (the OPF is always solved by PowerModels). powsybl requires network.reader: powsybl
   pf_fast: true # Whether to use fast PF solver by default (compute_ac_pf from powermodels.jl); if false, uses Ipopt-based PF. Some networks e.g. case10000_goc do not work with pf_fast: true
   dcpf_fast: true # Whether to use fast DC PF solver (compute_dc_pf from powermodels.jl); if false, uses optimizer-based DC PF
-  enable_solver_logs: false # If true, write OPF/PF/DCPF logs, including fast paths, to {data_dir}/solver_log
+  enable_solver_logs: false # If true, write OPF/PF solver logs to {data_dir}/solver_log; PF fast ignores logging
   max_iter: 200 # Maximum iterations for Ipopt-based solvers
 
 ```
@@ -100,7 +100,8 @@ The `mode` parameter controls how the power flow scenarios are generated and val
 - **Constraints**: Since the topology perturbations are performed after solving OPF, the inequality constraints of OPF (e.g. branch loading, voltage magnitude at PQ buses, generator bounds on reactive power, etc) might be violated.
 - **Use Case**: Training data for power flow, contingency analysis, etc
 - **Performance**: Faster as it avoids re-solving OPF for each perturbed scenario
-- **PF Solver Choice**: `settings.pf_solver` selects the `powermodel` or `powsybl` backend. The `powsybl` backend currently requires `network.reader: "powsybl"`. With `powermodel`, `settings.pf_fast` selects the fast `compute_ac_pf` path when `true` and the Ipopt-based AC PF when `false`.
+- **PF Solver Choice**: `settings.pf_solver` selects the engine: `powermodel` (default), `powsybl`, or `lightsim2grid`. The OPF is always solved by PowerModels. The `powsybl` backend requires `network.reader: "powsybl"`. See [Power flow solver](power_flow_solver.md).
+- **PF Fast Path**: With `powermodel`, `settings.pf_fast` selects the fast `compute_ac_pf` path when `true` and the Ipopt-based AC PF when `false`.
 
 ## Data Validation
 

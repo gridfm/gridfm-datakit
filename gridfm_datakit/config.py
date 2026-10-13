@@ -237,7 +237,7 @@ class _StaticSettingsConfig(_ConfigModel):
     dcpf_fast: bool
     max_iter: _PositiveInt
     seed: Optional[_Seed] = None
-    pf_solver: Literal["powermodel", "powsybl"] = "powermodel"
+    pf_solver: Literal["powermodel", "powsybl", "lightsim2grid"] = "powermodel"
     opf_formulation: Literal["polar", "rectangular"] = "polar"
 
 
@@ -295,6 +295,8 @@ _PF_SOLVER_REQUIREMENTS = {
             _NetworkCapability.POWSYBL_INDEX_MAPPING,
         },
     ),
+    # lightsim2grid is built from the GridFM bus, generator, and branch arrays.
+    "lightsim2grid": frozenset({_NetworkCapability.GRIDFM_NETWORK}),
 }
 
 

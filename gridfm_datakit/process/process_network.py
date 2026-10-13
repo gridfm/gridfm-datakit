@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
+import gridfm_datakit.lightsim2grid as lightsim2grid
 import gridfm_datakit.powsybl as powsybl
 from gridfm_datakit.network import Network, branch_vectors, makeYbus
 from gridfm_datakit.perturbations.admittance_perturbation import AdmittanceGenerator
@@ -596,6 +597,22 @@ def _solution_arrays(
     ids_branch = net.idx_branches_in_service
     ids_gen = net.idx_gens_in_service
     n_buses = net.buses.shape[0]
+    if isinstance(sol, dict) and "arrays" in sol:
+        # already dense (e.g. lightsim2grid with as_arrays=True): no per-element
+        # dicts to check the keys of, so check the shapes instead
+        branch_flows, gen_pq, bus_vmva = sol["arrays"]
+        assert branch_flows.shape == (len(ids_branch), 4), (
+            f"Branch flows of shape {branch_flows.shape}, expected "
+            f"({len(ids_branch)}, 4) for the in-service branches"
+        )
+        assert gen_pq.shape == (len(ids_gen), 2), (
+            f"Generator injections of shape {gen_pq.shape}, expected "
+            f"({len(ids_gen)}, 2) for the in-service generators"
+        )
+        assert bus_vmva.shape == (n_buses, 2), (
+            f"Bus voltages of shape {bus_vmva.shape}, expected ({n_buses}, 2)"
+        )
+        return branch_flows, gen_pq, bus_vmva
 
     if isinstance(sol, dict):
         branch_flows = np.array(
@@ -781,7 +798,11 @@ def pf_post_processing(
     X_branch[:, 3] = np.real(net.branches[:, T_BUS])
 
     # pf, qf, pt, qt
-    if res["solution"]["pf"]:
+    # (solutions that already hold dense arrays have no per-element dicts to count:
+    # _solution_arrays checks their shapes against the in-service elements instead)
+    if "arrays" in res["solution"]:
+        pass
+    elif res["solution"]["pf"]:
         # when solving pf, the flow of all branches is computed, so the number of branches in solution should match the number of branches in network
         assert len(res["solution"]["branch"]) == n_branches, (
             "Number of branches in solution should match number of branches in network"
@@ -801,7 +822,8 @@ def pf_post_processing(
     X_branch[:, 10] = net.branches[:, BR_B]
 
     # admittances
-    Ytt, Yff, Yft, Ytf = branch_vectors(net.branches, net.branches.shape[0])
+    branch_vecs = branch_vectors(net.branches, net.branches.shape[0])
+    Ytt, Yff, Yft, Ytf = branch_vecs
     X_branch[:, 11] = np.real(Yff)
     X_branch[:, 12] = np.imag(Yff)
     X_branch[:, 13] = np.real(Yft)
@@ -847,9 +869,9 @@ def pf_post_processing(
     X_bus[:, 3] = net.buses[:, QD]
 
     # --- Generator injections
-    assert len(res["solution"]["gen"]) == len(net.idx_gens_in_service), (
-        "Number of generators in solution should match number of generators in network"
-    )
+    assert "arrays" in res["solution"] or len(res["solution"]["gen"]) == len(
+        net.idx_gens_in_service,
+    ), "Number of generators in solution should match number of generators in network"
     gen_pq = gen_pq * net.baseMVA
     pg_gen = gen_pq[:, 0]
     qg_gen = gen_pq[:, 1]
@@ -869,7 +891,7 @@ def pf_post_processing(
     if include_dc_res:
         if res_dc is not None:
             # check if "gen" key is in res_dc["solution"]
-            if "gen" in res_dc["solution"]:
+            if "gen" in res_dc["solution"] or "arrays" in res_dc["solution"]:
                 pg_gen_dc = gen_pq_dc[:, 0] * net.baseMVA
             else:
                 pg_gen_dc = apply_slack_single_gen(net, pg_gen, Pg_bus, pf_dc, pt_dc)
@@ -883,7 +905,7 @@ def pf_post_processing(
 
     # Voltage. Extraction (_solution_arrays) raises on any missing expected
     # bus key, so together with this length check the key sets must match.
-    assert len(res["solution"]["bus"]) == n_buses, (
+    assert "arrays" in res["solution"] or len(res["solution"]["bus"]) == n_buses, (
         "Buses in solution should match buses in network"
     )
 
@@ -972,22 +994,24 @@ def pf_post_processing(
             X_gen[net.idx_gens_in_service, 14] = np.nan
 
     # --- Y-bus ---
-    Y_bus, Yf, Yt = makeYbus(net.baseMVA, net.buses, net.branches)
+    # lightsim2grid already built it for its power flow
+    Y_bus = res["solution"].get("Ybus")
+    if Y_bus is None:
+        Y_bus, _, _ = makeYbus(net.baseMVA, net.buses, net.branches, branch_vecs)
 
-    i, j = np.nonzero(Y_bus)
+    # Non-zero entries in row-major order, read straight from the CSR storage
+    # (makeYbus already eliminated the explicit zeros).
     # note that Y_bus[i,j] can be != 0 even if a branch from i to j is not in service because there might be other branches connected to the same buses
+    Y_bus = Y_bus.tocsr()
+    Y_bus.sort_indices()
+    Y_coo = Y_bus.tocoo()
 
-    s = Y_bus[i, j]
-    G = np.real(s)
-    B = np.imag(s)
-
-    edge_index = np.column_stack((i, j))
-    edge_attr = np.stack((G, B)).T
-    Y_bus = np.zeros(
-        (edge_index.shape[0], edge_attr.shape[1] + edge_index.shape[1] + 1),
-    )
+    Y_bus = np.zeros((Y_coo.nnz, 5))
     Y_bus[:, 0] = scenario_index
-    Y_bus[:, 1:] = np.column_stack((edge_index, edge_attr))
+    Y_bus[:, 1] = Y_coo.row
+    Y_bus[:, 2] = Y_coo.col
+    Y_bus[:, 3] = Y_coo.data.real
+    Y_bus[:, 4] = Y_coo.data.imag
 
     # ---- runtime data ----
     n_cols = (
@@ -1068,9 +1092,9 @@ def process_scenario_pf_mode(
         produces the generator set-points before topology perturbation.
     pf_solver:
         Which engine to use for the power flow solve after topology
-        perturbation.  Must be ``'powermodel'`` (default) or
-        ``'powsybl'``.  OPF is always solved by PowerModels regardless
-        of this value.
+        perturbation.  Must be ``'powermodel'`` (default),
+        ``'powsybl'`` or ``'lightsim2grid'``.  OPF is always solved by
+        PowerModels regardless of this value.
 
     Keyword-only arguments (only required when ``pf_solver='powsybl'``)
     -------------------------------------------------------------------
@@ -1133,6 +1157,9 @@ def process_scenario_pf_mode(
         base_variant_id = pp_net.get_working_variant_id()
         lf_params = powsybl.get_default_lf_params()
 
+    if pf_solver == "lightsim2grid":
+        lightsim2grid.check_lightsim2grid_available()
+
     # to get PF points that can violate some OPF inequality constraints (to train PF solvers that can handle points outside of normal operating limits), we apply the topology perturbation after OPF.
     # The setpoints are then no longer adapted to the new topology, and might lead to e.g. abranch overload or a voltage magnitude violation once we drop an element.
     for pert_index, perturbation in enumerate(perturbations):
@@ -1153,6 +1180,52 @@ def process_scenario_pf_mode(
                 with open(error_log_file, "a") as f:
                     f.write(
                         f"Caught an exception at scenario {scenario_index} when solving in run_pf function: {e}\n",
+                    )
+                continue
+
+        if pf_solver == "lightsim2grid":
+            try:
+                # kept in meta so the same LSGrid is updated in place across the
+                # perturbations (and scenarios) handled by this worker
+                converted = lightsim2grid.update_lightsim2grid(
+                    perturbation,
+                    None if meta is None else meta.get("ls_converted"),
+                )
+                if meta is not None:
+                    meta["ls_converted"] = converted
+            except Exception as e:
+                with open(error_log_file, "a") as f:
+                    f.write(
+                        f"Caught an exception at scenario {scenario_index} when building the lightsim2grid model: {e}\n",
+                    )
+                continue
+
+            res_dcpf = None
+            if include_dc_res:
+                try:
+                    res_dcpf = lightsim2grid.run_ls_pf(
+                        converted.ls_net,
+                        perturbation,
+                        converted.mapping_l2g,
+                        dc=True,
+                        as_arrays=True,
+                    )
+                except Exception as e:
+                    with open(error_log_file, "a") as f:
+                        f.write(
+                            f"Caught an exception at scenario {scenario_index} when solving dcpf function with lightsim2grid solver: {e}\n",
+                        )
+            try:
+                res = lightsim2grid.run_ls_pf(
+                    converted.ls_net,
+                    perturbation,
+                    converted.mapping_l2g,
+                    as_arrays=True,
+                )
+            except Exception as e:
+                with open(error_log_file, "a") as f:
+                    f.write(
+                        f"Caught an exception at scenario {scenario_index} when solving in run_pf function with lightsim2grid solver: {e}\n",
                     )
                 continue
 
@@ -1366,7 +1439,7 @@ def process_scenario_chunk(
         solver_log_dir: Directory for solver logs.
         max_iter: Maximum iterations for the solver.
         seed: Global random seed for reproducibility.
-        pf_solver: PF solver to use in pf mode; either 'powermodel' or 'powsybl'.
+        pf_solver: PF solver to use in pf mode; one of 'powermodel', 'powsybl' or 'lightsim2grid'.
             OPF is always solved by PowerModels regardless of this value.
         meta: metadata dict; when pf_solver='powsybl', must contain 'network_path'
             and 'mapping_p2g'. 'pp_net' is loaded fresh per worker from 'network_path'.

@@ -211,6 +211,125 @@ def test_validate_static_config_accepts_powsybl_reader_for_powsybl_pf() -> None:
     assert validated["settings"]["pf_solver"] == "powsybl"
 
 
+@pytest.mark.parametrize("reader", ["native", "powsybl"])
+def test_validate_static_config_accepts_lightsim2grid_pf(reader: str) -> None:
+    """lightsim2grid is built from the GridFM arrays, so either reader can load them."""
+    config = _default_config()
+    config["settings"]["mode"] = "pf"
+    config["settings"]["pf_solver"] = "lightsim2grid"
+    config["network"]["reader"] = reader
+
+    validated = validate_static_config(config)
+
+    assert validated["settings"]["pf_solver"] == "lightsim2grid"
+    assert validated["network"]["reader"] == reader
+
+
+def test_setup_environment_rejects_unknown_pf_solver_before_overwrite(
+    tmp_path: Path,
+) -> None:
+    """An unknown static PF solver must fail before an existing output is removed."""
+    config = _default_config()
+    config["settings"]["data_dir"] = str(tmp_path / "data")
+    config["settings"]["pf_solver"] = "not-a-solver"
+    marker = _create_existing_output(config)
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            r"settings\.pf_solver: Input should be 'powermodel', "
+            r"'powsybl' or 'lightsim2grid'"
+        ),
+    ):
+        _setup_environment(config)
+
+    assert marker.read_text() == "must survive validation failure"
+
+
+def test_setup_environment_checks_lightsim2grid_before_overwrite(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A missing lightsim2grid install must fail before an existing output is removed."""
+    config = _default_config()
+    config["settings"]["data_dir"] = str(tmp_path / "data")
+    config["settings"]["pf_solver"] = "lightsim2grid"
+    marker = _create_existing_output(config)
+
+    def unavailable() -> None:
+        raise ImportError("lightsim2grid missing")
+
+    monkeypatch.setattr(
+        "gridfm_datakit.generate.lightsim2grid.check_lightsim2grid_available",
+        unavailable,
+    )
+
+    with pytest.raises(ImportError, match="lightsim2grid missing"):
+        _setup_environment(config)
+
+    assert marker.read_text() == "must survive validation failure"
+
+
+def test_setup_environment_accepts_lightsim2grid_after_availability_check(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A static lightsim2grid config proceeds only after the install check."""
+    config = _default_config()
+    config["settings"]["data_dir"] = str(tmp_path / "data")
+    config["settings"]["overwrite"] = True
+    config["settings"]["pf_solver"] = "lightsim2grid"
+    called: list[bool] = []
+    monkeypatch.setattr(
+        "gridfm_datakit.generate.lightsim2grid.check_lightsim2grid_available",
+        lambda: called.append(True),
+    )
+
+    args, base_path, _, _ = _setup_environment(config)
+
+    assert called == [True]
+    assert args.settings.pf_solver == "lightsim2grid"
+    assert Path(base_path).is_dir()
+
+
+def test_dynamic_setup_accepts_lightsim2grid(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Dynamic configs skip the static schema and still allow lightsim2grid."""
+    config = _default_config()
+    config["dynamic"] = {"enabled": True}
+    config["settings"]["data_dir"] = str(tmp_path / "data")
+    config["settings"]["pf_solver"] = "lightsim2grid"
+    monkeypatch.setattr(
+        "gridfm_datakit.generate.lightsim2grid.check_lightsim2grid_available",
+        lambda: None,
+    )
+
+    args, _, _, _ = _setup_environment(config)
+
+    assert args.settings.pf_solver == "lightsim2grid"
+
+
+def test_dynamic_setup_rejects_unknown_pf_solver_before_overwrite(
+    tmp_path: Path,
+) -> None:
+    """The dynamic allow-list includes lightsim2grid and still rejects other names."""
+    config = _default_config()
+    config["dynamic"] = {"enabled": True}
+    config["settings"]["data_dir"] = str(tmp_path / "data")
+    config["settings"]["pf_solver"] = "not-a-solver"
+    marker = _create_existing_output(config)
+
+    with pytest.raises(
+        ValueError,
+        match="settings.pf_solver must be 'powermodel', 'powsybl' or 'lightsim2grid'",
+    ):
+        _setup_environment(config)
+
+    assert marker.read_text() == "must survive validation failure"
+
+
 def test_validate_static_config_supplies_execution_defaults() -> None:
     """Sequential callers need not provide parallel execution tuning fields."""
     config = _default_config()
