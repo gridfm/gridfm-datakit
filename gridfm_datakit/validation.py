@@ -73,7 +73,7 @@ def _validate_partition_structure(
             )
 
         print(
-            f"  ✓ Partition {k:>2}: {len(unique_scenarios)} scenarios ({min_scenario}-{max_scenario}) OK",
+            f"  Partition {k:>2}: {len(unique_scenarios)} scenarios ({min_scenario}-{max_scenario}) OK",
         )
 
 

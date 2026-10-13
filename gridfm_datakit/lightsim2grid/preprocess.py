@@ -10,6 +10,7 @@ import time
 from typing import Any, Dict
 
 import numpy as np
+from scipy.sparse import csr_matrix
 
 from gridfm_datakit.network import Network
 from gridfm_datakit.utils.idx_bus import BUS_I
@@ -25,6 +26,7 @@ def run_ls_pf(
     dc: bool = False,
     max_iter: int = 50,
     tol: float = 1e-8,
+    as_arrays: bool = False,
 ) -> Dict[str, Any]:
     """Run an AC (or DC) power flow with lightsim2grid and format the results.
 
@@ -38,6 +40,8 @@ def run_ls_pf(
         dc: Run a DC power flow instead of an AC one.
         max_iter: Maximum number of iterations.
         tol: Convergence tolerance.
+        as_arrays: Return the results as dense arrays under ``["solution"]["arrays"]``
+            instead of per-element dicts (see :func:`get_pf_res`).
 
     Returns:
         The power flow results in PowerModels' format (see :func:`get_pf_res`), with the
@@ -50,7 +54,49 @@ def run_ls_pf(
     start_time = time.perf_counter()
     v = (ls_net.dc_pf if dc else ls_net.ac_pf)(v_init, max_iter, tol)
     solve_time = time.perf_counter() - start_time
-    return get_pf_res(ls_net, v, solve_time, net, mapping_l2g)
+    return get_pf_res(
+        ls_net,
+        v,
+        solve_time,
+        net,
+        mapping_l2g,
+        as_arrays=as_arrays,
+        with_ybus=as_arrays and not dc,
+    )
+
+
+def get_ybus(ls_net: Any, net: Network) -> csr_matrix:
+    """Bus admittance matrix of the LSGrid, indexed like :func:`gridfm_datakit.network.makeYbus`.
+
+    lightsim2grid builds it for its AC power flow, so this is much cheaper than
+    rebuilding it from ``net``. It must be called after an AC power flow, which is
+    what updates it.
+
+    Args:
+        ls_net: The lightsim2grid LSGrid, on which an AC power flow was just run.
+        net: The network the LSGrid is in sync with.
+
+    Returns:
+        The sparse Ybus (no explicit zeros, sorted indices), with row and column
+        ``i`` for the bus whose ``BUS_I`` is ``i``, like ``makeYbus``. It matches
+        ``makeYbus(net.baseMVA, net.buses, net.branches)`` up to the rounding of the
+        summation order.
+    """
+    ybus = ls_net.get_Ybus()  # one row per lightsim2grid bus = per row of net.buses
+    bus_i = net.buses[:, BUS_I].astype(int)
+    n_buses = net.buses.shape[0]
+    if np.array_equal(bus_i, np.arange(n_buses)):
+        ybus = ybus.tocsr()
+    else:
+        ybus = ybus.tocoo()
+        ybus = csr_matrix(
+            (ybus.data, (bus_i[ybus.row], bus_i[ybus.col])),
+            shape=(n_buses, n_buses),
+        )
+        ybus.sum_duplicates()
+    ybus.sort_indices()
+    ybus.eliminate_zeros()
+    return ybus
 
 
 def get_pf_res(
@@ -59,6 +105,8 @@ def get_pf_res(
     solve_time: float,
     net: Network,
     mapping_l2g: MappingL2G,
+    as_arrays: bool = False,
+    with_ybus: bool = False,
 ) -> Dict[Any, Any]:
     """Format lightsim2grid power flow results for the pf_post_process function.
 
@@ -68,6 +116,13 @@ def get_pf_res(
         solve_time: power flow solving time
         net: gridfm Network the LSGrid was built from
         mapping_l2g: lightsim2grid-to-gridfm index maps
+        as_arrays: Skip the per-element dicts (which ``_solution_arrays`` would only turn
+            back into arrays): ``["solution"]["arrays"]`` then holds the
+            ``(branch_flows, gen_pq, bus_vmva)`` triple that ``_solution_arrays``
+            would extract (in-service branches and generators, buses by bus index).
+        with_ybus: With ``as_arrays``, also return the bus admittance matrix in
+            ``["solution"]["Ybus"]`` (see :func:`get_ybus`). Only valid right after an
+            AC power flow, not after a DC one.
 
     Returns:
         Power flow results in a nested Dict format, similar to PowerModel's power flow results
@@ -99,6 +154,26 @@ def get_pf_res(
 
     reverse = net.reverse_bus_index_mapping
     vm, va = np.abs(v), np.angle(v)
+
+    if as_arrays:
+        bus_vmva = np.empty((net.buses.shape[0], 2))
+        bus_vmva[net.buses[:, BUS_I].astype(int)] = np.column_stack((vm, va))
+        res = {
+            "solution": {
+                "baseMVA": base_mva,
+                "per_unit": True,
+                "pf": True,
+                "arrays": (
+                    flows[net.idx_branches_in_service],
+                    np.column_stack((gen_p, gen_q))[net.idx_gens_in_service],
+                    bus_vmva,
+                ),
+            },
+            "solve_time": solve_time,
+        }
+        if with_ybus:
+            res["solution"]["Ybus"] = get_ybus(ls_net, net)
+        return res
 
     return {
         "solution": {

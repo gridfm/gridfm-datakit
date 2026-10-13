@@ -16,6 +16,7 @@ def run_generation(config_params):
         args = NestedNamespace(**config_dict)
 
         # Apply perturbation settings
+        args.load.generator = config_params["load_generator"]
         args.topology_perturbation.type = config_params["topology_type"]
         args.generation_perturbation.type = config_params["generation_type"]
         args.admittance_perturbation.type = config_params["admittance_type"]
