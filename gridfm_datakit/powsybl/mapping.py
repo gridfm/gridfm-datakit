@@ -100,3 +100,43 @@ def build_p2g_maps(
         offset += len(df)
 
     return MappingP2G(bus=map_bus_p2g, branch=map_branch_p2g, gen=map_gen_p2g)
+
+
+def build_p2g_maps_by_bus_number(
+    network: Network,
+    pp_net,
+) -> MappingP2G:
+    """Build pypowsybl-to-gridfm index maps for a network built by ``to_powsybl``.
+
+    ``to_powsybl`` names each bus-breaker bus ``BUS-<n>`` after its original
+    bus number.  pypowsybl lists buses by voltage level, and buses joined by a
+    transformer share one, so position does not give the gridfm row.
+
+    Args:
+        network: The gridfm_datakit Network passed to ``to_powsybl``.
+        pp_net: The pypowsybl network ``to_powsybl(network)`` built.
+
+    Returns:
+        MappingP2G with the bus map read from the bus-breaker buses.
+
+    Raises:
+        ValueError: If a pypowsybl bus groups several gridfm buses or has none.
+    """
+    maps = build_p2g_maps(network, pp_net)
+    maps.bus = {}
+    bb_buses = pp_net.get_bus_breaker_view_buses(attributes=["bus_id"])
+    for bb_bus_id, pp_bus_id in bb_buses["bus_id"].items():
+        if not pp_bus_id:
+            continue
+        gfm_bus = network.bus_index_mapping[_bus_number(bb_bus_id)]
+        if maps.bus.setdefault(pp_bus_id, gfm_bus) != gfm_bus:
+            raise ValueError(f"pypowsybl bus {pp_bus_id} groups several gridfm buses")
+    unmapped = set(pp_net.get_buses().index) - set(maps.bus)
+    if unmapped:
+        raise ValueError(f"No gridfm bus for pypowsybl buses {sorted(unmapped)}")
+    return maps
+
+
+def _bus_number(bus_breaker_bus_id: str) -> int:
+    """Return the original bus number of a ``BUS-<n>`` bus-breaker bus ID."""
+    return int(bus_breaker_bus_id.rsplit("-", 1)[1])
