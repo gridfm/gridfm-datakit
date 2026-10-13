@@ -44,6 +44,8 @@ def test_validate_static_config_accepts_shipped_configs(config_path: Path) -> No
     with config_path.open() as stream:
         config = yaml.safe_load(stream)
 
+    # consistency_test.yaml omits data_dir; its fixture assigns a temporary directory.
+    config["settings"].setdefault("data_dir", "data")
     validated = validate_static_config(config)
 
     assert validated["settings"]["opf_formulation"] == "polar"
