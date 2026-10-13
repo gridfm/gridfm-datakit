@@ -24,7 +24,16 @@ jobs:
         with:
           python-version: '3.12'
 
-      - uses: pre-commit/action@v3.0.1
+      - name: Cache pre-commit environments
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ runner.os }}-${{ env.pythonLocation }}-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: Run pre-commit
+        run: |
+          python -m pip install pre-commit
+          pre-commit run --all-files --show-diff-on-failure --color=always
 
   security-test:
     runs-on: ubuntu-latest
