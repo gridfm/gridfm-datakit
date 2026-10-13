@@ -59,6 +59,16 @@ from gridfm_datakit.utils.idx_cost import MODEL, NCOST, POLYNOMIAL
 from gridfm_datakit.utils.idx_gen import GEN_BUS, GEN_STATUS, PG, QG
 
 
+def _julia_string(value: str) -> str:
+    """Return ``value`` as a Julia string literal.
+
+    Backslashes, quotes and ``$`` are escaped, so Windows paths and paths
+    containing interpolation characters reach Julia unchanged.
+    """
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"').replace("$", "\\$")
+    return f'"{escaped}"'
+
+
 def correct_network(network_path: str, force: bool = False) -> str:
     """
     Load a MATPOWER network using PowerModels via run_julia
@@ -101,8 +111,8 @@ def correct_network(network_path: str, force: bool = False) -> str:
         julia_code = [
             "using PowerModels",
             "PowerModels.silence()",
-            f'data = PowerModels.parse_file("{network_path}")',
-            f'PowerModels.export_matpower("{tmp_path}", data)',
+            f"data = PowerModels.parse_file({_julia_string(network_path)})",
+            f"PowerModels.export_matpower({_julia_string(tmp_path)}, data)",
         ]
 
         # Run Julia
@@ -484,14 +494,31 @@ class Network:
             bool: True if there is exactly one connected component, False otherwise
         """
         n_buses = self.buses.shape[0]
-        in_service = self.branches[:, BR_STATUS] == 1
-        from_buses = self.branches[in_service, F_BUS].astype(np.int64, copy=False)
-        to_buses = self.branches[in_service, T_BUS].astype(np.int64, copy=False)
+        # The branch ends never change between perturbations: the branches sorted by
+        # origin bus are kept in the (shared) solver cache, which makes the CSR
+        # adjacency of the in-service branches a masking, without any sorting.
+        f, t = self.branches[:, F_BUS], self.branches[:, T_BUS]
+        cached = self._solver_cache.get("connectivity")
+        if cached is None or not (
+            np.array_equal(cached[0], f) and np.array_equal(cached[1], t)
+        ):
+            order = np.argsort(f, kind="stable")
+            cached = (
+                f.copy(),
+                t.copy(),
+                order,
+                f[order].astype(np.int64),
+                t[order].astype(np.int64),
+            )
+            self._solver_cache["connectivity"] = cached
+        _, _, order, from_sorted, to_sorted = cached
+        keep = (self.branches[:, BR_STATUS] == 1)[order]
+        indices = to_sorted[keep]
+        indptr = np.concatenate(
+            ([0], np.cumsum(np.bincount(from_sorted[keep], minlength=n_buses))),
+        )
         adjacency = csr_matrix(
-            (
-                np.ones(from_buses.size, dtype=np.uint8),
-                (from_buses, to_buses),
-            ),
+            (np.ones(indices.size, dtype=np.uint8), indices, indptr),
             shape=(n_buses, n_buses),
         )
         return (
@@ -796,6 +823,7 @@ def makeYbus(
     baseMVA: float,
     bus: np.ndarray,
     branch: np.ndarray,
+    branch_vecs: Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None = None,
 ) -> Tuple[csr_matrix, csr_matrix, csr_matrix]:
     """Build the bus admittance matrix and branch admittance matrices.
 
@@ -809,6 +837,8 @@ def makeYbus(
         baseMVA: Base MVA for the power system.
         bus: Bus data array.
         branch: Branch data array.
+        branch_vecs: Optional result of ``branch_vectors(branch, branch.shape[0])``,
+            to avoid computing it twice when the caller already has it.
 
     Returns:
         Tuple containing:
@@ -826,7 +856,9 @@ def makeYbus(
     #      |    | = |          | * |    |
     #      | It |   | Ytf  Ytt |   | Vt |
     #
-    Ytt, Yff, Yft, Ytf = branch_vectors(branch, nl)
+    Ytt, Yff, Yft, Ytf = (
+        branch_vectors(branch, nl) if branch_vecs is None else branch_vecs
+    )
     # compute shunt admittance
     # if Psh is the real power consumed by the shunt at V = 1.0 p.u.
     # and Qsh is the reactive power injected by the shunt at V = 1.0 p.u.

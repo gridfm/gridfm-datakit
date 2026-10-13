@@ -34,7 +34,7 @@ from gridfm_datakit.dynamic.dynawo import (
 )
 from gridfm_datakit.process.process_network import init_julia
 from gridfm_datakit.powsybl import load_net
-from gridfm_datakit.utils.random_seed import custom_seed
+from gridfm_datakit.utils.random_seed import _DEFAULT_SEED_POLICY, custom_seed
 from gridfm_datakit.utils.param_handler import (
     NestedNamespace,
     initialize_admittance_generator,
@@ -283,12 +283,11 @@ def _process_dynamic_chunk(args: Tuple) -> Union[List[Dict[str, Any]], List[Exce
 
             chunk_results: List[Dict[str, Any]] = []
 
-            # Same derivation as the static pipeline (process_network.py): the
-            # x20_000 spreads chunk seeds so runs with nearby base seeds don't
-            # overlap, and the +1 keeps seed=0/start_idx=0 from reusing the very
-            # seed the load scenarios were drawn with (which would correlate the
-            # perturbations with the loads instead of making them independent).
-            with custom_seed(seed * 20_000 + start_idx + 1):
+            # Use the same chunk-seed policy as the static pipeline so nearby
+            # runs remain separated and perturbations do not reuse the load seed.
+            with custom_seed(
+                _DEFAULT_SEED_POLICY.distributed_seed(seed, start_idx),
+            ):
                 for scenario_index in range(start_idx, end_idx):
                     try:
                         # One scenario expands to one result per topology
