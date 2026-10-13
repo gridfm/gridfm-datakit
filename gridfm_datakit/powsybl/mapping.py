@@ -34,46 +34,40 @@ def build_p2g_maps(
     network: Network,
     pp_net,
 ) -> MappingP2G:
-    """Build pypowsybl-to-gridfm ID maps in O(n) by parsing pypowsybl element IDs.
+    """Build pypowsybl-to-gridfm index maps for a network read by ``from_powsybl``.
 
-    When a gridfm :class:`~gridfm_datakit.network.Network` is converted to
-    pypowsybl via :func:`~gridfm_datakit.powsybl.convert.to_powsybl`, the
-    element IDs encode the **original** (pre-normalisation) bus numbers from
-    ``network.reverse_bus_index_mapping``.  This function reads those IDs and
-    converts back to 0-based gridfm indices via ``network.bus_index_mapping``.
+    :func:`~gridfm_datakit.powsybl.convert.from_powsybl` writes buses,
+    generators and branches (lines, then 2-winding transformers) in the order
+    pypowsybl lists them, so each map pairs the i-th pypowsybl element with
+    gridfm row i.  A network built by
+    :func:`~gridfm_datakit.powsybl.convert.to_powsybl` follows the gridfm
+    tables instead, so use the maps ``to_powsybl`` returns.
 
     The maps can be built once on the **base network** and then reused across
     all perturbed scenarios, because perturbations preserve element identity
-    and row ordering, and ``to_powsybl`` always uses ``reverse_bus_index_mapping``
-    to produce consistent IDs.
+    and row ordering.
 
     Parameters
     ----------
     network:
-        The gridfm_datakit Network passed to ``to_powsybl()`` to produce *pp_net*.
+        The gridfm_datakit Network returned by ``from_powsybl(pp_net)``.
     pp_net:
-        The pypowsybl network produced by ``to_powsybl(network)``.
+        The pypowsybl network passed to ``from_powsybl``.
 
     Returns
     -------
     MappingP2G
         Dataclass bundling the three maps: ``bus``, ``branch``, and ``gen``.
 
-    Raises
-    ------
-    ValueError
-        If any pypowsybl element ID does not match the expected naming pattern,
-        or if one or more pypowsybl buses cannot be assigned a gridfm index.
-
     Examples
     --------
-    >>> from gridfm_datakit.network import load_net_from_pglib
-    >>> from gridfm_datakit.powsybl.convert import to_powsybl
+    >>> import pypowsybl as pp
+    >>> from gridfm_datakit.powsybl.convert import from_powsybl
     >>> from gridfm_datakit.powsybl.mapping import build_p2g_maps
     >>>
-    >>> net = load_net_from_pglib("case14_ieee")
-    >>> result = to_powsybl(net)
-    >>> mapping = build_p2g_maps(net, result.pp_net)
+    >>> pp_net = pp.network.create_ieee14()
+    >>> net = from_powsybl(pp_net)
+    >>> mapping = build_p2g_maps(net, pp_net)
     >>> mapping.bus    # pp_bus_id → gfm index
     >>> mapping.branch # pp_branch_id → gfm row
     >>> mapping.gen    # pp_gen_id → gfm row
