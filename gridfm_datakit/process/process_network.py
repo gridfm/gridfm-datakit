@@ -1194,7 +1194,7 @@ def process_scenario_pf_mode(
                 if meta is not None:
                     meta["ls_converted"] = converted
             except Exception as e:
-                with open(error_log_file, "a") as f:
+                with open(error_log_file, "a", encoding="utf-8") as f:
                     f.write(
                         f"Caught an exception at scenario {scenario_index} when building the lightsim2grid model: {e}\n",
                     )
@@ -1211,7 +1211,7 @@ def process_scenario_pf_mode(
                         as_arrays=True,
                     )
                 except Exception as e:
-                    with open(error_log_file, "a") as f:
+                    with open(error_log_file, "a", encoding="utf-8") as f:
                         f.write(
                             f"Caught an exception at scenario {scenario_index} when solving dcpf function with lightsim2grid solver: {e}\n",
                         )
@@ -1223,7 +1223,7 @@ def process_scenario_pf_mode(
                     as_arrays=True,
                 )
             except Exception as e:
-                with open(error_log_file, "a") as f:
+                with open(error_log_file, "a", encoding="utf-8") as f:
                     f.write(
                         f"Caught an exception at scenario {scenario_index} when solving in run_pf function with lightsim2grid solver: {e}\n",
                     )
