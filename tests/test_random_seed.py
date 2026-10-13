@@ -2,7 +2,39 @@
 
 import numpy as np
 import pytest
-from gridfm_datakit.utils.random_seed import custom_seed
+from gridfm_datakit.utils.random_seed import _DEFAULT_SEED_POLICY, custom_seed
+
+
+def test_seed_policy_derives_execution_seeds() -> None:
+    """Sequential and distributed paths must share the documented policy."""
+    assert _DEFAULT_SEED_POLICY.sequential_seed(42) == 43
+    assert _DEFAULT_SEED_POLICY.distributed_seed(42, 3) == 840_004
+
+
+def test_seed_policy_uses_worst_case_auto_seed_for_validation() -> None:
+    """An omitted seed must be checked against every possible automatic draw."""
+    expected = (
+        _DEFAULT_SEED_POLICY.auto_seed_upper_bound - 1
+    ) * _DEFAULT_SEED_POLICY.distributed_stride + 10_000
+
+    assert _DEFAULT_SEED_POLICY.maximum_distributed_seed(None, 10_000) == expected
+
+
+@pytest.mark.parametrize(
+    ("operation", "args"),
+    [
+        ("sequential_seed", (2**32 - 1,)),
+        ("distributed_seed", (2**32 - 1, 0)),
+        ("distributed_seed", (42, -1)),
+    ],
+)
+def test_seed_policy_rejects_unsupported_derived_seed(
+    operation: str,
+    args: tuple[int, ...],
+) -> None:
+    """Policy methods must guard their own NumPy seed boundary."""
+    with pytest.raises(ValueError):
+        getattr(_DEFAULT_SEED_POLICY, operation)(*args)
 
 
 def test_seed_set_inside_with_block():
