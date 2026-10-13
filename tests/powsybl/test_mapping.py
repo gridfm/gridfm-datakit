@@ -20,6 +20,7 @@ import pytest
 import gridfm_datakit.powsybl as powsybl
 from gridfm_datakit.network import Network, load_net_from_pglib
 from gridfm_datakit.powsybl.convert import update_powsybl
+from gridfm_datakit.utils.idx_brch import F_BUS, T_BUS
 
 pytestmark = pytest.mark.skipif(
     not powsybl.is_powsybl_available(),
@@ -264,3 +265,35 @@ class TestToPowsyblMapsFollowOriginalBusNumbers:
         conv.pp_net.per_unit = False
         after = conv.pp_net.get_loads()["p0"]
         assert np.allclose(after[before.index], before)
+
+    def test_branch_map_follows_end_buses(self, case14_any_order):
+        """Each pypowsybl branch maps to the gridfm row with the same ends."""
+        net, conv = case14_any_order
+        pp_net, mapping = conv.pp_net, conv.mapping_p2g
+        rev = net.reverse_bus_index_mapping
+        ends = ["bus_breaker_bus1_id", "bus_breaker_bus2_id"]
+        for df in (
+            pp_net.get_lines(attributes=ends),
+            pp_net.get_2_windings_transformers(attributes=ends),
+        ):
+            for pp_branch_id, bus1, bus2 in df.itertuples():
+                row = mapping.branch[pp_branch_id]
+                assert rev[int(net.branches[row, F_BUS])] == _bus_number(bus1)
+                assert rev[int(net.branches[row, T_BUS])] == _bus_number(bus2)
+
+    @pytest.mark.parametrize("case", ["case14_ieee", "case24_ieee_rts"])
+    def test_update_keeps_case_impedances(self, case):
+        """Writing the unchanged network back leaves every r and x as in the case."""
+        net = load_net_from_pglib(case)
+        conv = powsybl.to_powsybl(net)
+        pp_net = conv.pp_net
+        pp_net.per_unit = True
+        before = [df[["r", "x"]].copy() for df in _branch_frames(pp_net)]
+        update_powsybl(pp_net, net, conv.mapping_p2g)
+        pp_net.per_unit = True
+        for old, new in zip(before, _branch_frames(pp_net)):
+            assert np.allclose(new.loc[old.index, ["r", "x"]], old)
+
+
+def _branch_frames(pp_net):
+    return pp_net.get_lines(), pp_net.get_2_windings_transformers()

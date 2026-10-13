@@ -1,7 +1,8 @@
 from dataclasses import dataclass
-from typing import Dict
+from typing import Dict, List, Tuple
 
 from gridfm_datakit.network import Network
+from gridfm_datakit.utils.idx_brch import F_BUS, T_BUS
 
 from .api import check_powsybl_available
 
@@ -110,17 +111,21 @@ def build_p2g_maps_by_bus_number(
 
     ``to_powsybl`` names each bus-breaker bus ``BUS-<n>`` after its original
     bus number.  pypowsybl lists buses by voltage level, and buses joined by a
-    transformer share one, so position does not give the gridfm row.
+    transformer share one, so position does not give the gridfm row.  Branches
+    are matched by original from and to buses, parallel branches in table
+    order, because pypowsybl lists lines before transformers.
 
     Args:
         network: The gridfm_datakit Network passed to ``to_powsybl``.
         pp_net: The pypowsybl network ``to_powsybl(network)`` built.
 
     Returns:
-        MappingP2G with the bus map read from the bus-breaker buses.
+        MappingP2G with the bus and branch maps read from the original bus
+        numbers.
 
     Raises:
-        ValueError: If a pypowsybl bus groups several gridfm buses or has none.
+        ValueError: If a pypowsybl bus groups several gridfm buses or has none,
+            or a pypowsybl branch has no gridfm branch with the same ends.
     """
     maps = build_p2g_maps(network, pp_net)
     maps.bus = {}
@@ -134,6 +139,26 @@ def build_p2g_maps_by_bus_number(
     unmapped = set(pp_net.get_buses().index) - set(maps.bus)
     if unmapped:
         raise ValueError(f"No gridfm bus for pypowsybl buses {sorted(unmapped)}")
+
+    rev = network.reverse_bus_index_mapping
+    rows_by_ends: Dict[Tuple[int, int], List[int]] = {}
+    for row, (f_bus, t_bus) in enumerate(network.branches[:, [F_BUS, T_BUS]]):
+        rows_by_ends.setdefault((rev[int(f_bus)], rev[int(t_bus)]), []).append(row)
+    ends = ["bus_breaker_bus1_id", "bus_breaker_bus2_id"]
+    maps.branch = {}
+    for df in (
+        pp_net.get_lines(attributes=ends),
+        pp_net.get_2_windings_transformers(attributes=ends),
+    ):
+        for pp_branch_id, bus1, bus2 in df.itertuples():
+            key = (_bus_number(bus1), _bus_number(bus2))
+            rows = rows_by_ends.get(key)
+            if not rows:
+                raise ValueError(
+                    f"No gridfm branch from bus {key[0]} to bus {key[1]} "
+                    f"for pypowsybl branch {pp_branch_id}",
+                )
+            maps.branch[pp_branch_id] = rows.pop(0)
     return maps
 
 
