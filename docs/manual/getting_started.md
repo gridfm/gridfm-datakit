@@ -80,7 +80,7 @@ settings:
   pf_solver: "powermodel" # Engine solving the power flow in pf mode; options: powermodel, powsybl, lightsim2grid (the OPF is always solved by PowerModels). powsybl requires network.reader: powsybl
   pf_fast: true # Whether to use fast PF solver by default (compute_ac_pf from powermodels.jl); if false, uses Ipopt-based PF. Some networks e.g. case10000_goc do not work with pf_fast: true
   dcpf_fast: true # Whether to use fast DC PF solver (compute_dc_pf from powermodels.jl); if false, uses optimizer-based DC PF
-  enable_solver_logs: false # If true, write OPF/PF solver logs to {data_dir}/solver_log; PF fast ignores logging
+  enable_solver_logs: false # If true, write OPF/PF solver logs to {data_dir}/solver_log; PF fast and DCPF fast ignore logging
   max_iter: 200 # Maximum iterations for Ipopt-based solvers
 
 ```
