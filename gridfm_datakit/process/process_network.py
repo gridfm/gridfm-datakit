@@ -1694,9 +1694,9 @@ def process_scenario_chunk_multiprocessing(
             contains only the current chunk.
         coinhsl_enabled: Whether to use CoinHSL linear solvers in Ipopt.
         coinhsl_linear_solver: CoinHSL linear solver to use (e.g., "ma27", "ma57",
-        coinhsl_hsllib: Path to CoinHSL shared library.
             "ma77", "ma86", "ma97").
-        skip_scenario: scenario indices that timed out in the previous attempt
+        coinhsl_hsllib: Path to CoinHSL shared library.
+        skip_scenarios: scenario indices that timed out in the previous attempt.
     Returns:
         Tuple containing:
             - Exception object (None if successful)
