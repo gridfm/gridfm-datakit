@@ -19,11 +19,15 @@ class MappingP2G:
         ``{pp_branch_id: gfm_branch_row}``
     gen : Dict[str, int]
         ``{pp_gen_id: gfm_gen_row}``
+    reverse_bus_index_mapping : Dict[int, int]
+        ``{gfm_bus_index: original_bus_number}``. Power-flow bus results are
+        keyed by that original number, the same way PowerModels keys them.
     """
 
     bus: Dict[str, float]
     branch: Dict[str, int]
     gen: Dict[str, int]
+    reverse_bus_index_mapping: Dict[int, int]
 
 
 # ---------------------------------------------------------------------------
@@ -100,7 +104,15 @@ def build_p2g_maps(
             map_branch_p2g[pp_branch_id] = offset + row
         offset += len(df)
 
-    return MappingP2G(bus=map_bus_p2g, branch=map_branch_p2g, gen=map_gen_p2g)
+    return MappingP2G(
+        bus=map_bus_p2g,
+        branch=map_branch_p2g,
+        gen=map_gen_p2g,
+        reverse_bus_index_mapping={
+            int(row): int(orig)
+            for row, orig in network.reverse_bus_index_mapping.items()
+        },
+    )
 
 
 def build_p2g_maps_by_bus_number(

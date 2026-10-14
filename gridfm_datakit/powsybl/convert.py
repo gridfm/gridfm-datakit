@@ -217,20 +217,22 @@ def update_powsybl(
 
     pp_net.per_unit = True
     line_id = pp_net.get_lines().index.to_numpy()
-    gfm_line_idx = np.array([mapping_p2g.branch[i] for i in line_id])
-    pp_net.update_lines(
-        id=line_id,
-        r=gfm_net.branches[gfm_line_idx, BR_R].tolist(),
-        x=gfm_net.branches[gfm_line_idx, BR_X].tolist(),
-    )
+    if len(line_id):
+        gfm_line_idx = np.array([mapping_p2g.branch[i] for i in line_id])
+        pp_net.update_lines(
+            id=line_id,
+            r=gfm_net.branches[gfm_line_idx, BR_R].tolist(),
+            x=gfm_net.branches[gfm_line_idx, BR_X].tolist(),
+        )
 
     wt2_id = pp_net.get_2_windings_transformers().index.to_numpy()
-    gfm_wt2_idx = np.array([mapping_p2g.branch[i] for i in wt2_id])
-    pp_net.update_2_windings_transformers(
-        id=wt2_id,
-        r=gfm_net.branches[gfm_wt2_idx, BR_R].tolist(),
-        x=gfm_net.branches[gfm_wt2_idx, BR_X].tolist(),
-    )
+    if len(wt2_id):
+        gfm_wt2_idx = np.array([mapping_p2g.branch[i] for i in wt2_id])
+        pp_net.update_2_windings_transformers(
+            id=wt2_id,
+            r=gfm_net.branches[gfm_wt2_idx, BR_R].tolist(),
+            x=gfm_net.branches[gfm_wt2_idx, BR_X].tolist(),
+        )
 
     pp_net.per_unit = initial_per_unit_status
 
