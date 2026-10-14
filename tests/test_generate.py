@@ -5,7 +5,6 @@ Test cases for generating data from gridfm_datakit.generate module
 import pytest
 import os
 
-import shutil
 import tempfile
 import yaml
 import pandas as pd
@@ -20,7 +19,7 @@ from gridfm_datakit.generate import (
 
 
 @pytest.fixture(params=["opf", "pf"])
-def conf(request):
+def conf(request, tmp_path):
     """
     Loads configuration files for both opf and pf modes.
     This fixture reads the configuration files and returns both for parametrized testing.
@@ -34,9 +33,7 @@ def conf(request):
     with open(path, "r") as f:
         base_config = yaml.safe_load(f)
         args = NestedNamespace(**base_config)
-    # Isolate outputs per xdist worker
-    worker = os.environ.get("PYTEST_XDIST_WORKER", "local")
-    args.settings.data_dir = f"./tests/test_data_{request.param}_mode_{worker}"
+    args.settings.data_dir = str(tmp_path)
     return args
 
 
@@ -76,7 +73,7 @@ def test_setup_environment_rejects_unknown_opf_formulation(conf):
     conf.settings.opf_formulation = "unsupported"
     with pytest.raises(
         ValueError,
-        match="settings.opf_formulation must be 'polar' or 'rectangular'",
+        match=r"settings\.opf_formulation: Input should be 'polar' or 'rectangular'",
     ):
         _setup_environment(conf)
 
@@ -110,16 +107,16 @@ def test_fail_prepare_network_and_scenarios_config(conf):
     Tests if preparing network and scenarios fails with an invalid grid source in the configuration file
     """
     args, base_path, file_paths, seed = _setup_environment(conf)
-    conf.network.source = "invalid_source"  # Set invalid source
+    args.network.source = "invalid_source"  # Set invalid source
     with pytest.raises(
         ValueError,
-        match=f"network.source must be 'pglib' or 'file', got {conf.network.source!r}",
+        match=f"network.source must be 'pglib' or 'file', got {args.network.source!r}",
     ):
-        net, scenarios, _ = _prepare_network_and_scenarios(conf, file_paths, seed)
+        net, scenarios, _ = _prepare_network_and_scenarios(args, file_paths, seed)
 
 
 # Test save network function
-def test_save_generated_data():
+def test_save_generated_data(tmp_path):
     """
     Tests if saving generated data works correctly by processing a single scenario
     and verifying that output files are created with correct structure.
@@ -130,8 +127,7 @@ def test_save_generated_data():
     with open(config_path, "r") as f:
         cfg = yaml.safe_load(f)
     args = NestedNamespace(**cfg)
-    worker = os.environ.get("PYTEST_XDIST_WORKER", "local")
-    args.settings.data_dir = f"./tests/test_data_without_perturbation_{worker}"
+    args.settings.data_dir = str(tmp_path)
     file_paths = generate_power_flow_data_distributed(args)
     print(file_paths)
 
@@ -177,32 +173,6 @@ def test_fail_generate_pf_data():
         generate_power_flow_data(config)
 
 
-# Clean up generated files after tests
-@pytest.fixture(scope="session", autouse=True)
-def cleanup_generated_files():
-    """
-    Cleans up generated files after tests.
-    This fixture runs after all tests in the module have completed.
-    """
-    yield  # This allows tests to run first
-
-    # Only clean up directories that were actually created by these tests
-    worker = os.environ.get("PYTEST_XDIST_WORKER", "local")
-    cleanup_paths = [
-        f"./tests/test_data_without_perturbation_{worker}",
-        f"./tests/test_data_pf_mode_{worker}",
-        f"./tests/test_data_opf_mode_{worker}",
-    ]
-
-    for path in cleanup_paths:
-        try:
-            if os.path.exists(path):
-                shutil.rmtree(path)
-                print(f"Cleaned up: {path}")
-        except Exception as e:
-            print(f"Warning: Could not clean up {path}: {e}")
-
-
 def test_setup_environment_overwrite_behavior():
     """Ensure _setup_environment respects the overwrite flag by deleting or preserving existing output.
 
@@ -213,22 +183,11 @@ def test_setup_environment_overwrite_behavior():
     - Call _setup_environment with overwrite=True: marker should be removed
     """
     with tempfile.TemporaryDirectory() as tmpdir:
-        config = {
-            "settings": {
-                "data_dir": tmpdir,
-                "overwrite": False,
-                "include_dc_res": False,
-                "enable_solver_logs": False,
-                "pf_fast": False,
-                "mode": "opf",
-            },
-            "network": {"name": "case24_ieee_rts"},
-            # minimal required sections for downstream functions
-            "load": {"generator": "agg_load_profile", "scenarios": 1},
-            "topology_perturbation": {"type": "none"},
-            "generation_perturbation": {"type": "none"},
-            "admittance_perturbation": {"type": "none"},
-        }
+        with open("tests/config/default_without_perturbation_test.yaml", "r") as f:
+            config = yaml.safe_load(f)
+        config["settings"]["data_dir"] = tmpdir
+        config["settings"]["overwrite"] = False
+        config["load"]["scenarios"] = 1
 
         # First setup creates directories
         args, base_path, file_paths, seed = _setup_environment(config)
@@ -373,8 +332,6 @@ def test_reproducibility_with_same_seed():
         # Also check the scenarios file
         scenarios_1 = pd.read_parquet(file_paths_1["scenarios"], engine="pyarrow")
         scenarios_2 = pd.read_parquet(file_paths_2["scenarios"], engine="pyarrow")
-
-        os.makedirs("tests/test_data", exist_ok=True)
 
         pd.testing.assert_frame_equal(
             scenarios_1,

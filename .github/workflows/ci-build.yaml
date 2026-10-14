@@ -17,21 +17,30 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
-      - uses: pre-commit/action@v3.0.1
+      - name: Cache pre-commit environments
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ runner.os }}-${{ env.pythonLocation }}-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: Run pre-commit
+        run: |
+          python -m pip install pre-commit
+          pre-commit run --all-files --show-diff-on-failure --color=always
 
   security-test:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     container: python:3.12-slim
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install bandit
         run: pip install bandit
@@ -43,10 +52,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Julia 1.12
-        uses: julia-actions/setup-julia@v1
+        uses: julia-actions/setup-julia@v3
         with:
           version: '1.12'
 
@@ -54,7 +63,7 @@ jobs:
       # importantly, the precompile cache). Keyed on the pinned solver versions
       # so it only rebuilds when juliapkg.json changes.
       - name: Cache Julia depot
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.julia
           key: julia-depot-${{ runner.os }}-julia1.12-${{ hashFiles('gridfm_datakit/juliapkg.json') }}
@@ -62,26 +71,20 @@ jobs:
             julia-depot-${{ runner.os }}-julia1.12-
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
       - name: Cache pip
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/pip
           key: pip-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
           restore-keys: |
             pip-${{ runner.os }}-
 
-      - name: Create virtualenv
-        run: |
-          python -m venv .venv
-          source .venv/bin/activate
-
       - name: Install Python dependencies
         run: |
-          source .venv/bin/activate
           python -m pip install --upgrade pip wheel
           pip install -e ".[test]"
 
@@ -92,12 +95,10 @@ jobs:
       # versions don't resolve together. Near-instant on a cache hit.
       - name: Set up Julia packages (PowerModels)
         run: |
-          source .venv/bin/activate
           python -c "from juliacall import Main as jl; jl.seval('using PowerModels, Ipopt, Memento')"
 
       - name: Unit tests
         run: |
-          source .venv/bin/activate
           export SKIP_LARGE_GRIDS=1
           pytest --cov=. tests/ -v -s
 
@@ -107,15 +108,15 @@ jobs:
     env:
       DYNAWO_VERSION: '1.7.0'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Julia 1.12
-        uses: julia-actions/setup-julia@v1
+        uses: julia-actions/setup-julia@v3
         with:
           version: '1.12'
 
       - name: Cache Julia depot
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.julia
           key: julia-depot-${{ runner.os }}-julia1.12-${{ hashFiles('gridfm_datakit/juliapkg.json') }}
@@ -123,12 +124,12 @@ jobs:
             julia-depot-${{ runner.os }}-julia1.12-
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
       - name: Cache pip
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/pip
           key: pip-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
@@ -142,7 +143,7 @@ jobs:
 
       - name: Cache Dynawo
         id: cache-dynawo
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/dynawo
           key: dynawo-${{ runner.os }}-${{ env.DYNAWO_VERSION }}
@@ -163,7 +164,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip wheel
-          pip install -e ".[test,dynamic,powsybl]"
+          pip install -e ".[test,dynamic,powsybl,lightsim2grid]"
 
       - name: Set up Julia packages (PowerModels)
         run: python -c "from juliacall import Main as jl; jl.seval('using PowerModels, Ipopt, Memento')"
@@ -173,19 +174,60 @@ jobs:
           "$HOME/dynawo/dynawo.sh" version
           python -c "from gridfm_datakit.dynamic.dynawo.api import check_dynawo_available; check_dynawo_available()"
 
-      - name: Dynawo and powsybl tests
-        run: pytest tests/dynamic tests/powsybl -v
+      - name: Dynawo, powsybl and lightsim2grid tests
+        run: pytest tests/dynamic tests/powsybl tests/lightsim2grid -v
+
+  windows-pytests:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Julia 1.12
+        uses: julia-actions/setup-julia@v3
+        with:
+          version: '1.12'
+
+      - name: Cache Julia depot
+        uses: actions/cache@v6
+        with:
+          path: ~/.julia
+          key: julia-depot-${{ runner.os }}-julia1.12-${{ hashFiles('gridfm_datakit/juliapkg.json') }}
+          restore-keys: |
+            julia-depot-${{ runner.os }}-julia1.12-
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip wheel
+          pip install -e ".[test]"
+
+      - name: Set up Julia packages (PowerModels)
+        run: python -c "from juliacall import Main as jl; jl.seval('using PowerModels, Ipopt, Memento')"
+
+      - name: Unit tests
+        run: |
+          export SKIP_LARGE_GRIDS=1
+          pytest tests/ -v --durations=25
 
   codeql:
     name: CodeQL (Python)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: github/codeql-action/init@v3
+      - uses: actions/checkout@v7
+      - uses: github/codeql-action/init@v4
         with:
           languages: python
-      - uses: github/codeql-action/autobuild@v3
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@v4
         with:
           category: "/language:python"
