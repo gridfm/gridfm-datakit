@@ -77,7 +77,7 @@ Before opening a PR, make sure you complete all steps:
 ### 8. Pull request
 
 * [ ] **Rebase your branch onto the latest `main`/`dev` before opening a PR.**
-* [ ] Open a PR with a short description of your changes and add Alban Puech as a reviewer.
+* [ ] Open a PR with a short description of your changes.
 * [ ] Ensure code, tests, and documentation are clear and complete.
 
 ## Running the integration tests
