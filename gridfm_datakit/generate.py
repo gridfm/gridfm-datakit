@@ -19,6 +19,7 @@ from tqdm import tqdm
 
 import gridfm_datakit.lightsim2grid as lightsim2grid
 import gridfm_datakit.powsybl as powsybl
+from gridfm_datakit.config import validate_static_config
 from gridfm_datakit.network import (
     Network,
     get_pglib_file_path,
@@ -47,7 +48,7 @@ from gridfm_datakit.utils.param_handler import (
     initialize_generation_generator,
     initialize_topology_generator,
 )
-from gridfm_datakit.utils.random_seed import custom_seed
+from gridfm_datakit.utils.random_seed import _DEFAULT_SEED_POLICY, custom_seed
 from gridfm_datakit.utils.utils import Tee, write_parquet, write_ram_usage_distributed
 
 
@@ -85,54 +86,66 @@ def _setup_environment(
 
     Returns:
         Tuple of (args, base_path, file_paths, seed)
+
+    Raises:
+        TypeError: If config is not a path, dictionary, or NestedNamespace.
+        ValueError: If a static configuration is invalid.
     """
-    # Load config from file if a path is provided
     if isinstance(config, str):
         with open(config, "r") as f:
             config = yaml.safe_load(f)
-
-    # Convert dict to NestedNamespace if needed
-    if isinstance(config, dict):
-        args = NestedNamespace(**config)
-    else:
-        args = config
-
-    # Resolve and validate the network reader.
-    #
-    # reader controls HOW the network file is parsed (independent of pf_solver).
-    # source controls WHERE to get the file: 'pglib' (download) or 'file' (local).
-    reader = getattr(args.network, "reader", "native")
-    if reader not in ("native", "powsybl"):
-        raise ValueError(
-            f"network.reader must be 'native' or 'powsybl', got {reader!r}",
+    elif isinstance(config, NestedNamespace):
+        config = config.to_dict()
+    elif not isinstance(config, dict):
+        raise TypeError(
+            "config must be a YAML path, a dictionary, or a NestedNamespace, "
+            f"got {type(config).__name__}",
         )
-    args.network.reader = reader
 
-    # Resolve and validate the PF solver setting.
-    #
-    # pf_solver controls which engine is used to solve the power flow equations
-    # in PF mode.  pf_solver 'powsybl' requires network.reader 'powsybl'.
-    #
-    # OPF is always solved by PowerModels (Julia) regardless of this setting.
-    # In OPF mode the value is read and stored on args but is never consulted
-    # during execution — it is kept here purely for consistency and logging.
-    pf_solver = getattr(args.settings, "pf_solver", "powermodel")
-    if pf_solver not in ("powermodel", "powsybl", "lightsim2grid"):
+    if not isinstance(config, dict):
         raise ValueError(
-            "settings.pf_solver must be 'powermodel', 'powsybl' or 'lightsim2grid', "
-            f"got {pf_solver!r}",
+            f"Configuration must contain a YAML mapping, got {type(config).__name__}",
         )
-    if pf_solver == "lightsim2grid":
+
+    is_dynamic_config = bool(config.get("dynamic"))
+    if not is_dynamic_config:
+        config = validate_static_config(config)
+    args = NestedNamespace(**config)
+
+    # Dynamic generation retains its dedicated validator for now. Static
+    # configurations receive these defaults from the Pydantic schema above.
+    if is_dynamic_config:
+        reader = getattr(args.network, "reader", "native")
+        if reader not in ("native", "powsybl"):
+            raise ValueError(
+                f"network.reader must be 'native' or 'powsybl', got {reader!r}",
+            )
+        args.network.reader = reader
+
+        # pf_solver controls which engine solves the power flow in PF mode.
+        # 'powsybl' requires network.reader 'powsybl'. OPF is always solved
+        # by PowerModels, so this value is only stored in OPF mode.
+        pf_solver = getattr(args.settings, "pf_solver", "powermodel")
+        if pf_solver not in ("powermodel", "powsybl", "lightsim2grid"):
+            raise ValueError(
+                "settings.pf_solver must be 'powermodel', 'powsybl' or 'lightsim2grid', "
+                f"got {pf_solver!r}",
+            )
+        args.settings.pf_solver = pf_solver
+
+        opf_formulation = getattr(args.settings, "opf_formulation", "polar")
+        if opf_formulation not in ("polar", "rectangular"):
+            raise ValueError(
+                "settings.opf_formulation must be 'polar' or 'rectangular', "
+                f"got {opf_formulation!r}",
+            )
+        args.settings.opf_formulation = opf_formulation
+
+    # Static configs are checked by the schema. This still has to run for both
+    # paths: the schema cannot tell whether the package is installed, and the
+    # check must happen before an existing output directory is removed.
+    if args.settings.pf_solver == "lightsim2grid":
         lightsim2grid.check_lightsim2grid_available()
-    args.settings.pf_solver = pf_solver
-
-    opf_formulation = getattr(args.settings, "opf_formulation", "polar")
-    if opf_formulation not in ("polar", "rectangular"):
-        raise ValueError(
-            "settings.opf_formulation must be 'polar' or 'rectangular', "
-            f"got {opf_formulation!r}",
-        )
-    args.settings.opf_formulation = opf_formulation
 
     # Setup output directory
     base_path = os.path.join(args.settings.data_dir, args.network.name, "raw")
@@ -141,28 +154,18 @@ def _setup_environment(
     os.makedirs(base_path, exist_ok=True)
 
     rng_seed_path = os.path.join(base_path, "rng_seed.txt")
-    # If it is a checkpoint resume (overwrite=False and rng_seed.txt exists), reuse seed
-    if args.settings.overwrite is False and os.path.exists(rng_seed_path):
+    # Resume with the original seed so scenario generation remains reproducible.
+    if not args.settings.overwrite and os.path.exists(rng_seed_path):
         with open(rng_seed_path, "r") as f:
             seed = int(f.readline())
-        print(f"Global random seed set to: {seed} due to checkpoint")
+        print(f"Reusing checkpoint seed: {seed}")
     else:
-        # Set global seed if provided, otherwise generate a unique seed for this generation
-        if (
-            hasattr(args.settings, "seed")
-            and args.settings.seed is not None
-            and args.settings.seed != ""
-        ):
-            seed = args.settings.seed
-            print(f"Global random seed set to: {seed} from config")
+        configured_seed = getattr(args.settings, "seed", None)
+        if configured_seed is not None:
+            seed = configured_seed
+            print(f"Global random seed set to: {seed}")
         else:
-            # Generate a unique seed for non-reproducible but independent scenarios
-            # This ensures scenarios are i.i.d. within a run, but different across runs
-            import secrets
-
-            seed = secrets.randbelow(50_000)
-            # chunk_seed = seed * 20000 + start_idx + 1 < 2^31 - 1
-            # seed < (2,147,483,647 - n_scenarios) / 20,000 ~= 100_000 so taking 50_000 to be safe
+            seed = _DEFAULT_SEED_POLICY.random_base_seed()
             print(f"No seed provided. Using seed={seed}")
         with open(rng_seed_path, "w") as f:
             f.write(str(seed))
@@ -396,7 +399,7 @@ def generate_power_flow_data(
 
     # Process scenarios sequentially with deterministic seed
     # Use custom_seed to control randomness for reproducibility
-    with custom_seed(seed + 1):
+    with custom_seed(_DEFAULT_SEED_POLICY.sequential_seed(seed)):
         with open(file_paths["tqdm_log"], "a") as f:
             with tqdm(
                 total=args.load.scenarios,
@@ -496,19 +499,9 @@ def generate_power_flow_data_distributed(
     # Setup environment
     args, base_path, file_paths, seed = _setup_environment(config)
 
-    # check if mode is valid
-    if args.settings.mode not in ["opf", "pf"]:
-        raise ValueError("Invalid mode!")
-
     scenario_count = args.load.scenarios
     large_chunk_size = args.settings.large_chunk_size
     configured_processes = args.settings.num_processes
-    if scenario_count <= 0:
-        raise ValueError("load.scenarios must be positive")
-    if large_chunk_size <= 0:
-        raise ValueError("settings.large_chunk_size must be positive")
-    if configured_processes <= 0:
-        raise ValueError("settings.num_processes must be positive")
 
     # Prepare network and scenarios
     net, scenarios, meta = _prepare_network_and_scenarios(args, file_paths, seed)
@@ -897,7 +890,6 @@ def generate_power_flow_data_distributed_multiprocessing(
                             ]
 
                             timed_out = False
-                            timed_out_pid = None
                             timed_out_scenario = None
 
                             worker_failed = False
@@ -968,7 +960,6 @@ def generate_power_flow_data_distributed_multiprocessing(
 
                                         if elapsed > scenario_timeout:
                                             timed_out = True
-                                            timed_out_pid = worker_pid
                                             timed_out_scenario = scenario_index
 
                                             message = (
