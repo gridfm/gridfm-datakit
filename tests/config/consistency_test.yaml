@@ -39,7 +39,7 @@ settings:
   large_chunk_size: 1000 # Number of load scenarios processed before saving
   is_multiprocessing: false # This decides whether the multiprocessing.Manager path is taken or ProcessPoolExecutor. Default value false.
   scenario_timeout_sec: 600 #scenario gets timed out after these secs in multiprocessing
-  overwrite: true # If true, overwrites existing files, if false, appends to files. True checkpointing only available with is_multiprocessing=true. Ignores seed value if false (reads from checkpoint instead). 
+  overwrite: true # If true, overwrites existing files, if false, appends to files. True checkpointing only available with is_multiprocessing=true. Ignores seed value if false (reads from checkpoint instead).
   mode: "pf" # Mode of the script; options: pf, opf. pf: power flow data where one or more operating limits – the inequality constraints defined in OPF, e.g., voltage magnitude or branch limits – may be violated. opf:  generates datapoints for training OPF solvers, with cost-optimal dispatches that satisfy all operating limits (OPF-feasible)
   include_dc_res: true # If true, also stores the results of dc power flow or dc optimal power flow
   enable_solver_logs: false # If true, write OPF/PF logs to {data_dir}/solver_log; PF fast and DCPF fast do not log.
@@ -51,4 +51,4 @@ settings:
   coinhsl:
     enabled: false # Whether to use CoinHSL linear solvers (MA27, MA57, MA77, MA86, MA97)
     linear_solver: "ma57" # CoinHSL linear solver to use
-    hsllib: "/home/atif/packages/coinhsl-2023.11.17/install/lib/x86_64-linux-gnu/libcoinhsl.so" # Path to CoinHSL shared library
+    hsllib: "/lib/x86_64-linux-gnu/libcoinhsl.so" # Path to CoinHSL shared library

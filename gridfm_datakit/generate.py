@@ -141,8 +141,8 @@ def _setup_environment(
     os.makedirs(base_path, exist_ok=True)
 
     rng_seed_path = os.path.join(base_path, "rng_seed.txt")
-    # If it is a checkpoint resume, i.e., overwrite=False then reuse seed
-    if args.settings.overwrite is False:
+    # If it is a checkpoint resume (overwrite=False and rng_seed.txt exists), reuse seed
+    if args.settings.overwrite is False and os.path.exists(rng_seed_path):
         with open(rng_seed_path, "r") as f:
             seed = int(f.readline())
         print(f"Global random seed set to: {seed} due to checkpoint")

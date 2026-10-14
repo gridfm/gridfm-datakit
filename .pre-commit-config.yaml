@@ -10,7 +10,6 @@ repos:
   rev: v0.14.10
   hooks:
     - id: ruff-check
-      args: ["--ignore=UP006"]
     - id: ruff-format
 -   repo: https://github.com/PyCQA/flake8
     rev: 7.3.0
