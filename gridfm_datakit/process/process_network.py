@@ -155,16 +155,6 @@ def init_julia(
     else:
         coinhsl_options = ""
 
-    # Ipopt robustness options for improved convergence on difficult problems
-    robustness_options = '''
-                        "max_wall_time" => 60000.0,          # Maximum wall time in seconds
-                        "diverging_iterates_tol" => 10000.0, # Tolerance for diverging iterates
-                        "acceptable_tol" => 1e-4,            # Acceptable convergence tolerance
-                        "acceptable_iter" => 200,            # Iterations at acceptable tolerance
-                        "acceptable_dual_inf_tol" => 1e6,    # Acceptable dual infeasibility
-                        "dual_inf_tol" => 1e4,               # Dual infeasibility tolerance
-'''
-
     try:
         # If dc_max_iter not provided, use 1000
         dc_iter = 1000 if dc_max_iter is None else dc_max_iter
@@ -268,7 +258,6 @@ def init_julia(
                     "print_level" => {print_level},
                     "max_iter" => {max_iter},
 {coinhsl_options}
-{robustness_options}
                 ),
             )
             result["runtime"] = time() - start_time
@@ -292,7 +281,6 @@ def init_julia(
                         "print_level" => {print_level},
                         "max_iter" => {max_iter},
 {coinhsl_options}
-{robustness_options}
                     );
                     solution_processors=[sol_data_model!],
                 )
@@ -336,7 +324,7 @@ def init_julia(
             result["solution"]["pf"] = false
             return result
         end
-        """.format(print_level, dc_iter, robustness_options=robustness_options),
+        """.format(print_level, dc_iter),
         )
 
         jl.seval("const run_dcopf = _run_dcopf_core")
