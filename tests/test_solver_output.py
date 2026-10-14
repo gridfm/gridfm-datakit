@@ -5,6 +5,7 @@ The Julia wiring is exercised by the generation tests.
 
 import ctypes
 import os
+import sys
 
 import pytest
 
@@ -88,7 +89,7 @@ class TestRedirectCStdio:
     # capturing fd-level output that bypasses Python's sys.stdout.
 
     def test_redirects_c_level_writes_to_file(self, tmp_path, capfd):
-        libc = ctypes.CDLL(None)
+        libc = ctypes.CDLL("ucrtbase" if sys.platform == "win32" else None)
         log = tmp_path / "out.log"
 
         with redirect_fds(str(log)):

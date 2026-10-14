@@ -59,6 +59,16 @@ from gridfm_datakit.utils.idx_cost import MODEL, NCOST, POLYNOMIAL
 from gridfm_datakit.utils.idx_gen import GEN_BUS, GEN_STATUS, PG, QG
 
 
+def _julia_string(value: str) -> str:
+    """Return ``value`` as a Julia string literal.
+
+    Backslashes, quotes and ``$`` are escaped, so Windows paths and paths
+    containing interpolation characters reach Julia unchanged.
+    """
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"').replace("$", "\\$")
+    return f'"{escaped}"'
+
+
 def correct_network(network_path: str, force: bool = False) -> str:
     """
     Load a MATPOWER network using PowerModels via run_julia
@@ -101,8 +111,8 @@ def correct_network(network_path: str, force: bool = False) -> str:
         julia_code = [
             "using PowerModels",
             "PowerModels.silence()",
-            f'data = PowerModels.parse_file("{network_path}")',
-            f'PowerModels.export_matpower("{tmp_path}", data)',
+            f"data = PowerModels.parse_file({_julia_string(network_path)})",
+            f"PowerModels.export_matpower({_julia_string(tmp_path)}, data)",
         ]
 
         # Run Julia
@@ -152,7 +162,8 @@ class Network:
     This class handles power system networks loaded from MATPOWER case files,
     providing functionality for bus index mapping, power flow calculations,
     and data export. It automatically handles non-continuous bus indexing
-    by mapping to continuous indices for internal processing.
+    by mapping to continuous indices for internal processing. Those ids follow
+    the bus-table order, so bus id ``i`` is row ``i``.
 
     Attributes:
         mpc: Original MATPOWER case dictionary.
@@ -161,10 +172,10 @@ class Network:
         gens: Generator data array with continuous indexing.
         branches: Branch data array with continuous indexing.
         gencosts: Generator cost data array.
-        original_bus_indices: Original bus indices from MATPOWER file.
+        original_bus_indices: Original bus indices from MATPOWER file, in table order.
         bus_index_mapping: Mapping from original to continuous bus indices.
         reverse_bus_index_mapping: Mapping from continuous to original bus indices.
-        ref_bus_idx: Index of the reference bus.
+        ref_bus_idx: Continuous id of the reference bus. This is also its row.
     """
 
     def __init__(self, mpc: Dict[str, Any]) -> None:
@@ -187,21 +198,31 @@ class Network:
         # Store original bus indices before conversion (these are 1-based from MATPOWER)
         self.original_bus_indices = self.buses[:, BUS_I].astype(int).copy()
 
-        # Create mapping from original bus indices to continuous indices (0, 1, 2, ..., n_bus-1)
-        unique_bus_indices = np.unique(self.original_bus_indices)
+        # Number buses in table order. Sorting the original ids (np.unique)
+        # makes the continuous id differ from the row whenever the case does
+        # not list buses in increasing order, and Pd / bus type / Vm are
+        # stored by row while generator and branch ends are stored by id.
+        if len(np.unique(self.original_bus_indices)) != len(self.original_bus_indices):
+            raise ValueError(
+                "Duplicate bus numbers in the bus table: "
+                f"{self.original_bus_indices.tolist()}",
+            )
         self.bus_index_mapping = {
-            int(orig_idx): new_idx
-            for new_idx, orig_idx in enumerate(unique_bus_indices)
+            int(orig_idx): row for row, orig_idx in enumerate(self.original_bus_indices)
         }
         self.reverse_bus_index_mapping = {
-            new_idx: int(orig_idx)
-            for orig_idx, new_idx in self.bus_index_mapping.items()
+            row: int(orig_idx) for row, orig_idx in enumerate(self.original_bus_indices)
         }
 
-        # Convert bus indices to continuous (0-based) for internal processing
+        # Convert bus indices to continuous (0-based) for internal processing.
+        # After this, buses[:, BUS_I] is 0 .. n-1.
         self.buses[:, BUS_I] = np.array(
             [self.bus_index_mapping[int(idx)] for idx in self.buses[:, BUS_I]],
         )
+        assert np.array_equal(
+            self.buses[:, BUS_I],
+            np.arange(len(self.buses)),
+        ), "Continuous bus id must equal the bus row"
         self.gens[:, GEN_BUS] = np.array(
             [self.bus_index_mapping[int(idx)] for idx in self.gens[:, GEN_BUS]],
         )
@@ -230,7 +251,8 @@ class Network:
         assert np.sum(self.buses[:, BUS_TYPE] == REF) == 1, (
             "There should be exactly one reference bus"
         )
-        self.ref_bus_idx = np.where(self.buses[:, BUS_TYPE] == REF)[0][0]
+        # The reference bus id equals its row, because ids follow table order.
+        self.ref_bus_idx = int(np.where(self.buses[:, BUS_TYPE] == REF)[0][0])
 
         # Static solver metadata is computed lazily and shared by the cheap
         # scenario copies.  The electrical matrices themselves remain isolated.
@@ -484,14 +506,31 @@ class Network:
             bool: True if there is exactly one connected component, False otherwise
         """
         n_buses = self.buses.shape[0]
-        in_service = self.branches[:, BR_STATUS] == 1
-        from_buses = self.branches[in_service, F_BUS].astype(np.int64, copy=False)
-        to_buses = self.branches[in_service, T_BUS].astype(np.int64, copy=False)
+        # The branch ends never change between perturbations: the branches sorted by
+        # origin bus are kept in the (shared) solver cache, which makes the CSR
+        # adjacency of the in-service branches a masking, without any sorting.
+        f, t = self.branches[:, F_BUS], self.branches[:, T_BUS]
+        cached = self._solver_cache.get("connectivity")
+        if cached is None or not (
+            np.array_equal(cached[0], f) and np.array_equal(cached[1], t)
+        ):
+            order = np.argsort(f, kind="stable")
+            cached = (
+                f.copy(),
+                t.copy(),
+                order,
+                f[order].astype(np.int64),
+                t[order].astype(np.int64),
+            )
+            self._solver_cache["connectivity"] = cached
+        _, _, order, from_sorted, to_sorted = cached
+        keep = (self.branches[:, BR_STATUS] == 1)[order]
+        indices = to_sorted[keep]
+        indptr = np.concatenate(
+            ([0], np.cumsum(np.bincount(from_sorted[keep], minlength=n_buses))),
+        )
         adjacency = csr_matrix(
-            (
-                np.ones(from_buses.size, dtype=np.uint8),
-                (from_buses, to_buses),
-            ),
+            (np.ones(indices.size, dtype=np.uint8), indices, indptr),
             shape=(n_buses, n_buses),
         )
         return (
@@ -796,6 +835,7 @@ def makeYbus(
     baseMVA: float,
     bus: np.ndarray,
     branch: np.ndarray,
+    branch_vecs: Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None = None,
 ) -> Tuple[csr_matrix, csr_matrix, csr_matrix]:
     """Build the bus admittance matrix and branch admittance matrices.
 
@@ -809,6 +849,8 @@ def makeYbus(
         baseMVA: Base MVA for the power system.
         bus: Bus data array.
         branch: Branch data array.
+        branch_vecs: Optional result of ``branch_vectors(branch, branch.shape[0])``,
+            to avoid computing it twice when the caller already has it.
 
     Returns:
         Tuple containing:
@@ -826,7 +868,9 @@ def makeYbus(
     #      |    | = |          | * |    |
     #      | It |   | Ytf  Ytt |   | Vt |
     #
-    Ytt, Yff, Yft, Ytf = branch_vectors(branch, nl)
+    Ytt, Yff, Yft, Ytf = (
+        branch_vectors(branch, nl) if branch_vecs is None else branch_vecs
+    )
     # compute shunt admittance
     # if Psh is the real power consumed by the shunt at V = 1.0 p.u.
     # and Qsh is the reactive power injected by the shunt at V = 1.0 p.u.

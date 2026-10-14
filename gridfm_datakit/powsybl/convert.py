@@ -15,7 +15,7 @@ to_powsybl(network) → ConvertedNetwork:
     1. Restore original bus numbers via network.reverse_bus_index_mapping
     2. Build MATPOWER struct and save to temp .mat
     3. Load .mat with pypowsybl
-    4. Build pypowsybl-to-gridfm maps (build_p2g_maps)
+    4. Build pypowsybl-to-gridfm maps (build_p2g_maps_by_bus_number)
     5. Return ConvertedNetwork(pp_net, maps)
 
     Using reverse_bus_index_mapping ensures that any two networks sharing the
@@ -65,7 +65,7 @@ from gridfm_datakit.utils.idx_cost import (
 from gridfm_datakit.utils.idx_gen import GEN_BUS, GEN_STATUS, PG
 
 from .api import check_powsybl_available, pypowsybl
-from .mapping import MappingP2G, build_p2g_maps
+from .mapping import MappingP2G, build_p2g_maps_by_bus_number
 
 
 @dataclass
@@ -217,20 +217,22 @@ def update_powsybl(
 
     pp_net.per_unit = True
     line_id = pp_net.get_lines().index.to_numpy()
-    gfm_line_idx = np.array([mapping_p2g.branch[i] for i in line_id])
-    pp_net.update_lines(
-        id=line_id,
-        r=gfm_net.branches[gfm_line_idx, BR_R].tolist(),
-        x=gfm_net.branches[gfm_line_idx, BR_X].tolist(),
-    )
+    if len(line_id):
+        gfm_line_idx = np.array([mapping_p2g.branch[i] for i in line_id])
+        pp_net.update_lines(
+            id=line_id,
+            r=gfm_net.branches[gfm_line_idx, BR_R].tolist(),
+            x=gfm_net.branches[gfm_line_idx, BR_X].tolist(),
+        )
 
     wt2_id = pp_net.get_2_windings_transformers().index.to_numpy()
-    gfm_wt2_idx = np.array([mapping_p2g.branch[i] for i in wt2_id])
-    pp_net.update_2_windings_transformers(
-        id=wt2_id,
-        r=gfm_net.branches[gfm_wt2_idx, BR_R].tolist(),
-        x=gfm_net.branches[gfm_wt2_idx, BR_X].tolist(),
-    )
+    if len(wt2_id):
+        gfm_wt2_idx = np.array([mapping_p2g.branch[i] for i in wt2_id])
+        pp_net.update_2_windings_transformers(
+            id=wt2_id,
+            r=gfm_net.branches[gfm_wt2_idx, BR_R].tolist(),
+            x=gfm_net.branches[gfm_wt2_idx, BR_X].tolist(),
+        )
 
     pp_net.per_unit = initial_per_unit_status
 
@@ -391,6 +393,6 @@ def to_powsybl(
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
-    mapping_p2g = build_p2g_maps(network, pp_net)
+    mapping_p2g = build_p2g_maps_by_bus_number(network, pp_net)
 
     return ConvertedNetwork(pp_net=pp_net, mapping_p2g=mapping_p2g)

@@ -1,7 +1,8 @@
 from dataclasses import dataclass
-from typing import Dict
+from typing import Dict, List, Tuple
 
 from gridfm_datakit.network import Network
+from gridfm_datakit.utils.idx_brch import F_BUS, T_BUS
 
 from .api import check_powsybl_available
 
@@ -18,11 +19,15 @@ class MappingP2G:
         ``{pp_branch_id: gfm_branch_row}``
     gen : Dict[str, int]
         ``{pp_gen_id: gfm_gen_row}``
+    reverse_bus_index_mapping : Dict[int, int]
+        ``{gfm_bus_index: original_bus_number}``. Power-flow bus results are
+        keyed by that original number, the same way PowerModels keys them.
     """
 
     bus: Dict[str, float]
     branch: Dict[str, int]
     gen: Dict[str, int]
+    reverse_bus_index_mapping: Dict[int, int]
 
 
 # ---------------------------------------------------------------------------
@@ -34,46 +39,40 @@ def build_p2g_maps(
     network: Network,
     pp_net,
 ) -> MappingP2G:
-    """Build pypowsybl-to-gridfm ID maps in O(n) by parsing pypowsybl element IDs.
+    """Build pypowsybl-to-gridfm index maps for a network read by ``from_powsybl``.
 
-    When a gridfm :class:`~gridfm_datakit.network.Network` is converted to
-    pypowsybl via :func:`~gridfm_datakit.powsybl.convert.to_powsybl`, the
-    element IDs encode the **original** (pre-normalisation) bus numbers from
-    ``network.reverse_bus_index_mapping``.  This function reads those IDs and
-    converts back to 0-based gridfm indices via ``network.bus_index_mapping``.
+    :func:`~gridfm_datakit.powsybl.convert.from_powsybl` writes buses,
+    generators and branches (lines, then 2-winding transformers) in the order
+    pypowsybl lists them, so each map pairs the i-th pypowsybl element with
+    gridfm row i.  A network built by
+    :func:`~gridfm_datakit.powsybl.convert.to_powsybl` follows the gridfm
+    tables instead, so use the maps ``to_powsybl`` returns.
 
     The maps can be built once on the **base network** and then reused across
     all perturbed scenarios, because perturbations preserve element identity
-    and row ordering, and ``to_powsybl`` always uses ``reverse_bus_index_mapping``
-    to produce consistent IDs.
+    and row ordering.
 
     Parameters
     ----------
     network:
-        The gridfm_datakit Network passed to ``to_powsybl()`` to produce *pp_net*.
+        The gridfm_datakit Network returned by ``from_powsybl(pp_net)``.
     pp_net:
-        The pypowsybl network produced by ``to_powsybl(network)``.
+        The pypowsybl network passed to ``from_powsybl``.
 
     Returns
     -------
     MappingP2G
         Dataclass bundling the three maps: ``bus``, ``branch``, and ``gen``.
 
-    Raises
-    ------
-    ValueError
-        If any pypowsybl element ID does not match the expected naming pattern,
-        or if one or more pypowsybl buses cannot be assigned a gridfm index.
-
     Examples
     --------
-    >>> from gridfm_datakit.network import load_net_from_pglib
-    >>> from gridfm_datakit.powsybl.convert import to_powsybl
+    >>> import pypowsybl as pp
+    >>> from gridfm_datakit.powsybl.convert import from_powsybl
     >>> from gridfm_datakit.powsybl.mapping import build_p2g_maps
     >>>
-    >>> net = load_net_from_pglib("case14_ieee")
-    >>> result = to_powsybl(net)
-    >>> mapping = build_p2g_maps(net, result.pp_net)
+    >>> pp_net = pp.network.create_ieee14()
+    >>> net = from_powsybl(pp_net)
+    >>> mapping = build_p2g_maps(net, pp_net)
     >>> mapping.bus    # pp_bus_id → gfm index
     >>> mapping.branch # pp_branch_id → gfm row
     >>> mapping.gen    # pp_gen_id → gfm row
@@ -105,4 +104,76 @@ def build_p2g_maps(
             map_branch_p2g[pp_branch_id] = offset + row
         offset += len(df)
 
-    return MappingP2G(bus=map_bus_p2g, branch=map_branch_p2g, gen=map_gen_p2g)
+    return MappingP2G(
+        bus=map_bus_p2g,
+        branch=map_branch_p2g,
+        gen=map_gen_p2g,
+        reverse_bus_index_mapping={
+            int(row): int(orig)
+            for row, orig in network.reverse_bus_index_mapping.items()
+        },
+    )
+
+
+def build_p2g_maps_by_bus_number(
+    network: Network,
+    pp_net,
+) -> MappingP2G:
+    """Build pypowsybl-to-gridfm index maps for a network built by ``to_powsybl``.
+
+    ``to_powsybl`` names each bus-breaker bus ``BUS-<n>`` after its original
+    bus number.  pypowsybl lists buses by voltage level, and buses joined by a
+    transformer share one, so position does not give the gridfm row.  Branches
+    are matched by original from and to buses, parallel branches in table
+    order, because pypowsybl lists lines before transformers.
+
+    Args:
+        network: The gridfm_datakit Network passed to ``to_powsybl``.
+        pp_net: The pypowsybl network ``to_powsybl(network)`` built.
+
+    Returns:
+        MappingP2G with the bus and branch maps read from the original bus
+        numbers.
+
+    Raises:
+        ValueError: If a pypowsybl bus groups several gridfm buses or has none,
+            or a pypowsybl branch has no gridfm branch with the same ends.
+    """
+    maps = build_p2g_maps(network, pp_net)
+    maps.bus = {}
+    bb_buses = pp_net.get_bus_breaker_view_buses(attributes=["bus_id"])
+    for bb_bus_id, pp_bus_id in bb_buses["bus_id"].items():
+        if not pp_bus_id:
+            continue
+        gfm_bus = network.bus_index_mapping[_bus_number(bb_bus_id)]
+        if maps.bus.setdefault(pp_bus_id, gfm_bus) != gfm_bus:
+            raise ValueError(f"pypowsybl bus {pp_bus_id} groups several gridfm buses")
+    unmapped = set(pp_net.get_buses().index) - set(maps.bus)
+    if unmapped:
+        raise ValueError(f"No gridfm bus for pypowsybl buses {sorted(unmapped)}")
+
+    rev = network.reverse_bus_index_mapping
+    rows_by_ends: Dict[Tuple[int, int], List[int]] = {}
+    for row, (f_bus, t_bus) in enumerate(network.branches[:, [F_BUS, T_BUS]]):
+        rows_by_ends.setdefault((rev[int(f_bus)], rev[int(t_bus)]), []).append(row)
+    ends = ["bus_breaker_bus1_id", "bus_breaker_bus2_id"]
+    maps.branch = {}
+    for df in (
+        pp_net.get_lines(attributes=ends),
+        pp_net.get_2_windings_transformers(attributes=ends),
+    ):
+        for pp_branch_id, bus1, bus2 in df.itertuples():
+            key = (_bus_number(bus1), _bus_number(bus2))
+            rows = rows_by_ends.get(key)
+            if not rows:
+                raise ValueError(
+                    f"No gridfm branch from bus {key[0]} to bus {key[1]} "
+                    f"for pypowsybl branch {pp_branch_id}",
+                )
+            maps.branch[pp_branch_id] = rows.pop(0)
+    return maps
+
+
+def _bus_number(bus_breaker_bus_id: str) -> int:
+    """Return the original bus number of a ``BUS-<n>`` bus-breaker bus ID."""
+    return int(bus_breaker_bus_id.rsplit("-", 1)[1])
