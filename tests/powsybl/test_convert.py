@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from gridfm_datakit.network import Network, load_net_from_pglib, get_pglib_file_path
+from gridfm_datakit.utils.idx_brch import BR_R, BR_X, TAP
 from gridfm_datakit.utils.idx_bus import (
     BS,
     BUS_I,
@@ -257,6 +258,55 @@ class TestToPowsybl:
         assert total_branches == gridfm_case14.branches.shape[0], (
             f"Should have {gridfm_case14.branches.shape[0]} branches"
         )
+
+    @pytest.mark.parametrize(
+        ("tap", "element_type"),
+        [(0.0, "line"), (1.1, "transformer")],
+    )
+    def test_update_powsybl_handles_one_empty_branch_type(
+        self,
+        gridfm_case14,
+        tap,
+        element_type,
+    ):
+        """Line-only and transformer-only networks update without empty indexing."""
+        net = gridfm_case14.copy_for_perturbation()
+        net.branches[:, TAP] = tap
+        converted = powsybl.to_powsybl(net)
+
+        if element_type == "line":
+            assert len(converted.pp_net.get_lines()) == len(net.branches)
+            assert converted.pp_net.get_2_windings_transformers().empty
+        else:
+            assert converted.pp_net.get_lines().empty
+            assert len(converted.pp_net.get_2_windings_transformers()) == len(
+                net.branches,
+            )
+
+        perturbed = net.copy_for_perturbation()
+        perturbed.branches[:, BR_R] += 0.001
+        perturbed.branches[:, BR_X] += 0.002
+        powsybl.update_powsybl(
+            converted.pp_net,
+            perturbed,
+            converted.mapping_p2g,
+        )
+
+        was_per_unit = converted.pp_net.per_unit
+        converted.pp_net.per_unit = True
+        if element_type == "line":
+            elements = converted.pp_net.get_lines()
+        else:
+            elements = converted.pp_net.get_2_windings_transformers()
+        converted.pp_net.per_unit = was_per_unit
+
+        for pp_id, row in converted.mapping_p2g.branch.items():
+            assert elements.loc[pp_id, "r"] == pytest.approx(
+                perturbed.branches[row, BR_R],
+            )
+            assert elements.loc[pp_id, "x"] == pytest.approx(
+                perturbed.branches[row, BR_X],
+            )
 
     def test_to_powsybl_substations_created(self, gridfm_case14):
         """Test that substations are created."""
