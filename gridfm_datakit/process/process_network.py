@@ -879,9 +879,7 @@ def pf_post_processing(
     Pg_bus = np.bincount(gen_bus, weights=pg_gen, minlength=n_buses)
     Qg_bus = np.bincount(gen_bus, weights=qg_gen, minlength=n_buses)
 
-    # Pg_bus / Qg_bus are indexed by 0-based bus INDEX; net.buses rows may be
-    # in a different order (pypowsybl does not guarantee sorted bus export).
-    # Build a bus-type array indexed by bus index so the mask aligns correctly.
+    # Bus ids follow table order, so Pg_bus[i] is the generation at row i.
     bus_type_by_idx = np.zeros(n_buses)
     bus_type_by_idx[net.buses[:, BUS_I].astype(int)] = net.buses[:, BUS_TYPE]
 
@@ -898,7 +896,7 @@ def pf_post_processing(
             Pg_bus_dc = np.bincount(gen_bus, weights=pg_gen_dc, minlength=n_buses)
             assert np.all(Pg_bus_dc[bus_type_by_idx == PQ] == 0)
 
-    # Reindex Pg/Qg from bus-index order to bus-row order for X_bus assignment.
+    # BUS_I equals the row, so this copies Pg/Qg onto the matching bus row.
     bus_row_idx = net.buses[:, BUS_I].astype(int)
     X_bus[:, 4] = Pg_bus[bus_row_idx]
     X_bus[:, 5] = Qg_bus[bus_row_idx]
