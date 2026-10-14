@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Dict
 
 from gridfm_datakit.network import Network
 
@@ -18,7 +18,7 @@ class MappingP2G:
         ``{pp_branch_id: gfm_branch_row}``
     gen : Dict[str, int]
         ``{pp_gen_id: gfm_gen_row}``
-    reverse_bus_index_mapping : Dict[int, int] | None
+    reverse_bus_index_mapping : Dict[int, int]
         ``{gfm_bus_index: original_bus_number}``. Power-flow bus results are
         keyed by that original number, the same way PowerModels keys them.
     """
@@ -26,7 +26,7 @@ class MappingP2G:
     bus: Dict[str, float]
     branch: Dict[str, int]
     gen: Dict[str, int]
-    reverse_bus_index_mapping: Optional[Dict[int, int]] = None
+    reverse_bus_index_mapping: Dict[int, int]
 
 
 # ---------------------------------------------------------------------------

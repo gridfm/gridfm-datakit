@@ -119,7 +119,7 @@ def _format_branch_res(
 def _format_buses_res(
     pp_net: "pp.network.Network",
     map_bus_p2g: Dict[Any, Any],
-    reverse_bus_index_mapping: Dict[int, int] | None = None,
+    reverse_bus_index_mapping: Dict[int, int],
 ) -> Dict[str, float]:
     """Format PowSyBl power flow results for the buses.
 
@@ -128,22 +128,18 @@ def _format_buses_res(
         map_bus_p2g: Mapping of the bus indexes from PowSyBl to GridFM.
         reverse_bus_index_mapping: Continuous row to original bus number.
             Result keys use that original number, which is what
-            ``_solution_arrays`` looks up. Without it, keys are the 1-based
-            row, and that only matches when the case numbers buses 1..n in
-            table order.
+            ``_solution_arrays`` looks up.
 
     Returns:
         Dict containing voltage magnitude and angle for each bus.
     """
     df = pp_net.get_buses()
 
-    def _key(gfm_row: int) -> str:
-        if reverse_bus_index_mapping is None:
-            return str(int(gfm_row + 1))
-        return str(int(reverse_bus_index_mapping[int(gfm_row)]))
-
     return {
-        _key(map_bus_p2g[row.Index]): {"vm": row.v_mag, "va": row.v_angle}
+        str(int(reverse_bus_index_mapping[int(map_bus_p2g[row.Index])])): {
+            "vm": row.v_mag,
+            "va": row.v_angle,
+        }
         for row in df[["v_mag", "v_angle"]].itertuples()
     }
 
