@@ -97,6 +97,10 @@ def init_julia(
         opf_formulation: AC OPF coordinate formulation. ``"polar"`` preserves
             the historical formulation; ``"rectangular"`` uses ACR coordinates
             with starts from the current network state and is often faster.
+        coinhsl_enabled: Whether to use CoinHSL linear solvers in Ipopt.
+        coinhsl_linear_solver: CoinHSL linear solver to use (e.g., "ma27", "ma57",
+            "ma77", "ma86", "ma97").
+        coinhsl_hsllib: Path to CoinHSL shared library.
 
     Returns:
         Julia interface object for running power flow calculations.
@@ -141,6 +145,25 @@ def init_julia(
     set_active_router(router)
 
     print_level = ipopt_print_level
+
+    # Build coinhsl options string for Ipopt
+    if coinhsl_enabled:
+        coinhsl_options = f'''
+                        "linear_solver" => "{coinhsl_linear_solver}",
+                        "hsllib" => "{coinhsl_hsllib}",
+'''
+    else:
+        coinhsl_options = ""
+
+    # Ipopt robustness options for improved convergence on difficult problems
+    robustness_options = '''
+                        "max_wall_time" => 60000.0,          # Maximum wall time in seconds
+                        "diverging_iterates_tol" => 10000.0, # Tolerance for diverging iterates
+                        "acceptable_tol" => 1e-4,            # Acceptable convergence tolerance
+                        "acceptable_iter" => 200,            # Iterations at acceptable tolerance
+                        "acceptable_dual_inf_tol" => 1e6,    # Acceptable dual infeasibility
+                        "dual_inf_tol" => 1e4,               # Dual infeasibility tolerance
+'''
 
     try:
         # If dc_max_iter not provided, use 1000
@@ -244,6 +267,8 @@ def init_julia(
                     "tol" => 1e-6,
                     "print_level" => {print_level},
                     "max_iter" => {max_iter},
+{coinhsl_options}
+{robustness_options}
                 ),
             )
             result["runtime"] = time() - start_time
@@ -266,6 +291,8 @@ def init_julia(
                         "tol" => 1e-6,
                         "print_level" => {print_level},
                         "max_iter" => {max_iter},
+{coinhsl_options}
+{robustness_options}
                     );
                     solution_processors=[sol_data_model!],
                 )
@@ -309,7 +336,7 @@ def init_julia(
             result["solution"]["pf"] = false
             return result
         end
-        """.format(print_level, dc_iter),
+        """.format(print_level, dc_iter, robustness_options=robustness_options),
         )
 
         jl.seval("const run_dcopf = _run_dcopf_core")
@@ -376,6 +403,7 @@ def init_julia(
                         "tol" => 1e-6,
                         "print_level" => {},
                         "max_iter" => {},
+{coinhsl_options}
                     ),
                 )
             finally
@@ -394,7 +422,7 @@ def init_julia(
             return result
         end
         _run_pf_core(case_file) = run_pf_data(PowerModels.parse_file(case_file))
-        """.format(print_level, max_iter),
+        """.format(print_level, max_iter, coinhsl_options=coinhsl_options),
         )
 
         jl.seval("const run_pf = _run_pf_core")
