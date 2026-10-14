@@ -46,6 +46,9 @@ from gridfm_datakit.utils.random_seed import _DEFAULT_SEED_POLICY, custom_seed
 from gridfm_datakit.utils.utils import Tee, write_parquet, write_ram_usage_distributed
 
 
+_ConfigInput = Union[str, os.PathLike, Dict[str, Any], NestedNamespace]
+
+
 def _split_range(start: int, stop: int, n_parts: int) -> List[Tuple[int, int]]:
     """Split a range into balanced contiguous bounds without materializing indices."""
     length = stop - start
@@ -67,32 +70,28 @@ def _split_range(start: int, stop: int, n_parts: int) -> List[Tuple[int, int]]:
     return bounds
 
 
-def _setup_environment(
-    config: Union[str, Dict[str, Any], NestedNamespace],
-) -> Tuple[NestedNamespace, str, Dict[str, str], int]:
-    """Setup the environment for data generation.
+def _load_config(config: _ConfigInput) -> Dict[str, Any]:
+    """Load every supported configuration input into a plain dictionary.
 
     Args:
-        config: Configuration can be provided in three ways:
-            1. Path to a YAML config file (str)
-            2. Configuration dictionary (Dict)
-            3. NestedNamespace object (NestedNamespace)
+        config: YAML path, dictionary, or nested namespace.
 
     Returns:
-        Tuple of (args, base_path, file_paths, seed)
+        Parsed configuration mapping. No schema validation is performed.
 
     Raises:
         TypeError: If config is not a path, dictionary, or NestedNamespace.
-        ValueError: If a static configuration is invalid.
+        ValueError: If a YAML document does not contain a mapping.
     """
-    if isinstance(config, str):
+    if isinstance(config, (str, os.PathLike)):
         with open(config, "r") as f:
             config = yaml.safe_load(f)
     elif isinstance(config, NestedNamespace):
         config = config.to_dict()
     elif not isinstance(config, dict):
         raise TypeError(
-            "config must be a YAML path, a dictionary, or a NestedNamespace, "
+            "config must be a YAML path, a dictionary, or a NestedNamespace "
+            "(path types: str or os.PathLike), "
             f"got {type(config).__name__}",
         )
 
@@ -100,11 +99,32 @@ def _setup_environment(
         raise ValueError(
             f"Configuration must contain a YAML mapping, got {type(config).__name__}",
         )
+    return config
 
-    is_dynamic_config = bool(config.get("dynamic"))
-    if not is_dynamic_config:
-        config = validate_static_config(config)
-    args = NestedNamespace(**config)
+
+def _setup_environment(
+    config: _ConfigInput,
+) -> Tuple[NestedNamespace, str, Dict[str, str], int]:
+    """Validate static input and set up the generation environment.
+
+    Args:
+        config: YAML path, dictionary, or nested namespace.
+
+    Returns:
+        Tuple of (args, base_path, file_paths, seed).
+
+    Raises:
+        TypeError: If config is not a supported input form.
+        ValueError: If a static configuration is invalid.
+    """
+    config = validate_static_config(_load_config(config))
+    return _setup_generation_environment(NestedNamespace(**config))
+
+
+def _setup_generation_environment(
+    args: NestedNamespace,
+) -> Tuple[NestedNamespace, str, Dict[str, str], int]:
+    """Create output paths and logs for an already validated configuration."""
 
     # Set global seed if provided, otherwise generate a unique seed for this generation
     if (
@@ -121,37 +141,7 @@ def _setup_environment(
         seed = _DEFAULT_SEED_POLICY.random_base_seed()
         print(f"No seed provided. Using seed={seed}")
 
-    # Dynamic generation retains its dedicated validator for now. Static
-    # configurations receive these defaults from the Pydantic schema above.
-    if is_dynamic_config:
-        reader = getattr(args.network, "reader", "native")
-        if reader not in ("native", "powsybl"):
-            raise ValueError(
-                f"network.reader must be 'native' or 'powsybl', got {reader!r}",
-            )
-        args.network.reader = reader
-
-        # pf_solver controls which engine solves the power flow in PF mode.
-        # 'powsybl' requires network.reader 'powsybl'. OPF is always solved
-        # by PowerModels, so this value is only stored in OPF mode.
-        pf_solver = getattr(args.settings, "pf_solver", "powermodel")
-        if pf_solver not in ("powermodel", "powsybl", "lightsim2grid"):
-            raise ValueError(
-                "settings.pf_solver must be 'powermodel', 'powsybl' or 'lightsim2grid', "
-                f"got {pf_solver!r}",
-            )
-        args.settings.pf_solver = pf_solver
-
-        opf_formulation = getattr(args.settings, "opf_formulation", "polar")
-        if opf_formulation not in ("polar", "rectangular"):
-            raise ValueError(
-                "settings.opf_formulation must be 'polar' or 'rectangular', "
-                f"got {opf_formulation!r}",
-            )
-        args.settings.opf_formulation = opf_formulation
-
-    # Static configs are checked by the schema. This still has to run for both
-    # paths: the schema cannot tell whether the package is installed, and the
+    # The schema cannot tell whether the optional package is installed, and the
     # check must happen before an existing output directory is removed.
     if args.settings.pf_solver == "lightsim2grid":
         lightsim2grid.check_lightsim2grid_available()
@@ -231,7 +221,7 @@ def _prepare_network_and_scenarios(
         Tuple of (network, scenarios)
     """
     meta = {}
-    reader = args.network.reader  # already validated in _setup_environment
+    reader = args.network.reader
 
     if args.network.source == "pglib":
         if reader == "powsybl":
