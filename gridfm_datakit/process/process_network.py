@@ -1403,10 +1403,6 @@ def process_scenario_chunk(
     seed: int,
     pf_solver: str = "powermodel",
     meta: Optional[Dict] = None,
-    coinhsl_enabled: bool = True,
-    coinhsl_linear_solver: str = "",
-    coinhsl_hsllib: str = "",
-    skip_scenarios: Optional[set] = None,
     *,
     scenario_index_offset: int = 0,
     opf_formulation: str = "polar",
@@ -1669,7 +1665,44 @@ def process_scenario_chunk_multiprocessing(
     Union[None, str],
     Optional[List[np.ndarray]],
 ]:
-    """Process a chunk of scenarios for distributed processing."""
+    """Process a chunk of scenarios for distributed processing with multiprocessing Manager
+
+    This function processes multiple scenarios in a single worker process,
+    accumulating results before returning them to the main process.
+
+    Args:
+        mode: Processing mode ("opf" or "pf").
+        start_idx: Starting scenario index (inclusive).
+        end_idx: Ending scenario index (exclusive).
+        scenarios: Array of load scenarios with shape (n_loads, n_scenarios, 2).
+        net: The power network.
+        progress_queue: Queue for reporting progress to main process.
+        topology_generator: Generator for topology perturbations.
+        generation_generator: Generator for generation cost perturbations.
+        admittance_generator: Generator for line admittance perturbations.
+        error_log_path: Path to error log file for recording failures.
+        include_dc_res: Whether to include DC power flow results in output.
+        pf_fast: Whether to use fast AC PF solver.
+        dcpf_fast: Whether to use fast DC PF solver.
+        solver_log_dir: Directory for solver logs.
+        max_iter: Maximum iterations for the solver.
+        seed: Global random seed for reproducibility.
+        pf_solver: PF solver to use in pf mode; one of 'powermodel', 'powsybl' or 'lightsim2grid'.
+            OPF is always solved by PowerModels regardless of this value.
+        meta: metadata dict; when pf_solver='powsybl', must contain 'network_path'
+            and 'mapping_p2g'. 'pp_net' is loaded fresh per worker from 'network_path'.
+            contains only the current chunk.
+        coinhsl_enabled: Whether to use CoinHSL linear solvers in Ipopt.
+        coinhsl_linear_solver: CoinHSL linear solver to use (e.g., "ma27", "ma57",
+        coinhsl_hsllib: Path to CoinHSL shared library.
+            "ma77", "ma86", "ma97").
+        skip_scenario: scenario indices that timed out in the previous attempt
+    Returns:
+        Tuple containing:
+            - Exception object (None if successful)
+            - Traceback string (None if successful)
+            - List of processed data tuples (bus, gen, branch, Y_bus arrays)
+    """
 
     worker_pid = os.getpid()
     current_scenario_index = None
