@@ -52,7 +52,7 @@ If you use `gridfm-datakit` in your research, please cite both:
 * **Flexible topology perturbations**: Handles arbitrary (N-k) outages for lines, transformers, and generators.
 * **Generator cost diversity**: Permutes or randomly scales generator cost functions when solving OPF to produce diverse dispatches and improve generalization across different cost conditions.
 * **Out-of-operating-limits scenarios for PF**: PF datasets include realistic violations of operating limits (e.g., voltage or branch overloads) resulting from topology and load perturbations without re-optimizing generator dispatch.
-* **Structured outputs for ML**: Per-bus, per-branch, and per-generator data ready for training neural PF/OPF solvers, with pre-computed DC-PF and DC-OPF baselines and runtime. 
+* **Structured outputs for ML**: Per-bus, per-branch, and per-generator data ready for training neural PF/OPF solvers, with pre-computed DC-PF and DC-OPF baselines and runtime.
 * **Data validation and benchmarking**: Includes CLI tools for consistency checks, statistics, and constraint validation.
 
 
