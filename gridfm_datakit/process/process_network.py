@@ -75,6 +75,9 @@ def init_julia(
     print_level: Optional[int] = None,
     output: Optional[SolverOutputConfig] = None,
     opf_formulation: str = "polar",
+    coinhsl_enabled: bool = False,
+    coinhsl_linear_solver: str = "",
+    coinhsl_hsllib: str = "",
 ) -> Any:
     """Initialize Julia interface with PowerModels.jl.
 
@@ -94,6 +97,10 @@ def init_julia(
         opf_formulation: AC OPF coordinate formulation. ``"polar"`` preserves
             the historical formulation; ``"rectangular"`` uses ACR coordinates
             with starts from the current network state and is often faster.
+        coinhsl_enabled: Whether to use CoinHSL linear solvers in Ipopt.
+        coinhsl_linear_solver: CoinHSL linear solver to use (e.g., "ma27", "ma57",
+            "ma77", "ma86", "ma97").
+        coinhsl_hsllib: Path to CoinHSL shared library.
 
     Returns:
         Julia interface object for running power flow calculations.
@@ -138,6 +145,15 @@ def init_julia(
     set_active_router(router)
 
     print_level = ipopt_print_level
+
+    # Build coinhsl options string for Ipopt
+    if coinhsl_enabled:
+        coinhsl_options = f'''
+                        "linear_solver" => "{coinhsl_linear_solver}",
+                        "hsllib" => "{coinhsl_hsllib}",
+'''
+    else:
+        coinhsl_options = ""
 
     try:
         # If dc_max_iter not provided, use 1000
@@ -241,6 +257,7 @@ def init_julia(
                     "tol" => 1e-6,
                     "print_level" => {print_level},
                     "max_iter" => {max_iter},
+{coinhsl_options}
                 ),
             )
             result["runtime"] = time() - start_time
@@ -263,6 +280,7 @@ def init_julia(
                         "tol" => 1e-6,
                         "print_level" => {print_level},
                         "max_iter" => {max_iter},
+{coinhsl_options}
                     );
                     solution_processors=[sol_data_model!],
                 )
@@ -373,6 +391,7 @@ def init_julia(
                         "tol" => 1e-6,
                         "print_level" => {},
                         "max_iter" => {},
+{coinhsl_options}
                     ),
                 )
             finally
@@ -391,7 +410,7 @@ def init_julia(
             return result
         end
         _run_pf_core(case_file) = run_pf_data(PowerModels.parse_file(case_file))
-        """.format(print_level, max_iter),
+        """.format(print_level, max_iter, coinhsl_options=coinhsl_options),
         )
 
         jl.seval("const run_pf = _run_pf_core")
@@ -1635,3 +1654,189 @@ def process_scenario_opf_mode(
             ),
         )
     return local_processed_data
+
+
+def process_scenario_chunk_multiprocessing(
+    mode: str,
+    start_idx: int,
+    end_idx: int,
+    scenarios: np.ndarray,
+    net: Network,
+    progress_queue: Any,
+    topology_generator: TopologyGenerator,
+    generation_generator: GenerationGenerator,
+    admittance_generator: AdmittanceGenerator,
+    error_log_path: str,
+    include_dc_res: bool,
+    pf_fast: bool,
+    dcpf_fast: bool,
+    solver_log_dir: str,
+    max_iter: int,
+    seed: int,
+    pf_solver: str = "powermodel",
+    meta: Optional[Dict] = None,
+    coinhsl_enabled: bool = True,
+    coinhsl_linear_solver: str = "",
+    coinhsl_hsllib: str = "",
+    skip_scenarios: Optional[set] = None,
+) -> Tuple[
+    Union[None, Exception],
+    Union[None, str],
+    Optional[List[np.ndarray]],
+]:
+    """Process a chunk of scenarios for distributed processing with multiprocessing Manager
+
+    This function processes multiple scenarios in a single worker process,
+    accumulating results before returning them to the main process.
+
+    Args:
+        mode: Processing mode ("opf" or "pf").
+        start_idx: Starting scenario index (inclusive).
+        end_idx: Ending scenario index (exclusive).
+        scenarios: Array of load scenarios with shape (n_loads, n_scenarios, 2).
+        net: The power network.
+        progress_queue: Queue for reporting progress to main process.
+        topology_generator: Generator for topology perturbations.
+        generation_generator: Generator for generation cost perturbations.
+        admittance_generator: Generator for line admittance perturbations.
+        error_log_path: Path to error log file for recording failures.
+        include_dc_res: Whether to include DC power flow results in output.
+        pf_fast: Whether to use fast AC PF solver.
+        dcpf_fast: Whether to use fast DC PF solver.
+        solver_log_dir: Directory for solver logs.
+        max_iter: Maximum iterations for the solver.
+        seed: Global random seed for reproducibility.
+        pf_solver: PF solver to use in pf mode; one of 'powermodel', 'powsybl' or 'lightsim2grid'.
+            OPF is always solved by PowerModels regardless of this value.
+        meta: metadata dict; when pf_solver='powsybl', must contain 'network_path'
+            and 'mapping_p2g'. 'pp_net' is loaded fresh per worker from 'network_path'.
+            contains only the current chunk.
+        coinhsl_enabled: Whether to use CoinHSL linear solvers in Ipopt.
+        coinhsl_linear_solver: CoinHSL linear solver to use (e.g., "ma27", "ma57",
+            "ma77", "ma86", "ma97").
+        coinhsl_hsllib: Path to CoinHSL shared library.
+        skip_scenarios: scenario indices that timed out in the previous attempt.
+    Returns:
+        Tuple containing:
+            - Exception object (None if successful)
+            - Traceback string (None if successful)
+            - List of processed data tuples (bus, gen, branch, Y_bus arrays)
+    """
+
+    worker_pid = os.getpid()
+    current_scenario_index = None
+
+    if skip_scenarios is None:
+        skip_scenarios = set()
+
+    try:
+        jl = init_julia(
+            max_iter,
+            solver_log_dir,
+            coinhsl_enabled=coinhsl_enabled,
+            coinhsl_linear_solver=coinhsl_linear_solver,
+            coinhsl_hsllib=coinhsl_hsllib,
+        )
+
+        if (
+            pf_solver == "powsybl"
+            and meta
+            and "network_path" in meta
+            and "pp_net" not in meta
+        ):
+            import gridfm_datakit.powsybl as _powsybl
+
+            loaded_net = _powsybl.load_net(meta["network_path"])
+
+            meta = dict(meta)
+            meta["pp_net"] = loaded_net.pp_net
+
+        local_processed_data = []
+
+        with custom_seed(seed * 20_000 + start_idx + 1):
+            for scenario_index in range(start_idx, end_idx):
+                # Do not retry scenarios that previously timed out.
+                if scenario_index in skip_scenarios:
+                    continue
+
+                current_scenario_index = scenario_index
+
+                progress_queue.put(
+                    (
+                        "start",
+                        worker_pid,
+                        scenario_index,
+                    ),
+                )
+
+                if mode == "opf":
+                    local_processed_data = process_scenario_opf_mode(
+                        net,
+                        scenarios,
+                        scenario_index,
+                        topology_generator,
+                        generation_generator,
+                        admittance_generator,
+                        local_processed_data,
+                        error_log_path,
+                        include_dc_res,
+                        jl,
+                    )
+
+                elif mode == "pf":
+                    local_processed_data = process_scenario_pf_mode(
+                        net,
+                        scenarios,
+                        scenario_index,
+                        topology_generator,
+                        generation_generator,
+                        admittance_generator,
+                        local_processed_data,
+                        error_log_path,
+                        include_dc_res,
+                        pf_fast,
+                        dcpf_fast,
+                        jl,
+                        pf_solver,
+                        meta=meta,
+                    )
+
+                else:
+                    raise ValueError(f"Invalid mode: {mode}")
+
+                progress_queue.put(
+                    (
+                        "done",
+                        worker_pid,
+                        scenario_index,
+                    ),
+                )
+
+                current_scenario_index = None
+
+        return (
+            None,
+            None,
+            local_processed_data,
+        )
+    except Exception as e:
+        tb = traceback.format_exc()
+        with open(error_log_path, "a") as f:
+            f.write(
+                "Caught an exception in process_scenario_chunk_multiprocessing function: "
+                f"{e}\n",
+            )
+            f.write(tb)
+            f.write("\n")
+        progress_queue.put(
+            (
+                "error",
+                worker_pid,
+                current_scenario_index,
+            ),
+        )
+        return (
+            e,
+            tb,
+            None,
+        )

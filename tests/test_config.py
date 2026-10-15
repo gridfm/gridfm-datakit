@@ -337,11 +337,48 @@ def test_validate_static_config_supplies_execution_defaults() -> None:
     config = _default_config()
     del config["settings"]["num_processes"]
     del config["settings"]["large_chunk_size"]
+    del config["settings"]["is_multiprocessing"]
+    del config["settings"]["scenario_timeout_sec"]
+    del config["settings"]["coinhsl"]
 
     validated = validate_static_config(config)
 
     assert validated["settings"]["num_processes"] == 1
     assert validated["settings"]["large_chunk_size"] == 1_000
+    assert validated["settings"]["is_multiprocessing"] is False
+    assert "scenario_timeout_sec" not in validated["settings"]
+    assert validated["settings"]["coinhsl"] == {
+        "enabled": False,
+        "linear_solver": "ma57",
+        "hsllib": "/lib/x86_64-linux-gnu/libcoinhsl.so",
+    }
+
+
+@pytest.mark.parametrize("timeout", [0.0, -1.0])
+def test_validate_static_config_rejects_non_positive_scenario_timeout(
+    timeout: float,
+) -> None:
+    """A configured scenario timeout must be positive."""
+    config = _default_config()
+    config["settings"]["scenario_timeout_sec"] = timeout
+
+    with pytest.raises(
+        ValueError,
+        match=r"settings\.scenario_timeout_sec: Input should be greater than 0",
+    ):
+        validate_static_config(config)
+
+
+def test_validate_static_config_rejects_unknown_coinhsl_solver() -> None:
+    """CoinHSL must use one of the supported MA linear solvers."""
+    config = _default_config()
+    config["settings"]["coinhsl"]["linear_solver"] = "mumps"
+
+    with pytest.raises(
+        ValueError,
+        match=r"settings\.coinhsl\.linear_solver: Input should be",
+    ):
+        validate_static_config(config)
 
 
 def test_validate_static_config_rejects_unknown_field() -> None:
