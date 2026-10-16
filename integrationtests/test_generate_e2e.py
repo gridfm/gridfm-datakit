@@ -4,7 +4,10 @@ Each case
 1. derives a config from the shipped ``scripts/config/default.yaml`` (seeded, small),
 2. runs ``gridfm_datakit generate`` and ``gridfm_datakit validate`` as subprocesses,
 3. computes summary metrics from the generated parquet files, and
-4. asserts them against fixed physical ranges and the calibrated baseline.
+4. asserts them against the calibrated baseline.
+
+``validate`` checks that every scenario is physically valid; the baseline catches
+changes in *what* is generated, which ``validate`` cannot see.
 
 Run ``pytest integrationtests --calibrate -s`` on unchanged code to (re)write the
 baseline; plain ``pytest integrationtests -s`` asserts against it.
@@ -15,7 +18,7 @@ import shutil
 import subprocess
 import sys
 
-import numpy as np
+import pandas as pd
 import pytest
 import yaml
 
@@ -26,7 +29,6 @@ from integrationtests.baseline import (
     read_baseline,
     write_baseline,
 )
-from integrationtests.metrics import NOISE_METRICS, compute_metrics, physical_ranges
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_CONFIG = os.path.join(REPO_ROOT, "scripts", "config", "default.yaml")
@@ -57,12 +59,59 @@ def build_config(overrides: dict, data_dir: str) -> dict:
             "large_chunk_size": 100,
             "overwrite": True,
             "enable_solver_logs": False,
+            "include_dc_res": True,
             "seed": SEED,
         },
     )
     for section, values in overrides.items():
         config[section].update(values)
     return config
+
+
+def compute_metrics(raw_dir: str) -> dict:
+    """Scalar aggregates over all scenarios; solver runtimes are left out (not reproducible)."""
+    bus = pd.read_parquet(os.path.join(raw_dir, "bus_data.parquet"))
+    branch = pd.read_parquet(os.path.join(raw_dir, "branch_data.parquet"))
+    gen = pd.read_parquet(os.path.join(raw_dir, "gen_data.parquet"))
+    gen = gen[gen["in_service"] == 1]
+    branch = branch[branch["br_status"] == 1]
+    rated = branch[branch["rate_a"] > 0]
+    loading = (
+        pd.concat(
+            [
+                rated["pf"].pow(2) + rated["qf"].pow(2),
+                rated["pt"].pow(2) + rated["qt"].pow(2),
+            ],
+            axis=1,
+        )
+        .max(axis=1)
+        .pow(0.5)
+        / rated["rate_a"]
+    )
+    cost = (
+        gen["cp0_eur"]
+        + gen["cp1_eur_per_mw"] * gen["p_mw"]
+        + gen["cp2_eur_per_mw2"] * gen["p_mw"] ** 2
+    )
+
+    return {
+        "n_scenarios": float(bus["scenario"].nunique()),
+        "mean_total_pd_mw": float(bus.groupby("scenario")["Pd"].sum().mean()),
+        "mean_total_qd_mvar": float(bus.groupby("scenario")["Qd"].sum().mean()),
+        "mean_total_pg_mw": float(gen.groupby("scenario")["p_mw"].sum().mean()),
+        "mean_total_qg_mvar": float(gen.groupby("scenario")["q_mvar"].sum().mean()),
+        "mean_total_gen_cost": float(cost.groupby(gen["scenario"]).sum().mean()),
+        "mean_active_gens": float(gen.groupby("scenario").size().mean()),
+        "mean_active_branches": float(branch.groupby("scenario").size().mean()),
+        "mean_vm_pu": float(bus["Vm"].mean()),
+        "min_vm_pu": float(bus["Vm"].min()),
+        "max_vm_pu": float(bus["Vm"].max()),
+        "mean_abs_va_deg": float(bus["Va"].abs().mean()),
+        "mean_abs_va_ac_minus_dc_deg": float((bus["Va"] - bus["Va_dc"]).abs().mean()),
+        "mean_abs_pf_mw": float(branch["pf"].abs().mean()),
+        "mean_branch_loading": float(loading.mean()),
+        "max_branch_loading": float(loading.max()),
+    }
 
 
 def run_cli(*args: str) -> None:
@@ -94,48 +143,26 @@ def generate_and_measure(case: str, work_dir: str) -> dict:
         "--sn-mva",
         str(SN_MVA),
     )
-    return compute_metrics(raw_dir, sn_mva=SN_MVA)
+    return compute_metrics(raw_dir)
 
 
 @pytest.mark.parametrize("case", sorted(CASES))
 def test_generate_end_to_end(case, tmp_path, calibrate_runs, ci_level, calibrate_pad):
-    expected_scenarios = LOAD_SCENARIOS * TOPOLOGY_VARIANTS
     n_runs = max(calibrate_runs, 1)
     all_runs = []
     for run_i in range(n_runs):
         print(f"\n--- {case.upper()} generation run {run_i + 1}/{n_runs} ---")
-        metrics = generate_and_measure(case, str(tmp_path))
-        # Physical validity is checked on every run, calibration included: a
-        # baseline must never be calibrated from broken data.
-        check_bounds(
-            metrics,
-            physical_ranges(CASES[case]["settings"]["mode"], expected_scenarios),
-            f"{case} physical ranges (run {run_i + 1})",
-        )
-        all_runs.append(metrics)
-
-    calibrated_keys = sorted(k for k in all_runs[0] if k not in NOISE_METRICS)
+        all_runs.append(generate_and_measure(case, str(tmp_path)))
+    metric_keys = sorted(all_runs[0])
 
     if calibrate_runs > 0:
-        # Tolerate float summation-order noise (~1e-15) from parallel workers.
-        nondeterministic = [
-            k
-            for k in calibrated_keys
-            if np.ptp([run[k] for run in all_runs])
-            > 1e-9 * max(abs(all_runs[0][k]), 1.0)
-        ]
-        if nondeterministic:
-            print(
-                f"\nNOTE: {len(nondeterministic)} metric(s) differ between seeded runs "
-                f"(generation is not bit-reproducible here): {nondeterministic}",
-            )
-        bounds = compute_bounds(all_runs, calibrated_keys, ci_level, calibrate_pad)
-        print_calibration_stats(all_runs, calibrated_keys, bounds, ci_level)
+        bounds = compute_bounds(all_runs, metric_keys, ci_level, calibrate_pad)
+        print_calibration_stats(all_runs, metric_keys, bounds, ci_level)
         write_baseline(case, bounds)
         return
 
     checks = read_baseline(case)
-    missing = sorted(set(calibrated_keys) - set(checks))
+    missing = sorted(set(metric_keys) - set(checks))
     assert not missing, (
         f"Metrics {missing} have no calibrated bounds in the baseline for '{case}'. "
         f"Recalibrate on the code before your change: pytest integrationtests --calibrate -s"

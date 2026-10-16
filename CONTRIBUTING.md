@@ -89,14 +89,13 @@ both `pf` and `opf` mode, each test:
 1. builds a config from `scripts/config/default.yaml`,
 2. runs `gridfm_datakit generate` and then `gridfm_datakit validate --n-partitions 0`,
 3. computes summary metrics from the generated parquet files (dataset size, total
-   load and dispatch, losses, generation cost, voltages, branch flows and loading,
-   DC-vs-AC differences, power balance errors), and
-4. checks them against two sets of ranges:
-   * **physical ranges**, hard-coded in `integrationtests/metrics.py`, which any
-     correct dataset must satisfy (e.g. AC power balance error below 1e-3 MW, no
-     overloads in OPF mode, PF converging for at least 95% of scenarios), and
-   * **calibrated bounds**, read from `integrationtests/calibration_baseline.json`,
-     which catch drift: a change that moves any metric out of its interval fails.
+   load and dispatch, generation cost, voltages, branch flows and loading, DC-vs-AC
+   angle differences), and
+4. checks them against calibrated bounds read from
+   `integrationtests/calibration_baseline.json`.
+
+`validate` checks that every scenario is physically valid; the calibrated bounds
+catch changes in *what* is generated, which `validate` cannot see.
 
 They are not part of `pytest tests/` and take a few minutes. Run them with:
 
@@ -131,7 +130,7 @@ Passed to `pytest`:
 
 | Flag | When omitted | Meaning |
 |------|--------------|---------|
-| `--calibrate [N]` | assert mode (generate once, check bounds) | `--calibrate` alone runs 3 calibration passes; `--calibrate N` runs `N`. Both write bounds and skip the baseline assertions (physical ranges are still checked). |
+| `--calibrate [N]` | assert mode (generate once, check bounds) | `--calibrate` alone runs 3 calibration passes; `--calibrate N` runs `N`. Both write bounds and skip the baseline assertions. |
 | `--ci C` | `0.995` | Confidence level for the Student-t interval. |
 | `--pad P` | `0.001` | Relative floor on each bound's half-width (`P * \|mean\|`). Seeded runs are identical, so this is usually the whole interval; metrics whose mean is exactly `0` stay exactly `(0, 0)`. |
 
