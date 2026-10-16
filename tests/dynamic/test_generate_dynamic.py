@@ -406,6 +406,32 @@ def test_a_malformed_event_block_raises_before_the_output_is_set_up(
         gd.generate_dynamic_data(config_ieee14)
 
 
+def test_an_unknown_fixed_target_raises_before_the_output_is_set_up(
+    config_ieee14,
+    monkeypatch,
+):
+    def _fail(args):
+        raise AssertionError("the output was set up before the targets were checked")
+
+    monkeypatch.setattr(gd, "_validate_dynamic_config", lambda args: None)
+    monkeypatch.setattr(gd, "_setup_environment", _fail)
+    del config_ieee14.dynamic.input_files.events_file
+    config_ieee14.dynamic.event_perturbation = NestedNamespace(
+        type="random",
+        scenarios=[
+            {
+                "name": "fixed_trip",
+                "start_time": 1.0,
+                "events": [
+                    {"type": "Disconnect", "target": {"static_id": "_NO_SUCH_GEN"}},
+                ],
+            },
+        ],
+    )
+    with pytest.raises(ValueError, match=r"_NO_SUCH_GEN"):
+        gd.generate_dynamic_data(config_ieee14)
+
+
 @needs_dynawo
 def test_validate_flag_runs_the_validation_suite(config_ieee14, monkeypatch):
     config_ieee14.dynamic.validate = True
