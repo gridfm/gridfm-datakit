@@ -495,7 +495,9 @@ class TestDrawEvents:
 
     def test_draws_are_reproducible_and_bounded(self):
         graph = _chain_graph()
-        perturbation = _parse(_random())
+        perturbation = _parse(
+            _edit(lambda b: b["scenarios"][0].update(anchor="B0")),
+        )
 
         def draw(seed, event_index):
             rng = np.random.default_rng([seed, 0, 0, event_index])
@@ -508,10 +510,7 @@ class TestDrawEvents:
             differs |= not frame.equals(draw(2, event_index))
             start = frame["start_time"].iloc[0]
             assert 20 <= start < 80
-            bus = f"B{frame['static_id'].iloc[0][1:]}"
-            assert any(
-                graph.distances(anchor).get(bus, 99) <= 2 for anchor in graph.adjacency
-            )
+            assert frame["static_id"].iloc[0] in {"G0", "G1", "G2"}
         assert differs
 
     def test_node_faults_are_reproducible_and_bounded(self):
