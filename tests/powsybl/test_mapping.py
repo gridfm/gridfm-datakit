@@ -14,10 +14,13 @@ build_p2g_maps() and to_powsybl_with_mapping() are tested at two levels:
    build_p2g_maps called separately.
 """
 
+import numpy as np
 import pytest
 
 import gridfm_datakit.powsybl as powsybl
-from gridfm_datakit.network import load_net_from_pglib
+from gridfm_datakit.network import Network, load_net_from_pglib
+from gridfm_datakit.powsybl.convert import update_powsybl
+from gridfm_datakit.utils.idx_brch import F_BUS, T_BUS
 
 pytestmark = pytest.mark.skipif(
     not powsybl.is_powsybl_available(),
@@ -212,3 +215,85 @@ class TestBuildP2gMaps:
                 f"Generator {pp_gen_id!r} mapped to row {mapping.gen[pp_gen_id]}, "
                 f"expected {expected_row}"
             )
+
+
+# ---------------------------------------------------------------------------
+# 3. to_powsybl maps follow the original bus numbers
+# ---------------------------------------------------------------------------
+
+
+def _shuffled_case14():
+    net = load_net_from_pglib("case14_ieee")
+    mpc = dict(net.mpc)
+    mpc["bus"] = net.mpc["bus"][np.random.default_rng(0).permutation(14)]
+    return Network(mpc)
+
+
+@pytest.fixture(scope="module", params=["sorted", "shuffled"])
+def case14_any_order(request):
+    """IEEE 14-bus network, buses listed in file order or shuffled."""
+    if request.param == "sorted":
+        net = load_net_from_pglib("case14_ieee")
+    else:
+        net = _shuffled_case14()
+    return net, powsybl.to_powsybl(net)
+
+
+def _bus_number(bus_breaker_bus_id):
+    return int(bus_breaker_bus_id.rsplit("-", 1)[1])
+
+
+class TestToPowsyblMapsFollowOriginalBusNumbers:
+    """pypowsybl lists buses by voltage level, so position is not identity."""
+
+    def test_bus_map_follows_bus_breaker_buses(self, case14_any_order):
+        """Each pypowsybl bus maps to the gridfm bus of the BUS-<n> it groups."""
+        net, conv = case14_any_order
+        pp_net, mapping = conv.pp_net, conv.mapping_p2g
+        bb_buses = pp_net.get_bus_breaker_view_buses()
+        for bb_bus_id, pp_bus_id in bb_buses["bus_id"].items():
+            gfm_bus = int(mapping.bus[pp_bus_id])
+            assert net.reverse_bus_index_mapping[gfm_bus] == _bus_number(bb_bus_id)
+
+    def test_update_keeps_case_loads(self):
+        """Writing the unchanged network back leaves every load as in the case."""
+        net = load_net_from_pglib("case14_ieee")
+        conv = powsybl.to_powsybl(net)
+        conv.pp_net.per_unit = False
+        before = conv.pp_net.get_loads()["p0"].copy()
+        update_powsybl(conv.pp_net, net, conv.mapping_p2g)
+        conv.pp_net.per_unit = False
+        after = conv.pp_net.get_loads()["p0"]
+        assert np.allclose(after[before.index], before)
+
+    def test_branch_map_follows_end_buses(self, case14_any_order):
+        """Each pypowsybl branch maps to the gridfm row with the same ends."""
+        net, conv = case14_any_order
+        pp_net, mapping = conv.pp_net, conv.mapping_p2g
+        rev = net.reverse_bus_index_mapping
+        ends = ["bus_breaker_bus1_id", "bus_breaker_bus2_id"]
+        for df in (
+            pp_net.get_lines(attributes=ends),
+            pp_net.get_2_windings_transformers(attributes=ends),
+        ):
+            for pp_branch_id, bus1, bus2 in df.itertuples():
+                row = mapping.branch[pp_branch_id]
+                assert rev[int(net.branches[row, F_BUS])] == _bus_number(bus1)
+                assert rev[int(net.branches[row, T_BUS])] == _bus_number(bus2)
+
+    @pytest.mark.parametrize("case", ["case14_ieee", "case24_ieee_rts"])
+    def test_update_keeps_case_impedances(self, case):
+        """Writing the unchanged network back leaves every r and x as in the case."""
+        net = load_net_from_pglib(case)
+        conv = powsybl.to_powsybl(net)
+        pp_net = conv.pp_net
+        pp_net.per_unit = True
+        before = [df[["r", "x"]].copy() for df in _branch_frames(pp_net)]
+        update_powsybl(pp_net, net, conv.mapping_p2g)
+        pp_net.per_unit = True
+        for old, new in zip(before, _branch_frames(pp_net)):
+            assert np.allclose(new.loc[old.index, ["r", "x"]], old)
+
+
+def _branch_frames(pp_net):
+    return pp_net.get_lines(), pp_net.get_2_windings_transformers()
