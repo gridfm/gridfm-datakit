@@ -116,9 +116,11 @@ the console limited to pipeline progress. The Dynawo per-simulation reports
   `settings.large_chunk_size`.
 - **Topology perturbations:** set `topology_perturbation.type: random` (with
   `k` / `n_topology_variants` / `elements`) to expand each scenario into several
-  samples, one Dynawo run per perturbed topology, each labelled by
-  `perturbation_index`. This is the only perturbation that adds *dynamic*
-  diversity.
+  samples, each labelled by `perturbation_index`. It is the only perturbation
+  that changes which dynamic models Dynawo instantiates.
+- **Random events:** set `dynamic.event_perturbation.type: random` to draw
+  `n_event_variants` event sets per topology variant, each labelled by
+  `event_index`.
 - **`admittance_perturbation`:** accepted for parity with the static pipeline.
   Its perturbed `r`/`x` are written to the pypowsybl network with the OPF
   set-points, so they do change the simulated network. But one scenario still

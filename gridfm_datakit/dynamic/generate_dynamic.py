@@ -47,7 +47,11 @@ from gridfm_datakit.dynamic.event_perturbation import (
     EVENT_RECORD_COLUMNS,
     check_event_perturbation,
 )
-from gridfm_datakit.generate import _prepare_network_and_scenarios, _setup_environment
+from gridfm_datakit.generate import (
+    _powsybl_network_path,
+    _prepare_network_and_scenarios,
+    _setup_environment,
+)
 from gridfm_datakit.process.solver_output import SolverVerbosity
 from gridfm_datakit.utils.column_names import (
     BRANCH_COLUMNS,
@@ -156,6 +160,10 @@ def generate_dynamic_data(
     _validate_dynamic_config(args)
     _configure_logging(args)
     dynamic_inputs = load_raw_inputs(args)
+    check_event_perturbation(
+        dynamic_inputs.event_perturbation,
+        _powsybl_network_path(args),
+    )
 
     # --- Step 1: standard environment setup (reuse generate.py logic) ---
     args, base_path, file_paths, seed = _setup_environment(args)
@@ -182,10 +190,7 @@ def generate_dynamic_data(
     # reload the network themselves from that path (see _process_dynamic_chunk).
     _, scenarios, meta = _prepare_network_and_scenarios(args, file_paths, seed)
 
-    # --- Step 3: fixed event targets ---
-    check_event_perturbation(dynamic_inputs.event_perturbation, meta["network_path"])
-
-    # --- Step 4: output directory ---
+    # --- Step 3: output directory ---
     # Single root: everything this run produces lives under settings.data_dir, in
     # the same base_path (data_dir/<network>/raw) the static pipeline uses for its
     # logs and scenarios. The dynamic artifacts go one level down, in dynamic/,
@@ -198,7 +203,7 @@ def generate_dynamic_data(
     dynamic_solver = args.dynamic.dynamic_solver
     output_dir = Path(base_path) / "dynamic"
 
-    # --- Steps 5 & 6: simulate and save, one chunk at a time ---
+    # --- Steps 4 & 5: simulate and save, one chunk at a time ---
     # Each chunk is written and released before the next runs, so peak memory
     # tracks settings.large_chunk_size rather than the whole dataset. Dynamic
     # curves are far larger than static snapshots, which is why this streams
@@ -220,7 +225,7 @@ def generate_dynamic_data(
         gc.collect()
     writer.close()
 
-    # --- Step 7: optional validation ---
+    # --- Step 6: optional validation ---
     _validate_outputs(args, file_paths)
 
     return file_paths
@@ -513,10 +518,10 @@ class _DynamicDataWriter:
         """Append the static PF snapshot rows for this chunk.
 
         Every element row is tagged with its (scenario_index, perturbation_index,
-        event_index) so the static snapshot (features / initial conditions) can be joined back
-        to the dynamic trajectory (labels) by key rather than by row position.
-        This keeps the two modalities aligned even when a sample contributes to
-        only one.
+        event_index) so the static snapshot (features / initial conditions) can be
+        joined back to the dynamic trajectory (labels) by key rather than by row
+        position. This keeps the two modalities aligned even when a sample
+        contributes to only one.
         """
         keys, rows = [], {key: [] for key, _, _ in self._STATIC_TABLES}
         for result in results:

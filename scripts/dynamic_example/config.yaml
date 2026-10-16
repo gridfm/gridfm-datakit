@@ -22,7 +22,7 @@ load:
 
 # Topology / generation / admittance perturbations are optional. Left at "none"
 # here; enable e.g. topology_perturbation to expand each scenario into several
-# samples (one Dynawo run per perturbed topology).
+# samples (n_event_variants Dynawo runs per perturbed topology).
 #
 # generation_perturbation (generation *cost* randomisation) and
 # admittance_perturbation act before the OPF, so they vary the initial operating
@@ -60,7 +60,8 @@ dynamic:
     solver_parameters_id: SimplifiedSolver
   # Optional. Draws the events of each sample instead of replaying events_file.
   # An absent block means type: file. With type none or random, events_file is
-  # optional and ignored. See docs/manual/dynamic_simulation.md.
+  # optional and ignored, with a warning when set as here. See
+  # docs/manual/dynamic_simulation.md.
   # event_perturbation:
   #   type: random                 # none | file | random
   #   n_event_variants: 3          # event variants per topology variant

@@ -15,7 +15,8 @@ support, so a caller validates against it.
 
 A floor is checked at parse: fixed, uniform and choice specs are rejected when
 their support fails it, a normal takes it as a lower truncation bound and redraws a
-value equal to a strict one.
+value equal to a strict one, at most ``_MAX_REDRAWS`` times: ``truncnorm`` returns
+the bound itself on an interval too narrow to resolve.
 """
 
 from __future__ import annotations
@@ -29,6 +30,7 @@ import numpy as np
 from scipy.stats import truncnorm
 
 _NORMAL_SPAN = 6.0
+_MAX_REDRAWS = 1000
 
 _KEYS = {
     "normal": ({"mean", "std"}, {"min", "max"}),
@@ -144,16 +146,23 @@ class Normal(ValueSpec):
 
         Returns:
             float: A value inside the support, above ``lower`` when strict.
+
+        Raises:
+            ValueError: If no draw lands above a strict ``lower``.
         """
         lower, upper = self.support()
         a = (lower - self.mean) / self.std
         b = (upper - self.mean) / self.std
-        while True:
+        for _ in range(_MAX_REDRAWS):
             x = float(
                 truncnorm.rvs(a, b, loc=self.mean, scale=self.std, random_state=rng),
             )
             if not (self.strict and x <= self.lower):
                 return x
+        raise ValueError(
+            f"no draw above {self.lower} in [{lower}, {upper}] after "
+            f"{_MAX_REDRAWS} attempts",
+        )
 
     def support(self) -> Tuple[float, float]:
         """Return the worst case bounds of a draw.

@@ -240,6 +240,12 @@ class TestFloor:
         assert parse_value_spec(spec, PATH, NON_NEGATIVE).sample(rng) == 0.0
         assert not parse_value_spec({**spec, "min": 0.05}, PATH, POSITIVE).strict
 
+    def test_a_strict_floor_too_close_to_max_raises(self):
+        spec = {"distribution": "normal", "mean": 0, "std": 1, "max": 1e-200}
+        positive = parse_value_spec(spec, PATH, POSITIVE)
+        with pytest.raises(ValueError, match="no draw above 0.0"):
+            positive.sample(np.random.default_rng(0))
+
     def test_normal_far_below_the_floor(self):
         with pytest.raises(ValueError, match=f"^{re.escape(PATH)}: "):
             parse_value_spec(

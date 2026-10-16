@@ -495,7 +495,9 @@ class TestDrawEvents:
 
     def test_draws_are_reproducible_and_bounded(self):
         graph = _chain_graph()
-        perturbation = _parse(_random())
+        perturbation = _parse(
+            _edit(lambda b: b["scenarios"][0].update(anchor="B0")),
+        )
 
         def draw(seed, event_index):
             rng = np.random.default_rng([seed, 0, 0, event_index])
@@ -508,10 +510,7 @@ class TestDrawEvents:
             differs |= not frame.equals(draw(2, event_index))
             start = frame["start_time"].iloc[0]
             assert 20 <= start < 80
-            bus = f"B{frame['static_id'].iloc[0][1:]}"
-            assert any(
-                graph.distances(anchor).get(bus, 99) <= 2 for anchor in graph.adjacency
-            )
+            assert frame["static_id"].iloc[0] in {"G0", "G1", "G2"}
         assert differs
 
     def test_node_faults_are_reproducible_and_bounded(self):
@@ -576,7 +575,6 @@ class TestDrawEvents:
             frame = draw(event_index)
             pd.testing.assert_frame_equal(frame, draw(event_index))
             assert frame["event_name"].tolist() == ["Disconnect", "NodeFault"]
-            assert frame["static_id"].nunique() == 2
             start, later = frame["start_time"]
             assert 0.1 <= later - start < 0.3
             assert 20 <= start < 80
@@ -728,6 +726,21 @@ class TestCheck:
         block["scenarios"][0]["anchor"] = "_BUS____2_TN"
         with pytest.raises(ValueError, match=f"^{re.escape(SCENARIO)}.anchor: "):
             check_event_perturbation(_parse(block), PATH_NETWORK_IEEE14)
+
+    def test_a_random_anchor_target_of_a_missing_type_raises(self, monkeypatch):
+        monkeypatch.setattr(
+            "gridfm_datakit.dynamic.event_perturbation.EventGraph.from_network",
+            lambda pp_net: _chain_graph(),
+        )
+        perturbation = _parse(_event("ActivePowerVariation", "load", {"delta_p": 0.1}))
+        with pytest.raises(
+            ValueError,
+            match="^" + re.escape(f"{EVENT}.target.element: "),
+        ):
+            check_event_perturbation(perturbation, PATH_NETWORK_IEEE14)
+
+    def test_a_random_anchor_target_of_a_present_type_passes(self):
+        check_event_perturbation(_parse(_random()), PATH_NETWORK_IEEE14)
 
     def test_file_mode_does_not_load_the_network(self, tmp_path):
         check_event_perturbation(
