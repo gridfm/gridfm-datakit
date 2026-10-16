@@ -252,6 +252,113 @@ class _StaticGenerationConfig(_ConfigModel):
     settings: _StaticSettingsConfig
 
 
+class _DynamicInputFilesConfig(_ConfigModel):
+    """Input tables used to construct a dynamic simulation."""
+
+    static_element_dynamic_models_file: _NonEmptyString
+    automation_systems_file: _NonEmptyString
+    events_file: _NonEmptyString
+    variables_file: _NonEmptyString
+
+
+class _DynawoSolverParametersConfig(_ConfigModel):
+    """Parameters accepted by the Dynawo simulation provider."""
+
+    start_time: float
+    stop_time: float
+    parameters_file: Optional[_NonEmptyString] = None
+    network_parameters_file: Optional[_NonEmptyString] = None
+    network_parameters_id: Optional[_NonEmptyString] = None
+    solver_type: Optional[Literal["SIM", "IDA", "none"]] = None
+    solver_parameters_file: Optional[_NonEmptyString] = None
+    solver_parameters_id: Optional[_NonEmptyString] = None
+    precision: Optional[Union[_PositiveFloat, Literal["none"]]] = None
+
+    @model_validator(mode="after")
+    def validate_simulation_window(self) -> "_DynawoSolverParametersConfig":
+        """Require a non-empty, forward-moving simulation window."""
+        if self.stop_time <= self.start_time:
+            raise ValueError("stop_time must be greater than start_time")
+        return self
+
+
+class _DynamicLoadflowParametersConfig(_ConfigModel):
+    """Optional OpenLoadFlow overrides for the balanced initial state."""
+
+    distributed_slack: Optional[bool] = None
+    read_slack_bus: Optional[bool] = None
+    write_slack_bus: Optional[bool] = None
+    provider_parameters: Optional[Dict[str, Union[str, int, float, bool]]] = None
+
+
+class _DynamicLoggingConfig(_ConfigModel):
+    """Progress and per-simulation report settings."""
+
+    verbosity: Literal["silent", "error", "warning", "info", "debug"] = "info"
+    save_reports: bool = True
+
+
+class _DynamicConfig(_ConfigModel):
+    """Configuration owned by a dynamic simulation backend."""
+
+    dynamic_solver: Literal["dynawo"]
+    input_files: _DynamicInputFilesConfig
+    solver_parameters: _DynawoSolverParametersConfig
+    loadflow_parameters: Optional[_DynamicLoadflowParametersConfig] = None
+    run_validation: bool = Field(default=False, alias="validate")
+    logging: _DynamicLoggingConfig = Field(default_factory=_DynamicLoggingConfig)
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_removed_output_dir(cls, value: Any) -> Any:
+        """Give users of the former second output root a migration message."""
+        if isinstance(value, Mapping) and "output_dir" in value:
+            raise ValueError(
+                "dynamic.output_dir has been removed: dynamic outputs are now "
+                "written under settings.data_dir, in "
+                "{data_dir}/{network.name}/raw/dynamic/. Delete 'output_dir' "
+                "from the dynamic block and set settings.data_dir instead.",
+            )
+        return value
+
+
+class _DynamicSettingsConfig(_ConfigModel):
+    """Execution settings used by dynamic generation."""
+
+    num_processes: _PositiveInt = 1
+    data_dir: _NonEmptyString
+    large_chunk_size: _PositiveInt = 1_000
+    overwrite: bool = False
+    mode: Literal["pf"] = "pf"
+    include_dc_res: Literal[False] = False
+    enable_solver_logs: bool = False
+    pf_fast: Literal[False] = False
+    dcpf_fast: Literal[False] = False
+    max_iter: _PositiveInt = 200
+    seed: Optional[_Seed] = None
+    pf_solver: Literal["powsybl"] = "powsybl"
+    opf_formulation: Literal["polar"] = "polar"
+    sn_mva: _PositiveFloat = 100.0
+
+
+class _DynamicGenerationConfig(_ConfigModel):
+    """Complete configuration for dynamic data generation."""
+
+    network: _NetworkConfig
+    load: _StaticLoadConfig
+    topology_perturbation: _StaticTopologyConfig = Field(
+        default_factory=lambda: _NoTopologyPerturbationConfig(type="none"),
+    )
+    generation_perturbation: _StaticGenerationPerturbationConfig = Field(
+        default_factory=lambda: _NoGenerationPerturbationConfig(type="none"),
+    )
+    admittance_perturbation: _StaticAdmittancePerturbationConfig = Field(
+        default_factory=lambda: _NoAdmittancePerturbationConfig(type="none"),
+    )
+    dynamic: _DynamicConfig
+    settings: _DynamicSettingsConfig
+
+
 @dataclass(frozen=True)
 class _ConfigIssue:
     """Describe one semantic configuration error."""
@@ -260,10 +367,10 @@ class _ConfigIssue:
     message: str
 
 
-class _StaticConfigRule(Protocol):
+class _ConfigRule(Protocol):
     """Interface implemented by cross-field configuration rules."""
 
-    def check(self, config: _StaticGenerationConfig) -> tuple[_ConfigIssue, ...]:
+    def check(self, config: Any) -> tuple[_ConfigIssue, ...]:
         """Return every issue found by this rule."""
         ...
 
@@ -299,6 +406,15 @@ _PF_SOLVER_REQUIREMENTS = {
     "lightsim2grid": frozenset({_NetworkCapability.GRIDFM_NETWORK}),
 }
 
+_DYNAMIC_SOLVER_REQUIREMENTS = {
+    "dynawo": frozenset(
+        {
+            _NetworkCapability.POWSYBL_NETWORK,
+            _NetworkCapability.POWSYBL_INDEX_MAPPING,
+        },
+    ),
+}
+
 
 class _PfBackendCapabilityRule:
     """Require the selected reader to provide the PF backend's inputs."""
@@ -327,13 +443,40 @@ class _PfBackendCapabilityRule:
         )
 
 
+class _DynamicBackendCapabilityRule:
+    """Require the reader to provide the dynamic backend's network inputs."""
+
+    def check(self, config: _DynamicGenerationConfig) -> tuple[_ConfigIssue, ...]:
+        """Report capabilities missing from a reader/backend combination."""
+        provided = _READER_CAPABILITIES[config.network.reader]
+        required = _DYNAMIC_SOLVER_REQUIREMENTS[config.dynamic.dynamic_solver]
+        missing = required - provided
+        if not missing:
+            return ()
+
+        missing_names = ", ".join(sorted(capability.value for capability in missing))
+        return (
+            _ConfigIssue(
+                location="configuration",
+                message=(
+                    f"dynamic.dynamic_solver={config.dynamic.dynamic_solver!r} is "
+                    f"incompatible with network.reader={config.network.reader!r}; "
+                    f"missing capabilities: {missing_names}"
+                ),
+            ),
+        )
+
+
 @dataclass(frozen=True)
 class _DerivedSeedRule:
     """Keep every possible distributed seed in NumPy's supported range."""
 
     policy: _SeedPolicy = _DEFAULT_SEED_POLICY
 
-    def check(self, config: _StaticGenerationConfig) -> tuple[_ConfigIssue, ...]:
+    def check(
+        self,
+        config: Union[_StaticGenerationConfig, _DynamicGenerationConfig],
+    ) -> tuple[_ConfigIssue, ...]:
         """Report an overflow in the largest derived chunk seed."""
         max_derived_seed = self.policy.maximum_distributed_seed(
             config.settings.seed,
@@ -353,17 +496,23 @@ class _DerivedSeedRule:
         )
 
 
-_STATIC_CONFIG_RULES: tuple[_StaticConfigRule, ...] = (
+_STATIC_CONFIG_RULES: tuple[_ConfigRule, ...] = (
     _PfBackendCapabilityRule(),
     _DerivedSeedRule(),
 )
 
+_DYNAMIC_CONFIG_RULES: tuple[_ConfigRule, ...] = (
+    _DynamicBackendCapabilityRule(),
+    _DerivedSeedRule(),
+)
 
-def _check_static_config_rules(
-    config: _StaticGenerationConfig,
+
+def _check_config_rules(
+    config: Any,
+    rules: tuple[_ConfigRule, ...],
 ) -> tuple[_ConfigIssue, ...]:
-    """Run all registered semantic rules for a parsed static configuration."""
-    return tuple(issue for rule in _STATIC_CONFIG_RULES for issue in rule.check(config))
+    """Run registered semantic rules for a parsed configuration."""
+    return tuple(issue for rule in rules for issue in rule.check(config))
 
 
 _DISCRIMINATOR_VALUES = {
@@ -384,6 +533,16 @@ def _format_error_location(location: tuple[Union[str, int], ...]) -> str:
     return ".".join(parts) if parts else "configuration"
 
 
+def _format_validation_errors(exc: ValidationError) -> list[str]:
+    """Render Pydantic issues as user-facing configuration paths."""
+    messages = []
+    for error in exc.errors(include_url=False):
+        location = _format_error_location(error["loc"])
+        message = error["msg"].removeprefix("Value error, ")
+        messages.append(f"- {location}: {message}")
+    return messages
+
+
 def validate_static_config(config: Mapping[str, Any]) -> Dict[str, Any]:
     """Validate and normalize a static PF or OPF configuration.
 
@@ -400,19 +559,46 @@ def validate_static_config(config: Mapping[str, Any]) -> Dict[str, Any]:
     try:
         validated = _StaticGenerationConfig.model_validate(config)
     except ValidationError as exc:
-        messages = []
-        for error in exc.errors(include_url=False):
-            location = _format_error_location(error["loc"])
-            message = error["msg"].removeprefix("Value error, ")
-            messages.append(f"- {location}: {message}")
+        messages = _format_validation_errors(exc)
         raise ValueError(
             "Invalid static configuration:\n" + "\n".join(messages),
         ) from exc
 
-    issues = _check_static_config_rules(validated)
+    issues = _check_config_rules(validated, _STATIC_CONFIG_RULES)
     if issues:
         messages = [f"- {issue.location}: {issue.message}" for issue in issues]
         raise ValueError(
             "Invalid static configuration:\n" + "\n".join(messages),
         )
     return validated.model_dump(exclude_none=True)
+
+
+def validate_dynamic_config(config: Mapping[str, Any]) -> Dict[str, Any]:
+    """Validate and normalize a dynamic generation configuration.
+
+    Args:
+        config: Parsed configuration mapping.
+
+    Returns:
+        Validated configuration with established defaults applied.
+
+    Raises:
+        ValueError: If required fields are missing, values have invalid types or
+            ranges, unknown fields are present, or the selected reader cannot
+            provide the dynamic backend's network representation.
+    """
+    try:
+        validated = _DynamicGenerationConfig.model_validate(config)
+    except ValidationError as exc:
+        messages = _format_validation_errors(exc)
+        raise ValueError(
+            "Invalid dynamic configuration:\n" + "\n".join(messages),
+        ) from exc
+
+    issues = _check_config_rules(validated, _DYNAMIC_CONFIG_RULES)
+    if issues:
+        messages = [f"- {issue.location}: {issue.message}" for issue in issues]
+        raise ValueError(
+            "Invalid dynamic configuration:\n" + "\n".join(messages),
+        )
+    return validated.model_dump(exclude_none=True, by_alias=True)

@@ -19,6 +19,10 @@ AUTOMATION_SYSTEM_PARAMS_MAPPING = {
     "UnderVoltageAutomationSystem": ["generator"],
 }
 
+# These categories exist in pypowsybl's mapping API, but cannot be represented
+# by the flat ``key=value`` strings accepted by the CSV input contract.
+UNSUPPORTED_CSV_AUTOMATION_SYSTEMS = frozenset({"TapChangerBlocking"})
+
 EVENT_PARAMS_MAPPING = {
     "ActivePowerVariation": ["delta_p"],
     "Disconnect": ["disconnect_only"],

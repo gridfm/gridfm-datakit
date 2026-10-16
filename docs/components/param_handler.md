@@ -2,6 +2,10 @@
 
 This module provides utilities for handling and manipulating configuration parameters.
 
+### `parse_parameter_string`
+
+::: gridfm_datakit.utils.param_handler.parse_parameter_string
+
 ### `flatten_dict`
 
 ::: gridfm_datakit.utils.param_handler.flatten_dict

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 from markers import needs_powsybl
 
@@ -41,6 +43,29 @@ def test_unsupported_solver_key_raises():
     config = _config(start_time=0.0, stop_time=500.0, solver_typo="SIM")
     with pytest.raises(ValueError, match="solver_typo"):
         get_dynawo_simulation_parameters(config)
+
+
+def test_none_solver_parameters_are_not_forwarded(monkeypatch):
+    class _Parameters:
+        def __init__(self, **kwargs):
+            self.provider_parameters = kwargs["provider_parameters"]
+
+    monkeypatch.setattr(
+        "gridfm_datakit.dynamic.dynawo.pp",
+        SimpleNamespace(dynamic=SimpleNamespace(Parameters=_Parameters)),
+    )
+
+    params = get_dynawo_simulation_parameters(
+        _config(
+            start_time=0.0,
+            stop_time=500.0,
+            solver_type="none",
+            precision="none",
+        ),
+    )
+
+    assert "solver.type" not in params.provider_parameters
+    assert "precision" not in params.provider_parameters
 
 
 @needs_powsybl

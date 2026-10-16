@@ -9,13 +9,13 @@ import numpy as np
 import pytest
 from markers import needs_dynawo
 
+from gridfm_datakit.dynamic import process_dynamic as pdyn
 from gridfm_datakit.dynamic.dynawo import (
     generate_dynawo_mappings,
     get_dynawo_simulation_parameters,
 )
-from gridfm_datakit.dynamic import load_raw_inputs
-from gridfm_datakit.dynamic import process_dynamic as pdyn
-from gridfm_datakit.generate import _setup_environment, _prepare_network_and_scenarios
+from gridfm_datakit.dynamic.generate_dynamic import _setup_environment
+from gridfm_datakit.generate import _prepare_network_and_scenarios
 from gridfm_datakit.powsybl import load_net
 from gridfm_datakit.utils.param_handler import NestedNamespace
 
@@ -29,8 +29,7 @@ def test_process_single_dynamic_simulation(config_ieee14):
 
     config = config_ieee14
 
-    args, _, _, _ = _setup_environment(config)
-    dynamic_inputs = load_raw_inputs(args)
+    args, dynamic_inputs, _, _, _ = _setup_environment(config)
     dynawo_mappings = generate_dynawo_mappings(dynamic_inputs)
     simulation_parameters = get_dynawo_simulation_parameters(args)
     net = load_net(args.network.file)
@@ -71,9 +70,8 @@ def test_process_dynamic_simulation(config_ieee14):
 
     config = config_ieee14
 
-    args, _, file_paths, seed = _setup_environment(config)
+    args, dynamic_inputs, _, file_paths, seed = _setup_environment(config)
     gfm_net, scenarios, meta = _prepare_network_and_scenarios(args, file_paths, seed)
-    dynamic_inputs = load_raw_inputs(args)
 
     res_dict = process_dynamic_simulations(
         network_path=str(meta.get("network_path")),

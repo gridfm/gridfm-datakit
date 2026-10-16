@@ -29,7 +29,6 @@ try:
 except ImportError:  # pragma: no cover - optional dependency
     pp = None
 
-from gridfm_datakit.utils.param_handler import NestedNamespace
 from gridfm_datakit.dynamic import DynamicInputs
 from gridfm_datakit.dynamic.dynawo.utils import (
     AUTOMATION_SYSTEM_PARAMS_MAPPING,
@@ -37,6 +36,7 @@ from gridfm_datakit.dynamic.dynawo.utils import (
     LOADFLOW_PARAMETERS_DEFAULTS,
     SIMULATION_PARAMETERS_MAPPING,
 )
+from gridfm_datakit.utils.param_handler import NestedNamespace, parse_parameter_string
 
 
 @dataclass
@@ -325,7 +325,7 @@ def _get_param_value(params, keyword):
 
     # maxsplit=1: only the FIRST "=" separates key from value, so a value that
     # itself contains "=" parses instead of raising ("too many values to unpack").
-    pairs = dict(pair.split("=", 1) for pair in params.split(";") if "=" in pair)
+    pairs = parse_parameter_string(params)
     # specific case for the "Disconnect" event, the sole one to have an optional parameter
 
     if keyword == "disconnect_only" and pairs.get(keyword) == "":

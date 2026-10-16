@@ -36,7 +36,7 @@ class _SeedPolicy:
         base_seed: Optional[int],
         scenario_count: int,
     ) -> int:
-        """Return the largest possible chunk seed for a static configuration."""
+        """Return the largest possible chunk seed for a generation run."""
         if scenario_count <= 0:
             raise ValueError("scenario_count must be positive")
         effective_seed = (

@@ -197,6 +197,150 @@ class TestValidateValues:
         with pytest.raises(ValueError, match="no row of type 'Curve'"):
             load_raw_inputs(config)
 
+    @pytest.mark.parametrize(
+        ("dataset_key", "file_label", "column"),
+        [
+            (
+                "df_static_element_dynamic_models",
+                "static_element_dynamic_models",
+                "category_name",
+            ),
+            (
+                "df_static_element_dynamic_models",
+                "static_element_dynamic_models",
+                "static_id",
+            ),
+            (
+                "df_static_element_dynamic_models",
+                "static_element_dynamic_models",
+                "parameter_set_id",
+            ),
+            (
+                "df_static_element_dynamic_models",
+                "static_element_dynamic_models",
+                "model_name",
+            ),
+            ("df_automation_systems", "automation_systems", "category_name"),
+            ("df_automation_systems", "automation_systems", "dynamic_model_id"),
+            ("df_automation_systems", "automation_systems", "parameter_set_id"),
+            ("df_automation_systems", "automation_systems", "model_name"),
+            ("df_events", "events", "event_name"),
+            ("df_events", "events", "static_id"),
+            ("df_variables", "variables", "type"),
+            ("df_variables", "variables", "model_id"),
+            ("df_variables", "variables", "variables"),
+        ],
+    )
+    @pytest.mark.parametrize("empty_value", [None, "   "], ids=["null", "whitespace"])
+    def test_required_string_values_must_not_be_empty(
+        self,
+        tmp_path,
+        minimal_dataset,
+        dataset_key,
+        file_label,
+        column,
+        empty_value,
+    ):
+        table = minimal_dataset[dataset_key].copy()
+        table.loc[0, column] = empty_value
+        config = self._config(
+            tmp_path,
+            minimal_dataset,
+            **{dataset_key: table},
+        )
+
+        with pytest.raises(
+            ValueError,
+            match=rf"{file_label}: required values must not be empty: .*{column} row\(s\) \[0\]",
+        ):
+            load_raw_inputs(config)
+
+    def test_disconnect_accepts_empty_params(self, tmp_path, minimal_dataset):
+        events = minimal_dataset["df_events"].copy()
+        events.loc[0, "params"] = ""
+        config = self._config(tmp_path, minimal_dataset, df_events=events)
+
+        assert load_raw_inputs(config).events.loc[0, "params"] == ""
+
+    @pytest.mark.parametrize(
+        ("params", "match"),
+        [
+            ("delta_p", "must use key=value"),
+            ("delta_p=1;delta_p=2", "specified more than once"),
+            ("delta_p=1;typo=2", r"unexpected parameter\(s\) \['typo'\]"),
+        ],
+        ids=["malformed", "duplicate", "unexpected"],
+    )
+    def test_event_params_reject_ambiguous_or_unknown_input(
+        self,
+        tmp_path,
+        minimal_dataset,
+        params,
+        match,
+    ):
+        events = minimal_dataset["df_events"].copy()
+        events.loc[0, "event_name"] = "ActivePowerVariation"
+        events.loc[0, "params"] = params
+        config = self._config(tmp_path, minimal_dataset, df_events=events)
+
+        with pytest.raises(ValueError, match=match):
+            load_raw_inputs(config)
+
+    @pytest.mark.parametrize(
+        ("event_name", "params"),
+        [
+            ("NodeFault", "r_pu=not-a-number"),
+            ("ActivePowerVariation", "delta_p=inf"),
+        ],
+        ids=["required-and-type", "finite"],
+    )
+    def test_backend_validates_event_parameter_semantics(
+        self,
+        tmp_path,
+        minimal_dataset,
+        event_name,
+        params,
+    ):
+        events = minimal_dataset["df_events"].copy()
+        events.loc[0, "event_name"] = event_name
+        events.loc[0, "params"] = params
+        config = self._config(tmp_path, minimal_dataset, df_events=events)
+
+        assert load_raw_inputs(config).events.loc[0, "params"] == params
+
+    def test_backend_validates_automation_parameter_semantics(
+        self,
+        tmp_path,
+        minimal_dataset,
+    ):
+        systems = minimal_dataset["df_automation_systems"].copy()
+        systems.loc[0, "params"] = ""
+        config = self._config(
+            tmp_path,
+            minimal_dataset,
+            df_automation_systems=systems,
+        )
+
+        assert load_raw_inputs(config).dynamic_models[1].loc[0, "params"] == ""
+
+    def test_tap_changer_blocking_is_rejected(self, tmp_path, minimal_dataset):
+        systems = minimal_dataset["df_automation_systems"].copy()
+        systems.loc[0, "category_name"] = "TapChangerBlocking"
+        systems.loc[0, "params"] = (
+            "rfo_df=one;mp1_df=one;mp2_df=one;mp3_df=one;mp4_df=one;mp5_df=one"
+        )
+        config = self._config(
+            tmp_path,
+            minimal_dataset,
+            df_automation_systems=systems,
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="cannot be configured from the flat params column",
+        ):
+            load_raw_inputs(config)
+
     def test_valid_dataset_still_loads(self, tmp_path, minimal_dataset):
         assert isinstance(
             load_raw_inputs(_make_config(str(tmp_path), minimal_dataset)),

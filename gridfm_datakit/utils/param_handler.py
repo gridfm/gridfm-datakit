@@ -84,6 +84,35 @@ class NestedNamespace(argparse.Namespace):
         return dict(items)
 
 
+def parse_parameter_string(params: str) -> dict[str, str]:
+    """Parse a flat dynamic-input parameter string.
+
+    Args:
+        params: Semicolon-separated ``key=value`` pairs. A trailing semicolon
+            is accepted, and values may themselves contain ``=``.
+
+    Returns:
+        Parameter values keyed by their names.
+
+    Raises:
+        ValueError: If a non-empty fragment is malformed, a key is empty, or a
+            key occurs more than once.
+    """
+    parsed = {}
+    for fragment in params.split(";"):
+        if fragment == "":
+            continue
+        if "=" not in fragment:
+            raise ValueError(f"parameter fragment {fragment!r} must use key=value")
+        key, value = fragment.split("=", 1)
+        if key == "":
+            raise ValueError("parameter keys must not be empty")
+        if key in parsed:
+            raise ValueError(f"parameter {key!r} is specified more than once")
+        parsed[key] = value
+    return parsed
+
+
 def flatten_dict(
     d: Dict[str, Any],
     parent_key: str = "",

@@ -186,11 +186,35 @@ def test_topology_perturbation_expands_scenarios_into_samples(config_ieee14):
 
 
 def _valid_config_skeleton() -> dict:
-    """The smallest config _validate_dynamic_config accepts, as a plain dict."""
+    """A complete minimal dynamic-generation config, as a plain dict."""
     return {
-        "network": {"name": "IEEE14", "reader": "powsybl"},
-        "load": {"scenarios": 1},
-        "dynamic": {"dynamic_solver": "dynawo"},
+        "network": {
+            "name": "IEEE14",
+            "reader": "powsybl",
+            "source": "file",
+            "file": "network.xiidm",
+        },
+        "load": {
+            "generator": "agg_load_profile",
+            "agg_profile": "default",
+            "scenarios": 1,
+            "sigma": 0.2,
+            "change_reactive_power": True,
+            "global_range": 0.4,
+            "max_scaling_factor": 4.0,
+            "step_size": 0.05,
+            "start_scaling_factor": 0.8,
+        },
+        "dynamic": {
+            "dynamic_solver": "dynawo",
+            "input_files": {
+                "static_element_dynamic_models_file": "models.csv",
+                "automation_systems_file": "automation.csv",
+                "events_file": "events.csv",
+                "variables_file": "variables.csv",
+            },
+            "solver_parameters": {"start_time": 0.0, "stop_time": 10.0},
+        },
         "settings": {"data_dir": "out"},
     }
 
@@ -204,22 +228,30 @@ class TestConfigValidation:
                 config.pop(block, None)
             else:
                 config.setdefault(block, {}).update(values)
-        gd._validate_dynamic_config(NestedNamespace(**config))
+        gd.validate_dynamic_config(config)
 
     def test_native_reader_raises(self):
-        with pytest.raises(ValueError, match="require network.reader='powsybl'"):
-            self._validate({"network": {"reader": "native"}})
+        with pytest.raises(
+            ValueError,
+            match=r"dynamic\.dynamic_solver='dynawo'.*network\.reader='native'",
+        ):
+            self._validate(
+                {"network": {"reader": "native", "network_dir": "grids"}},
+            )
 
     def test_missing_network_block_raises_about_the_reader(self):
-        with pytest.raises(ValueError, match="require network.reader='powsybl'"):
+        with pytest.raises(ValueError, match=r"network: Field required"):
             self._validate({"network": None})
 
     def test_missing_dynamic_block_raises(self):
-        with pytest.raises(ValueError, match="missing the 'dynamic:' block"):
+        with pytest.raises(ValueError, match=r"dynamic: Field required"):
             self._validate({"dynamic": None})
 
     def test_missing_dynamic_solver_raises(self):
-        with pytest.raises(ValueError, match="missing dynamic.dynamic_solver"):
+        with pytest.raises(
+            ValueError,
+            match=r"dynamic\.dynamic_solver: Input should be 'dynawo'",
+        ):
             self._validate({"dynamic": {"dynamic_solver": None}})
 
     def test_removed_output_dir_key_raises(self):
@@ -228,26 +260,22 @@ class TestConfigValidation:
 
     @pytest.mark.parametrize("scenarios", [0, -1, None])
     def test_non_positive_scenario_count_raises(self, scenarios):
-        with pytest.raises(ValueError, match="load.scenarios must be >= 1"):
+        with pytest.raises(ValueError, match=r"load\.scenarios:"):
             self._validate({"load": {"scenarios": scenarios}})
 
     def test_missing_load_block_raises(self):
-        with pytest.raises(ValueError, match="load.scenarios must be >= 1"):
+        with pytest.raises(ValueError, match=r"load: Field required"):
             self._validate({"load": None})
 
-    @needs_dynawo
     def test_a_valid_config_passes(self):
         self._validate({})  # must not raise
 
-    def test_an_unknown_solver_skips_the_dynawo_install_check(self, monkeypatch):
-        def _fail():
-            raise AssertionError("must not check for Dynawo on another solver")
-
-        monkeypatch.setattr(
-            "gridfm_datakit.dynamic.dynawo.api.check_dynawo_available",
-            _fail,
-        )
-        self._validate({"dynamic": {"dynamic_solver": "some_other_solver"}})
+    def test_an_unknown_solver_is_rejected(self):
+        with pytest.raises(
+            ValueError,
+            match=r"dynamic\.dynamic_solver: Input should be 'dynawo'",
+        ):
+            self._validate({"dynamic": {"dynamic_solver": "some_other_solver"}})
 
 
 class _StopPipeline(Exception):
@@ -257,14 +285,14 @@ class _StopPipeline(Exception):
 class TestAcceptedConfigForms:
     @pytest.fixture
     def accepted(self, monkeypatch):
-        """Capture the normalised config, then bail out."""
+        """Capture the loaded config, then bail out before runtime checks."""
         seen = {}
 
-        def _spy(args):
-            seen["args"] = args
+        def _spy(config):
+            seen["config"] = config
             raise _StopPipeline
 
-        monkeypatch.setattr(gd, "_validate_dynamic_config", _spy)
+        monkeypatch.setattr(gd, "validate_dynamic_config", _spy)
         return seen
 
     @pytest.fixture
@@ -276,35 +304,35 @@ class TestAcceptedConfigForms:
     def test_path_string(self, accepted, config_file):
         with pytest.raises(_StopPipeline):
             gd.generate_dynamic_data(str(config_file))
-        assert accepted["args"].dynamic.dynamic_solver == "dynawo"
-        assert accepted["args"].load.scenarios == 1
+        assert accepted["config"]["dynamic"]["dynamic_solver"] == "dynawo"
+        assert accepted["config"]["load"]["scenarios"] == 1
 
     def test_path_object(self, accepted, config_file):
         """A Path used to fail with an AttributeError on the path object."""
         with pytest.raises(_StopPipeline):
             gd.generate_dynamic_data(config_file)
-        assert accepted["args"].dynamic.dynamic_solver == "dynawo"
+        assert accepted["config"]["dynamic"]["dynamic_solver"] == "dynawo"
 
     def test_dict(self, accepted):
         with pytest.raises(_StopPipeline):
             gd.generate_dynamic_data(_valid_config_skeleton())
-        assert isinstance(accepted["args"], NestedNamespace)
-        assert accepted["args"].network.reader == "powsybl"
+        assert isinstance(accepted["config"], dict)
+        assert accepted["config"]["network"]["reader"] == "powsybl"
 
-    def test_nested_namespace_is_used_as_is(self, accepted):
+    def test_nested_namespace_is_converted_to_a_mapping(self, accepted):
         config = NestedNamespace(**_valid_config_skeleton())
         with pytest.raises(_StopPipeline):
             gd.generate_dynamic_data(config)
-        assert accepted["args"] is config
+        assert accepted["config"] == config.to_dict()
 
     def test_every_form_yields_the_same_config(self, monkeypatch, config_file):
         seen = []
 
-        def _spy(args):
-            seen.append(args.to_dict())
+        def _spy(config):
+            seen.append(config)
             raise _StopPipeline
 
-        monkeypatch.setattr(gd, "_validate_dynamic_config", _spy)
+        monkeypatch.setattr(gd, "validate_dynamic_config", _spy)
         for form in (str(config_file), config_file, _valid_config_skeleton()):
             with pytest.raises(_StopPipeline):
                 gd.generate_dynamic_data(form)
