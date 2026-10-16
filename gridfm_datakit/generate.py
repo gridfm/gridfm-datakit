@@ -215,6 +215,29 @@ def _setup_environment(
     return args, base_path, file_paths, seed
 
 
+def _powsybl_network_path(args: NestedNamespace) -> str:
+    """Return the network file the powsybl reader loads.
+
+    Args:
+        args: Configuration object, ``network.source`` ``pglib`` or ``file``.
+
+    Returns:
+        The PGLib file, downloaded and corrected if needed, or the given file.
+
+    Raises:
+        ValueError: If ``network.source`` is neither ``pglib`` nor ``file``.
+    """
+    if args.network.source == "pglib":
+        return get_pglib_file_path(args.network.name)
+    if args.network.source != "file":
+        raise ValueError(
+            f"network.source must be 'pglib' or 'file', got {args.network.source!r}",
+        )
+    if getattr(args.network, "file", None):
+        return args.network.file
+    return os.path.join(args.network.network_dir, args.network.name) + ".m"
+
+
 def _prepare_network_and_scenarios(
     args: NestedNamespace,
     file_paths: Dict[str, str],
@@ -235,7 +258,7 @@ def _prepare_network_and_scenarios(
 
     if args.network.source == "pglib":
         if reader == "powsybl":
-            network_path = get_pglib_file_path(args.network.name)
+            network_path = _powsybl_network_path(args)
             loaded_net = powsybl.load_net(network_path)
             meta["pp_net"] = loaded_net.pp_net
             meta["network_path"] = network_path
@@ -245,11 +268,7 @@ def _prepare_network_and_scenarios(
             net = load_net_from_pglib(args.network.name)
     elif args.network.source == "file":
         if reader == "powsybl":
-            network_path = (
-                args.network.file
-                if getattr(args.network, "file", None)
-                else os.path.join(args.network.network_dir, args.network.name) + ".m"
-            )
+            network_path = _powsybl_network_path(args)
             loaded_net = powsybl.load_net(network_path)
             meta["pp_net"] = loaded_net.pp_net
             meta["network_path"] = network_path
