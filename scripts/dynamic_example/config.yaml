@@ -60,7 +60,8 @@ dynamic:
     solver_parameters_id: SimplifiedSolver
   # Optional. Draws the events of each sample instead of replaying events_file.
   # An absent block means type: file. With type none or random, events_file is
-  # optional and ignored. See docs/manual/dynamic_simulation.md.
+  # optional and ignored, with a warning when set as here. See
+  # docs/manual/dynamic_simulation.md.
   # event_perturbation:
   #   type: random                 # none | file | random
   #   n_event_variants: 3          # event variants per topology variant

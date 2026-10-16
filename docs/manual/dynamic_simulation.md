@@ -395,9 +395,10 @@ draws a load step.
 
 | `type` | `target.element` | `params` |
 | --- | --- | --- |
+| `Disconnect` | any | none |
 | `NodeFault` | `bus` | `fault_time` positive, `r_pu` and `x_pu` non-negative |
 | `ActivePowerVariation` | `generator`, `load` | `delta_p`, any sign, unit as in `events_file` |
-| `ReactivePowerVariation` | `generator`, `load` | `delta_q`, any sign, unit as in `events_file` |
+| `ReactivePowerVariation` | `generator`, `load` | `delta_q`, any sign, unit as in `events_file`. No effect on a generator |
 | `ReferenceVoltageVariation` | `generator` | `delta_u`, any sign, unit as in `events_file` |
 
 A node fault on a bus drawn at `distance` 0 or 1 hop from a random anchor:
@@ -423,7 +424,9 @@ A value spec is a number, fixed, or one of:
 | `{distribution: uniform, low, high}` | Uniform on `[low, high)` |
 | `{distribution: choice, values, weights}` | One of `values`, `weights` optional |
 
-Values outside the bounds are redrawn, never clipped.
+Values outside the bounds are redrawn, never clipped. A normal whose truncation
+interval misses `mean` ± 6 `std` is rejected. `weights` are relative,
+non-negative with a positive sum, equal when absent.
 
 `distance` counts branch hops from the anchor over the lines, two-winding
 transformers and three-winding transformers in service after the topology
@@ -452,7 +455,8 @@ not exceed it, and for a `NodeFault` neither may that sum plus the largest
 Each event variant draws from
 `numpy.random.default_rng([settings.seed, scenario_index, perturbation_index,
 event_index])`, so unless `topology_perturbation.type` is `random` a seed gives
-the same events whatever `num_processes` and `large_chunk_size`. A random
+the same events whatever `num_processes` and `large_chunk_size`. Without
+`settings.seed`, the seed drawn is recorded in `metadata.json`. A random
 topology perturbation draws per chunk, so the chunking changes the topology
 variants and the targets placed on them.
 The draws come in this order: the scenario by `weight`, only
@@ -675,7 +679,7 @@ static pipeline's `{data_dir}/{network.name}/raw/`:
     ├── y_bus_data.parquet
     ├── runtime_data.parquet
     ├── final_state_values.parquet     only when FinalStateValue rows are monitored
-    ├── events.parquet
+    ├── events.parquet                 only when a sample carries events
     ├── dynamic_results.zarr/
     ├── reports/
     └── metadata.json
@@ -749,7 +753,10 @@ One row per event per sample, keyed by `(scenario_index, perturbation_index,
 event_index)`, with the columns `scenario`, `event_name`, `static_id`,
 `start_time` and `params`. It records the events each sample simulated, read
 from `events_file` or drawn. `scenario` is the name of the drawn scenario, `""`
-for `events_file` rows. With `event_perturbation.type: none` no file is written.
+for `events_file` rows. `start_time` is a float, the other non-key columns
+strings, `params` in the `events_file` format. Only samples that reached the
+outputs have rows. No file is written when no sample carries events, with
+`event_perturbation.type: none` or an `events_file` with no rows.
 
 ### `reports/`
 
@@ -848,13 +855,13 @@ reports neither:
 | --- | --- |
 | `Dynawo backend unavailable: …` | No `~/.itools/config.yml`, no `dynawo.homeDir` entry, or `homeDir` does not contain `dynawo.sh` / `bin/dynawo` (`dynawo.cmd` on Windows) |
 | `Dynamic simulations require network.reader='powsybl'` | Set `reader: powsybl` in the `network` block |
-| `Dynawo failed to instantiate N dynamic model(s)` | A `static_id`, `model_name` or `category_name` does not match the network's element IDs or a Dynawo model. Check the IDs against the network file, not against `get_*()` output |
+| `Dynawo failed to instantiate N dynamic model(s)` | A `static_id`, `model_name` or `category_name` does not match the network's element IDs or a Dynawo model. Check the IDs against the network file, not against `get_*()` output. Also raised when an `events_file` event targets an element whose model does not accept it, for example a `NodeFault` on a generator |
 | `variables: no row of type 'Curve'` | The time-series store needs at least one `Curve` row |
 | `automation_systems: unsupported category_name …` | Typo in a key column; the message lists the accepted values |
 | `dynamic.solver_parameters: missing required key(s)` | `start_time` / `stop_time` are mandatory |
 | `Error in dynamic chunk: …` on every chunk | A per-worker setup step failed identically everywhere, most often a bad key in `dynamic.solver_parameters` or `dynamic.loadflow_parameters`. The message carries the underlying error |
 | `Dynamic generation produced no samples: every scenario failed` | Read `raw/error.log` for the per-scenario cause, and the `Error in dynamic chunk` lines above it for worker-level ones. No reports are written in this case, since `raw/dynamic/` is never created |
-| Trajectory looks like the base case | Check that `events.csv` `start_time` falls inside `[start_time, stop_time]` |
+| Trajectory looks like the base case | Check that `events.csv` `start_time` falls inside `[start_time, stop_time]`, or the event is a power or voltage variation the target's model ignores (see Current limitations) |
 
 ## Current limitations
 
