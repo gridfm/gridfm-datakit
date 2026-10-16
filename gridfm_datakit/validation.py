@@ -332,8 +332,9 @@ def validate_dynamic_data(
 
     This loader bridges the two: it reads the flat files and adds a dense
     ``scenario`` column by ranking the distinct (scenario_index, perturbation_index,
-    event_index) triples, so each dynamic sample becomes one "scenario" from the checks' point of
-    view. The checks themselves are shared verbatim with the static pipeline.
+    event_index) triples, so each dynamic sample becomes one "scenario" from the
+    checks' point of view. The checks themselves are shared verbatim with the
+    static pipeline.
 
     Note this validates the *static snapshot* (the initial operating point Dynawo
     starts from): the bus/branch/gen/Y-bus/runtime tables. It does not validate the

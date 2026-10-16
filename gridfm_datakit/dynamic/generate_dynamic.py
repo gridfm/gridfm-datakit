@@ -513,10 +513,10 @@ class _DynamicDataWriter:
         """Append the static PF snapshot rows for this chunk.
 
         Every element row is tagged with its (scenario_index, perturbation_index,
-        event_index) so the static snapshot (features / initial conditions) can be joined back
-        to the dynamic trajectory (labels) by key rather than by row position.
-        This keeps the two modalities aligned even when a sample contributes to
-        only one.
+        event_index) so the static snapshot (features / initial conditions) can be
+        joined back to the dynamic trajectory (labels) by key rather than by row
+        position. This keeps the two modalities aligned even when a sample
+        contributes to only one.
         """
         keys, rows = [], {key: [] for key, _, _ in self._STATIC_TABLES}
         for result in results:

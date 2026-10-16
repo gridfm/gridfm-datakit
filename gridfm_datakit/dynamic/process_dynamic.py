@@ -446,7 +446,7 @@ def process_single_dynamic_simulation(
                 else None
             )
 
-            # Step 3 and 4: one dynamic simulation per event variant, labelled
+            # Steps 3 and 4: simulate and label each event variant
             n_event_variants = event_perturbation.n_event_variants
             for event_index in range(n_event_variants):
                 in_place = event_index == n_event_variants - 1
