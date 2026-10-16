@@ -368,22 +368,17 @@ def process_single_dynamic_simulation(
     the balanced initial state is computed on the perturbed network (so OPF adapts
     the set-points to the topology and Dynawo initialises from a converged
     operating point). Each of the ``event_perturbation.n_event_variants`` event
-    variants then runs the dynamic simulation on its own clone of that balanced
-    variant. One sample is produced per ``(scenario_index, perturbation_index,
-    event_index)``, and the event variants of one topology variant share its
-    ``pf_data``.
+    variants then simulates from that state. One sample is produced per
+    ``(scenario_index, perturbation_index, event_index)``; the event variants of
+    one topology variant share its ``pf_data``.
 
     Absent generators default to identity, so a scenario yields exactly one
     sample, the pre-perturbation behaviour.
 
-    In ``random`` mode each event variant draws its events with
-    ``default_rng([seed, scenario_index, perturbation_index, event_index])``;
-    otherwise it runs ``events``. Each simulation builds its event mapping from
-    them, which replaces the event mapping in ``dynamic_mappings``. Each sample
-    carries the events it simulated. A failed event variant drops only its sample.
-    Dynawo writes its final state into the variant it runs on, so each event
-    variant but the last runs on a clone of the topology variant, the last on the
-    topology variant itself.
+    Events are drawn per variant in ``random`` mode (seeding in
+    ``event_perturbation``), ``events`` otherwise, and replace the event mapping
+    of ``dynamic_mappings``. Each sample carries its events. A failed event
+    variant drops only its sample.
 
     Returns a list of result dicts (possibly empty if every perturbation failed).
     """

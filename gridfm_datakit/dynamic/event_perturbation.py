@@ -46,9 +46,9 @@ event in list order its delay and its params in table order. A placement failure
 raises: another scenario would bias the weights. A fixed spec draws nothing, so
 no delay and Disconnect cost no draw.
 
-The M event variants of a topology variant share its balanced state: it does not
-depend on the events, so it is computed once. A Dynawo run writes its final state
-into the variant it ran on, so each event variant runs on its own clone.
+The M event variants of a topology variant share its balanced state, computed
+once. A Dynawo run writes its final state into its variant, so every event
+variant but the last runs on a clone.
 """
 
 from __future__ import annotations
