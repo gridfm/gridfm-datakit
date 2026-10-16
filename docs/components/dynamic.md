@@ -38,6 +38,38 @@ configuration and output reference.
 
 ::: gridfm_datakit.dynamic.process_dynamic.process_single_dynamic_simulation
 
+## Event placement
+
+### `EventGraph`
+
+::: gridfm_datakit.dynamic.placement.EventGraph
+
+### `place_scenario`
+
+::: gridfm_datakit.dynamic.placement.place_scenario
+
+### `PlacementError`
+
+::: gridfm_datakit.dynamic.placement.PlacementError
+
+## Event perturbation
+
+### `EventPerturbation`
+
+::: gridfm_datakit.dynamic.event_perturbation.EventPerturbation
+
+### `parse_event_perturbation`
+
+::: gridfm_datakit.dynamic.event_perturbation.parse_event_perturbation
+
+### `check_event_perturbation`
+
+::: gridfm_datakit.dynamic.event_perturbation.check_event_perturbation
+
+### `draw_events`
+
+::: gridfm_datakit.dynamic.event_perturbation.draw_events
+
 ## Dynawo backend
 
 ### `DynawoMappings`
@@ -47,6 +79,10 @@ configuration and output reference.
 ### `generate_dynawo_mappings`
 
 ::: gridfm_datakit.dynamic.dynawo.generate_dynawo_mappings
+
+### `generate_dynawo_event_mapping`
+
+::: gridfm_datakit.dynamic.dynawo.generate_dynawo_event_mapping
 
 ### `get_dynawo_simulation_parameters`
 

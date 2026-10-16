@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from markers import needs_dynawo
+from markers import needs_dynawo, needs_powsybl
 
 from gridfm_datakit.dynamic import generate_dynamic as gd
 from gridfm_datakit.utils.param_handler import NestedNamespace
@@ -41,6 +41,27 @@ def test_generated_data_passes_static_validation(config_ieee14):
 
     file_paths = generate_dynamic_data(config_ieee14)
     assert validate_dynamic_data(file_paths, mode="pf", sn_mva=100.0)
+
+
+@needs_dynawo
+def test_datasets_without_event_index_pass_static_validation(config_ieee14, tmp_path):
+    import pandas as pd
+
+    from gridfm_datakit.dynamic.generate_dynamic import generate_dynamic_data
+    from gridfm_datakit.validation import validate_dynamic_data
+
+    config_ieee14.dynamic.solver_parameters.stop_time = 60.0
+    file_paths = generate_dynamic_data(config_ieee14)
+
+    legacy = tmp_path / "legacy"
+    legacy.mkdir()
+    legacy_paths = {}
+    for key in ("bus_data", "branch_data", "gen_data", "y_bus_data", "runtime_data"):
+        legacy_paths[key] = str(legacy / f"{key}.parquet")
+        pd.read_parquet(file_paths[key]).drop(columns="event_index").to_parquet(
+            legacy_paths[key],
+        )
+    assert validate_dynamic_data(legacy_paths, mode="pf", sn_mva=100.0)
 
 
 @needs_dynawo
@@ -76,12 +97,16 @@ def test_final_state_values_reach_the_output(config_ieee14):
     path = Path(file_paths["final_state_values"])
     assert path.is_file()
     frame = pd.read_parquet(path)
-    assert list(frame.columns[:2]) == ["scenario_index", "perturbation_index"]
+    assert list(frame.columns[:3]) == [
+        "scenario_index",
+        "perturbation_index",
+        "event_index",
+    ]
 
     metadata = json.loads(Path(file_paths["metadata"]).read_text())
     names = metadata["final_state_value_names"]
     assert names, "the run monitors a FinalStateValue row, so names must be recorded"
-    assert list(frame.columns[2:]) == names
+    assert list(frame.columns[3:]) == names
     assert len(frame) == metadata["n_samples"]
     assert frame[names].notna().all().all()
 
@@ -101,7 +126,8 @@ def test_several_final_state_values_each_get_a_column(config_ieee14_multi_fsv):
     names = metadata["final_state_value_names"]
 
     assert len(names) == 3, names
-    assert list(frame.columns) == ["scenario_index", "perturbation_index"] + names
+    key = ["scenario_index", "perturbation_index", "event_index"]
+    assert list(frame.columns) == key + names
     assert frame[names].notna().all().all()
     # distinct models, so not one number repeated
     assert frame[names].iloc[0].nunique() > 1
@@ -109,6 +135,302 @@ def test_several_final_state_values_each_get_a_column(config_ieee14_multi_fsv):
     # each column names the model it came from
     for model_id in ("_GEN____1_SM", "_GEN____3_SM", "_GEN____6_SM"):
         assert any(model_id in name for name in names), (model_id, names)
+
+
+@needs_dynawo
+def test_events_are_recorded_for_every_sample(config_ieee14):
+    import pandas as pd
+
+    events = pd.read_csv(config_ieee14.dynamic.input_files.events_file)
+
+    file_paths = gd.generate_dynamic_data(config_ieee14)
+    metadata = json.loads(Path(file_paths["metadata"]).read_text())
+
+    key = ["scenario_index", "perturbation_index", "event_index"]
+    recorded = pd.read_parquet(file_paths["events"])
+    bus = pd.read_parquet(file_paths["bus_data"])
+    assert len(recorded) == metadata["n_samples"] * len(events)
+    assert set(map(tuple, recorded[key].to_numpy())) == set(
+        map(tuple, bus[key].to_numpy()),
+    )
+
+
+@needs_dynawo
+def test_random_events_are_drawn_per_event_variant(config_ieee14):
+    import pandas as pd
+    import pypowsybl.network as pn
+
+    config_ieee14.dynamic.solver_parameters.stop_time = 60.0
+    del config_ieee14.dynamic.input_files.events_file
+    config_ieee14.dynamic.event_perturbation = NestedNamespace(
+        type="random",
+        n_event_variants=3,
+        scenarios=[
+            {
+                "name": "generator_trip",
+                "start_time": {"distribution": "uniform", "low": 20, "high": 50},
+                "events": [
+                    {
+                        "type": "Disconnect",
+                        "target": {"element": "generator", "distance": [0, 2]},
+                    },
+                ],
+            },
+        ],
+    )
+
+    file_paths = gd.generate_dynamic_data(config_ieee14)
+    metadata = json.loads(Path(file_paths["metadata"]).read_text())
+    error_log = Path(file_paths["error_log"])
+    assert metadata["n_samples"] == 3, error_log.read_text()
+
+    events = pd.read_parquet(file_paths["events"])
+    assert events["event_index"].tolist() == [0, 1, 2]
+    assert (events["scenario"] == "generator_trip").all()
+    generators = set(pn.load(config_ieee14.network.file).get_generators().index)
+    assert set(events["static_id"]) <= generators
+    assert len(set(zip(events["static_id"], events["start_time"]))) == 3
+    assert events["start_time"].between(20, 50, inclusive="left").all()
+
+    bus = pd.read_parquet(file_paths["bus_data"])
+    samples = [
+        frame.drop(columns="event_index").reset_index(drop=True)
+        for _, frame in bus.groupby("event_index")
+    ]
+    assert len(samples) == 3
+    assert all(sample.equals(samples[0]) for sample in samples)
+
+
+@needs_dynawo
+def test_node_faults_are_drawn_per_event_variant(config_ieee14):
+    import pandas as pd
+    import pypowsybl.network as pn
+
+    config_ieee14.dynamic.solver_parameters.stop_time = 60.0
+    del config_ieee14.dynamic.input_files.events_file
+    config_ieee14.dynamic.event_perturbation = NestedNamespace(
+        type="random",
+        n_event_variants=2,
+        scenarios=[
+            {
+                "name": "node_fault",
+                "start_time": {"distribution": "uniform", "low": 20, "high": 50},
+                "events": [
+                    {
+                        "type": "NodeFault",
+                        "target": {"element": "bus", "distance": [0, 1]},
+                        "params": {
+                            "fault_time": 0.1,
+                            "r_pu": 0,
+                            "x_pu": {
+                                "distribution": "uniform",
+                                "low": 0.01,
+                                "high": 0.1,
+                            },
+                        },
+                    },
+                ],
+            },
+        ],
+    )
+
+    file_paths = gd.generate_dynamic_data(config_ieee14)
+    metadata = json.loads(Path(file_paths["metadata"]).read_text())
+    error_log = Path(file_paths["error_log"])
+    assert metadata["n_samples"] == 2, error_log.read_text()
+
+    events = pd.read_parquet(file_paths["events"])
+    assert (events["event_name"] == "NodeFault").all()
+    buses = set(pn.load(config_ieee14.network.file).get_bus_breaker_view_buses().index)
+    assert set(events["static_id"]) <= buses
+    x_pu = [
+        float(dict(item.split("=") for item in params.split(";"))["x_pu"])
+        for params in events["params"]
+    ]
+    assert all(0.01 <= value < 0.1 for value in x_pu)
+
+
+@needs_dynawo
+def test_multi_event_scenarios_are_drawn_per_event_variant(config_ieee14):
+    import pandas as pd
+
+    config_ieee14.dynamic.solver_parameters.stop_time = 60.0
+    del config_ieee14.dynamic.input_files.events_file
+    config_ieee14.dynamic.event_perturbation = NestedNamespace(
+        type="random",
+        n_event_variants=2,
+        scenarios=[
+            {
+                "name": "trip_then_fault",
+                "start_time": {"distribution": "uniform", "low": 20, "high": 50},
+                "events": [
+                    {
+                        "type": "Disconnect",
+                        "target": {"element": "generator", "distance": [0, 2]},
+                    },
+                    {
+                        "type": "NodeFault",
+                        "target": {"element": "bus", "distance": [0, 1]},
+                        "delay": {"distribution": "uniform", "low": 0.1, "high": 0.3},
+                        "params": {"fault_time": 0.1, "r_pu": 0, "x_pu": 0.05},
+                    },
+                ],
+            },
+        ],
+    )
+
+    file_paths = gd.generate_dynamic_data(config_ieee14)
+    metadata = json.loads(Path(file_paths["metadata"]).read_text())
+    error_log = Path(file_paths["error_log"])
+    assert metadata["n_samples"] == 2, error_log.read_text()
+
+    events = pd.read_parquet(file_paths["events"])
+    assert len(events) == 4
+    for _, group in events.groupby("event_index"):
+        assert group["event_name"].tolist() == ["Disconnect", "NodeFault"]
+        start, later = group["start_time"]
+        assert 0.1 <= later - start < 0.3
+
+
+@needs_dynawo
+def test_fixed_event_targets_are_simulated(config_ieee14):
+    import pandas as pd
+
+    config_ieee14.dynamic.solver_parameters.stop_time = 60.0
+    del config_ieee14.dynamic.input_files.events_file
+    config_ieee14.dynamic.event_perturbation = NestedNamespace(
+        type="random",
+        n_event_variants=2,
+        scenarios=[
+            {
+                "name": "fixed_trip",
+                "start_time": {"distribution": "uniform", "low": 20, "high": 50},
+                "events": [
+                    {"type": "Disconnect", "target": {"static_id": "_GEN____2_SM"}},
+                ],
+            },
+        ],
+    )
+
+    file_paths = gd.generate_dynamic_data(config_ieee14)
+    metadata = json.loads(Path(file_paths["metadata"]).read_text())
+    error_log = Path(file_paths["error_log"])
+    assert metadata["n_samples"] == 2, error_log.read_text()
+
+    events = pd.read_parquet(file_paths["events"])
+    assert len(events) == 2
+    assert (events["static_id"] == "_GEN____2_SM").all()
+    assert events["start_time"].nunique() == 2
+
+
+@needs_dynawo
+@pytest.mark.parametrize(
+    "static_id",
+    [
+        pytest.param("_BUS___10_TN", id="bus"),
+        pytest.param("_BUS___10-BUS___11-1_AC", id="line"),
+        pytest.param("_BUS____4-BUS____7-1_PT", id="transformer"),
+    ],
+)
+def test_disconnecting_a_bus_line_or_transformer_moves_the_curves(
+    config_ieee14,
+    static_id,
+):
+    import numpy as np
+    import pandas as pd
+    import zarr
+
+    config_ieee14.dynamic.solver_parameters.stop_time = 60.0
+    del config_ieee14.dynamic.input_files.events_file
+    config_ieee14.dynamic.event_perturbation = NestedNamespace(type="none")
+    file_paths = gd.generate_dynamic_data(config_ieee14)
+    base = np.asarray(zarr.open(file_paths["dynamic_results"], mode="r")["curves"])
+
+    config_ieee14.dynamic.event_perturbation = NestedNamespace(
+        type="random",
+        n_event_variants=1,
+        scenarios=[
+            {
+                "name": "fixed_disconnect",
+                "start_time": 20,
+                "events": [
+                    {"type": "Disconnect", "target": {"static_id": static_id}},
+                ],
+            },
+        ],
+    )
+    file_paths = gd.generate_dynamic_data(config_ieee14)
+    metadata = json.loads(Path(file_paths["metadata"]).read_text())
+    error_log = Path(file_paths["error_log"]).read_text()
+    assert metadata["n_samples"] == 1, error_log
+    assert metadata["n_samples_with_curves"] == 1
+    assert not re.search(r"^\[dynamic\]", error_log, re.MULTILINE), error_log
+
+    events = pd.read_parquet(file_paths["events"])
+    assert len(events) == 1
+    assert events["event_name"].iloc[0] == "Disconnect"
+    assert events["static_id"].iloc[0] == static_id
+    assert events["start_time"].iloc[0] == 20
+
+    curves = np.asarray(zarr.open(file_paths["dynamic_results"], mode="r")["curves"])
+    assert curves.shape != base.shape or not np.allclose(
+        curves,
+        base,
+        equal_nan=True,
+    ), static_id
+
+
+@needs_dynawo
+def test_no_events_writes_no_event_table(config_ieee14):
+    del config_ieee14.dynamic.input_files.events_file
+    config_ieee14.dynamic.event_perturbation = NestedNamespace(type="none")
+
+    file_paths = gd.generate_dynamic_data(config_ieee14)
+    metadata = json.loads(Path(file_paths["metadata"]).read_text())
+
+    assert metadata["n_samples"] == 1
+    assert "events" not in file_paths
+
+
+def test_a_malformed_event_block_raises_before_the_output_is_set_up(
+    config_ieee14,
+    monkeypatch,
+):
+    def _fail(args):
+        raise AssertionError("the output was set up before the inputs were read")
+
+    monkeypatch.setattr(gd, "_validate_dynamic_config", lambda args: None)
+    monkeypatch.setattr(gd, "_setup_environment", _fail)
+    config_ieee14.dynamic.event_perturbation = NestedNamespace(type="sometimes")
+    with pytest.raises(ValueError, match=r"dynamic\.event_perturbation\.type"):
+        gd.generate_dynamic_data(config_ieee14)
+
+
+@needs_powsybl
+def test_an_unknown_fixed_target_raises_before_the_output_is_set_up(
+    config_ieee14,
+    monkeypatch,
+):
+    def _fail(args):
+        raise AssertionError("the output was set up before the targets were checked")
+
+    monkeypatch.setattr(gd, "_validate_dynamic_config", lambda args: None)
+    monkeypatch.setattr(gd, "_setup_environment", _fail)
+    del config_ieee14.dynamic.input_files.events_file
+    config_ieee14.dynamic.event_perturbation = NestedNamespace(
+        type="random",
+        scenarios=[
+            {
+                "name": "fixed_trip",
+                "start_time": 1.0,
+                "events": [
+                    {"type": "Disconnect", "target": {"static_id": "_NO_SUCH_GEN"}},
+                ],
+            },
+        ],
+    )
+    with pytest.raises(ValueError, match=r"_NO_SUCH_GEN"):
+        gd.generate_dynamic_data(config_ieee14)
 
 
 @needs_dynawo
@@ -168,7 +490,7 @@ def test_topology_perturbation_expands_scenarios_into_samples(config_ieee14):
         flags=re.MULTILINE,
     ), error_log
     failures = re.findall(
-        r"^\[dynamic\] scenario \d+ perturbation \d+ failed",
+        r"^\[dynamic\] scenario \d+ perturbation \d+ (event \d+ )?failed",
         error_log,
         flags=re.MULTILINE,
     )

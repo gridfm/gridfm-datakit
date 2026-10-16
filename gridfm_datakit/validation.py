@@ -8,6 +8,7 @@ to provide comprehensive validation of generated power flow data.
 import pandas as pd
 import numpy as np
 import os
+import pyarrow.parquet as pq
 from typing import Dict, Iterable
 from gridfm_datakit.utils.power_balance import compute_branch_admittances
 from gridfm_datakit.utils.column_names import (
@@ -167,7 +168,8 @@ def _run_validation_checks(
     Split out of validate_generated_data so the static and dynamic pipelines can
     share exactly the same checks despite storing their data differently: the
     static one writes partitioned parquet keyed by a ``scenario`` column, the
-    dynamic one writes flat parquet keyed by (scenario_index, perturbation_index).
+    dynamic one writes flat parquet keyed by (scenario_index, perturbation_index,
+    event_index).
     Every check below reads only the DataFrames in ``generated_data``, so the
     caller just has to supply them with a ``scenario`` column.
 
@@ -323,18 +325,23 @@ def validate_dynamic_data(
     lays them out differently, so validate_generated_data cannot read them directly:
 
     * flat single-file parquet, not partitioned directories (no ``n_scenarios.txt``);
-    * a sample is keyed by the pair (scenario_index, perturbation_index), because a
-      topology perturbation expands one load scenario into several samples, whereas
-      the static schema has a single ``scenario`` column.
+    * a sample is keyed by the triple (scenario_index, perturbation_index,
+      event_index), because topology perturbations and event variants expand one
+      load scenario into several samples, whereas the static schema has a single
+      ``scenario`` column.
 
     This loader bridges the two: it reads the flat files and adds a dense
-    ``scenario`` column by ranking the distinct (scenario_index, perturbation_index)
-    pairs, so each dynamic sample becomes one "scenario" from the checks' point of
-    view. The checks themselves are shared verbatim with the static pipeline.
+    ``scenario`` column by ranking the distinct (scenario_index, perturbation_index,
+    event_index) triples, so each dynamic sample becomes one "scenario" from the
+    checks' point of view. The checks themselves are shared verbatim with the
+    static pipeline.
 
     Note this validates the *static snapshot* (the initial operating point Dynawo
     starts from): the bus/branch/gen/Y-bus/runtime tables. It does not validate the
     time-series curves in the Zarr store.
+
+    A table without ``event_index``, as written by release 1.1.0 and earlier, is
+    read as ``event_index`` 0.
 
     Args:
         file_paths: Paths as returned by generate_dynamic_data (needs "bus_data",
@@ -349,10 +356,17 @@ def validate_dynamic_data(
     Raises:
         AssertionError: If any validation fails.
     """
-    KEY = ["scenario_index", "perturbation_index"]
+    KEY = ["scenario_index", "perturbation_index", "event_index"]
+
+    def _with_event_index(df: pd.DataFrame) -> pd.DataFrame:
+        if "event_index" in df.columns:
+            return df
+        df = df.copy()
+        df.insert(df.columns.get_loc("perturbation_index") + 1, "event_index", 0)
+        return df
 
     def _read(key: str) -> pd.DataFrame:
-        df = pd.read_parquet(file_paths[key], engine="pyarrow")
+        df = _with_event_index(pd.read_parquet(file_paths[key], engine="pyarrow"))
         # One dense "scenario" per distinct sample, consistent across every table:
         # the checks assume a single integer key and compare its set across files.
         df.insert(0, "scenario", df.set_index(KEY).index.map(sample_ids))
@@ -360,12 +374,23 @@ def validate_dynamic_data(
 
     # Build the sample -> dense id map once, from the bus table (every table carries
     # the same set of samples), so the id is stable across all five files.
-    bus_keys = pd.read_parquet(file_paths["bus_data"], columns=KEY, engine="pyarrow")
+    bus_path = file_paths["bus_data"]
+    bus_keys = _with_event_index(
+        pd.read_parquet(
+            bus_path,
+            columns=[c for c in KEY if c in pq.read_schema(bus_path).names],
+            engine="pyarrow",
+        ),
+    )
     unique_keys = bus_keys.drop_duplicates().sort_values(KEY)
     sample_ids = {
-        (int(s), int(p)): i
-        for i, (s, p) in enumerate(
-            zip(unique_keys["scenario_index"], unique_keys["perturbation_index"]),
+        (int(s), int(p), int(e)): i
+        for i, (s, p, e) in enumerate(
+            zip(
+                unique_keys["scenario_index"],
+                unique_keys["perturbation_index"],
+                unique_keys["event_index"],
+            ),
         )
     }
 

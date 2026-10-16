@@ -21,3 +21,17 @@ This module provides utility functions for the project.
 ### `Tee`
 
 ::: gridfm_datakit.utils.utils.Tee
+
+## Value specs
+
+### `parse_value_spec`
+
+::: gridfm_datakit.utils.value_spec.parse_value_spec
+
+### `ValueSpec`
+
+::: gridfm_datakit.utils.value_spec.ValueSpec
+
+### `Floor`
+
+::: gridfm_datakit.utils.value_spec.Floor

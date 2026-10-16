@@ -14,12 +14,14 @@ all scenarios in that chunk.
 from __future__ import annotations
 
 import copy
+import dataclasses
 import logging
 import multiprocessing
 import traceback
 from typing import Any, Dict, Iterator, List, Tuple, Union
 
 import numpy as np
+import pandas as pd
 
 from gridfm_datakit.network import Network
 from gridfm_datakit.dynamic.dynawo.simulate import (
@@ -27,9 +29,12 @@ from gridfm_datakit.dynamic.dynawo.simulate import (
     compute_balanced_static_state_dynawo,
 )
 from gridfm_datakit.dynamic import DynamicResults
+from gridfm_datakit.dynamic.event_perturbation import EventPerturbation, draw_events
+from gridfm_datakit.dynamic.placement import EventGraph
 from gridfm_datakit.dynamic.dynawo import (
     get_dynawo_loadflow_parameters,
     get_dynawo_simulation_parameters,
+    generate_dynawo_event_mapping,
     generate_dynawo_mappings,
 )
 from gridfm_datakit.process.process_network import init_julia
@@ -96,7 +101,8 @@ def iter_dynamic_simulations(
     list of dict
         One list per large chunk, holding one dict per successfully processed
         (scenario, topology-perturbation) sample, each with keys ``"pf_data"``,
-        ``"dynamic_results"``, ``"scenario_index"``, ``"perturbation_index"``.
+        ``"dynamic_results"``, ``"scenario_index"``, ``"perturbation_index"``,
+        ``"event_index"``, ``"events"``.
         A chunk whose scenarios all failed yields an empty list.
     """
     n_scenarios = config.load.scenarios
@@ -119,12 +125,12 @@ def iter_dynamic_simulations(
     # perturbs branch admittances, both pre-OPF. They therefore vary the initial
     # operating point Dynawo starts from (which machines are dispatched and at what
     # loading), and so do influence the trajectory. What they do NOT vary is the
-    # dynamic model set or the event sequence: those come from the CSV inputs and are
-    # identical across every sample. admittance_perturbation's r/x do reach the
-    # simulated network (update_powsybl writes them), but only topology_perturbation
-    # changes which elements are in service, so it alone changes the set of models
-    # Dynawo instantiates and alone expands a scenario into several samples. Wired
-    # for parity with the static pipeline; effect on dynamic outputs untested.
+    # dynamic model set, which comes from the CSV inputs and is identical across
+    # every sample; events vary only through event_perturbation.
+    # admittance_perturbation's r/x do reach the simulated network (update_powsybl
+    # writes them), but only topology_perturbation changes which elements are in
+    # service, so it alone changes the set of models Dynawo instantiates. Wired for
+    # parity with the static pipeline; effect on dynamic outputs untested.
     generation_generator = initialize_generation_generator(
         getattr(config, "generation_perturbation", _none),
         base_net,
@@ -299,6 +305,9 @@ def _process_dynamic_chunk(args: Tuple) -> Union[List[Dict[str, Any]], List[Exce
                             scenario_index=scenario_index,
                             p2g_maps=net.mapping_p2g,
                             dynamic_mappings=dynamic_mappings,
+                            events=dynamic_inputs.events,
+                            event_perturbation=dynamic_inputs.event_perturbation,
+                            seed=seed,
                             dynamic_solver_params=dynamic_solver_params,
                             dynamic_solver=dynamic_solver,
                             julia=julia,
@@ -340,6 +349,7 @@ def process_single_dynamic_simulation(
     scenario_index: int,
     p2g_maps,
     dynamic_mappings: Any,
+    events: pd.DataFrame,
     dynamic_solver_params: Any,
     dynamic_solver: str,
     julia: Any,
@@ -348,18 +358,27 @@ def process_single_dynamic_simulation(
     admittance_generator: Any = None,
     error_log_file: str = None,
     lf_params: Any = None,
+    event_perturbation: EventPerturbation = EventPerturbation(),
+    seed: int = 0,
 ) -> List[Dict[str, Any]]:
-    """Process one load scenario, expanded over topology perturbations.
+    """Process one load scenario, expanded over topology and event variants.
 
     The load scenario is applied, then generation and admittance perturbations
     (before OPF). Each resulting topology perturbation is processed independently:
     the balanced initial state is computed on the perturbed network (so OPF adapts
     the set-points to the topology and Dynawo initialises from a converged
-    operating point), then the dynamic simulation is run. One sample is produced
-    per ``(scenario_index, perturbation_index)``.
+    operating point). Each of the ``event_perturbation.n_event_variants`` event
+    variants then simulates from that state. One sample is produced per
+    ``(scenario_index, perturbation_index, event_index)``; the event variants of
+    one topology variant share its ``pf_data``.
 
     Absent generators default to identity, so a scenario yields exactly one
     sample, the pre-perturbation behaviour.
+
+    Events are drawn per variant in ``random`` mode (seeding in
+    ``event_perturbation``), ``events`` otherwise, and replace the event mapping
+    of ``dynamic_mappings``. Each sample carries its events. A failed event
+    variant drops only its sample.
 
     Returns a list of result dicts (possibly empty if every perturbation failed).
     """
@@ -379,6 +398,8 @@ def process_single_dynamic_simulation(
     #       for a single network, so it is the only generator that expands one
     #       load scenario into several samples, hence the loop below and hence
     #       perturbation_index existing at all.
+    #   event variants          : 1 -> M. n_event_variants runs per topology
+    #       variant, hence the inner loop and event_index.
     #
     # Generation + admittance perturbations, applied before OPF.
     net_iter = iter([gfm_net])
@@ -419,19 +440,61 @@ def process_single_dynamic_simulation(
                 lf_params=lf_params,
             )
 
-            # Step 3: dynamic simulation
-            dyn_results = _run_dynamic_simulation(
-                pp_net,
-                dynamic_mappings,
-                dynamic_solver_params,
-                dynamic_solver,
+            graph = (
+                EventGraph.from_network(pp_net)
+                if event_perturbation.type == "random"
+                else None
             )
 
-            # Step 4: combine + label with the (scenario, perturbation) key
-            combined = _combine_pf_and_dyn_res(pf_data, dyn_results)
-            combined["scenario_index"] = scenario_index
-            combined["perturbation_index"] = perturbation_index
-            results.append(combined)
+            # Steps 3 and 4: simulate and label each event variant
+            n_event_variants = event_perturbation.n_event_variants
+            for event_index in range(n_event_variants):
+                in_place = event_index == n_event_variants - 1
+                event_variant_id = (
+                    variant_id if in_place else f"{variant_id}_event_{event_index}"
+                )
+                event_variant_created = False
+                try:
+                    if graph is None:
+                        variant_events = events
+                    else:
+                        variant_events = draw_events(
+                            event_perturbation,
+                            graph,
+                            np.random.default_rng(
+                                [seed, scenario_index, perturbation_index, event_index],
+                            ),
+                        )
+                    if not in_place:
+                        pp_net.clone_variant(variant_id, event_variant_id)
+                        event_variant_created = True
+                    pp_net.set_working_variant(event_variant_id)
+
+                    dyn_results = _run_dynamic_simulation(
+                        pp_net,
+                        dynamic_mappings,
+                        variant_events,
+                        dynamic_solver_params,
+                        dynamic_solver,
+                    )
+
+                    combined = _combine_pf_and_dyn_res(pf_data, dyn_results)
+                    combined["scenario_index"] = scenario_index
+                    combined["perturbation_index"] = perturbation_index
+                    combined["event_index"] = event_index
+                    combined["events"] = variant_events
+                    results.append(combined)
+                except Exception as e:
+                    _log_error(
+                        error_log_file,
+                        f"[dynamic] scenario {scenario_index} perturbation "
+                        f"{perturbation_index} event {event_index} failed: {e}\n"
+                        f"{traceback.format_exc()}\n",
+                    )
+                finally:
+                    pp_net.set_working_variant(variant_id)
+                    if event_variant_created:
+                        pp_net.remove_variant(event_variant_id)
         except Exception as e:
             # A single perturbation failing must not drop the whole scenario.
             _log_error(
@@ -492,15 +555,24 @@ def _compute_balanced_static_state(
 def _run_dynamic_simulation(
     network,
     dynamic_mappings,
+    events,
     solver_parameters,
     dynamic_solver,
 ) -> DynamicResults:
     """Wrapper around solver-specific dynamic simulation run.
 
-    Currently routes to ``run_dynawo_simulation``.
+    Currently routes to ``run_dynawo_simulation``, with the event mapping of
+    ``dynamic_mappings`` replaced by one built from ``events``.
     """
     if dynamic_solver == "dynawo":
-        return run_dynawo_simulation(network, dynamic_mappings, solver_parameters)
+        return run_dynawo_simulation(
+            network,
+            dataclasses.replace(
+                dynamic_mappings,
+                event_mapping=generate_dynawo_event_mapping(events),
+            ),
+            solver_parameters,
+        )
     raise NotImplementedError(
         f"Dynamic solver {dynamic_solver!r} is not implemented. "
         "Supported solvers: 'dynawo'.",
@@ -515,7 +587,8 @@ def _combine_pf_and_dyn_res(
 
     The two have different granularity, per element vs per monitored variable,
     so they are packaged side by side and written to separate stores, joined by
-    the (scenario_index, perturbation_index) key the writer adds to both.
+    the (scenario_index, perturbation_index, event_index) key the writer adds to
+    both.
 
     Args
     ----
