@@ -829,7 +829,7 @@ def interactive_interface() -> None:
             try:
                 config = create_config()
                 config_path = Path(config_filename.value)
-                with open(config_path, "w") as f:
+                with open(config_path, "w", encoding="utf-8") as f:
                     yaml.dump(config, f, default_flow_style=False)
                 print(f"YAML configuration saved to {config_path.resolve()}")
             except Exception as e:
@@ -850,7 +850,7 @@ def interactive_interface() -> None:
 
                 # Save config to file
                 config_path = Path(config_filename.value)
-                with open(config_path, "w") as f:
+                with open(config_path, "w", encoding="utf-8") as f:
                     yaml.dump(config, f, default_flow_style=False)
                 print(f"\nConfiguration written to: {config_path.resolve()}\n")
 
