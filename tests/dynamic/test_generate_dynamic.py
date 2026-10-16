@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from markers import needs_dynawo
+from markers import needs_dynawo, needs_powsybl
 
 from gridfm_datakit.dynamic import generate_dynamic as gd
 from gridfm_datakit.utils.param_handler import NestedNamespace
@@ -406,6 +406,7 @@ def test_a_malformed_event_block_raises_before_the_output_is_set_up(
         gd.generate_dynamic_data(config_ieee14)
 
 
+@needs_powsybl
 def test_an_unknown_fixed_target_raises_before_the_output_is_set_up(
     config_ieee14,
     monkeypatch,
