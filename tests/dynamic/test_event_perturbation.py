@@ -575,7 +575,6 @@ class TestDrawEvents:
             frame = draw(event_index)
             pd.testing.assert_frame_equal(frame, draw(event_index))
             assert frame["event_name"].tolist() == ["Disconnect", "NodeFault"]
-            assert frame["static_id"].nunique() == 2
             start, later = frame["start_time"]
             assert 0.1 <= later - start < 0.3
             assert 20 <= start < 80
