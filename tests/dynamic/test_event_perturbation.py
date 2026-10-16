@@ -727,6 +727,21 @@ class TestCheck:
         with pytest.raises(ValueError, match=f"^{re.escape(SCENARIO)}.anchor: "):
             check_event_perturbation(_parse(block), PATH_NETWORK_IEEE14)
 
+    def test_a_random_anchor_target_of_a_missing_type_raises(self, monkeypatch):
+        monkeypatch.setattr(
+            "gridfm_datakit.dynamic.event_perturbation.EventGraph.from_network",
+            lambda pp_net: _chain_graph(),
+        )
+        perturbation = _parse(_event("ActivePowerVariation", "load", {"delta_p": 0.1}))
+        with pytest.raises(
+            ValueError,
+            match="^" + re.escape(f"{EVENT}.target.element: "),
+        ):
+            check_event_perturbation(perturbation, PATH_NETWORK_IEEE14)
+
+    def test_a_random_anchor_target_of_a_present_type_passes(self):
+        check_event_perturbation(_parse(_random()), PATH_NETWORK_IEEE14)
+
     def test_file_mode_does_not_load_the_network(self, tmp_path):
         check_event_perturbation(
             EventPerturbation("file"),

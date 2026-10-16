@@ -440,8 +440,9 @@ is drawn uniformly, with replacement, among the buses of the bus-breaker view, a
 most 100 times; if no draw places every target, the event variant fails. A fixed
 anchor is checked against the network file before any simulation, and so is
 every `static_id`: it must be in service and of an element type its event
-accepts. A fixed anchor that cannot place its targets in a topology variant fails
-that event variant.
+accepts. A random-anchor target is rejected at the same point when the network has
+no in-service element of its type. A fixed anchor that cannot place its targets in a
+topology variant fails that event variant.
 
 Every value `start_time` can take must lie inside the `[start_time, stop_time]`
 window of `dynamic.solver_parameters`, checked when the config is loaded. For a

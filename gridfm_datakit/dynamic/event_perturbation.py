@@ -257,7 +257,7 @@ def check_event_perturbation(
     perturbation: EventPerturbation,
     network_path: str,
 ) -> None:
-    """Check fixed anchors and fixed targets against the base network.
+    """Check fixed anchors, fixed targets and target types against the base network.
 
     Args:
         perturbation: The parsed block.
@@ -266,8 +266,9 @@ def check_event_perturbation(
     Raises:
         ValueError: If a fixed target is not an in-service element of a type its
             event accepts, or a fixed anchor is not a bus of the network or
-            cannot place its distance targets. The message starts with the
-            config path of the target or the anchor.
+            cannot place its distance targets, or the network has no in-service
+            element of a random-anchor target's type. The message starts with
+            the config path of the target or the anchor.
     """
     anchors = [
         (index, scenario)
@@ -280,7 +281,14 @@ def check_event_perturbation(
         for position, event in enumerate(scenario.events)
         if isinstance(event.target, FixedTarget)
     ]
-    if not anchors and not targets:
+    distance_targets = [
+        (index, position, event.target.element)
+        for index, scenario in enumerate(perturbation.scenarios)
+        if scenario.anchor is None
+        for position, event in enumerate(scenario.events)
+        if isinstance(event.target, EventTarget)
+    ]
+    if not anchors and not targets and not distance_targets:
         return
     from gridfm_datakit.powsybl import load_net
 
@@ -299,6 +307,12 @@ def check_event_perturbation(
             raise ValueError(
                 f"{path}: {event.type} accepts {list(elements)}, "
                 f"{static_id!r} is a {element}",
+            )
+    for index, position, element in distance_targets:
+        if not graph.candidates[element]:
+            raise ValueError(
+                f"{_PATH}.scenarios[{index}].events[{position}].target.element: "
+                f"the network has no in-service {element}",
             )
     for index, scenario in anchors:
         try:
