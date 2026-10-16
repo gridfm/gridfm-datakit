@@ -22,7 +22,7 @@ load:
 
 # Topology / generation / admittance perturbations are optional. Left at "none"
 # here; enable e.g. topology_perturbation to expand each scenario into several
-# samples (one Dynawo run per perturbed topology).
+# samples (n_event_variants Dynawo runs per perturbed topology).
 #
 # generation_perturbation (generation *cost* randomisation) and
 # admittance_perturbation act before the OPF, so they vary the initial operating

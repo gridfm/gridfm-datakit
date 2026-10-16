@@ -27,8 +27,8 @@ For every load scenario, and for every topology perturbation of it:
    tagged with the same `(scenario_index, perturbation_index, event_index)` key.
 
 Each `(scenario, perturbation, event)` triple is one **sample**. `event_index`
-numbers the event variants of a topology variant: always 0 with `events_file`,
-0 to `n_event_variants - 1` with random events. Load scenarios are
+numbers the event variants of a topology variant: 0 unless
+`event_perturbation.type` is `random`, then 0 to `n_event_variants - 1`. Load scenarios are
 distributed across worker processes (the perturbations of a single scenario run
 sequentially inside one worker), and results are written incrementally, one large
 chunk at a time, so peak memory tracks `settings.large_chunk_size` rather than
@@ -367,7 +367,7 @@ dynamic:
 ```
 
 Each event variant draws `trip_then_fault` three times out of four: a generator
-trip, then a fault 0.1 to 0.3 s later on a bus next to the anchor. Otherwise it
+trip, then a fault 0.1 to 0.3 s later on the anchor or a bus next to it. Otherwise it
 draws a load step.
 
 | `type` | Events of every sample |
@@ -428,14 +428,17 @@ Values outside the bounds are redrawn, never clipped.
 `distance` counts branch hops from the anchor over the lines, two-winding
 transformers and three-winding transformers in service after the topology
 perturbation, a three-winding transformer joining each pair of its connected
-ends. A generator or load sits at its bus's distance, a branch at its nearer
-end's. A three-winding transformer is never a target. Each target is drawn among
-the elements that leave every later target of the scenario an element of its
-own. A random anchor is redrawn, up to 100 times, when its targets cannot all be
-placed around it. A fixed
+ends. A closed switch adds no hop: the buses it joins share a distance. A
+generator or load sits at its bus's distance, a branch at its nearer end's.
+Elements unreachable from the anchor are never candidates. A three-winding
+transformer is never a target. Each target is drawn among the elements that
+leave every later target of the scenario an element of its own. A random anchor
+is drawn uniformly, with replacement, among the buses of the bus-breaker view, at
+most 100 times; if no draw places every target, the event variant fails. A fixed
 anchor is checked against the network file before any simulation, and so is
 every `static_id`: it must be in service and of an element type its event
-accepts.
+accepts. A fixed anchor that cannot place its targets in a topology variant fails
+that event variant.
 
 Every value `start_time` can take must lie inside the `[start_time, stop_time]`
 window of `dynamic.solver_parameters`, checked when the config is loaded. For a
@@ -615,7 +618,7 @@ equally to *dynamic* diversity:
 | `load` scenarios | before OPF | Different loading, hence a different initial operating point |
 | `generation_perturbation` | before OPF | **Does not work here**, see below |
 | `admittance_perturbation` | before OPF | Perturbs branch `r`/`x`. These are pushed to pypowsybl together with the OPF set-points, so they change the network Dynawo simulates, not just the dispatch |
-| `topology_perturbation` | before OPF | **The only one that changes which elements are in service**, hence the only one that changes the set of dynamic models Dynawo instantiates. One Dynawo run per perturbed topology |
+| `topology_perturbation` | before OPF | **The only one that changes which elements are in service**, hence the only one that changes the set of dynamic models Dynawo instantiates. `n_event_variants` Dynawo runs per perturbed topology |
 
 ### Why `generation_perturbation` does not work
 
@@ -761,7 +764,7 @@ Dynawo simulation parameter `log.levelFilter`.
 | Key | Meaning |
 | --- | --- |
 | `generated_at`, `seed`, `config_hash` | Provenance |
-| `n_samples` | Number of **samples**, not load scenarios: larger than `load.scenarios` as soon as a scenario expands into more than one topology, smaller when samples failed |
+| `n_samples` | Number of **samples**, not load scenarios: larger than `load.scenarios` as soon as a scenario expands into more than one topology or event variant, smaller when samples failed |
 | `n_samples_with_curves` | Length of axis 0 of `curves` |
 | `variable_names`, `n_variables` | Axis 1 of `curves`, in order |
 | `n_timesteps`, `timesteps_per_scenario`, `time_units` | Axis 2 of `curves`; the per-sample valid (unpadded) length |
@@ -867,15 +870,16 @@ reports neither:
   `ReactivePowerVariation` on the loads modelled as
   `LoadOneTransformerTapChanger` (`_LOAD___6_EC` and `_LOAD___9_EC` in the
   example) or `LoadTwoTransformersTapChangers` (`_LOAD___2_EC` in the test
-  configuration), `ReactivePowerVariation` on every synchronous generator, and
+  configuration), `ReactivePowerVariation` on every generator, and
   `ReferenceVoltageVariation` on `_GEN____3_SM`.
-- The event graph joins buses by lines and transformers only. Bus-breaker buses
-  linked only by a closed switch, a tie line or an HVDC line are placed as if
-  apart, and a bus reached only through such links is unreachable from the
-  anchor. Tie lines and HVDC lines are never `line` targets.
-- A bus of the network file with no in-service branch is still a random anchor,
-  around which only distance 0 can be placed, and a `bus` target. The topology
-  perturbation never leaves such a bus, since it keeps connected variants only.
+- The event graph joins buses by lines, transformers and closed switches only.
+  Buses linked only by a tie line or an HVDC line are placed as if apart, and a
+  bus reached only through such links is unreachable from the anchor. Tie lines
+  and HVDC lines are never `line` targets.
+- A bus joined to no in-service branch, directly or through closed switches, is
+  still a random anchor, around which only distance 0 can be placed, and a `bus`
+  target. The topology perturbation never leaves such a bus, since it keeps
+  connected variants only.
 - `events_file` times are not checked against the simulation window.
 - `generation_perturbation` does not work: the powsybl reader supplies no real
   generator costs for it to perturb.
