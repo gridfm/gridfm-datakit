@@ -112,7 +112,7 @@ def _find_powsybl_config_file() -> Optional[Path]:
 def _read_dynawo_home_dir(config_file: Path) -> Optional[str]:
     """Extract ``dynawo.homeDir`` from a powsybl YAML or XML config file."""
     try:
-        text = config_file.read_text()
+        text = config_file.read_text(encoding="utf-8")
     except OSError:
         return None
 
