@@ -333,7 +333,7 @@ _CSV_DELIMITERS = ",;\t"
 
 def _read_csv_sample(p: Path) -> str:
     """Return whole lines from the head of a CSV, for delimiter sniffing."""
-    sample = p.read_text()[:8192]
+    sample = p.read_text(encoding="utf-8")[:8192]
     # Never end mid-line: a truncated last line can carry an unbalanced quote or a
     # partial field, either of which skews the sniffer.
     cut = sample.rfind("\n")
