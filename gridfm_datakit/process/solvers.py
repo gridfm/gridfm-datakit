@@ -100,6 +100,7 @@ def _julia_pm_data(net: Network, jl: Any) -> Any:
     if _ACTIVE_BASE_KEY != key:
         with tempfile.NamedTemporaryFile(
             mode="w",
+            encoding="utf-8",
             suffix=".m",
             delete=False,
         ) as temp_file:
