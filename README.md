@@ -43,16 +43,15 @@ If you use `gridfm-datakit` in your research, please cite both:
 
 # GridFM datakit
 
-**GridFM datakit** (`gridfm-datakit`) is a Python library for generating realistic, diverse, and scalable synthetic datasets for power flow (PF) and optimal power flow (OPF) machine learning solvers. It unifies state-of-the-art methods for perturbing loads, generator dispatches, network topologies, and branch parameters, addressing limitations of existing data generation libraries.
+**GridFM datakit** (gridfm-datakit) is a Python library for generating realistic, diverse, and scalable synthetic datasets for power flow (PF) and optimal power flow (OPF) machine learning solvers, fully compatible with [gridfm-graphkit](https://github.com/gridfm/gridfm-graphkit). Its data diversity has been validated against real SCADA data from a 1,200-bus grid ([Fig. 2](https://arxiv.org/pdf/2608.09921)).
 
-## Key Features
+## Unique Features
 
-* **Scalable**: Supports grids with up to 30,000 buses for PF and 10,000 buses for OPF. Compatible with MATPOWER (`.m`) files and the PGLib dataset.
+* **Scalable**: Supports grids with up to 30,000 buses for PF and 10,000 buses for OPF. Compatible with MATPOWER (`.m`) files and the PGLib dataset, as well as XIIDM, CGMES, PSS/E (.raw), UCTE (.uct) files.
 * **Realistic load scenarios**: Combines global scaling from real-world aggregated profiles with localized per-bus noise, preserving temporal and spatial correlations.
-* **Flexible topology perturbations**: Handles arbitrary (N-k) outages for lines, transformers, and generators, ensuring feasible network states.
+* **Flexible topology perturbations**: Handles arbitrary (N-k) outages for lines, transformers, and generators.
 * **Generator cost diversity**: Permutes or randomly scales generator cost functions when solving OPF to produce diverse dispatches and improve generalization across different cost conditions.
 * **Out-of-operating-limits scenarios for PF**: PF datasets include realistic violations of operating limits (e.g., voltage or branch overloads) resulting from topology and load perturbations without re-optimizing generator dispatch.
-* **Admittance perturbations**: Randomly scales branch resistances and reactances to enhance diversity.
 * **Structured outputs for ML**: Per-bus, per-branch, and per-generator data ready for training neural PF/OPF solvers, with pre-computed DC-PF and DC-OPF baselines and runtime.
 * **Data validation and benchmarking**: Includes CLI tools for consistency checks, statistics, and constraint validation.
 

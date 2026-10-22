@@ -199,7 +199,7 @@ def save_node_edge_data(
     base_path = os.path.dirname(node_path)
     n_scenarios_file = os.path.join(base_path, "n_scenarios.txt")
     if os.path.exists(n_scenarios_file):
-        with open(n_scenarios_file, "r") as f:
+        with open(n_scenarios_file, "r", encoding="utf-8") as f:
             last_scenario = int(f.read().strip()) - 1
 
     # Define arguments per data type
@@ -224,5 +224,5 @@ def save_node_edge_data(
 
     # Write n_scenarios metadata file
     total_scenarios = last_scenario + 1 + len(processed_data)
-    with open(n_scenarios_file, "w") as f:
+    with open(n_scenarios_file, "w", encoding="utf-8") as f:
         f.write(str(total_scenarios))

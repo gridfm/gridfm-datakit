@@ -1135,7 +1135,7 @@ def process_scenario_pf_mode(
     try:
         res = run_opf(net, jl)
     except Exception as e:
-        with open(error_log_file, "a") as f:
+        with open(error_log_file, "a", encoding="utf-8") as f:
             f.write(
                 f"Caught an exception at scenario {scenario_index} in run_opf function: {e}\n",
             )
@@ -1168,14 +1168,14 @@ def process_scenario_pf_mode(
                     res_dcpf = run_dcpf(perturbation, jl, fast=dcpf_fast)
 
                 except Exception as e:
-                    with open(error_log_file, "a") as f:
+                    with open(error_log_file, "a", encoding="utf-8") as f:
                         f.write(
                             f"Caught an exception at scenario {scenario_index} when solving dcpf function: {e}\n",
                         )
             try:
                 res = run_pf(perturbation, jl, fast=pf_fast)
             except Exception as e:
-                with open(error_log_file, "a") as f:
+                with open(error_log_file, "a", encoding="utf-8") as f:
                     f.write(
                         f"Caught an exception at scenario {scenario_index} when solving in run_pf function: {e}\n",
                     )
@@ -1192,7 +1192,7 @@ def process_scenario_pf_mode(
                 if meta is not None:
                     meta["ls_converted"] = converted
             except Exception as e:
-                with open(error_log_file, "a") as f:
+                with open(error_log_file, "a", encoding="utf-8") as f:
                     f.write(
                         f"Caught an exception at scenario {scenario_index} when building the lightsim2grid model: {e}\n",
                     )
@@ -1209,7 +1209,7 @@ def process_scenario_pf_mode(
                         as_arrays=True,
                     )
                 except Exception as e:
-                    with open(error_log_file, "a") as f:
+                    with open(error_log_file, "a", encoding="utf-8") as f:
                         f.write(
                             f"Caught an exception at scenario {scenario_index} when solving dcpf function with lightsim2grid solver: {e}\n",
                         )
@@ -1221,7 +1221,7 @@ def process_scenario_pf_mode(
                     as_arrays=True,
                 )
             except Exception as e:
-                with open(error_log_file, "a") as f:
+                with open(error_log_file, "a", encoding="utf-8") as f:
                     f.write(
                         f"Caught an exception at scenario {scenario_index} when solving in run_pf function with lightsim2grid solver: {e}\n",
                     )
@@ -1252,7 +1252,7 @@ def process_scenario_pf_mode(
                         )
 
                     except Exception as e:
-                        with open(error_log_file, "a") as f:
+                        with open(error_log_file, "a", encoding="utf-8") as f:
                             f.write(
                                 f"Caught an exception at scenario {scenario_index} when solving dcpf function with PowSyBl solver: {e}\n",
                             )
@@ -1268,7 +1268,7 @@ def process_scenario_pf_mode(
                         mapping_p2g,
                     )
                 except Exception as e:
-                    with open(error_log_file, "a") as f:
+                    with open(error_log_file, "a", encoding="utf-8") as f:
                         f.write(
                             f"Caught an exception at scenario {scenario_index} when solving in run_pf function with PowSyBl solver: {e}\n",
                         )
@@ -1530,7 +1530,7 @@ def process_scenario_chunk(
             local_processed_data,
         )
     except Exception as e:
-        with open(error_log_path, "a") as f:
+        with open(error_log_path, "a", encoding="utf-8") as f:
             f.write(f"Caught an exception in process_scenario_chunk function: {e}\n")
             f.write(traceback.format_exc())
             f.write("\n")
@@ -1603,7 +1603,7 @@ def process_scenario_opf_mode(
             try:
                 res_dcopf = run_dcopf(perturbation, jl)
             except Exception as e:
-                with open(error_log_file, "a") as f:
+                with open(error_log_file, "a", encoding="utf-8") as f:
                     f.write(
                         f"Caught an exception at scenario {scenario_index} in run_dcopf function: {e}\n",
                     )
@@ -1611,7 +1611,7 @@ def process_scenario_opf_mode(
             # run OPF to get the gen set points. Here the set points account for the topology perturbation.
             res = run_opf(perturbation, jl)
         except Exception as e:
-            with open(error_log_file, "a") as f:
+            with open(error_log_file, "a", encoding="utf-8") as f:
                 f.write(
                     f"Caught an exception at scenario {scenario_index} in run_opf function: {e}\n",
                 )

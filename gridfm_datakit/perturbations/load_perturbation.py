@@ -44,6 +44,7 @@ def _find_largest_scaling_factor_worker(
         # Create a temporary file for the MATPOWER case
         with tempfile.NamedTemporaryFile(
             mode="w",
+            encoding="utf-8",
             suffix=".m",
             delete=False,
         ) as temp_file:
@@ -398,7 +399,7 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
             u - self.global_range * u
         )  # The lower bound used to be set as e.g. u - 40%, while now it is set as u - 40% of u
 
-        with open(scenarios_log, "a") as f:
+        with open(scenarios_log, "a", encoding="utf-8") as f:
             f.write("u=" + str(u) + "\n")
             f.write("l=" + str(lower) + "\n")
 
