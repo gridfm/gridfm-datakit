@@ -40,6 +40,8 @@ def _result(
     scenario_index,
     *,
     perturbation_index=0,
+    event_index=0,
+    events=None,
     static=True,
     dynamic=True,
     n_timesteps=5,
@@ -71,6 +73,8 @@ def _result(
         "dynamic_results": dr,
         "scenario_index": scenario_index,
         "perturbation_index": perturbation_index,
+        "event_index": event_index,
+        "events": events,
     }
 
 
@@ -193,12 +197,13 @@ def test_variable_name_mismatch_raises(tmp_path):
     out = tmp_path / "dyn"
     out.mkdir(parents=True)
     first = _result(0, n_variables=2)
-    second = _result(1, n_variables=2)
+    second = _result(1, perturbation_index=2, event_index=3, n_variables=2)
     second["dynamic_results"].dynamic_results.columns = ["v0", "other"]
 
     with pytest.raises(
         ValueError,
-        match=r"variable names: missing \['v1'\], unexpected \['other'\]",
+        match=r"sample \(1, 2, 3\) disagrees on variable names: "
+        r"missing \['v1'\], unexpected \['other'\]",
     ):
         _write([first, second], out)
 
@@ -243,6 +248,7 @@ def test_static_snapshot_is_at_parity_with_static_pipeline(tmp_path):
     assert list(y_bus.columns) == [
         "scenario_index",
         "perturbation_index",
+        "event_index",
         "index1",
         "index2",
         "G",
@@ -254,6 +260,7 @@ def test_static_snapshot_is_at_parity_with_static_pipeline(tmp_path):
     assert list(runtime.columns) == [
         "scenario_index",
         "perturbation_index",
+        "event_index",
         "ac",
     ]
     assert runtime["scenario_index"].tolist() == [7, 9]
@@ -266,7 +273,11 @@ def test_load_scenario_idx_is_not_duplicated_by_scenario_index(tmp_path):
     for name in ("bus_data", "branch_data", "gen_data", "y_bus_data", "runtime_data"):
         frame = pd.read_parquet(out / f"{name}.parquet")
         assert "load_scenario_idx" not in frame.columns, name
-        assert list(frame.columns[:2]) == ["scenario_index", "perturbation_index"]
+        assert list(frame.columns[:3]) == [
+            "scenario_index",
+            "perturbation_index",
+            "event_index",
+        ]
 
 
 def test_topology_perturbations_labeled_by_composite_key(tmp_path):
@@ -293,6 +304,22 @@ def test_topology_perturbations_labeled_by_composite_key(tmp_path):
     assert grp["curves"].shape[0] == 2
 
 
+def test_event_variants_of_one_sample_are_keyed_apart(tmp_path):
+    results = [_result(0, event_index=0), _result(0, event_index=1)]
+    out, grp, meta = _save(results, tmp_path)
+
+    bus = pd.read_parquet(out / "bus_data.parquet")
+    key = ["scenario_index", "perturbation_index", "event_index"]
+    assert sorted(set(map(tuple, bus[key].to_numpy()))) == [(0, 0, 0), (0, 0, 1)]
+    assert np.asarray(grp["event_index"]).tolist() == [0, 1]
+    assert meta["static_event_index"] == [0, 1]
+    assert meta["dynamic_event_index"] == [0, 1]
+    assert meta["reports"] == [
+        "scenario_0_perturbation_0_event_0.json",
+        "scenario_0_perturbation_0_event_1.json",
+    ]
+
+
 def test_features_and_labels_joinable_when_membership_differs(tmp_path):
     # scenario 7: both; 9: static only; 11: dynamic only
     results = [
@@ -314,6 +341,69 @@ def test_features_and_labels_joinable_when_membership_differs(tmp_path):
     # and its curve slice is addressable via the scenario_index coordinate
     i7 = np.asarray(grp["scenario_index"]).tolist().index(7)
     assert np.all(grp["curves"][i7] == 7.0)
+
+
+def _events(start_time: float) -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "event_name": ["Disconnect", "Disconnect"],
+            "static_id": ["GEN_1", "LINE_2"],
+            "start_time": [start_time, start_time + 1.0],
+            "params": ["disconnect_only=;", ""],
+            "extra": ["x", "y"],
+        },
+    )
+
+
+def test_events_are_recorded_per_sample(tmp_path):
+    first, second = _events(10.0), _events(20.0)
+    results = [
+        _result(0, events=first),
+        _result(1, perturbation_index=2, event_index=3, events=second),
+    ]
+    out, _, _ = _save(results, tmp_path)
+
+    frame = pd.read_parquet(out / "events.parquet")
+    key = ["scenario_index", "perturbation_index", "event_index"]
+    cols = ["event_name", "static_id", "start_time", "params"]
+    assert list(frame.columns) == key + ["scenario"] + cols
+    assert len(frame) == 4
+    assert (frame["scenario"] == "").all()
+    for sample, events in (((0, 0, 0), first), ((1, 2, 3), second)):
+        rows = frame[(frame[key] == sample).all(axis=1)]
+        pd.testing.assert_frame_equal(rows[cols].reset_index(drop=True), events[cols])
+
+
+def test_drawn_scenario_names_are_recorded(tmp_path):
+    first = _events(10.0).assign(scenario="trip")
+    second = _events(20.0).assign(scenario="fault")
+    results = [
+        _result(0, events=first),
+        _result(0, event_index=1, events=second),
+    ]
+    out, _, _ = _save(results, tmp_path)
+
+    frame = pd.read_parquet(out / "events.parquet")
+    assert frame["scenario"].tolist() == ["trip", "trip", "fault", "fault"]
+
+
+def test_no_events_writes_no_table(tmp_path):
+    file_paths = {}
+    out = tmp_path / "dyn"
+    out.mkdir(parents=True)
+    _write([_result(0), _result(1)], out, file_paths)
+    assert not (out / "events.parquet").exists()
+    assert "events" not in file_paths
+
+
+def test_empty_events_write_no_table(tmp_path):
+    empty = pd.DataFrame(columns=["event_name", "static_id", "start_time", "params"])
+    file_paths = {}
+    out = tmp_path / "dyn"
+    out.mkdir(parents=True)
+    _write([_result(0, events=empty), _result(1, events=empty)], out, file_paths)
+    assert not (out / "events.parquet").exists()
+    assert "events" not in file_paths
 
 
 # ---------------------------------------------------------------------------
@@ -339,6 +429,7 @@ def test_final_state_values_are_exported_as_a_keyed_table(tmp_path):
     assert list(frame.columns) == [
         "scenario_index",
         "perturbation_index",
+        "event_index",
         "gen_UPu",
         "gen_efd",
     ]
