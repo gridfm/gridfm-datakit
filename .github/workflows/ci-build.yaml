@@ -228,11 +228,13 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    env:
-      # Written in phase 1, read in phase 2. Kept in runner.temp (outside the
-      # workspace) so the phase-2 checkout does not wipe it.
-      GRIDFM_CALIBRATION_BASELINE: ${{ runner.temp }}/baseline.json
     steps:
+      # Baseline is written in phase 1 and read in phase 2. Keep it in RUNNER_TEMP
+      # (outside the workspace) so the phase-2 checkout does not wipe it. Set via
+      # $GITHUB_ENV because the runner.* context is not available in job-level env.
+      - name: Set baseline path
+        run: echo "GRIDFM_CALIBRATION_BASELINE=$RUNNER_TEMP/baseline.json" >> "$GITHUB_ENV"
+
       # --- Phase 1: calibrate on the base branch ---
       - name: Checkout base branch
         uses: actions/checkout@v7
