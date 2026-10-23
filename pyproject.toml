@@ -99,5 +99,7 @@ dynamic = [
 ]
 
 [tool.pytest.ini_options]
+# integrationtests/ is run explicitly (see CONTRIBUTING.md), not by a bare `pytest`.
+testpaths = ["tests"]
 timeout = 900
 timeout_method = "thread"
