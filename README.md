@@ -103,6 +103,14 @@ python -m pip install --upgrade pip  # Upgrade pip to ensure compatibility with 
 pip3 install -e '.[test,dev]'
 ```
 
+Alternatively, with [uv](https://docs.astral.sh/uv/) (creates `.venv` and installs the versions pinned in `uv.lock`):
+
+```bash
+uv sync --extra test --extra dev
+uv run gridfm_datakit setup_pm  # Install Julia with PowerModels and Ipopt (inside .venv)
+uv run pytest tests -n 2
+```
+
 # Getting Started
 
 ## Option 1: Run data gen using interactive interface
