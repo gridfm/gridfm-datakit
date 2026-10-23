@@ -211,6 +211,43 @@ def test_setup_environment_overwrite_behavior():
         )
 
 
+def test_setup_environment_reuses_checkpoint_seed(tmp_path):
+    """A resumed run must reuse its persisted seed instead of the config seed."""
+    with open("tests/config/default_without_perturbation_test.yaml", "r") as f:
+        config = yaml.safe_load(f)
+    config["settings"]["data_dir"] = str(tmp_path)
+    config["settings"]["overwrite"] = True
+    config["settings"]["seed"] = 123
+
+    _, base_path, _, seed = _setup_environment(config)
+    assert seed == 123
+    with open(os.path.join(base_path, "rng_seed.txt")) as f:
+        assert f.read() == "123"
+
+    config["settings"]["overwrite"] = False
+    config["settings"]["seed"] = 456
+    _, _, _, resumed_seed = _setup_environment(config)
+
+    assert resumed_seed == 123
+
+
+def test_setup_environment_overwrite_replaces_checkpoint_seed(tmp_path):
+    """A fresh overwrite must replace any seed persisted by an earlier run."""
+    with open("tests/config/default_without_perturbation_test.yaml", "r") as f:
+        config = yaml.safe_load(f)
+    config["settings"]["data_dir"] = str(tmp_path)
+    config["settings"]["overwrite"] = True
+    config["settings"]["seed"] = 123
+    _setup_environment(config)
+
+    config["settings"]["seed"] = 456
+    _, base_path, _, seed = _setup_environment(config)
+
+    assert seed == 456
+    with open(os.path.join(base_path, "rng_seed.txt")) as f:
+        assert f.read() == "456"
+
+
 def test_parquet_append_vs_overwrite():
     """Verify that saves append rows when overwrite is False, and reset when overwrite is True.
 

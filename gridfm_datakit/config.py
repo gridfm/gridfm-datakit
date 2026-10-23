@@ -223,12 +223,22 @@ _StaticAdmittancePerturbationConfig = Annotated[
 ]
 
 
+class _CoinHSLConfig(_ConfigModel):
+    """Optional CoinHSL linear-solver settings for Ipopt."""
+
+    enabled: bool = False
+    linear_solver: Literal["ma27", "ma57", "ma77", "ma86", "ma97"] = "ma57"
+    hsllib: _NonEmptyString = "/lib/x86_64-linux-gnu/libcoinhsl.so"
+
+
 class _StaticSettingsConfig(_ConfigModel):
     """Settings required by static PF and OPF generation."""
 
     num_processes: _PositiveInt = 1
     data_dir: _NonEmptyString
     large_chunk_size: _PositiveInt = 1_000
+    is_multiprocessing: bool = False
+    scenario_timeout_sec: Optional[_PositiveFloat] = None
     overwrite: bool
     mode: Literal["pf", "opf"]
     include_dc_res: bool
@@ -239,6 +249,7 @@ class _StaticSettingsConfig(_ConfigModel):
     seed: Optional[_Seed] = None
     pf_solver: Literal["powermodel", "powsybl", "lightsim2grid"] = "powermodel"
     opf_formulation: Literal["polar", "rectangular"] = "polar"
+    coinhsl: _CoinHSLConfig = Field(default_factory=_CoinHSLConfig)
 
 
 class _StaticGenerationConfig(_ConfigModel):
