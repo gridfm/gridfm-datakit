@@ -43,6 +43,14 @@ SN_MVA = 100.0
 CASES = {
     "pf": {"settings": {"mode": "pf"}},
     "opf": {"settings": {"mode": "opf"}},
+    "pf_powsybl": {
+        "network": {"reader": "powsybl"},
+        "settings": {"mode": "pf", "pf_solver": "powsybl"},
+    },
+    "opf_powsybl": {
+        "network": {"reader": "powsybl"},
+        "settings": {"mode": "opf"},
+    },
 }
 
 
