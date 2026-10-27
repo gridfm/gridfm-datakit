@@ -14,8 +14,7 @@ def _install(tmp_path, monkeypatch, launcher):
     config_dir = tmp_path / "itools"
     config_dir.mkdir()
     (config_dir / "config.yml").write_text(f"dynawo:\n  homeDir: {home}\n")
-    monkeypatch.setenv("POWSYBL_CONFIG_DIR", str(config_dir))
-    monkeypatch.delenv("POWSYBL_CONFIG_NAME", raising=False)
+    monkeypatch.setattr(api, "_DEFAULT_CONFIG_DIR", config_dir)
 
 
 def test_windows_launcher_is_dynawo_cmd():
@@ -45,3 +44,12 @@ def test_install_without_launcher_is_rejected(tmp_path, monkeypatch):
     reason = api._dynawo_unavailable_reason()
     assert reason is not None
     assert "launcher" in reason
+
+
+def test_config_dir_environment_variable_is_ignored(tmp_path, monkeypatch):
+    _install(tmp_path, monkeypatch, "dynawo.sh")
+    monkeypatch.setattr(api, "_DEFAULT_CONFIG_DIR", tmp_path / "empty")
+    monkeypatch.setenv("POWSYBL_CONFIG_DIR", str(tmp_path / "itools"))
+    reason = api._dynawo_unavailable_reason()
+    assert reason is not None
+    assert "no powsybl configuration file" in reason
