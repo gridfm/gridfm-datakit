@@ -113,6 +113,7 @@ def _format_branch_res(
             "qt": row.q2,
         }
         for row in df[["p1", "q1", "p2", "q2"]].itertuples()
+        if row.Index in map_branch_p2g
     }
 
 
