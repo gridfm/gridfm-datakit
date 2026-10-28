@@ -416,10 +416,10 @@ class TestEventMapping:
         benchmark_dataset,
     ):
         """Test the event mapping on benchmark."""
-        from gridfm_datakit.dynamic.dynawo import _map_events_dynawo
+        from gridfm_datakit.dynamic.dynawo import generate_dynawo_event_mapping
 
         df_events = benchmark_dataset["df_events"]
-        event_mapping = _map_events_dynawo(df_events)
+        event_mapping = generate_dynawo_event_mapping(df_events)
 
         sim = pp.dynamic.Simulation()
         report_node = pp.report.ReportNode()
@@ -443,7 +443,7 @@ class TestEventMapping:
         param_ieee14,
     ):
         """Test the mapping for a disconnection event."""
-        from gridfm_datakit.dynamic.dynawo import _map_events_dynawo
+        from gridfm_datakit.dynamic.dynawo import generate_dynawo_event_mapping
 
         df_event = pd.DataFrame.from_records(
             columns=["event_name", "static_id", "start_time", "params"],
@@ -451,7 +451,7 @@ class TestEventMapping:
                 ("Disconnect", "_GEN____2_SM", 50, "disconnect_only=;"),
             ],
         )
-        event_mapping = _map_events_dynawo(df_event)
+        event_mapping = generate_dynawo_event_mapping(df_event)
         sim = pp.dynamic.Simulation()
         report_node = pp.report.ReportNode()
 
@@ -475,7 +475,7 @@ class TestEventMapping:
         param_ieee14,
     ):
         """Test the mapping for an active power variation event."""
-        from gridfm_datakit.dynamic.dynawo import _map_events_dynawo
+        from gridfm_datakit.dynamic.dynawo import generate_dynawo_event_mapping
 
         df_event = pd.DataFrame.from_records(
             columns=["event_name", "static_id", "start_time", "params"],
@@ -483,7 +483,7 @@ class TestEventMapping:
                 ("ActivePowerVariation", "_GEN____2_SM", 50, "delta_p=2"),
             ],
         )
-        event_mapping = _map_events_dynawo(df_event)
+        event_mapping = generate_dynawo_event_mapping(df_event)
         sim = pp.dynamic.Simulation()
         report_node = pp.report.ReportNode()
 
@@ -508,7 +508,7 @@ class TestEventMapping:
         benchmark_dataset,
     ):
         """Test the mapping for a reactive power variation event."""
-        from gridfm_datakit.dynamic.dynawo import _map_events_dynawo
+        from gridfm_datakit.dynamic.dynawo import generate_dynawo_event_mapping
         from gridfm_datakit.dynamic.dynawo import _map_dynamic_models_dynawo
 
         # drop the dynamic model for _LOAD___2_EC to apply Q variation
@@ -525,7 +525,7 @@ class TestEventMapping:
                 ("ReactivePowerVariation", "_LOAD___2_EC", 50, "delta_q=2"),
             ],
         )
-        event_mapping = _map_events_dynawo(df_event)
+        event_mapping = generate_dynawo_event_mapping(df_event)
 
         sim = pp.dynamic.Simulation()
         report_node = pp.report.ReportNode()
@@ -553,7 +553,7 @@ class TestEventMapping:
         param_ieee14,
     ):
         """Test the mapping for a node fault event."""
-        from gridfm_datakit.dynamic.dynawo import _map_events_dynawo
+        from gridfm_datakit.dynamic.dynawo import generate_dynawo_event_mapping
 
         df_event = pd.DataFrame.from_records(
             columns=["event_name", "static_id", "start_time", "params"],
@@ -561,7 +561,7 @@ class TestEventMapping:
                 ("NodeFault", "_BUS____2_TN", 50, "fault_time=0.2;r_pu=0;x_pu=0.2"),
             ],
         )
-        event_mapping = _map_events_dynawo(df_event)
+        event_mapping = generate_dynawo_event_mapping(df_event)
         sim = pp.dynamic.Simulation()
         report_node = pp.report.ReportNode()
 
@@ -586,7 +586,7 @@ class TestEventMapping:
         param_ieee14,
     ):
         """Test the mapping for a reference voltage variation event."""
-        from gridfm_datakit.dynamic.dynawo import _map_events_dynawo
+        from gridfm_datakit.dynamic.dynawo import generate_dynawo_event_mapping
 
         df_event = pd.DataFrame.from_records(
             columns=["event_name", "static_id", "start_time", "params"],
@@ -594,7 +594,7 @@ class TestEventMapping:
                 ("ReferenceVoltageVariation", "_GEN____3_SM", 50, "delta_u=200"),
             ],
         )
-        event_mapping = _map_events_dynawo(df_event)
+        event_mapping = generate_dynawo_event_mapping(df_event)
         sim = pp.dynamic.Simulation()
         report_node = pp.report.ReportNode()
 

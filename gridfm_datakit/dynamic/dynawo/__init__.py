@@ -79,7 +79,7 @@ def generate_dynawo_mappings(dynamic_inputs: DynamicInputs) -> DynawoMappings:
     """
 
     dynamic_model_mapping = _map_dynamic_models_dynawo(dynamic_inputs.dynamic_models)
-    event_mapping = _map_events_dynawo(dynamic_inputs.events)
+    event_mapping = generate_dynawo_event_mapping(dynamic_inputs.events)
     variable_mapping = _map_variables_dynawo(dynamic_inputs.variables)
 
     return DynawoMappings(
@@ -247,8 +247,16 @@ def _map_dynamic_models_dynawo(
     return dynamic_model_mapping
 
 
-def _map_events_dynawo(events: pd.DataFrame) -> pp.dynamic.EventMapping:
-    """Maps the event inputs to Dynawo format."""
+def generate_dynawo_event_mapping(events: pd.DataFrame) -> pp.dynamic.EventMapping:
+    """Build the Dynawo event mapping from an events DataFrame.
+
+    Args:
+        events: Events with columns ``event_name``, ``static_id``, ``start_time``
+            and ``params``.
+
+    Returns:
+        pp.dynamic.EventMapping: The events registered for Dynawo.
+    """
     event_mapping = pp.dynamic.EventMapping()
     event_types = events["event_name"].unique()
     df_grp_event = events.groupby("event_name")
@@ -341,6 +349,7 @@ def _get_param_value(params, keyword):
 __all__ = [
     # primary entry points
     "generate_dynawo_mappings",
+    "generate_dynawo_event_mapping",
     "get_dynawo_simulation_parameters",
     "get_dynawo_loadflow_parameters",
     # data class

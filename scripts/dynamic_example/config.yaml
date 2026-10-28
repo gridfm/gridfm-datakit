@@ -22,16 +22,16 @@ load:
 
 # Topology / generation / admittance perturbations are optional. Left at "none"
 # here; enable e.g. topology_perturbation to expand each scenario into several
-# samples (one Dynawo run per perturbed topology).
+# samples (n_event_variants Dynawo runs per perturbed topology).
 #
 # generation_perturbation (generation *cost* randomisation) and
 # admittance_perturbation act before the OPF, so they vary the initial operating
 # point Dynawo starts from (which machines are dispatched and at what loading),
-# and do influence the trajectory. What they do not vary is the dynamic model set
-# or the event sequence, which come from the CSV inputs and are identical across
-# samples. Only topology_perturbation changes which elements are in service, so it
-# alone changes the set of models Dynawo instantiates and alone expands a scenario
-# into several samples. Their effect on the dynamic outputs is not validated.
+# and do influence the trajectory. What they do not vary is the dynamic model set,
+# which comes from the CSV inputs and is identical across samples; events vary
+# only through dynamic.event_perturbation. Only topology_perturbation changes
+# which elements are in service, so it alone changes the set of models Dynawo
+# instantiates. Their effect on the dynamic outputs is not validated.
 #
 # generation_perturbation additionally does not work under reader: powsybl, which
 # dynamic runs require: there are no real generator costs for it to perturb.
@@ -58,6 +58,28 @@ dynamic:
     solver_type: SIM
     solver_parameters_file: grids/IEEE14.par
     solver_parameters_id: SimplifiedSolver
+  # Optional. Draws the events of each sample instead of replaying events_file.
+  # An absent block means type: file. With type none or random, events_file is
+  # optional and ignored, with a warning when set as here. See
+  # docs/manual/dynamic_simulation.md.
+  # event_perturbation:
+  #   type: random                 # none | file | random
+  #   n_event_variants: 3          # event variants per topology variant
+  #   scenarios:                   # one drawn per event variant, by weight
+  #     - name: trip_then_fault
+  #       anchor: random           # or a bus ID of the network file
+  #       weight: 1
+  #       start_time: {distribution: uniform, low: 20, high: 80}
+  #       events:
+  #         - type: Disconnect
+  #           target: {element: generator, distance: [0, 2]}  # or {static_id: _GEN____2_SM}
+  #         - type: NodeFault
+  #           target: {element: bus, distance: [0, 1]}
+  #           delay: {distribution: uniform, low: 0.1, high: 0.3}
+  #           params:
+  #             fault_time: 0.1
+  #             r_pu: 0
+  #             x_pu: {distribution: uniform, low: 0.01, high: 0.1}
   # Optional. Governs the AC power flow that produces the balanced initial state.
   # The defaults below are applied when this block is absent; they differ from the
   # static pipeline's on purpose. Dynawo initialises each synchronous machine from
