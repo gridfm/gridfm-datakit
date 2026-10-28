@@ -80,8 +80,8 @@ dynawo:
   debug: false
 ```
 
-Set `POWSYBL_CONFIG_DIR` (and optionally `POWSYBL_CONFIG_NAME`) to use a
-different location; `.yml`, `.yaml` and `.xml` config files are all recognised.
+pypowsybl reads its configuration from `~/.itools` only, whatever the
+environment. `.yml`, `.yaml` and `.xml` config files are all recognised.
 
 ### Checking the installation
 
