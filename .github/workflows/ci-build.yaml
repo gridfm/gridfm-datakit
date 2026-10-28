@@ -219,6 +219,97 @@ jobs:
           export SKIP_LARGE_GRIDS=1
           pytest tests/ -v --durations=25
 
+  integration-tests:
+    # End-to-end dataset-generation tests. The calibrated baseline is machine
+    # sensitive (solver numerics), so instead of asserting against the committed
+    # baseline we rebuild it from the base branch on THIS runner, then assert the
+    # PR head against it. Same machine for both phases -> the --pad floor only has
+    # to absorb run-to-run jitter, not cross-environment drift.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      # Baseline is written in phase 1 and read in phase 2. Keep it in RUNNER_TEMP
+      # (outside the workspace) so the phase-2 checkout does not wipe it. Set via
+      # $GITHUB_ENV because the runner.* context is not available in job-level env.
+      - name: Set baseline path
+        run: echo "GRIDFM_CALIBRATION_BASELINE=$RUNNER_TEMP/baseline.json" >> "$GITHUB_ENV"
+
+      # Cache the base-branch baseline so we only recalibrate when the base commit
+      # or the solver/deps change. The key pins:
+      #   - base SHA: a new base means possibly-different generated data
+      #   - runner image: baselines are machine sensitive; a new image must recalibrate
+      #   - juliapkg.json + pyproject.toml of the BASE: a solver/dep bump shifts numerics
+      # On a hit, phase 1 (checkout base -> calibrate) is skipped entirely. On a miss
+      # we calibrate inline and the cache is saved at job end (post step).
+      - name: Checkout base for cache key inputs
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base-src
+
+      - name: Restore base baseline
+        id: baseline-cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/baseline.json
+          key: >-
+            e2e-baseline-${{ runner.os }}-${{ github.event.pull_request.base.sha }}-${{ hashFiles('base-src/gridfm_datakit/juliapkg.json', 'base-src/pyproject.toml') }}
+
+      - name: Install Julia 1.12
+        uses: julia-actions/setup-julia@v3
+        with:
+          version: '1.12'
+
+      - name: Cache Julia depot
+        uses: actions/cache@v6
+        with:
+          path: ~/.julia
+          key: julia-depot-${{ runner.os }}-julia1.12-${{ hashFiles('base-src/gridfm_datakit/juliapkg.json') }}
+          restore-keys: |
+            julia-depot-${{ runner.os }}-julia1.12-
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Cache pip
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('base-src/pyproject.toml') }}
+          restore-keys: |
+            pip-${{ runner.os }}-
+
+      # --- Phase 1: calibrate on the base branch (skipped on a baseline cache hit) ---
+      - name: Install base package and calibrate baseline
+        if: steps.baseline-cache.outputs.cache-hit != 'true'
+        working-directory: base-src
+        run: |
+          python -m pip install --upgrade pip wheel
+          pip install -e ".[test]"
+          python -c "from juliacall import Main as jl; jl.seval('using PowerModels, Ipopt, Memento')"
+          pytest integrationtests -s --calibrate
+
+      # --- Phase 2: assert the PR head against the (cached or fresh) baseline ---
+      - name: Checkout PR head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: head-src
+
+      - name: Install package at PR head
+        working-directory: head-src
+        run: |
+          python -m pip install --upgrade pip wheel
+          pip install -e ".[test]"
+          python -c "from juliacall import Main as jl; jl.seval('using PowerModels, Ipopt, Memento')"
+
+      - name: Assert PR head against base-calibrated baseline
+        working-directory: head-src
+        run: pytest integrationtests -s
+
   codeql:
     name: CodeQL (Python)
     runs-on: ubuntu-latest
