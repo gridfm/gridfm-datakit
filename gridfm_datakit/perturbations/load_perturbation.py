@@ -23,7 +23,7 @@ def _find_largest_scaling_factor_worker(
     p_ref = net.Pd.copy()  # Active power demand
     q_ref = net.Qd.copy()  # Reactive power demand
     u = start
-    converged = True
+    largest = None
 
     print("Finding upper limit u .", end="", flush=True)
 
@@ -33,7 +33,7 @@ def _find_largest_scaling_factor_worker(
 
     jl = init_julia(max_iter=max_iter, solver_log_dir=None)
 
-    while (u <= max_scaling) and converged:
+    while u <= max_scaling:
         # Update load values in the Network using properties
         net.Pd = p_ref * u
         if change_reactive_power:
@@ -56,27 +56,27 @@ def _find_largest_scaling_factor_worker(
 
             # Run OPF using the initialized Julia interface
             result = jl.run_opf(temp_filename)
-            u += step_size
             print(".", end="", flush=True)
-
-            if str(result["termination_status"]) != "LOCALLY_SOLVED":
-                if u == start:
-                    raise RuntimeError(
-                        f"OPF did not converge for starting u={u:.3f}",
-                    )
-                print(
-                    f"\nOPF did not converge for u={u:.3f}. Using u={u - step_size:.3f} for upper limit",
-                    flush=True,
-                )
-                u -= step_size
-                converged = False
 
         finally:
             # Clean up temporary file
             if os.path.exists(temp_filename):
                 os.unlink(temp_filename)
 
-    return u
+        if str(result["termination_status"]) != "LOCALLY_SOLVED":
+            if largest is None:
+                raise RuntimeError(
+                    f"OPF did not converge for starting u={u:.3f}",
+                )
+            print(
+                f"\nOPF did not converge for u={u:.3f}. Using u={largest:.3f} for upper limit",
+                flush=True,
+            )
+            break
+        largest = u
+        u += step_size
+
+    return largest
 
 
 def load_scenarios_to_df(scenarios: np.ndarray) -> pd.DataFrame:
