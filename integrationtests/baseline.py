@@ -14,9 +14,10 @@ import warnings
 import numpy as np
 from scipy import stats
 
-# The committed baseline. Data generation runs on the CPU and is seeded, so these
-# bounds are expected to hold on other machines too; if they do not, recalibrate on
-# your machine (before changing any code) and point GRIDFM_CALIBRATION_BASELINE at it.
+# Where --calibrate writes the baseline and the assertions read it, unless
+# GRIDFM_CALIBRATION_BASELINE says otherwise. Ignored by git: bounds hold only on
+# the machine that calibrated them, so each run calibrates its own on unchanged
+# code, as CI does on the base of a PR.
 DEFAULT_BASELINE_PATH = os.path.join(
     os.path.dirname(__file__),
     "calibration_baseline.json",
