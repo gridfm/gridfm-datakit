@@ -163,7 +163,7 @@ def write_baseline(test_key: str, bounds: dict) -> None:
     print(f"\nCalibrated bounds for '{test_key}' written to {path}")
 
 
-def read_baseline(test_key: str):
+def read_baseline(test_key: str) -> dict | None:
     """Load this test's calibrated bounds, or None if the baseline has no entry.
 
     A missing entry means the test is newer than the code the baseline was
