@@ -84,7 +84,8 @@ Before opening a PR, make sure you complete all steps:
 
 `integrationtests/` holds end-to-end tests that exercise the whole pipeline the way a
 user does. For `case14_ieee` (200 load scenarios x 2 topology variants, fixed seed) in
-both `pf` and `opf` mode, each test:
+both `pf` and `opf` mode, once with the default reader and once through PowSyBl, each
+test:
 
 1. builds a config from `scripts/config/default.yaml`,
 2. runs `gridfm_datakit generate` and then `gridfm_datakit validate --n-partitions 0`,
