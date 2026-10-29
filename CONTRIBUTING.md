@@ -91,38 +91,34 @@ both `pf` and `opf` mode, each test:
 3. computes summary metrics from the generated parquet files (dataset size, total
    load and dispatch, generation cost, voltages, branch flows and loading, DC-vs-AC
    angle differences), and
-4. checks them against calibrated bounds read from
-   `integrationtests/calibration_baseline.json`.
+4. checks them against bounds calibrated on the code before your change.
 
 `validate` checks that every scenario is physically valid; the calibrated bounds
 catch changes in *what* is generated, which `validate` cannot see.
 
-They are not part of `pytest tests/` and take a few minutes. Run them with:
-
-```bash
-pytest integrationtests -s
-```
-
-The committed baseline was calibrated on unchanged code. Generation runs on the CPU
-and is seeded, so it is bit-reproducible on one machine and the default bounds are
-`mean ± 0.1%`. If you run on a different machine the test warns that the environment
-fingerprint differs; if a bound then fails **before** you have changed any code,
-calibrate a local baseline first:
+They are not part of `pytest tests/` and take a few minutes. Generation runs on the
+CPU and is seeded, so it is bit-reproducible on one machine and the default bounds
+are `mean ± 0.1%`, but only on the machine that calibrated them. No baseline is
+committed: calibrate your own on unchanged code, then assert your changes against
+it.
 
 ```bash
 # On an unchanged checkout:
-export GRIDFM_CALIBRATION_BASELINE=~/gridfm-datakit-baseline.json
 pytest integrationtests --calibrate -s
 # Make your changes, then assert against your baseline:
 pytest integrationtests -s
 ```
 
-If you calibrate *after* changing the code, the baseline just encodes your changed
-behaviour and can no longer catch regressions.
+The baseline goes to `integrationtests/calibration_baseline.json`, which git
+ignores; set `GRIDFM_CALIBRATION_BASELINE` to keep it elsewhere. If you calibrate
+*after* changing the code, the baseline just encodes your changed behaviour and can
+no longer catch regressions.
 
-If your change is *meant* to alter the generated data (e.g. a new perturbation
-default), recalibrate the committed baseline in the same PR and explain the metric
-shifts in the PR description, so reviewers can see what moved and by how much.
+CI does the same on every PR: it calibrates on the base branch and asserts the PR
+head against it on the same runner. If your change is *meant* to alter the
+generated data (e.g. a new perturbation default), the check fails by design: explain
+the metric shifts in the PR description, so reviewers can see what moved and by how
+much.
 
 ### Calibration options
 

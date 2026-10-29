@@ -9,8 +9,9 @@ Each case
 ``validate`` checks that every scenario is physically valid; the baseline catches
 changes in *what* is generated, which ``validate`` cannot see.
 
-Run ``pytest integrationtests --calibrate -s`` on unchanged code to (re)write the
-baseline; plain ``pytest integrationtests -s`` asserts against it.
+Run ``pytest integrationtests --calibrate -s`` on unchanged code to write the
+baseline, then plain ``pytest integrationtests -s`` on the changed code to assert
+against it.
 """
 
 import os
@@ -39,7 +40,7 @@ TOPOLOGY_VARIANTS = 2
 SEED = 42
 SN_MVA = 100.0
 
-# Changing any of these invalidates the committed baseline: recalibrate afterwards.
+# Changing any of these invalidates a calibrated baseline: recalibrate afterwards.
 CASES = {
     "pf": {"settings": {"mode": "pf"}},
     "opf": {"settings": {"mode": "opf"}},
