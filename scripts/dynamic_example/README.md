@@ -72,13 +72,16 @@ out/                                    <- settings.data_dir
         ├── bus_data.parquet / gen_data.parquet / branch_data.parquet
         │   y_bus_data.parquet / runtime_data.parquet
         │       static PF snapshot (features), tagged with
-        │       (scenario_index, perturbation_index). This pair replaces the
-        │       static pipeline's load_scenario_idx, which cannot tell two
-        │       perturbations of one load scenario apart
+        │       (scenario_index, perturbation_index, event_index). This triple
+        │       replaces the static pipeline's load_scenario_idx, which cannot
+        │       tell two perturbations of one load scenario apart
+        ├── events.parquet
+        │       the events each sample simulated, one row per event, same key,
+        │       with the name of the drawn scenario
         ├── dynamic_results.zarr/
         │       curves (n_samples, n_variables, n_timesteps) + scenario_index /
-        │       perturbation_index coordinate arrays; join the two modalities on
-        │       this key pair
+        │       perturbation_index / event_index coordinate arrays; join the two
+        │       modalities on this key triple
         ├── reports/
         │       one Dynawo report (JSON) per sample: model build-up + convergence
         └── metadata.json
@@ -113,9 +116,11 @@ the console limited to pipeline progress. The Dynawo per-simulation reports
   `settings.large_chunk_size`.
 - **Topology perturbations:** set `topology_perturbation.type: random` (with
   `k` / `n_topology_variants` / `elements`) to expand each scenario into several
-  samples, one Dynawo run per perturbed topology, each labelled by
-  `perturbation_index`. This is the only perturbation that adds *dynamic*
-  diversity.
+  samples, each labelled by `perturbation_index`. It is the only perturbation
+  that changes which dynamic models Dynawo instantiates.
+- **Random events:** set `dynamic.event_perturbation.type: random` to draw
+  `n_event_variants` event sets per topology variant, each labelled by
+  `event_index`.
 - **`admittance_perturbation`:** accepted for parity with the static pipeline.
   Its perturbed `r`/`x` are written to the pypowsybl network with the OPF
   set-points, so they do change the simulated network. But one scenario still
