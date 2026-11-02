@@ -204,6 +204,72 @@ class TestValidateValues:
         )
 
 
+_RANDOM_BLOCK = {
+    "type": "random",
+    "scenarios": [
+        {
+            "name": "generator_trip",
+            "start_time": {"distribution": "uniform", "low": 20, "high": 80},
+            "events": [
+                {
+                    "type": "Disconnect",
+                    "target": {"element": "generator", "distance": 1},
+                },
+            ],
+        },
+    ],
+}
+
+
+class TestEventPerturbation:
+    @staticmethod
+    def _config(tmp_path, dataset, block, keep_events_file):
+        config = _make_config(str(tmp_path), dataset)
+        config.dynamic.solver_parameters = NestedNamespace(
+            start_time=0.0,
+            stop_time=100.0,
+        )
+        config.dynamic.event_perturbation = NestedNamespace(**block)
+        if not keep_events_file:
+            del config.dynamic.input_files.events_file
+        return config
+
+    def test_random_without_events_file(self, tmp_path, minimal_dataset):
+        inputs = load_raw_inputs(
+            self._config(tmp_path, minimal_dataset, _RANDOM_BLOCK, False),
+        )
+        assert inputs.event_perturbation.type == "random"
+        assert inputs.events.empty
+        assert list(inputs.events.columns) == [
+            "event_name",
+            "static_id",
+            "start_time",
+            "params",
+        ]
+
+    def test_random_ignores_events_file_with_a_warning(
+        self,
+        tmp_path,
+        minimal_dataset,
+    ):
+        config = self._config(tmp_path, minimal_dataset, _RANDOM_BLOCK, True)
+        with pytest.warns(UserWarning, match="events_file is ignored"):
+            inputs = load_raw_inputs(config)
+        assert inputs.events.empty
+
+    def test_none_loads(self, tmp_path, minimal_dataset):
+        inputs = load_raw_inputs(
+            self._config(tmp_path, minimal_dataset, {"type": "none"}, False),
+        )
+        assert inputs.event_perturbation.type == "none"
+        assert inputs.events.empty
+
+    def test_absent_block_reads_events_file(self, tmp_path, minimal_dataset):
+        inputs = load_raw_inputs(_make_config(str(tmp_path), minimal_dataset))
+        assert inputs.event_perturbation.type == "file"
+        assert len(inputs.events) == len(minimal_dataset["df_events"])
+
+
 class TestLoadRawInputsErrors:
     def test_missing_file_raises(self, tmp_path):
         config = NestedNamespace(
