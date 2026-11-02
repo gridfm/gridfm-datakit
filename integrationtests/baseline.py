@@ -163,8 +163,12 @@ def write_baseline(test_key: str, bounds: dict) -> None:
     print(f"\nCalibrated bounds for '{test_key}' written to {path}")
 
 
-def read_baseline(test_key: str) -> dict:
-    """Load this test's calibrated bounds, or fail with a calibration hint."""
+def read_baseline(test_key: str) -> dict | None:
+    """Load this test's calibrated bounds, or None if the baseline has no entry.
+
+    A missing entry means the test is newer than the code the baseline was
+    calibrated on, as when CI calibrates on the base of a PR that adds it.
+    """
     path = baseline_path()
     assert os.path.exists(path), (
         f"No calibration baseline at {path}. Calibrate first, on the code **before** "
@@ -173,10 +177,8 @@ def read_baseline(test_key: str) -> dict:
     with open(path) as f:
         data = json.load(f)
     bounds = data.get("bounds", {})
-    assert test_key in bounds, (
-        f"Baseline {path} has no entry for '{test_key}'. Calibrate it on the code "
-        f"**before** your changes: pytest integrationtests --calibrate -s"
-    )
+    if test_key not in bounds:
+        return None
     saved_fp = data.get("fingerprints", {}).get(test_key, {})
     warn_on_fingerprint_mismatch(saved_fp, environment_fingerprint())
     return {k: tuple(v) for k, v in bounds[test_key].items()}
