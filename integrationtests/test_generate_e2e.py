@@ -4,7 +4,8 @@ Each case
 1. derives a config from the shipped ``scripts/config/default.yaml`` (seeded, small),
 2. runs ``gridfm_datakit generate`` and ``gridfm_datakit validate`` as subprocesses,
 3. computes summary metrics from the generated parquet files, and
-4. asserts them against the calibrated baseline.
+4. asserts them against the calibrated baseline, or skips that step for a case
+   the baseline has no entry for.
 
 ``validate`` checks that every scenario is physically valid; the baseline catches
 changes in *what* is generated, which ``validate`` cannot see.
@@ -23,6 +24,7 @@ import pytest
 import yaml
 
 from integrationtests.baseline import (
+    baseline_path,
     check_bounds,
     compute_bounds,
     print_calibration_stats,
@@ -43,6 +45,14 @@ SN_MVA = 100.0
 CASES = {
     "pf": {"settings": {"mode": "pf"}},
     "opf": {"settings": {"mode": "opf"}},
+    "pf_powsybl": {
+        "network": {"reader": "powsybl"},
+        "settings": {"mode": "pf", "pf_solver": "powsybl"},
+    },
+    "opf_powsybl": {
+        "network": {"reader": "powsybl"},
+        "settings": {"mode": "opf"},
+    },
 }
 
 
@@ -162,6 +172,12 @@ def test_generate_end_to_end(case, tmp_path, calibrate_runs, ci_level, calibrate
         return
 
     checks = read_baseline(case)
+    if checks is None:
+        pytest.skip(
+            f"No calibrated bounds for '{case}' in {baseline_path()}: generated and "
+            f"validated, bounds not checked. Calibrate it on the code before your "
+            f"change: pytest integrationtests --calibrate -s",
+        )
     missing = sorted(set(metric_keys) - set(checks))
     assert not missing, (
         f"Metrics {missing} have no calibrated bounds in the baseline for '{case}'. "
