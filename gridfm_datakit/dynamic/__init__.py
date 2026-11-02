@@ -13,11 +13,17 @@ load_raw_inputs loader live here. Solver-specific logic is in submodules
 from __future__ import annotations
 
 import csv
-from dataclasses import dataclass
+import warnings
+from dataclasses import dataclass, field
 import pandas as pd
 from pathlib import Path
 from typing import Any
 
+from gridfm_datakit.dynamic.event_perturbation import (
+    EVENT_COLUMNS,
+    EventPerturbation,
+    parse_event_perturbation,
+)
 from gridfm_datakit.utils.param_handler import NestedNamespace
 
 
@@ -97,14 +103,18 @@ class DynamicInputs:
     events : pd.DataFrame
         One row per event in the simulation sequence.
         Required columns: event_name, static_id, start_time, params
+        Empty unless dynamic.event_perturbation is of type file.
     variables : pd.DataFrame
         One row per monitored output variables (curve or final state value).
         Required columns: type, model_id, variables
+    event_perturbation : EventPerturbation
+        The parsed dynamic.event_perturbation block, type file when absent.
     """
 
     dynamic_models: list[pd.DataFrame]
     events: pd.DataFrame
     variables: pd.DataFrame
+    event_perturbation: EventPerturbation = field(default_factory=EventPerturbation)
 
 
 @dataclass
@@ -148,9 +158,13 @@ def load_raw_inputs(
 ) -> DynamicInputs:
     """Load dynamic simulation inputs from CSV files declared in the config.
 
-    Reads the four CSV (or Parquet) files listed under config.dynamic and
+    Reads the CSV (or Parquet) files listed under config.dynamic and
     returns a DynamicInputs instance. When dynamic_solver == "dynawo", the
     minimum required columns for each DataFrame are validated.
+
+    Parses ``args.dynamic.event_perturbation``. ``events_file`` is read only in
+    ``file`` mode, the default; in ``none`` and ``random`` mode it is optional,
+    ignored with a warning when set, and the events frame is empty.
 
     Args
     ----
@@ -158,7 +172,8 @@ def load_raw_inputs(
         Configuration object. ``args.dynamic.input_files`` must carry:
         - static_element_dynamic_models_file     : path to the models CSV
         - automation_systems_file                : path to the automation systems CSV
-        - events_file                            : path to the events CSV
+        - events_file                            : path to the events CSV,
+                                                   file mode only
         - variables_file                         : path to the variables CSV
         and ``args.dynamic.dynamic_solver`` the solver name ("dynawo" or future
         alternatives); it defaults to "dynawo" when absent.
@@ -170,11 +185,11 @@ def load_raw_inputs(
     Raises
     ------
     FileNotFoundError
-        If any of the four input files is missing.
+        If any of the input files read is missing.
     ValueError
         If required columns are absent from a DataFrame, if a key column holds an
-        unsupported value, or if the variables table declares no "Curve" row
-        (Dynawo solver only).
+        unsupported value, if the variables table declares no "Curve" row
+        (Dynawo solver only), or if dynamic.event_perturbation is malformed.
     TypeError
         If any of the input files is not of CSV or Parquet format.
     """
@@ -185,7 +200,22 @@ def load_raw_inputs(
         _load_table(dyn_input_cfg.automation_systems_file),
     ]
 
-    events = _load_table(dyn_input_cfg.events_file)
+    solver_parameters = getattr(args.dynamic, "solver_parameters", None)
+    event_perturbation = parse_event_perturbation(
+        getattr(args.dynamic, "event_perturbation", None),
+        getattr(solver_parameters, "start_time", None),
+        getattr(solver_parameters, "stop_time", None),
+    )
+    if event_perturbation.type == "file":
+        events = _load_table(dyn_input_cfg.events_file)
+    else:
+        if getattr(dyn_input_cfg, "events_file", None) is not None:
+            warnings.warn(
+                f"dynamic.input_files.events_file is ignored with "
+                f"dynamic.event_perturbation.type {event_perturbation.type!r}",
+                stacklevel=2,
+            )
+        events = pd.DataFrame(columns=EVENT_COLUMNS)
     variables = _load_table(dyn_input_cfg.variables_file)
 
     solver = getattr(args.dynamic, "dynamic_solver", "dynawo")
@@ -219,6 +249,7 @@ def load_raw_inputs(
         dynamic_models=dynamic_models,
         events=events,
         variables=variables,
+        event_perturbation=event_perturbation,
     )
 
 

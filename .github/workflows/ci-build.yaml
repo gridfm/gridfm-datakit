@@ -288,7 +288,7 @@ jobs:
         working-directory: base-src
         run: |
           python -m pip install --upgrade pip wheel
-          pip install -e ".[test]"
+          pip install -e ".[test,powsybl]"
           python -c "from juliacall import Main as jl; jl.seval('using PowerModels, Ipopt, Memento')"
           pytest integrationtests -s --calibrate
 
@@ -303,7 +303,7 @@ jobs:
         working-directory: head-src
         run: |
           python -m pip install --upgrade pip wheel
-          pip install -e ".[test]"
+          pip install -e ".[test,powsybl]"
           python -c "from juliacall import Main as jl; jl.seval('using PowerModels, Ipopt, Memento')"
 
       - name: Assert PR head against base-calibrated baseline
