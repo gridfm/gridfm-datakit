@@ -2,6 +2,13 @@
 
 This module validates configuration for static PF and OPF generation.
 
+### Scenario timeouts
+
+`settings.scenario_timeout_sec` defaults to `null`. A positive finite value enables
+per-load-scenario timeouts and requires `settings.is_multiprocessing: true`.
+Timed-out indices are skipped; checkpointing makes those skips survive a resume.
+See the [timeout manual](../manual/getting_started.md#scenario-timeouts).
+
 ### Checkpointing
 
 `settings.enable_checkpointing` defaults to `false`. When enabled, distributed

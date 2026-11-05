@@ -2,6 +2,7 @@
 
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import multiprocessing
+import json
 from multiprocessing.pool import Pool
 from queue import Empty
 import os
@@ -19,6 +20,7 @@ import gridfm_datakit.lightsim2grid as lightsim2grid
 import gridfm_datakit.powsybl as powsybl
 from gridfm_datakit.config import CoinHSLConfig, validate_static_config
 from gridfm_datakit.checkpoint import GenerationCheckpoint
+from gridfm_datakit.process.scenario_timeout import ScenarioTimeout, ScenarioTimeoutPool
 from gridfm_datakit.network import (
     Network,
     get_pglib_file_path,
@@ -171,6 +173,8 @@ def _setup_environment(
         raise ValueError(
             "enable_checkpointing is supported only by static generate_power_flow_data_distributed",
         )
+    if config.get("settings", {}).get("scenario_timeout_sec") is not None and (is_dynamic_config or not allow_checkpointing):
+        raise ValueError("scenario_timeout_sec is supported only by static generate_power_flow_data_distributed")
     base_path = os.path.join(
         config["settings"]["data_dir"],
         config["network"]["name"],
@@ -284,6 +288,9 @@ def _setup_environment(
     }
     if checkpointing:
         file_paths["checkpoint"] = os.path.join(base_path, "checkpoint.json")
+    if getattr(args.settings, "scenario_timeout_sec", None) is not None:
+        file_paths["timeouts_log"] = os.path.join(base_path, "timed_out_scenarios.jsonl")
+        Path(file_paths["timeouts_log"]).touch(exist_ok=True)
 
     # Initialize logs
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -578,6 +585,8 @@ def generate_power_flow_data_distributed(
     Both backends share worker initialization, chunk boundaries, and seed policy.
     With ``settings.enable_checkpointing``, completed large chunks and the run
     seed are persisted; ``overwrite: false`` resumes compatible saved progress.
+    An optional ``settings.scenario_timeout_sec`` enables Pool supervision,
+    per-load-scenario seeds, and durable skipping of timed-out indices.
 
     Args:
         config: Configuration can be provided in three ways:
@@ -654,6 +663,7 @@ def generate_power_flow_data_distributed(
     max_large_chunk_size = max(stop - start for start, stop in large_chunks)
     worker_count = min(configured_processes, max_large_chunk_size)
     use_multiprocessing = getattr(args.settings, "is_multiprocessing", False)
+    scenario_timeout = getattr(args.settings, "scenario_timeout_sec", None)
 
     # pp_net wraps JVM state and cannot cross process boundaries. Spawned
     # workers reload it once from network_path; the in-process path can reuse it.
@@ -693,6 +703,7 @@ def generate_power_flow_data_distributed(
                 executor: Optional[ProcessPoolExecutor] = None,
                 pool: Optional[Pool] = None,
                 progress_queue: Optional[Any] = None,
+                timed_pool: Optional[ScenarioTimeoutPool] = None,
             ) -> None:
                 for chunk_index, (large_start, large_stop) in enumerate(large_chunks):
                     if (
@@ -710,17 +721,12 @@ def generate_power_flow_data_distributed(
                     )
                     results_by_start = {}
 
-                    if pool is not None:
-                        tasks = [
-                            (start, np.ascontiguousarray(scenarios[:, start:stop, :]))
-                            for start, stop in scenario_chunks
-                        ]
-                        results_by_start = _collect_pool_results(
-                            pool,
-                            tasks,
-                            progress_queue,
-                            pbar,
-                        )
+                    if timed_pool is not None:
+                        tasks = [(start, np.ascontiguousarray(scenarios[:, start:stop, :])) for start, stop in scenario_chunks]
+                        results_by_start = timed_pool.collect(tasks, pbar)
+                    elif pool is not None:
+                        tasks = [(start, np.ascontiguousarray(scenarios[:, start:stop, :])) for start, stop in scenario_chunks]
+                        results_by_start = _collect_pool_results(pool, tasks, progress_queue, pbar)
                     elif executor is None:
                         for start, stop in scenario_chunks:
                             result = _process_scenario_worker(
@@ -773,7 +779,7 @@ def generate_power_flow_data_distributed(
                             raise RuntimeError(
                                 f"Scenario chunk starting at {start} returned no data",
                             )
-                        if progress_queue is None:
+                        if progress_queue is None and timed_pool is None:
                             pbar.update(processed_count)
                         processed_data.extend(local_processed_data)
 
@@ -788,7 +794,38 @@ def generate_power_flow_data_distributed(
                     if checkpoint is not None:
                         checkpoint.commit(chunk_index + 1)
 
-            if use_multiprocessing:
+            if scenario_timeout is not None:
+                def record_timeout(error: ScenarioTimeout) -> None:
+                    """Persist a skipped load scenario before retrying the unsaved chunk.
+
+                    Args:
+                        error: Timed-out index, worker PID, and measured duration.
+                    """
+                    if checkpoint is not None:
+                        checkpoint.record_skip(error.scenario_index)
+                    record = {
+                        "load_scenario_idx": error.scenario_index, "seed": seed,
+                        "elapsed_seconds": error.elapsed, "timeout_seconds": scenario_timeout,
+                        "worker_pid": error.worker_pid, "recorded_at": datetime.now().isoformat(),
+                    }
+                    with open(file_paths["timeouts_log"], "a", encoding="utf-8") as log:
+                        log.write(json.dumps(record) + "\n")
+                        log.flush()
+                        os.fsync(log.fileno())
+                    message = f"{error}; skipping this load scenario and retrying its unsaved large chunk.\n"
+                    with open(file_paths["error_log"], "a", encoding="utf-8") as log:
+                        log.write(message)
+                    print(message.rstrip(), flush=True)
+
+                skipped = set(checkpoint.state.skipped_scenarios) if checkpoint is not None else set()
+                with ScenarioTimeoutPool(
+                    context=multiprocessing.get_context("spawn"), processes=worker_count,
+                    initializer=_initialize_scenario_worker, initargs=worker_initargs,
+                    worker=_process_scenario_worker, timeout=scenario_timeout,
+                    skipped_scenarios=skipped, on_timeout=record_timeout,
+                ) as timed_pool:
+                    process_large_chunks(timed_pool=timed_pool)
+            elif use_multiprocessing:
                 mp_context = multiprocessing.get_context("spawn")
                 with mp_context.Manager() as manager:
                     progress_queue = manager.Queue()

@@ -108,8 +108,47 @@ seed derivation, and solver options, including CoinHSL and `opf_formulation`.
 The setting does not change the sequential `generate_power_flow_data` API or
 the dynamic simulation backend.
 
-Scenario timeouts are not part of this backend selection.
 `overwrite: false` retains its existing append behavior when checkpointing is disabled.
+
+### Scenario timeouts
+
+To skip load scenarios that hang or exceed a wall-clock limit, use the Pool
+backend and set a positive timeout in seconds:
+
+```yaml
+settings:
+  is_multiprocessing: true
+  scenario_timeout_sec: 600
+  enable_checkpointing: true
+```
+
+The timer covers one complete load scenario: its dispatch OPF and all topology
+variants. It begins after worker/solver initialization, immediately before
+scenario processing. Initialization, queue wait, and result transfer are outside
+this limit. A scenario that exceeds it is skipped in full, so none of its
+partially accumulated variants are saved.
+
+The parent kills the offending worker, terminates the remaining pool, and retries
+the unsaved large chunk in a fresh pool without known offenders. Other scenarios
+from that attempt are recomputed. Already checkpointed chunks remain untouched.
+Retries finish even if every scenario in a chunk times out. Ordinary exceptions
+and unexpected worker exits stop generation rather than being silently skipped.
+
+Skipped global `load_scenario_idx` values and measured durations are written to
+`timed_out_scenarios.jsonl` and reported in `error.log`. With checkpointing enabled,
+the checkpoint also persists `skipped_scenarios` immediately, before the chunk is
+saved, so resuming does not rerun known offenders. Without checkpointing, the skip
+set applies to the current invocation. Logs retain the history of aborted attempts.
+
+Timeout mode seeds each load scenario independently using its global index.
+Retries and skipped scenarios therefore do not change the random perturbations of
+surviving scenarios. This differs from the legacy chunk-stream seed sequence:
+enabling timeouts can change seeded output even when no limit is exceeded. Keep
+the timeout setting unchanged when resuming a checkpointed run.
+
+The default `scenario_timeout_sec: null` disables timeouts and retains the
+existing seed behavior. Timeouts apply only to distributed static generation with
+`is_multiprocessing: true`; sequential and dynamic pipelines reject them.
 
 ### Checkpoint and resume
 
@@ -136,8 +175,9 @@ duplicate samples. Missing or truncated committed files cause an error.
 
 Keep the same scenario count, worker count, chunk size, network, perturbations,
 and solver settings. An explicit seed must match the saved seed; `seed: null`
-uses the saved one. You may change solver logging, switch process backends, or
-move the complete output directory. Keep input-file contents and the software
+uses the saved one. You may change solver logging or move the complete output
+directory. You may switch process backends when scenario timeouts are disabled.
+Keep input-file contents and the software
 environment unchanged for reproducible results, and use one generation process
 per output directory.
 

@@ -31,6 +31,7 @@ class _CheckpointState(BaseModel):
     next_chunk: _NonNegativeInt = 0
     saved_scenarios: _NonNegativeInt = 0
     files: dict[str, _NonNegativeInt] = Field(default_factory=dict)
+    skipped_scenarios: list[_NonNegativeInt] = Field(default_factory=list)
 
 
 def _atomic_write(path: Path, content: str) -> None:
@@ -150,6 +151,10 @@ class GenerationCheckpoint:
             or (state.files and not state.saved_scenarios)
         ):
             raise ValueError("Checkpoint contains inconsistent chunk progress")
+        if len(set(state.skipped_scenarios)) != len(state.skipped_scenarios) or any(index >= config["load"]["scenarios"] for index in state.skipped_scenarios):
+            raise ValueError("Checkpoint contains invalid skipped scenario indices")
+        if state.skipped_scenarios and settings.get("scenario_timeout_sec") is None:
+            raise ValueError("Checkpoint contains skipped scenarios without timeout mode")
         for name, size in state.files.items():
             relative = PurePosixPath(name)
             if (
@@ -235,5 +240,20 @@ class GenerationCheckpoint:
                 next_chunk=next_chunk,
                 saved_scenarios=saved,
                 files=self._files(),
+                skipped_scenarios=self.state.skipped_scenarios
             ),
         )
+
+    def record_skip(self, scenario_index: int) -> None:
+        """Persist a timed-out index without committing the unfinished chunk.
+
+        Args:
+            scenario_index: Global load-scenario index that must not be retried.
+
+        Raises:
+            ValueError: If the index is outside the configured scenario range.
+        """
+        if not 0 <= scenario_index < self.state.config["load"]["scenarios"]:
+            raise ValueError("Skipped scenario index is outside the configured range")
+        skipped = sorted(set(self.state.skipped_scenarios) | {scenario_index})
+        self._publish(self.state.model_copy(update={"skipped_scenarios": skipped}))

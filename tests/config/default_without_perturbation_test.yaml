@@ -38,6 +38,7 @@ settings:
   num_processes: 2 # Number of parallel processes to use
   is_multiprocessing: false # Use multiprocessing.Pool instead of ProcessPoolExecutor
   enable_checkpointing: false # Resume completed chunks when overwrite is false
+  scenario_timeout_sec: null # Requires is_multiprocessing: true when set
   data_dir: "tests/test_data_without_perturbation/" # Directory to save generated data relative to the project root
   large_chunk_size: 5 # Number of load scenarios processed before saving
   overwrite: true # If true, overwrites existing files, if false, appends to files

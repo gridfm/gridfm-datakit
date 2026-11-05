@@ -1341,6 +1341,8 @@ def _initialize_scenario_worker(
     opf_formulation: str = "polar",
     coinhsl: Optional[Dict[str, Any]] = None,
     progress_queue: Optional[Any] = None,
+    scenario_timeout_sec: Optional[float] = None,
+    skipped_scenarios: Optional[set[int]] = None,
 ) -> None:
     """Install immutable run state once in a spawned scenario worker.
 
@@ -1367,6 +1369,8 @@ def _initialize_scenario_worker(
         "opf_formulation": opf_formulation,
         "coinhsl": coinhsl,
         "progress_queue": progress_queue,
+        "scenario_timeout_sec": scenario_timeout_sec,
+        "skipped_scenarios": skipped_scenarios,
     }
 
 
@@ -1407,6 +1411,8 @@ def _process_scenario_worker(
         scenario_index_offset=scenario_index_offset,
         opf_formulation=_worker_context["opf_formulation"],
         coinhsl=_worker_context["coinhsl"],
+        scenario_timeout_sec=_worker_context["scenario_timeout_sec"],
+        skipped_scenarios=_worker_context["skipped_scenarios"],
     )
     return (
         scenario_index_offset,
@@ -1440,6 +1446,8 @@ def process_scenario_chunk(
     scenario_index_offset: int = 0,
     opf_formulation: str = "polar",
     coinhsl: Optional[Dict[str, Any]] = None,
+    scenario_timeout_sec: Optional[float] = None,
+    skipped_scenarios: Optional[set[int]] = None,
 ) -> Tuple[
     Union[None, Exception],
     Union[None, str],
@@ -1475,6 +1483,8 @@ def process_scenario_chunk(
             contains only the current chunk.
         opf_formulation: AC OPF coordinate formulation.
         coinhsl: Optional CoinHSL settings forwarded to Ipopt initialization.
+        scenario_timeout_sec: Enables timed start/done events and per-scenario seeds.
+        skipped_scenarios: Global indices of timed-out load scenarios to omit.
 
     Returns:
         Tuple containing:
@@ -1485,6 +1495,7 @@ def process_scenario_chunk(
 
     global _worker_jl
     completed_scenarios = 0
+    current_scenario = None
     try:
         if _worker_jl is None:
             _worker_jl = init_julia(
@@ -1518,6 +1529,14 @@ def process_scenario_chunk(
         ):
             for scenario_data_index in range(start_idx, end_idx):
                 scenario_index = scenario_data_index + scenario_index_offset
+                if skipped_scenarios and scenario_index in skipped_scenarios:
+                    continue
+                current_scenario = scenario_index
+                if scenario_timeout_sec is not None:
+                    # Retry-independent randomness: skipped scenarios never shift
+                    # the perturbations of another scenario in this chunk.
+                    np.random.seed(_DEFAULT_SEED_POLICY.distributed_seed(seed, scenario_index))
+                    progress_queue.put(("start", os.getpid(), scenario_index, time.monotonic()))
                 if mode == "opf":
                     local_processed_data = process_scenario_opf_mode(
                         net,
@@ -1554,8 +1573,11 @@ def process_scenario_chunk(
                     raise ValueError(f"Invalid mode: {mode!r}")
 
                 completed_scenarios += 1
-                if progress_queue is not None:
+                if scenario_timeout_sec is not None:
+                    progress_queue.put(("done", os.getpid(), scenario_index, time.monotonic()))
+                elif progress_queue is not None:
                     progress_queue.put(1)
+                current_scenario = None
 
         return (
             None,
@@ -1567,7 +1589,9 @@ def process_scenario_chunk(
             f.write(f"Caught an exception in process_scenario_chunk function: {e}\n")
             f.write(traceback.format_exc())
             f.write("\n")
-        if progress_queue is not None:
+        if scenario_timeout_sec is not None:
+            progress_queue.put(("error", os.getpid(), current_scenario, time.monotonic()))
+        elif progress_queue is not None:
             for _ in range(end_idx - start_idx - completed_scenarios):
                 progress_queue.put(1)
         return e, traceback.format_exc(), None
