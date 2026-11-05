@@ -261,6 +261,7 @@ class _StaticSettingsConfig(_ConfigModel):
     """Settings required by static PF and OPF generation."""
 
     num_processes: _PositiveInt = 1
+    is_multiprocessing: bool = False
     data_dir: _NonEmptyString
     large_chunk_size: _PositiveInt = 1_000
     overwrite: bool

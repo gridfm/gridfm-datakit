@@ -2,6 +2,8 @@
 
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import multiprocessing
+from multiprocessing.pool import Pool
+from queue import Empty
 import os
 import shutil
 import sys
@@ -65,6 +67,54 @@ def _split_range(start: int, stop: int, n_parts: int) -> List[Tuple[int, int]]:
         bounds.append((cursor, cursor + part_size))
         cursor += part_size
     return bounds
+
+
+def _collect_pool_results(
+    pool: Pool,
+    tasks: List[Tuple[int, np.ndarray]],
+    progress_queue: Any,
+    progress_bar: tqdm,
+) -> Dict[int, Tuple]:
+    """Collect pool results by chunk offset while displaying scenario progress.
+
+    Args:
+        pool: Spawned pool initialized with the run's worker state.
+        tasks: Global offsets paired with contiguous scenario slices.
+        progress_queue: Manager queue receiving completed-scenario counts.
+        progress_bar: Parent-process progress display.
+
+    Returns:
+        Worker results keyed by their submitted global offsets.
+
+    Raises:
+        RuntimeError: If a task raises or a worker reports a chunk failure.
+    """
+    pending = {start: pool.apply_async(_process_scenario_worker, ((start, scenarios),)) for start, scenarios in tasks}
+    results = {}
+    while pending:
+        for start in list(pending):
+            if not pending[start].ready():
+                continue
+            try:
+                result = pending.pop(start).get()
+            except Exception as error:
+                raise RuntimeError(f"Scenario worker failed for chunk starting at {start}") from error
+            if result[2] is not None:
+                raise RuntimeError(f"Scenario chunk starting at {start} failed: {result[2]}\n{result[3]}") from result[2]
+            results[start] = result
+        try:
+            progress_bar.update(progress_queue.get(timeout=0.1))
+        except Empty:
+            pass
+
+    # Queue puts complete before a worker returns; drain final ticks before
+    # the next large chunk so progress cannot be counted twice or leak across chunks.
+    while True:
+        try:
+            progress_bar.update(progress_queue.get_nowait())
+        except Empty:
+            break
+    return results
 
 
 def _setup_environment(
@@ -492,6 +542,10 @@ def generate_power_flow_data_distributed(
 ) -> Dict[str, str]:
     """Generate power flow data based on the provided configuration using distributed processing.
 
+    ``settings.is_multiprocessing`` selects a spawned Pool with live scenario
+    progress when true, or the existing ProcessPoolExecutor path when false.
+    Both backends share worker initialization, chunk boundaries, and seed policy.
+
     Args:
         config: Configuration can be provided in three ways:
             1. Path to a YAML config file (str)
@@ -548,12 +602,13 @@ def generate_power_flow_data_distributed(
     large_chunks = _split_range(0, scenario_count, n_large_chunks)
     max_large_chunk_size = max(stop - start for start, stop in large_chunks)
     worker_count = min(configured_processes, max_large_chunk_size)
+    use_multiprocessing = getattr(args.settings, "is_multiprocessing", False)
 
     # pp_net wraps JVM state and cannot cross process boundaries. Spawned
     # workers reload it once from network_path; the in-process path can reuse it.
     worker_meta = (
         meta
-        if worker_count == 1
+        if worker_count == 1 and not use_multiprocessing
         else {key: value for key, value in meta.items() if key != "pp_net"}
     )
     worker_initargs = (
@@ -585,6 +640,8 @@ def generate_power_flow_data_distributed(
 
             def process_large_chunks(
                 executor: Optional[ProcessPoolExecutor] = None,
+                pool: Optional[Pool] = None,
+                progress_queue: Optional[Any] = None,
             ) -> None:
                 for large_start, large_stop in large_chunks:
                     write_ram_usage_distributed(f)
@@ -596,7 +653,10 @@ def generate_power_flow_data_distributed(
                     )
                     results_by_start = {}
 
-                    if executor is None:
+                    if pool is not None:
+                        tasks = [(start, np.ascontiguousarray(scenarios[:, start:stop, :])) for start, stop in scenario_chunks]
+                        results_by_start = _collect_pool_results(pool, tasks, progress_queue, pbar)
+                    elif executor is None:
                         for start, stop in scenario_chunks:
                             result = _process_scenario_worker(
                                 (start, scenarios[:, start:stop, :]),
@@ -648,7 +708,8 @@ def generate_power_flow_data_distributed(
                             raise RuntimeError(
                                 f"Scenario chunk starting at {start} returned no data",
                             )
-                        pbar.update(processed_count)
+                        if progress_queue is None:
+                            pbar.update(processed_count)
                         processed_data.extend(local_processed_data)
 
                     # Save processed data
@@ -660,7 +721,17 @@ def generate_power_flow_data_distributed(
                         args,
                     )
 
-            if worker_count == 1:
+            if use_multiprocessing:
+                mp_context = multiprocessing.get_context("spawn")
+                with mp_context.Manager() as manager:
+                    progress_queue = manager.Queue()
+                    with mp_context.Pool(
+                        processes=worker_count,
+                        initializer=_initialize_scenario_worker,
+                        initargs=worker_initargs + (progress_queue,),
+                    ) as pool:
+                        process_large_chunks(pool=pool, progress_queue=progress_queue)
+            elif worker_count == 1:
                 # Avoid spawning a process, serializing state, and starting a
                 # second Python interpreter when no parallelism was requested.
                 _initialize_scenario_worker(*worker_initargs)

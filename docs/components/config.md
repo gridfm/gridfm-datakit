@@ -2,6 +2,14 @@
 
 This module validates configuration for static PF and OPF generation.
 
+### Multiprocessing backend
+
+Set `settings.is_multiprocessing: true` to select a spawned `multiprocessing.Pool`
+with a Manager queue for live scenario progress. The default is `false`, which
+keeps the existing `ProcessPoolExecutor` backend. Both use the same chunk
+boundaries, seed policy, solver options, and output ordering. See the
+[generation manual](../manual/getting_started.md#parallel-generation).
+
 ### CoinHSL
 
 To use an installed CoinHSL library with Ipopt, add the following under `settings`:
