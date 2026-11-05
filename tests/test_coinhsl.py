@@ -155,7 +155,9 @@ def test_generation_forwards_coinhsl(
     """Forward options through sequential, local-worker, and pool generation."""
     generate = importlib.import_module("gridfm_datakit.generate")
     config["settings"].update(
-        coinhsl=coinhsl, mode="opf", num_processes=max(workers, 1),
+        coinhsl=coinhsl,
+        mode="opf",
+        num_processes=max(workers, 1),
     )
     net = SimpleNamespace()
     scenarios = np.zeros((1, 2, 2))
@@ -241,7 +243,9 @@ def test_load_scaling_forwards_coinhsl(
             assert processes == 1
 
         def apply_async(
-            self, fn: Callable[..., Any], args: tuple[Any, ...],
+            self,
+            fn: Callable[..., Any],
+            args: tuple[Any, ...],
         ) -> SimpleNamespace:
             """Return a result object wrapping the worker's computed value."""
             value = fn(*args)
@@ -258,7 +262,13 @@ def test_load_scaling_forwards_coinhsl(
     monkeypatch.setattr(load, "Pool", Pool)
     net = SimpleNamespace(Pd=np.array([10.0]), Qd=np.array([2.0]), to_mpc=Mock())
     generator = load.LoadScenariosFromAggProfile(
-        "default", 0.0, True, 0.0, 1.0, 0.1, 1.0,
+        "default",
+        0.0,
+        True,
+        0.0,
+        1.0,
+        0.1,
+        1.0,
     )
     scenarios = generator(net, 2, str(tmp_path / "load.log"), 50, 42, coinhsl=coinhsl)
     assert scenarios.shape == (1, 2, 2)

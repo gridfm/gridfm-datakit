@@ -478,7 +478,8 @@ def _stub_worker_setup(monkeypatch, **overrides):
 
 class TestProcessDynamicChunk:
     def test_coinhsl_settings_reach_initial_opf(
-        self, monkeypatch: pytest.MonkeyPatch,
+        self,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Forward CoinHSL settings to the initial dynamic OPF solver."""
         options = {
