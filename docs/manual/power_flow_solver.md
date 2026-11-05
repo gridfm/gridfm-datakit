@@ -15,6 +15,31 @@ settings:
 | `powsybl` | pypowsybl (Open Load Flow). Needs the network to be loaded with `network.reader: powsybl` | `pip install 'gridfm-datakit[powsybl]'` |
 | `lightsim2grid` | [lightsim2grid](https://github.com/Grid2op/lightsim2grid) (C++, no Julia for the power flow) | `pip install 'gridfm-datakit[lightsim2grid]'` |
 
+## CoinHSL for Ipopt
+
+CoinHSL can replace Ipopt's default linear solver. Install a compatible shared
+library for your platform, then add these settings to your configuration:
+
+```yaml
+settings:
+  coinhsl:
+    enabled: true
+    linear_solver: "ma57"
+    hsllib: "/path/to/libcoinhsl.so"
+```
+
+Supported names are `ma27`, `ma57`, `ma77`, `ma86`, and `ma97`. The library must
+provide the selected solver. Relative paths resolve from the working directory;
+each worker must be able to access the file. Configuration validation checks
+that the file exists before overwriting output. Ipopt checks compatibility when
+it loads the library.
+
+CoinHSL is disabled by default. Enabling it applies to all Ipopt-based AC/DC OPF
+and non-fast AC/DC PF solves, including load-scaling OPF and the initial OPF for
+dynamic generation. Direct fast PF, PowSyBl, LightSim2Grid, and Dynawo use their
+own solvers. To use CoinHSL for PowerModels PF as well as OPF, set `pf_fast: false`
+and `dcpf_fast: false`.
+
 ## lightsim2grid
 
 The network is read with the native reader, and only the power flow solver changes:
