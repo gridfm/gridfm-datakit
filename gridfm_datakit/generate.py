@@ -5,6 +5,7 @@ import multiprocessing
 from multiprocessing.pool import Pool
 from queue import Empty
 import os
+from pathlib import Path
 import shutil
 import sys
 from datetime import datetime
@@ -17,6 +18,7 @@ from tqdm import tqdm
 import gridfm_datakit.lightsim2grid as lightsim2grid
 import gridfm_datakit.powsybl as powsybl
 from gridfm_datakit.config import CoinHSLConfig, validate_static_config
+from gridfm_datakit.checkpoint import GenerationCheckpoint
 from gridfm_datakit.network import (
     Network,
     get_pglib_file_path,
@@ -119,6 +121,8 @@ def _collect_pool_results(
 
 def _setup_environment(
     config: Union[str, Dict[str, Any], NestedNamespace],
+    *,
+    allow_checkpointing: bool = False,
 ) -> Tuple[NestedNamespace, str, Dict[str, str], int]:
     """Setup the environment for data generation.
 
@@ -127,6 +131,7 @@ def _setup_environment(
             1. Path to a YAML config file (str)
             2. Configuration dictionary (Dict)
             3. NestedNamespace object (NestedNamespace)
+        allow_checkpointing: Whether the calling pipeline supports chunk recovery.
 
     Returns:
         Tuple of (args, base_path, file_paths, seed)
@@ -154,6 +159,14 @@ def _setup_environment(
     is_dynamic_config = bool(config.get("dynamic"))
     if not is_dynamic_config:
         config = validate_static_config(config)
+    checkpointing = config.get("settings", {}).get("enable_checkpointing", False)
+    if checkpointing and (is_dynamic_config or not allow_checkpointing):
+        raise ValueError("enable_checkpointing is supported only by static generate_power_flow_data_distributed")
+    base_path = os.path.join(config["settings"]["data_dir"], config["network"]["name"], "raw")
+    checkpoint = GenerationCheckpoint.load(Path(base_path), config)
+    if checkpoint is not None:
+        config["settings"]["seed"] = checkpoint.state.seed
+        config = validate_static_config(config)
     args = NestedNamespace(**config)
 
     # Dynamic configs share setup but retain their own configuration validator.
@@ -178,6 +191,9 @@ def _setup_environment(
         # This ensures scenarios are i.i.d. within a run, but different across runs
         seed = _DEFAULT_SEED_POLICY.random_base_seed()
         print(f"No seed provided. Using seed={seed}")
+
+    if checkpointing:
+        args.settings.seed = seed
 
     # Dynamic generation retains its dedicated validator for now. Static
     # configurations receive these defaults from the Pydantic schema above.
@@ -253,6 +269,8 @@ def _setup_environment(
             f"scenarios_{args.load.generator}.log",
         ),
     }
+    if checkpointing:
+        file_paths["checkpoint"] = os.path.join(base_path, "checkpoint.json")
 
     # Initialize logs
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -545,6 +563,8 @@ def generate_power_flow_data_distributed(
     ``settings.is_multiprocessing`` selects a spawned Pool with live scenario
     progress when true, or the existing ProcessPoolExecutor path when false.
     Both backends share worker initialization, chunk boundaries, and seed policy.
+    With ``settings.enable_checkpointing``, completed large chunks and the run
+    seed are persisted; ``overwrite: false`` resumes compatible saved progress.
 
     Args:
         config: Configuration can be provided in three ways:
@@ -572,11 +592,26 @@ def generate_power_flow_data_distributed(
         - scenarios_{generator}.log: Load scenario generation notes
     """
     # Setup environment
-    args, base_path, file_paths, seed = _setup_environment(config)
+    args, base_path, file_paths, seed = _setup_environment(config, allow_checkpointing=True)
 
     scenario_count = args.load.scenarios
     large_chunk_size = args.settings.large_chunk_size
     configured_processes = args.settings.num_processes
+
+    # Match np.array_split's balanced boundaries and preserve full-run chunking
+    # and worker counts even when resuming.
+    n_large_chunks = (scenario_count + large_chunk_size - 1) // large_chunk_size
+    large_chunks = _split_range(0, scenario_count, n_large_chunks)
+    checkpoint = None
+    if args.settings.enable_checkpointing:
+        checkpoint = GenerationCheckpoint.load(Path(base_path), args.to_dict())
+        if checkpoint is None:
+            checkpoint = GenerationCheckpoint.create(Path(base_path), args.to_dict(), seed)
+        else:
+            checkpoint.recover()
+        if checkpoint.state.next_chunk == n_large_chunks:
+            print("All large chunks are already checkpointed; generation is complete.")
+            return file_paths
 
     # Prepare network and scenarios
     net, scenarios, meta = _prepare_network_and_scenarios(args, file_paths, seed)
@@ -596,10 +631,6 @@ def generate_power_flow_data_distributed(
         net,
     )
 
-    # Match np.array_split's balanced chunk boundaries without first allocating
-    # an int64 array containing every scenario index.
-    n_large_chunks = (scenario_count + large_chunk_size - 1) // large_chunk_size
-    large_chunks = _split_range(0, scenario_count, n_large_chunks)
     max_large_chunk_size = max(stop - start for start, stop in large_chunks)
     worker_count = min(configured_processes, max_large_chunk_size)
     use_multiprocessing = getattr(args.settings, "is_multiprocessing", False)
@@ -643,7 +674,10 @@ def generate_power_flow_data_distributed(
                 pool: Optional[Pool] = None,
                 progress_queue: Optional[Any] = None,
             ) -> None:
-                for large_start, large_stop in large_chunks:
+                for chunk_index, (large_start, large_stop) in enumerate(large_chunks):
+                    if checkpoint is not None and chunk_index < checkpoint.state.next_chunk:
+                        pbar.update(large_stop - large_start)
+                        continue
                     write_ram_usage_distributed(f)
                     chunk_size = large_stop - large_start
                     scenario_chunks = _split_range(
@@ -720,6 +754,8 @@ def generate_power_flow_data_distributed(
                         base_path,
                         args,
                     )
+                    if checkpoint is not None:
+                        checkpoint.commit(chunk_index + 1)
 
             if use_multiprocessing:
                 mp_context = multiprocessing.get_context("spawn")

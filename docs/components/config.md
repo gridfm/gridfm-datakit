@@ -2,6 +2,13 @@
 
 This module validates configuration for static PF and OPF generation.
 
+### Checkpointing
+
+`settings.enable_checkpointing` defaults to `false`. When enabled, distributed
+static generation persists its seed and completed chunks in `checkpoint.json`.
+Use `overwrite: false` to resume with matching settings. See the
+[checkpoint and resume manual](../manual/getting_started.md#checkpoint-and-resume).
+
 ### Multiprocessing backend
 
 Set `settings.is_multiprocessing: true` to select a spawned `multiprocessing.Pool`
