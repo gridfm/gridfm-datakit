@@ -10,13 +10,15 @@ from multiprocessing import Pool
 from gridfm_datakit.network import Network
 from gridfm_datakit.process.process_network import init_julia
 from gridfm_datakit.utils.random_seed import custom_seed
-from typing import Tuple, Any
+from typing import Tuple, Any, Dict, Optional
 
 
 def _find_largest_scaling_factor_worker(
-    args: Tuple[Network, float, float, float, bool, int],
+    args: Tuple[Network, float, float, float, bool, int, Optional[Dict[str, Any]]],
 ) -> float:
-    (net, max_scaling, step_size, start, change_reactive_power, max_iter) = args
+    (net, max_scaling, step_size, start, change_reactive_power, max_iter, coinhsl) = (
+        args
+    )
 
     net = deepcopy(net)
     # Get reference values from Network class (PD and QD columns)
@@ -31,7 +33,7 @@ def _find_largest_scaling_factor_worker(
     import tempfile
     import os
 
-    jl = init_julia(max_iter=max_iter, solver_log_dir=None)
+    jl = init_julia(max_iter=max_iter, solver_log_dir=None, coinhsl=coinhsl)
 
     while (u <= max_scaling) and converged:
         # Update load values in the Network using properties
@@ -175,6 +177,8 @@ class LoadScenarioGeneratorBase(ABC):
         scenario_log: str,
         max_iter: int,
         seed: int,
+        *,
+        coinhsl: Optional[Dict[str, Any]] = None,
     ) -> np.ndarray:
         """Generates load scenarios for a power network.
 
@@ -184,6 +188,7 @@ class LoadScenarioGeneratorBase(ABC):
             scenario_log: Path to log file for scenario generation details.
             max_iter: Maximum iterations for the OPF solver.
             seed: Global random seed for reproducibility.
+            coinhsl: Optional CoinHSL settings for load-scaling OPF solves.
         Returns:
             numpy.ndarray: Array of shape (n_loads, n_scenarios, 2) containing p_mw and q_mvar values.
         """
@@ -214,6 +219,7 @@ class LoadScenarioGeneratorBase(ABC):
         start: float,
         change_reactive_power: bool,
         max_iter: int,
+        coinhsl: Optional[Dict[str, Any]] = None,
     ) -> Tuple[Pool, Any]:
         """Finds the largest load scaling factor that maintains OPF convergence.
 
@@ -224,6 +230,7 @@ class LoadScenarioGeneratorBase(ABC):
             start: Starting scaling factor.
             change_reactive_power: Whether to scale reactive power.
             max_iter: Maximum iterations for the OPF solver.
+            coinhsl: Optional CoinHSL settings for the OPF solver.
 
         Returns:
             float: Largest scaling factor that maintains OPF convergence.
@@ -234,7 +241,17 @@ class LoadScenarioGeneratorBase(ABC):
         pool = Pool(processes=1)
         result = pool.apply_async(
             _find_largest_scaling_factor_worker,
-            ((net, max_scaling, step_size, start, change_reactive_power, max_iter),),
+            (
+                (
+                    net,
+                    max_scaling,
+                    step_size,
+                    start,
+                    change_reactive_power,
+                    max_iter,
+                    coinhsl,
+                ),
+            ),
         )
         return pool, result
 
@@ -356,6 +373,8 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
         scenarios_log: str,
         max_iter: int,
         seed: int,
+        *,
+        coinhsl: Optional[Dict[str, Any]] = None,
     ) -> np.ndarray:
         """Generates load profiles based on aggregated load data.
 
@@ -365,6 +384,7 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
             scenarios_log: Path to log file for scenario generation details.
             max_iter: Maximum iterations for the OPF solver.
             seed: Global random seed for reproducibility.
+            coinhsl: Optional CoinHSL settings for load-scaling OPF solves.
         Returns:
             numpy.ndarray: Array of shape (n_loads, n_scenarios, 2) containing p_mw and q_mvar values.
 
@@ -386,6 +406,7 @@ class LoadScenariosFromAggProfile(LoadScenarioGeneratorBase):
             start=self.start_scaling_factor,
             change_reactive_power=self.change_reactive_power,
             max_iter=max_iter,
+            coinhsl=coinhsl,
         )
 
         try:
@@ -523,6 +544,8 @@ class Powergraph(LoadScenarioGeneratorBase):
         scenario_log: str,
         max_iter: int,
         seed: int,
+        *,
+        coinhsl: Optional[Dict[str, Any]] = None,
     ) -> np.ndarray:
         """Generates load profiles based on aggregated load data.
 
@@ -532,6 +555,7 @@ class Powergraph(LoadScenarioGeneratorBase):
             scenario_log: Path to log file for scenario generation details.
             max_iter: Maximum iterations for the OPF solver (unused for Powergraph).
             seed: Global random seed for reproducibility.
+            coinhsl: Accepted for interface compatibility; unused for Powergraph.
         Returns:
             numpy.ndarray: Array of shape (n_loads, n_scenarios, 2) containing p_mw and q_mvar values.
         """

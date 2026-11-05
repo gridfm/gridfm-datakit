@@ -275,7 +275,12 @@ def _process_dynamic_chunk(args: Tuple) -> Union[List[Dict[str, Any]], List[Exce
     if dynamic_solver == "dynawo":
         try:
             # Initialise Julia once per worker, avoids repeated JIT compilation
-            julia = init_julia(max_iter, solver_log_dir)
+            coinhsl = getattr(getattr(config, "settings", None), "coinhsl", None)
+            julia = init_julia(
+                max_iter,
+                solver_log_dir,
+                coinhsl=coinhsl.to_dict() if coinhsl is not None else None,
+            )
 
             # Each worker reloads the network from file rather than receiving it:
             # to_powsybl() erases the original element IDs, which the dynamic model

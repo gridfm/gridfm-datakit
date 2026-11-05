@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 import gridfm_datakit.lightsim2grid as lightsim2grid
 import gridfm_datakit.powsybl as powsybl
-from gridfm_datakit.config import validate_static_config
+from gridfm_datakit.config import CoinHSLConfig, validate_static_config
 from gridfm_datakit.network import (
     Network,
     get_pglib_file_path,
@@ -105,6 +105,14 @@ def _setup_environment(
     if not is_dynamic_config:
         config = validate_static_config(config)
     args = NestedNamespace(**config)
+
+    # Dynamic configs share setup but retain their own configuration validator.
+    if is_dynamic_config:
+        args.settings.coinhsl = NestedNamespace(
+            **CoinHSLConfig.model_validate(
+                config.get("settings", {}).get("coinhsl", {}),
+            ).model_dump(),
+        )
 
     # Set global seed if provided, otherwise generate a unique seed for this generation
     if (
@@ -291,6 +299,7 @@ def _prepare_network_and_scenarios(
         file_paths["scenarios_log"],
         max_iter=args.settings.max_iter,
         seed=seed,
+        coinhsl=args.settings.coinhsl.to_dict(),
     )
     scenarios_df = load_scenarios_to_df(scenarios)
     write_parquet(scenarios_df, file_paths["scenarios"])
@@ -400,6 +409,7 @@ def generate_power_flow_data(
         args.settings.max_iter,
         file_paths["solver_log_dir"],
         opf_formulation=args.settings.opf_formulation,
+        coinhsl=args.settings.coinhsl.to_dict(),
     )
 
     processed_data = []
@@ -562,6 +572,7 @@ def generate_power_flow_data_distributed(
         args.settings.pf_solver,
         worker_meta,
         args.settings.opf_formulation,
+        args.settings.coinhsl.to_dict(),
     )
 
     with open(file_paths["tqdm_log"], "a", encoding="utf-8") as f:
