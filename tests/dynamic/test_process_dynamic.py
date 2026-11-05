@@ -477,6 +477,32 @@ def _stub_worker_setup(monkeypatch, **overrides):
 
 
 class TestProcessDynamicChunk:
+    def test_coinhsl_settings_reach_initial_opf(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Forward CoinHSL settings to the initial dynamic OPF solver."""
+        options = {
+            "enabled": True,
+            "linear_solver": "ma57",
+            "hsllib": "/path/to/libcoinhsl.so",
+        }
+        calls = []
+
+        def init_julia(*args: object, **kwargs: object) -> str:
+            """Record Julia options without loading a solver."""
+            calls.append(kwargs)
+            return "julia"
+
+        _stub_worker_setup(monkeypatch, init_julia=init_julia)
+        monkeypatch.setattr(
+            pdyn,
+            "process_single_dynamic_simulation",
+            lambda **kwargs: [{"scenario_index": kwargs["scenario_index"]}],
+        )
+        config = NestedNamespace(settings={"coinhsl": options})
+        results = pdyn._process_dynamic_chunk(_chunk_args(end_idx=1, config=config))
+
+        assert len(results) == 1
+        assert calls == [{"coinhsl": options}]
+
     def test_returns_one_entry_per_scenario_in_the_chunk(self, monkeypatch):
         _stub_worker_setup(monkeypatch)
         monkeypatch.setattr(
