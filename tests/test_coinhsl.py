@@ -23,7 +23,9 @@ from gridfm_datakit.process import process_network
 @pytest.fixture
 def config(tmp_path: Path) -> dict[str, Any]:
     """Return a small static configuration writing to a temporary directory."""
-    config = yaml.safe_load(Path("scripts/config/default.yaml").read_text(encoding="utf-8"))
+    config = yaml.safe_load(
+        Path("scripts/config/default.yaml").read_text(encoding="utf-8"),
+    )
     config["settings"].update(data_dir=str(tmp_path / "data"), seed=42)
     config["load"]["scenarios"] = 2
     return config
@@ -50,11 +52,15 @@ def test_coinhsl_defaults_are_disabled(config: dict[str, Any]) -> None:
 
 @pytest.mark.parametrize("solver", ["ma27", "ma57", "ma77", "ma86", "ma97"])
 def test_coinhsl_accepts_supported_solvers(
-    config: dict[str, Any], coinhsl: dict[str, Any], solver: str,
+    config: dict[str, Any],
+    coinhsl: dict[str, Any],
+    solver: str,
 ) -> None:
     """Accept each supported CoinHSL solver name."""
     config["settings"]["coinhsl"] = {**coinhsl, "linear_solver": solver}
-    assert validate_static_config(config)["settings"]["coinhsl"]["linear_solver"] == solver
+    assert (
+        validate_static_config(config)["settings"]["coinhsl"]["linear_solver"] == solver
+    )
 
 
 @pytest.mark.parametrize(
@@ -69,7 +75,9 @@ def test_coinhsl_accepts_supported_solvers(
     ],
 )
 def test_invalid_coinhsl_preserves_output(
-    config: dict[str, Any], options: dict[str, Any], match: str,
+    config: dict[str, Any],
+    options: dict[str, Any],
+    match: str,
 ) -> None:
     """Reject invalid options before deleting existing output."""
     config["settings"]["coinhsl"] = options
@@ -96,18 +104,24 @@ def test_init_julia_rejects_malformed_coinhsl(options: Any) -> None:
 
 
 def test_coinhsl_resolves_relative_library(
-    config: dict[str, Any], coinhsl: dict[str, Any], monkeypatch: pytest.MonkeyPatch,
+    config: dict[str, Any],
+    coinhsl: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Resolve a relative library path before passing it to workers."""
     library = Path(coinhsl["hsllib"])
     monkeypatch.chdir(library.parent)
     config["settings"]["coinhsl"] = {**coinhsl, "hsllib": library.name}
-    assert validate_static_config(config)["settings"]["coinhsl"]["hsllib"] == str(library)
+    assert validate_static_config(config)["settings"]["coinhsl"]["hsllib"] == str(
+        library,
+    )
 
 
 @pytest.mark.parametrize("enabled", [False, True])
 def test_init_julia_configures_all_ipopt_solvers(
-    monkeypatch: pytest.MonkeyPatch, coinhsl: dict[str, Any], enabled: bool,
+    monkeypatch: pytest.MonkeyPatch,
+    coinhsl: dict[str, Any],
+    enabled: bool,
 ) -> None:
     """Apply enabled options to all Ipopt definitions and escape Julia paths."""
     julia = Mock()
@@ -133,12 +147,16 @@ def test_init_julia_configures_all_ipopt_solvers(
 
 @pytest.mark.parametrize("workers", [0, 1, 2], ids=["sequential", "one-worker", "pool"])
 def test_generation_forwards_coinhsl(
-    config: dict[str, Any], coinhsl: dict[str, Any],
-    monkeypatch: pytest.MonkeyPatch, workers: int,
+    config: dict[str, Any],
+    coinhsl: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+    workers: int,
 ) -> None:
     """Forward options through sequential, local-worker, and pool generation."""
     generate = importlib.import_module("gridfm_datakit.generate")
-    config["settings"].update(coinhsl=coinhsl, mode="opf", num_processes=max(workers, 1))
+    config["settings"].update(
+        coinhsl=coinhsl, mode="opf", num_processes=max(workers, 1),
+    )
     net = SimpleNamespace()
     scenarios = np.zeros((1, 2, 2))
     monkeypatch.setattr(
@@ -167,8 +185,12 @@ def test_generation_forwards_coinhsl(
         """Execute pool tasks locally so initialization is observable."""
 
         def __init__(
-            self, *, max_workers: int, mp_context: BaseContext,
-            initializer: Callable[..., None], initargs: tuple[Any, ...],
+            self,
+            *,
+            max_workers: int,
+            mp_context: BaseContext,
+            initializer: Callable[..., None],
+            initargs: tuple[Any, ...],
         ) -> None:
             """Initialize worker state using the same arguments as a spawned pool."""
             assert max_workers == 2
@@ -200,7 +222,9 @@ def test_generation_forwards_coinhsl(
 
 
 def test_load_scaling_forwards_coinhsl(
-    coinhsl: dict[str, Any], monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    coinhsl: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     """Forward options from load generation to the scaling worker's Julia instance."""
     load = importlib.import_module("gridfm_datakit.perturbations.load_perturbation")
@@ -216,7 +240,9 @@ def test_load_scaling_forwards_coinhsl(
             """Check that load-scaling uses a single worker."""
             assert processes == 1
 
-        def apply_async(self, fn: Callable[..., Any], args: tuple[Any, ...]) -> SimpleNamespace:
+        def apply_async(
+            self, fn: Callable[..., Any], args: tuple[Any, ...],
+        ) -> SimpleNamespace:
             """Return a result object wrapping the worker's computed value."""
             value = fn(*args)
             return SimpleNamespace(get=lambda timeout: value)
@@ -231,7 +257,9 @@ def test_load_scaling_forwards_coinhsl(
 
     monkeypatch.setattr(load, "Pool", Pool)
     net = SimpleNamespace(Pd=np.array([10.0]), Qd=np.array([2.0]), to_mpc=Mock())
-    generator = load.LoadScenariosFromAggProfile("default", 0.0, True, 0.0, 1.0, 0.1, 1.0)
+    generator = load.LoadScenariosFromAggProfile(
+        "default", 0.0, True, 0.0, 1.0, 0.1, 1.0,
+    )
     scenarios = generator(net, 2, str(tmp_path / "load.log"), 50, 42, coinhsl=coinhsl)
     assert scenarios.shape == (1, 2, 2)
     assert init.call_args.kwargs["coinhsl"] == coinhsl
