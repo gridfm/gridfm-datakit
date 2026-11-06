@@ -134,7 +134,9 @@ def run_cli(*args: str) -> None:
 
 
 def generate_and_measure(
-    case: str, work_dir: str, is_multiprocessing: bool = False,
+    case: str,
+    work_dir: str,
+    is_multiprocessing: bool = False,
 ) -> dict:
     """Generate and validate one dataset using the selected process backend.
 
@@ -171,7 +173,9 @@ def generate_and_measure(
 
 @pytest.mark.parametrize("case", sorted(CASES))
 @pytest.mark.parametrize(
-    "is_multiprocessing", [False, True], ids=["executor", "multiprocessing"],
+    "is_multiprocessing",
+    [False, True],
+    ids=["executor", "multiprocessing"],
 )
 def test_generate_end_to_end(
     case: str,
