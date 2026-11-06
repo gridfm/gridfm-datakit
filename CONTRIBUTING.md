@@ -95,6 +95,12 @@ test:
 4. checks them against calibrated bounds read from
    `integrationtests/calibration_baseline.json`.
 
+Each reader/mode case runs with both `ProcessPoolExecutor` and
+`multiprocessing.Pool`, comparing both backends against the same baseline.
+A separate small case checks the Pool backend with one PowSyBl worker.
+Checkpoint recovery tests also interrupt a saved but uncommitted chunk and compare
+resumed PF/OPF datasets with uninterrupted generation across both process backends.
+
 `validate` checks that every scenario is physically valid; the calibrated bounds
 catch changes in *what* is generated, which `validate` cannot see.
 
