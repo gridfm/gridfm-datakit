@@ -23,7 +23,10 @@ def config(tmp_path: Path) -> dict[str, Any]:
         Path("scripts/config/default.yaml").read_text(encoding="utf-8"),
     )
     config["settings"].update(
-        data_dir=str(tmp_path / "data"), seed=42, num_processes=2, large_chunk_size=3,
+        data_dir=str(tmp_path / "data"),
+        seed=42,
+        num_processes=2,
+        large_chunk_size=3,
     )
     config["load"]["scenarios"] = 5
     return config
@@ -66,7 +69,10 @@ def test_pool_results_drain_progress_and_preserve_offsets() -> None:
     bar = Mock()
 
     results = _collect_pool_results(
-        pool, [(7, np.zeros((1, 2, 2))), (9, np.zeros((1, 1, 2)))], queue, bar,
+        pool,
+        [(7, np.zeros((1, 2, 2))), (9, np.zeros((1, 1, 2)))],
+        queue,
+        bar,
     )
 
     assert list(results) == [9, 7]
@@ -103,7 +109,9 @@ def test_pool_matches_executor_and_cleans_up(
     """Preserve seeds, ordering, and solver options across both backends."""
     generate = importlib.import_module("gridfm_datakit.generate")
     config["settings"].update(
-        num_processes=workers, mode=mode, opf_formulation="rectangular",
+        num_processes=workers,
+        mode=mode,
+        opf_formulation="rectangular",
     )
     metadata = {"pp_net": object(), "network_path": "network.m", "mapping_p2g": {}}
     monkeypatch.setattr(
@@ -180,7 +188,9 @@ def test_pool_matches_executor_and_cleans_up(
     monkeypatch.setattr(generate, "ProcessPoolExecutor", Executor)
     observed = []
     monkeypatch.setattr(
-        generate, "_save_generated_data", lambda net, data, *args: observed.extend(data),
+        generate,
+        "_save_generated_data",
+        lambda net, data, *args: observed.extend(data),
     )
     config["settings"]["is_multiprocessing"] = False
     generate.generate_power_flow_data_distributed(config)

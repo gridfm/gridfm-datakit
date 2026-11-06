@@ -59,7 +59,9 @@ def pipeline(monkeypatch: pytest.MonkeyPatch) -> Any:
     monkeypatch.setattr(process_network, "_worker_jl", None)
     monkeypatch.setattr(process_network, "init_julia", Mock(return_value=object()))
     monkeypatch.setattr(
-        type(generate._DEFAULT_SEED_POLICY), "random_base_seed", lambda _: 17,
+        type(generate._DEFAULT_SEED_POLICY),
+        "random_base_seed",
+        lambda _: 17,
     )
 
     def process(*args: Any, **kwargs: Any) -> list:
@@ -72,7 +74,10 @@ def pipeline(monkeypatch: pytest.MonkeyPatch) -> Any:
 
 
 def _save_records(
-    data: list, paths: dict[str, str], root: str, fail_during_write: bool = False,
+    data: list,
+    paths: dict[str, str],
+    root: str,
+    fail_during_write: bool = False,
 ) -> None:
     """Append actual parquet files and optionally interrupt after one dataset.
 
@@ -123,7 +128,11 @@ def test_resume_matches_uninterrupted_run(
     writes = 0
 
     def interrupted_save(
-        net: Any, data: list, paths: dict, root: str, args: Any,
+        net: Any,
+        data: list,
+        paths: dict,
+        root: str,
+        args: Any,
     ) -> None:
         """Interrupt the second large chunk at the selected write boundary."""
         nonlocal writes
@@ -205,7 +214,9 @@ def test_resume_matches_uninterrupted_run(
     ],
 )
 def test_incompatible_resume_does_not_modify_output(
-    config: dict, setting: str, value: Any,
+    config: dict,
+    setting: str,
+    value: Any,
 ) -> None:
     """Reject incompatible resumes before rewriting run configuration or logs."""
     args, root, paths, seed = _setup_environment(config, allow_checkpointing=True)
@@ -256,7 +267,9 @@ def test_failed_checkpoint_publication_preserves_previous_state(
     original = (Path(root) / "checkpoint.json").read_bytes()
     module = importlib.import_module("gridfm_datakit.checkpoint")
     monkeypatch.setattr(
-        module.os, "replace", Mock(side_effect=OSError("cannot publish checkpoint")),
+        module.os,
+        "replace",
+        Mock(side_effect=OSError("cannot publish checkpoint")),
     )
     with pytest.raises(OSError, match="cannot publish"):
         checkpoint.commit(1)
@@ -266,7 +279,8 @@ def test_failed_checkpoint_publication_preserves_previous_state(
 
 
 @pytest.mark.parametrize(
-    "corruption", ["version", "path", "missing-file", "changed-file"],
+    "corruption",
+    ["version", "path", "missing-file", "changed-file"],
 )
 def test_corrupt_checkpoint_preserves_files(config: dict, corruption: str) -> None:
     """Reject invalid state or committed files without deleting any output."""

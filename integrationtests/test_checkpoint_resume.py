@@ -40,7 +40,8 @@ def test_checkpoint_resume_matches_uninterrupted(
     expected = generate.generate_power_flow_data_distributed(config)
     resumed_config = deepcopy(config)
     resumed_config["settings"].update(
-        data_dir=str(tmp_path / "resumed"), enable_checkpointing=True,
+        data_dir=str(tmp_path / "resumed"),
+        enable_checkpointing=True,
     )
     save = generate._save_generated_data
     writes = 0
@@ -69,7 +70,8 @@ def test_checkpoint_resume_matches_uninterrupted(
 
     monkeypatch.setattr(generate, "_save_generated_data", save)
     resumed_config["settings"].update(
-        overwrite=False, is_multiprocessing=not is_multiprocessing,
+        overwrite=False,
+        is_multiprocessing=not is_multiprocessing,
     )
     actual = generate.generate_power_flow_data_distributed(resumed_config)
     assert all(not (raw / name).exists() for name in uncommitted)

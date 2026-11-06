@@ -98,7 +98,9 @@ class GenerationCheckpoint:
 
     @classmethod
     def load(
-        cls, root: Path, config: dict[str, Any],
+        cls,
+        root: Path,
+        config: dict[str, Any],
     ) -> Optional["GenerationCheckpoint"]:
         """Check resume eligibility before existing logs or output are changed.
 
@@ -173,7 +175,10 @@ class GenerationCheckpoint:
 
     @classmethod
     def create(
-        cls, root: Path, config: dict[str, Any], seed: int,
+        cls,
+        root: Path,
+        config: dict[str, Any],
+        seed: int,
     ) -> "GenerationCheckpoint":
         """Persist a fresh seed before any scenarios are generated.
 
@@ -186,7 +191,8 @@ class GenerationCheckpoint:
             Newly published checkpoint with no completed chunks.
         """
         checkpoint = cls(
-            root, _CheckpointState(seed=seed, config=_resume_config(config, seed)),
+            root,
+            _CheckpointState(seed=seed, config=_resume_config(config, seed)),
         )
         checkpoint._publish(checkpoint.state)
         return checkpoint

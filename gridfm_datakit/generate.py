@@ -172,7 +172,9 @@ def _setup_environment(
             "enable_checkpointing is supported only by static generate_power_flow_data_distributed",
         )
     base_path = os.path.join(
-        config["settings"]["data_dir"], config["network"]["name"], "raw",
+        config["settings"]["data_dir"],
+        config["network"]["name"],
+        "raw",
     )
     checkpoint = GenerationCheckpoint.load(Path(base_path), config)
     if checkpoint is not None:
@@ -604,7 +606,8 @@ def generate_power_flow_data_distributed(
     """
     # Setup environment
     args, base_path, file_paths, seed = _setup_environment(
-        config, allow_checkpointing=True,
+        config,
+        allow_checkpointing=True,
     )
 
     scenario_count = args.load.scenarios
@@ -620,7 +623,9 @@ def generate_power_flow_data_distributed(
         checkpoint = GenerationCheckpoint.load(Path(base_path), args.to_dict())
         if checkpoint is None:
             checkpoint = GenerationCheckpoint.create(
-                Path(base_path), args.to_dict(), seed,
+                Path(base_path),
+                args.to_dict(),
+                seed,
             )
         else:
             checkpoint.recover()
@@ -711,7 +716,10 @@ def generate_power_flow_data_distributed(
                             for start, stop in scenario_chunks
                         ]
                         results_by_start = _collect_pool_results(
-                            pool, tasks, progress_queue, pbar,
+                            pool,
+                            tasks,
+                            progress_queue,
+                            pbar,
                         )
                     elif executor is None:
                         for start, stop in scenario_chunks:
