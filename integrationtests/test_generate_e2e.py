@@ -133,7 +133,9 @@ def run_cli(*args: str) -> None:
     subprocess.run(cmd, check=True, cwd=REPO_ROOT)
 
 
-def generate_and_measure(case: str, work_dir: str, is_multiprocessing: bool = False) -> dict:
+def generate_and_measure(
+    case: str, work_dir: str, is_multiprocessing: bool = False,
+) -> dict:
     """Generate and validate one dataset using the selected process backend.
 
     Args:
@@ -168,10 +170,16 @@ def generate_and_measure(case: str, work_dir: str, is_multiprocessing: bool = Fa
 
 
 @pytest.mark.parametrize("case", sorted(CASES))
-@pytest.mark.parametrize("is_multiprocessing", [False, True], ids=["executor", "multiprocessing"])
+@pytest.mark.parametrize(
+    "is_multiprocessing", [False, True], ids=["executor", "multiprocessing"],
+)
 def test_generate_end_to_end(
-    case: str, tmp_path: Path, calibrate_runs: int,
-    ci_level: float, calibrate_pad: float, is_multiprocessing: bool,
+    case: str,
+    tmp_path: Path,
+    calibrate_runs: int,
+    ci_level: float,
+    calibrate_pad: float,
+    is_multiprocessing: bool,
 ) -> None:
     """Validate each backend against bounds calibrated on unchanged code."""
     n_runs = max(calibrate_runs, 1)
@@ -209,8 +217,11 @@ def test_multiprocessing_single_worker_powsybl(tmp_path: Path) -> None:
             "network": {"reader": "powsybl"},
             "load": {"scenarios": 3},
             "settings": {
-                "mode": "pf", "pf_solver": "powsybl", "is_multiprocessing": True,
-                "num_processes": 1, "large_chunk_size": 2,
+                "mode": "pf",
+                "pf_solver": "powsybl",
+                "is_multiprocessing": True,
+                "num_processes": 1,
+                "large_chunk_size": 2,
             },
         },
         str(tmp_path / "data"),
