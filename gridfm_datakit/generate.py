@@ -91,7 +91,10 @@ def _collect_pool_results(
     Raises:
         RuntimeError: If a task raises or a worker reports a chunk failure.
     """
-    pending = {start: pool.apply_async(_process_scenario_worker, ((start, scenarios),)) for start, scenarios in tasks}
+    pending = {
+        start: pool.apply_async(_process_scenario_worker, ((start, scenarios),))
+        for start, scenarios in tasks
+    }
     results = {}
     while pending:
         for start in list(pending):
@@ -100,9 +103,13 @@ def _collect_pool_results(
             try:
                 result = pending.pop(start).get()
             except Exception as error:
-                raise RuntimeError(f"Scenario worker failed for chunk starting at {start}") from error
+                raise RuntimeError(
+                    f"Scenario worker failed for chunk starting at {start}",
+                ) from error
             if result[2] is not None:
-                raise RuntimeError(f"Scenario chunk starting at {start} failed: {result[2]}\n{result[3]}") from result[2]
+                raise RuntimeError(
+                    f"Scenario chunk starting at {start} failed: {result[2]}\n{result[3]}",
+                ) from result[2]
             results[start] = result
         try:
             progress_bar.update(progress_queue.get(timeout=0.1))
@@ -161,8 +168,12 @@ def _setup_environment(
         config = validate_static_config(config)
     checkpointing = config.get("settings", {}).get("enable_checkpointing", False)
     if checkpointing and (is_dynamic_config or not allow_checkpointing):
-        raise ValueError("enable_checkpointing is supported only by static generate_power_flow_data_distributed")
-    base_path = os.path.join(config["settings"]["data_dir"], config["network"]["name"], "raw")
+        raise ValueError(
+            "enable_checkpointing is supported only by static generate_power_flow_data_distributed",
+        )
+    base_path = os.path.join(
+        config["settings"]["data_dir"], config["network"]["name"], "raw",
+    )
     checkpoint = GenerationCheckpoint.load(Path(base_path), config)
     if checkpoint is not None:
         config["settings"]["seed"] = checkpoint.state.seed
@@ -592,7 +603,9 @@ def generate_power_flow_data_distributed(
         - scenarios_{generator}.log: Load scenario generation notes
     """
     # Setup environment
-    args, base_path, file_paths, seed = _setup_environment(config, allow_checkpointing=True)
+    args, base_path, file_paths, seed = _setup_environment(
+        config, allow_checkpointing=True,
+    )
 
     scenario_count = args.load.scenarios
     large_chunk_size = args.settings.large_chunk_size
@@ -606,7 +619,9 @@ def generate_power_flow_data_distributed(
     if args.settings.enable_checkpointing:
         checkpoint = GenerationCheckpoint.load(Path(base_path), args.to_dict())
         if checkpoint is None:
-            checkpoint = GenerationCheckpoint.create(Path(base_path), args.to_dict(), seed)
+            checkpoint = GenerationCheckpoint.create(
+                Path(base_path), args.to_dict(), seed,
+            )
         else:
             checkpoint.recover()
         if checkpoint.state.next_chunk == n_large_chunks:
@@ -675,7 +690,10 @@ def generate_power_flow_data_distributed(
                 progress_queue: Optional[Any] = None,
             ) -> None:
                 for chunk_index, (large_start, large_stop) in enumerate(large_chunks):
-                    if checkpoint is not None and chunk_index < checkpoint.state.next_chunk:
+                    if (
+                        checkpoint is not None
+                        and chunk_index < checkpoint.state.next_chunk
+                    ):
                         pbar.update(large_stop - large_start)
                         continue
                     write_ram_usage_distributed(f)
@@ -688,8 +706,13 @@ def generate_power_flow_data_distributed(
                     results_by_start = {}
 
                     if pool is not None:
-                        tasks = [(start, np.ascontiguousarray(scenarios[:, start:stop, :])) for start, stop in scenario_chunks]
-                        results_by_start = _collect_pool_results(pool, tasks, progress_queue, pbar)
+                        tasks = [
+                            (start, np.ascontiguousarray(scenarios[:, start:stop, :]))
+                            for start, stop in scenario_chunks
+                        ]
+                        results_by_start = _collect_pool_results(
+                            pool, tasks, progress_queue, pbar,
+                        )
                     elif executor is None:
                         for start, stop in scenario_chunks:
                             result = _process_scenario_worker(

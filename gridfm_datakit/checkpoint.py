@@ -11,7 +11,13 @@ from pydantic import BaseModel, ConfigDict, Field
 from gridfm_datakit.utils.random_seed import _DEFAULT_SEED_POLICY
 
 
-_DATASETS = ("bus_data.parquet", "branch_data.parquet", "gen_data.parquet", "y_bus_data.parquet", "runtime_data.parquet")
+_DATASETS = (
+    "bus_data.parquet",
+    "branch_data.parquet",
+    "gen_data.parquet",
+    "y_bus_data.parquet",
+    "runtime_data.parquet",
+)
 _NonNegativeInt = Annotated[int, Field(ge=0)]
 
 
@@ -36,7 +42,13 @@ def _atomic_write(path: Path, content: str) -> None:
     """
     temporary = None
     try:
-        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent, prefix=".checkpoint-", delete=False) as stream:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=".checkpoint-",
+            delete=False,
+        ) as stream:
             temporary = Path(stream.name)
             stream.write(content)
             stream.flush()
@@ -85,7 +97,9 @@ class GenerationCheckpoint:
         self.state = state
 
     @classmethod
-    def load(cls, root: Path, config: dict[str, Any]) -> Optional["GenerationCheckpoint"]:
+    def load(
+        cls, root: Path, config: dict[str, Any],
+    ) -> Optional["GenerationCheckpoint"]:
         """Check resume eligibility before existing logs or output are changed.
 
         Args:
@@ -104,33 +118,63 @@ class GenerationCheckpoint:
         path = root / "checkpoint.json"
         enabled = settings.get("enable_checkpointing", False)
         if not path.exists():
-            if enabled and any((root / name).exists() for name in (*_DATASETS, "n_scenarios.txt")):
-                raise ValueError("Cannot resume existing output without checkpoint.json; use a new output directory or overwrite: true")
+            if enabled and any(
+                (root / name).exists() for name in (*_DATASETS, "n_scenarios.txt")
+            ):
+                raise ValueError(
+                    "Cannot resume existing output without checkpoint.json; use a new output directory or overwrite: true",
+                )
             return None
         if not enabled:
-            raise ValueError("Existing output has a checkpoint; keep enable_checkpointing: true to resume or use overwrite: true")
+            raise ValueError(
+                "Existing output has a checkpoint; keep enable_checkpointing: true to resume or use overwrite: true",
+            )
         try:
-            state = _CheckpointState.model_validate_json(path.read_text(encoding="utf-8"))
+            state = _CheckpointState.model_validate_json(
+                path.read_text(encoding="utf-8"),
+            )
         except (ValueError, OSError) as error:
             raise ValueError(f"Cannot read checkpoint {path}: {error}") from error
         if _resume_config(config, state.seed) != state.config:
-            raise ValueError("Resume configuration differs from checkpoint; keep the original scenario, chunk, worker, seed, and solver settings")
-        chunks = (config["load"]["scenarios"] + settings["large_chunk_size"] - 1) // settings["large_chunk_size"]
-        if state.next_chunk > chunks or (state.next_chunk == 0 and (state.files or state.saved_scenarios)) or (state.files and not state.saved_scenarios):
+            raise ValueError(
+                "Resume configuration differs from checkpoint; keep the original scenario, chunk, worker, seed, and solver settings",
+            )
+        chunks = (
+            config["load"]["scenarios"] + settings["large_chunk_size"] - 1
+        ) // settings["large_chunk_size"]
+        if (
+            state.next_chunk > chunks
+            or (state.next_chunk == 0 and (state.files or state.saved_scenarios))
+            or (state.files and not state.saved_scenarios)
+        ):
             raise ValueError("Checkpoint contains inconsistent chunk progress")
         for name, size in state.files.items():
             relative = PurePosixPath(name)
-            if relative.is_absolute() or ".." in relative.parts or len(relative.parts) != 3 or relative.parts[0] not in _DATASETS or not relative.parts[1].startswith("scenario_partition=") or relative.suffix != ".parquet":
+            if (
+                relative.is_absolute()
+                or ".." in relative.parts
+                or len(relative.parts) != 3
+                or relative.parts[0] not in _DATASETS
+                or not relative.parts[1].startswith("scenario_partition=")
+                or relative.suffix != ".parquet"
+            ):
                 raise ValueError(f"Invalid committed file path in checkpoint: {name}")
             file = root / name
             if not file.is_file() or file.stat().st_size != size:
-                raise ValueError(f"Committed checkpoint file is missing or changed: {name}")
-        if state.saved_scenarios and any(not any(PurePosixPath(name).parts[0] == dataset for name in state.files) for dataset in _DATASETS):
+                raise ValueError(
+                    f"Committed checkpoint file is missing or changed: {name}",
+                )
+        if state.saved_scenarios and any(
+            not any(PurePosixPath(name).parts[0] == dataset for name in state.files)
+            for dataset in _DATASETS
+        ):
             raise ValueError("Checkpoint is missing a committed output dataset")
         return cls(root, state)
 
     @classmethod
-    def create(cls, root: Path, config: dict[str, Any], seed: int) -> "GenerationCheckpoint":
+    def create(
+        cls, root: Path, config: dict[str, Any], seed: int,
+    ) -> "GenerationCheckpoint":
         """Persist a fresh seed before any scenarios are generated.
 
         Args:
@@ -141,13 +185,19 @@ class GenerationCheckpoint:
         Returns:
             Newly published checkpoint with no completed chunks.
         """
-        checkpoint = cls(root, _CheckpointState(seed=seed, config=_resume_config(config, seed)))
+        checkpoint = cls(
+            root, _CheckpointState(seed=seed, config=_resume_config(config, seed)),
+        )
         checkpoint._publish(checkpoint.state)
         return checkpoint
 
     def _files(self) -> dict[str, int]:
         """Return sizes of parquet files belonging to the five output datasets."""
-        return {path.relative_to(self.root).as_posix(): path.stat().st_size for dataset in _DATASETS for path in (self.root / dataset).rglob("*.parquet")}
+        return {
+            path.relative_to(self.root).as_posix(): path.stat().st_size
+            for dataset in _DATASETS
+            for path in (self.root / dataset).rglob("*.parquet")
+        }
 
     def _publish(self, state: _CheckpointState) -> None:
         """Persist state before replacing the last committed in-memory state.
@@ -172,4 +222,12 @@ class GenerationCheckpoint:
         """
         count = self.root / "n_scenarios.txt"
         saved = int(count.read_text(encoding="utf-8")) if count.exists() else 0
-        self._publish(_CheckpointState(seed=self.state.seed, config=self.state.config, next_chunk=next_chunk, saved_scenarios=saved, files=self._files()))
+        self._publish(
+            _CheckpointState(
+                seed=self.state.seed,
+                config=self.state.config,
+                next_chunk=next_chunk,
+                saved_scenarios=saved,
+                files=self._files(),
+            ),
+        )
