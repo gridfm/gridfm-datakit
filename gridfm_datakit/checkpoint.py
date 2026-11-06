@@ -151,10 +151,14 @@ class GenerationCheckpoint:
             or (state.files and not state.saved_scenarios)
         ):
             raise ValueError("Checkpoint contains inconsistent chunk progress")
-        if len(set(state.skipped_scenarios)) != len(state.skipped_scenarios) or any(index >= config["load"]["scenarios"] for index in state.skipped_scenarios):
+        if len(set(state.skipped_scenarios)) != len(state.skipped_scenarios) or any(
+            index >= config["load"]["scenarios"] for index in state.skipped_scenarios
+        ):
             raise ValueError("Checkpoint contains invalid skipped scenario indices")
         if state.skipped_scenarios and settings.get("scenario_timeout_sec") is None:
-            raise ValueError("Checkpoint contains skipped scenarios without timeout mode")
+            raise ValueError(
+                "Checkpoint contains skipped scenarios without timeout mode",
+            )
         for name, size in state.files.items():
             relative = PurePosixPath(name)
             if (
@@ -240,7 +244,7 @@ class GenerationCheckpoint:
                 next_chunk=next_chunk,
                 saved_scenarios=saved,
                 files=self._files(),
-                skipped_scenarios=self.state.skipped_scenarios
+                skipped_scenarios=self.state.skipped_scenarios,
             ),
         )
 

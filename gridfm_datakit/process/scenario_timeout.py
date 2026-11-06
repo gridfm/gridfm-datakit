@@ -30,12 +30,18 @@ class ScenarioTimeout(TimeoutError):
         self.scenario_index = scenario_index
         self.worker_pid = worker_pid
         self.elapsed = elapsed
-        super().__init__(f"Load scenario {scenario_index} timed out after {elapsed:.3f}s (pid={worker_pid})")
+        super().__init__(
+            f"Load scenario {scenario_index} timed out after {elapsed:.3f}s (pid={worker_pid})",
+        )
 
 
 def _collect_timed_results(
-    pool: Pool, tasks: list[tuple[int, np.ndarray]], progress_queue: Any,
-    progress_bar: tqdm, timeout: float, worker: Callable,
+    pool: Pool,
+    tasks: list[tuple[int, np.ndarray]],
+    progress_queue: Any,
+    progress_bar: tqdm,
+    timeout: float,
+    worker: Callable,
 ) -> dict[int, tuple]:
     """Collect chunk results while enforcing deadlines on active load scenarios.
 
@@ -54,7 +60,10 @@ def _collect_timed_results(
         ScenarioTimeout: If a running or completed scenario exceeds its limit.
         RuntimeError: If a worker fails, exits unexpectedly, or emits invalid events.
     """
-    pending = {start: pool.apply_async(worker, ((start, scenarios),)) for start, scenarios in tasks}
+    pending = {
+        start: pool.apply_async(worker, ((start, scenarios),))
+        for start, scenarios in tasks
+    }
     workers = tuple(pool._pool)
     active = {}
     results = {}
@@ -80,7 +89,9 @@ def _collect_timed_results(
             completed += 1
             progress_bar.update(1)
         elif kind == "error":
-            raise RuntimeError(f"Scenario worker pid={pid} failed at load scenario {index}; see error.log")
+            raise RuntimeError(
+                f"Scenario worker pid={pid} failed at load scenario {index}; see error.log",
+            )
         else:
             raise RuntimeError(f"Unknown scenario progress event: {event!r}")
 
@@ -109,13 +120,19 @@ def _collect_timed_results(
                 try:
                     result = pending.pop(start).get()
                 except Exception as error:
-                    raise RuntimeError(f"Scenario worker failed for chunk starting at {start}") from error
+                    raise RuntimeError(
+                        f"Scenario worker failed for chunk starting at {start}",
+                    ) from error
                 if result[2] is not None:
-                    raise RuntimeError(f"Scenario chunk starting at {start} failed: {result[2]}\n{result[3]}") from result[2]
+                    raise RuntimeError(
+                        f"Scenario chunk starting at {start} failed: {result[2]}\n{result[3]}",
+                    ) from result[2]
                 results[start] = result
             for process in workers:
                 if process.exitcode is not None:
-                    raise RuntimeError(f"Scenario worker pid={process.pid} exited unexpectedly (exit code {process.exitcode})")
+                    raise RuntimeError(
+                        f"Scenario worker pid={process.pid} exited unexpectedly (exit code {process.exitcode})",
+                    )
             # A done event may arrive while large results are being collected.
             read_events(False)
             now = time.monotonic()
@@ -138,9 +155,15 @@ class ScenarioTimeoutPool:
     """
 
     def __init__(
-        self, context: BaseContext, processes: int, initializer: Callable,
-        initargs: tuple, worker: Callable, timeout: float,
-        skipped_scenarios: set[int], on_timeout: Callable[[ScenarioTimeout], None],
+        self,
+        context: BaseContext,
+        processes: int,
+        initializer: Callable,
+        initargs: tuple,
+        worker: Callable,
+        timeout: float,
+        skipped_scenarios: set[int],
+        on_timeout: Callable[[ScenarioTimeout], None],
     ) -> None:
         """Configure pool ownership and durable timeout reporting.
 
@@ -175,8 +198,10 @@ class ScenarioTimeoutPool:
         """Start fresh workers and a fresh queue, excluding all known offenders."""
         self.progress_queue = self.manager.Queue()
         self.pool = self.context.Pool(
-            processes=self.processes, initializer=self.initializer,
-            initargs=self.initargs + (self.progress_queue, self.timeout, set(self.skipped_scenarios)),
+            processes=self.processes,
+            initializer=self.initializer,
+            initargs=self.initargs
+            + (self.progress_queue, self.timeout, set(self.skipped_scenarios)),
         )
 
     def _stop_pool(self, offending_pid: Optional[int] = None) -> None:
@@ -199,7 +224,9 @@ class ScenarioTimeoutPool:
         self.pool.join()
         self.pool = None
 
-    def collect(self, tasks: list[tuple[int, np.ndarray]], progress_bar: tqdm) -> dict[int, tuple]:
+    def collect(
+        self, tasks: list[tuple[int, np.ndarray]], progress_bar: tqdm,
+    ) -> dict[int, tuple]:
         """Retry an unsaved large chunk until every non-skipped scenario finishes.
 
         Args:
@@ -209,15 +236,29 @@ class ScenarioTimeoutPool:
         Returns:
             Ordered-by-offset-compatible task results for the successful attempt.
         """
-        indices = {index for start, scenarios in tasks for index in range(start, start + scenarios.shape[1])}
+        indices = {
+            index
+            for start, scenarios in tasks
+            for index in range(start, start + scenarios.shape[1])
+        }
         progress_bar.update(len(indices & self.skipped_scenarios))
         while True:
             if indices <= self.skipped_scenarios:
-                return {start: (start, scenarios.shape[1], None, None, []) for start, scenarios in tasks}
+                return {
+                    start: (start, scenarios.shape[1], None, None, [])
+                    for start, scenarios in tasks
+                }
             if self.pool is None:
                 self._start_pool()
             try:
-                return _collect_timed_results(self.pool, tasks, self.progress_queue, progress_bar, self.timeout, self.worker)
+                return _collect_timed_results(
+                    self.pool,
+                    tasks,
+                    self.progress_queue,
+                    progress_bar,
+                    self.timeout,
+                    self.worker,
+                )
             except ScenarioTimeout as error:
                 self._stop_pool(error.worker_pid)
                 self.skipped_scenarios.add(error.scenario_index)

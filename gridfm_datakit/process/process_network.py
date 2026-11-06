@@ -1535,8 +1535,12 @@ def process_scenario_chunk(
                 if scenario_timeout_sec is not None:
                     # Retry-independent randomness: skipped scenarios never shift
                     # the perturbations of another scenario in this chunk.
-                    np.random.seed(_DEFAULT_SEED_POLICY.distributed_seed(seed, scenario_index))
-                    progress_queue.put(("start", os.getpid(), scenario_index, time.monotonic()))
+                    np.random.seed(
+                        _DEFAULT_SEED_POLICY.distributed_seed(seed, scenario_index),
+                    )
+                    progress_queue.put(
+                        ("start", os.getpid(), scenario_index, time.monotonic()),
+                    )
                 if mode == "opf":
                     local_processed_data = process_scenario_opf_mode(
                         net,
@@ -1574,7 +1578,9 @@ def process_scenario_chunk(
 
                 completed_scenarios += 1
                 if scenario_timeout_sec is not None:
-                    progress_queue.put(("done", os.getpid(), scenario_index, time.monotonic()))
+                    progress_queue.put(
+                        ("done", os.getpid(), scenario_index, time.monotonic()),
+                    )
                 elif progress_queue is not None:
                     progress_queue.put(1)
                 current_scenario = None
@@ -1590,7 +1596,9 @@ def process_scenario_chunk(
             f.write(traceback.format_exc())
             f.write("\n")
         if scenario_timeout_sec is not None:
-            progress_queue.put(("error", os.getpid(), current_scenario, time.monotonic()))
+            progress_queue.put(
+                ("error", os.getpid(), current_scenario, time.monotonic()),
+            )
         elif progress_queue is not None:
             for _ in range(end_idx - start_idx - completed_scenarios):
                 progress_queue.put(1)
