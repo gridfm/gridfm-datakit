@@ -2,6 +2,28 @@
 
 This module validates configuration for static PF and OPF generation.
 
+### Scenario timeouts
+
+`settings.scenario_timeout_sec` defaults to `null`. A positive finite value enables
+per-load-scenario timeouts and requires `settings.is_multiprocessing: true`.
+Timed-out indices are skipped; checkpointing makes those skips survive a resume.
+See the [timeout manual](../manual/getting_started.md#scenario-timeouts).
+
+### Checkpointing
+
+`settings.enable_checkpointing` defaults to `false`. When enabled, distributed
+static generation persists its seed and completed chunks in `checkpoint.json`.
+Use `overwrite: false` to resume with matching settings. See the
+[checkpoint and resume manual](../manual/getting_started.md#checkpoint-and-resume).
+
+### Multiprocessing backend
+
+Set `settings.is_multiprocessing: true` to select a spawned `multiprocessing.Pool`
+with a Manager queue for live scenario progress. The default is `false`, which
+keeps the existing `ProcessPoolExecutor` backend. Both use the same chunk
+boundaries, seed policy, solver options, and output ordering. See the
+[generation manual](../manual/getting_started.md#parallel-generation).
+
 ### CoinHSL
 
 To use an installed CoinHSL library with Ipopt, add the following under `settings`:

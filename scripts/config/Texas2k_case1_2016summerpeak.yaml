@@ -40,6 +40,9 @@ admittance_perturbation:
 
 settings:
   num_processes: 16 # Number of parallel processes to use
+  is_multiprocessing: false # Use multiprocessing.Pool with live progress; false uses ProcessPoolExecutor
+  enable_checkpointing: false # Save completed chunks; overwrite: false resumes a matching run
+  scenario_timeout_sec: null # Optional positive seconds per load scenario; requires is_multiprocessing: true
   data_dir: "./baseline_perturbations" # Directory to save generated data relative to the project root
   large_chunk_size: 10000 # Number of load scenarios processed before saving
   overwrite: true # If true, overwrites existing files, if false, appends to files

@@ -261,6 +261,9 @@ class _StaticSettingsConfig(_ConfigModel):
     """Settings required by static PF and OPF generation."""
 
     num_processes: _PositiveInt = 1
+    is_multiprocessing: bool = False
+    enable_checkpointing: bool = False
+    scenario_timeout_sec: Optional[_PositiveFloat] = None
     data_dir: _NonEmptyString
     large_chunk_size: _PositiveInt = 1_000
     overwrite: bool
@@ -274,6 +277,20 @@ class _StaticSettingsConfig(_ConfigModel):
     pf_solver: Literal["powermodel", "powsybl", "lightsim2grid"] = "powermodel"
     opf_formulation: Literal["polar", "rectangular"] = "polar"
     coinhsl: CoinHSLConfig = Field(default_factory=CoinHSLConfig)
+
+    @model_validator(mode="after")
+    def validate_timeout_backend(self) -> "_StaticSettingsConfig":
+        """Require a terminable Pool when scenario timeouts are enabled.
+
+        Returns:
+            Settings with a compatible process backend.
+
+        Raises:
+            ValueError: If a timeout is requested for the executor backend.
+        """
+        if self.scenario_timeout_sec is not None and not self.is_multiprocessing:
+            raise ValueError("scenario_timeout_sec requires is_multiprocessing: true")
+        return self
 
 
 class _StaticGenerationConfig(_ConfigModel):
