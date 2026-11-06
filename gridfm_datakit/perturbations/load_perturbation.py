@@ -16,7 +16,9 @@ from typing import Tuple, Any, Dict, Optional
 def _find_largest_scaling_factor_worker(
     args: Tuple[Network, float, float, float, bool, int, Optional[Dict[str, Any]]],
 ) -> float:
-    (net, max_scaling, step_size, start, change_reactive_power, max_iter, coinhsl) = args
+    (net, max_scaling, step_size, start, change_reactive_power, max_iter, coinhsl) = (
+        args
+    )
 
     net = deepcopy(net)
     # Get reference values from Network class (PD and QD columns)
@@ -239,7 +241,17 @@ class LoadScenarioGeneratorBase(ABC):
         pool = Pool(processes=1)
         result = pool.apply_async(
             _find_largest_scaling_factor_worker,
-            ((net, max_scaling, step_size, start, change_reactive_power, max_iter, coinhsl),),
+            (
+                (
+                    net,
+                    max_scaling,
+                    step_size,
+                    start,
+                    change_reactive_power,
+                    max_iter,
+                    coinhsl,
+                ),
+            ),
         )
         return pool, result
 
