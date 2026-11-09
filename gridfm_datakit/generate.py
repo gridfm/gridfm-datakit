@@ -573,8 +573,8 @@ def generate_power_flow_data_distributed(
 ) -> Dict[str, str]:
     """Generate power flow data based on the provided configuration using distributed processing.
 
-    ``settings.is_multiprocessing`` selects a spawned Pool with live scenario
-    progress when true, or the existing ProcessPoolExecutor path when false.
+    ``settings.process_backend`` selects ``multiprocessing_pool`` for a spawned
+    Pool with live progress, or ``process_pool_executor`` (the default).
     Both backends share worker initialization, chunk boundaries, and seed policy.
     With ``settings.enable_checkpointing``, completed large chunks and the run
     seed are persisted; ``overwrite: false`` resumes compatible saved progress.
@@ -653,7 +653,8 @@ def generate_power_flow_data_distributed(
 
     max_large_chunk_size = max(stop - start for start, stop in large_chunks)
     worker_count = min(configured_processes, max_large_chunk_size)
-    use_multiprocessing = getattr(args.settings, "is_multiprocessing", False)
+    process_backend = getattr(args.settings, "process_backend", "process_pool_executor")
+    use_multiprocessing = process_backend == "multiprocessing_pool"
 
     # pp_net wraps JVM state and cannot cross process boundaries. Spawned
     # workers reload it once from network_path; the in-process path can reuse it.

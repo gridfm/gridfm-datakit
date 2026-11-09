@@ -36,7 +36,7 @@ admittance_perturbation:
 
 settings:
   num_processes: 2 # Number of parallel processes to use
-  is_multiprocessing: false # Use multiprocessing.Pool instead of ProcessPoolExecutor
+  process_backend: "process_pool_executor" # Options: process_pool_executor, multiprocessing_pool
   enable_checkpointing: false # Resume completed chunks when overwrite is false
   large_chunk_size: 1000 # Number of load scenarios processed before saving
   overwrite: true # If true, overwrites existing files, if false, appends to files

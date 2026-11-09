@@ -34,20 +34,23 @@ def config(tmp_path: Path) -> dict[str, Any]:
 
 def test_multiprocessing_defaults_to_existing_backend(config: dict[str, Any]) -> None:
     """Omitting the new setting keeps ProcessPoolExecutor behavior."""
-    del config["settings"]["is_multiprocessing"]
-    assert validate_static_config(config)["settings"]["is_multiprocessing"] is False
+    del config["settings"]["process_backend"]
+    assert (
+        validate_static_config(config)["settings"]["process_backend"]
+        == "process_pool_executor"
+    )
 
 
 def test_invalid_backend_setting_preserves_output(config: dict[str, Any]) -> None:
-    """Reject a string boolean before removing existing output."""
-    config["settings"]["is_multiprocessing"] = "true"
+    """Reject an invalid backend name before removing existing output."""
+    config["settings"]["process_backend"] = "true"
     raw = Path(config["settings"]["data_dir"]) / config["network"]["name"] / "raw"
     raw.mkdir(parents=True)
     marker = raw / "keep.txt"
     marker.write_text("existing output", encoding="utf-8")
     with pytest.raises(
         ValueError,
-        match=r"settings\.is_multiprocessing: Input should be a valid boolean",
+        match=r"settings\.process_backend: Input should be 'process_pool_executor' or 'multiprocessing_pool'",
     ):
         _setup_environment(config)
     assert marker.read_text(encoding="utf-8") == "existing output"
@@ -192,12 +195,12 @@ def test_pool_matches_executor_and_cleans_up(
         "_save_generated_data",
         lambda net, data, *args: observed.extend(data),
     )
-    config["settings"]["is_multiprocessing"] = False
+    config["settings"]["process_backend"] = "process_pool_executor"
     generate.generate_power_flow_data_distributed(config)
     expected = observed[:]
     observed.clear()
     initialize.reset_mock()
-    config["settings"]["is_multiprocessing"] = True
+    config["settings"]["process_backend"] = "multiprocessing_pool"
     generate.generate_power_flow_data_distributed(config)
 
     assert observed == expected

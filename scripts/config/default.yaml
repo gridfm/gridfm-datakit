@@ -41,7 +41,7 @@ admittance_perturbation:
 
 settings:
   num_processes: 16 # Number of parallel processes to use
-  is_multiprocessing: false # Use multiprocessing.Pool with live progress; false uses ProcessPoolExecutor
+  process_backend: "process_pool_executor" # Options: process_pool_executor, multiprocessing_pool
   enable_checkpointing: false # Save completed chunks; overwrite: false resumes a matching run
   data_dir: "./data_out" # Directory to save generated data relative to the project root
   large_chunk_size: 1000 # Number of load scenarios processed before saving

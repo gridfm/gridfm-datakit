@@ -11,8 +11,8 @@ Use `overwrite: false` to resume with matching settings. See the
 
 ### Multiprocessing backend
 
-Set `settings.is_multiprocessing: true` to select a spawned `multiprocessing.Pool`
-with a Manager queue for live scenario progress. The default is `false`, which
+Set `settings.process_backend: multiprocessing_pool` to select a spawned `multiprocessing.Pool`
+with a Manager queue for live scenario progress. The default is `process_pool_executor`, which
 keeps the existing `ProcessPoolExecutor` backend. Both use the same chunk
 boundaries, seed policy, solver options, and output ordering. See the
 [generation manual](../manual/getting_started.md#parallel-generation).

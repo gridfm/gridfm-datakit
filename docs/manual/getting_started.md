@@ -92,16 +92,16 @@ The CLI and `generate_power_flow_data_distributed` support two process backends:
 ```yaml
 settings:
   num_processes: 4
-  is_multiprocessing: true
+  process_backend: "multiprocessing_pool"
 ```
 
-With `is_multiprocessing: true`, static generation uses a spawned
+With `process_backend: multiprocessing_pool`, static generation uses a spawned
 `multiprocessing.Pool` and a Manager queue to display progress after each load
 scenario. The pool and its initialized solver instances are reused across large
 chunks. Results are saved in scenario order, regardless of worker completion
 order. Worker exceptions stop generation and clean up the pool and Manager.
 
-The default, `false`, uses the existing `ProcessPoolExecutor` backend; with one
+The default, `process_pool_executor`, uses the existing `ProcessPoolExecutor` backend; with one
 worker it processes scenarios in the current process. The Pool backend spawns a
 worker even when `num_processes: 1`. Both backends preserve chunk boundaries,
 seed derivation, and solver options, including CoinHSL and `opf_formulation`.

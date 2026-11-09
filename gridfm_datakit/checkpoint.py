@@ -73,7 +73,7 @@ def _resume_config(config: dict[str, Any], seed: int) -> dict[str, Any]:
     settings = result["settings"]
     if settings.get("seed") is None:
         settings["seed"] = seed
-    for name in ("overwrite", "data_dir", "enable_solver_logs", "is_multiprocessing"):
+    for name in ("overwrite", "data_dir", "enable_solver_logs", "process_backend"):
         settings.pop(name, None)
     return result
 

@@ -16,12 +16,16 @@ from integrationtests.test_generate_e2e import build_config
 
 
 @pytest.mark.parametrize("mode", ["pf", "opf"])
-@pytest.mark.parametrize("is_multiprocessing", [False, True], ids=["executor", "pool"])
+@pytest.mark.parametrize(
+    "process_backend",
+    ["process_pool_executor", "multiprocessing_pool"],
+    ids=["executor", "pool"],
+)
 def test_checkpoint_resume_matches_uninterrupted(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     mode: str,
-    is_multiprocessing: bool,
+    process_backend: str,
 ) -> None:
     """Recover an uncommitted chunk and continue on the other process backend."""
     generate = importlib.import_module("gridfm_datakit.generate")
@@ -32,7 +36,7 @@ def test_checkpoint_resume_matches_uninterrupted(
                 "mode": mode,
                 "num_processes": 2,
                 "large_chunk_size": 3,
-                "is_multiprocessing": is_multiprocessing,
+                "process_backend": process_backend,
             },
         },
         str(tmp_path / "baseline"),
@@ -71,7 +75,11 @@ def test_checkpoint_resume_matches_uninterrupted(
     monkeypatch.setattr(generate, "_save_generated_data", save)
     resumed_config["settings"].update(
         overwrite=False,
-        is_multiprocessing=not is_multiprocessing,
+        process_backend=(
+            "multiprocessing_pool"
+            if process_backend == "process_pool_executor"
+            else "process_pool_executor"
+        ),
     )
     actual = generate.generate_power_flow_data_distributed(resumed_config)
     assert all(not (raw / name).exists() for name in uncommitted)
