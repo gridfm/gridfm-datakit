@@ -1340,8 +1340,13 @@ def _initialize_scenario_worker(
     meta: Optional[Dict],
     opf_formulation: str = "polar",
     coinhsl: Optional[Dict[str, Any]] = None,
+    progress_queue: Optional[Any] = None,
 ) -> None:
-    """Install immutable run state once in a spawned scenario worker."""
+    """Install immutable run state once in a spawned scenario worker.
+
+    The optional ``progress_queue`` reports completed scenarios to the parent
+    when using the multiprocessing.Pool backend.
+    """
     global _worker_context, _worker_jl
     _worker_jl = None
     _worker_context = {
@@ -1361,6 +1366,7 @@ def _initialize_scenario_worker(
         "meta": meta,
         "opf_formulation": opf_formulation,
         "coinhsl": coinhsl,
+        "progress_queue": progress_queue,
     }
 
 
@@ -1385,7 +1391,7 @@ def _process_scenario_worker(
         scenario_count,
         scenarios,
         _worker_context["net"],
-        None,
+        _worker_context["progress_queue"],
         _worker_context["topology_generator"],
         _worker_context["generation_generator"],
         _worker_context["admittance_generator"],

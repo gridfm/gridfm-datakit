@@ -36,6 +36,8 @@ admittance_perturbation:
 
 settings:
   num_processes: 2 # Number of parallel processes to use
+  process_backend: "process_pool_executor" # Options: process_pool_executor, multiprocessing_pool
+  enable_checkpointing: false # Resume completed chunks when overwrite is false
   data_dir: "tests/test_data_opf_mode/" # Directory to save generated data relative to the project root
   large_chunk_size: 5 # Number of load scenarios processed before saving
   overwrite: true # If true, overwrites existing files, if false, appends to files

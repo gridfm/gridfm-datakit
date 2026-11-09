@@ -15,6 +15,7 @@ baseline; plain ``pytest integrationtests -s`` asserts against it.
 """
 
 import os
+from pathlib import Path
 import shutil
 import subprocess
 import sys
@@ -132,11 +133,25 @@ def run_cli(*args: str) -> None:
     subprocess.run(cmd, check=True, cwd=REPO_ROOT)
 
 
-def generate_and_measure(case: str, work_dir: str) -> dict:
-    """Generate one dataset for ``case`` from scratch, validate it, return its metrics."""
+def generate_and_measure(
+    case: str,
+    work_dir: str,
+    process_backend: str = "process_pool_executor",
+) -> dict:
+    """Generate and validate one dataset using the selected process backend.
+
+    Args:
+        case: Reader and solver case to exercise.
+        work_dir: Temporary directory for configuration and generated data.
+        process_backend: ProcessPoolExecutor or multiprocessing.Pool backend name.
+
+    Returns:
+        Dataset metrics used for comparison with the calibrated baseline.
+    """
     data_dir = os.path.join(work_dir, "data")
     shutil.rmtree(data_dir, ignore_errors=True)
     config = build_config(CASES[case], data_dir)
+    config["settings"]["process_backend"] = process_backend
     config_path = os.path.join(work_dir, f"{case}.yaml")
     with open(config_path, "w") as f:
         yaml.safe_dump(config, f, sort_keys=False)
@@ -157,12 +172,25 @@ def generate_and_measure(case: str, work_dir: str) -> dict:
 
 
 @pytest.mark.parametrize("case", sorted(CASES))
-def test_generate_end_to_end(case, tmp_path, calibrate_runs, ci_level, calibrate_pad):
+@pytest.mark.parametrize(
+    "process_backend",
+    ["process_pool_executor", "multiprocessing_pool"],
+    ids=["executor", "multiprocessing"],
+)
+def test_generate_end_to_end(
+    case: str,
+    tmp_path: Path,
+    calibrate_runs: int,
+    ci_level: float,
+    calibrate_pad: float,
+    process_backend: str,
+) -> None:
+    """Validate each backend against bounds calibrated on unchanged code."""
     n_runs = max(calibrate_runs, 1)
     all_runs = []
     for run_i in range(n_runs):
         print(f"\n--- {case.upper()} generation run {run_i + 1}/{n_runs} ---")
-        all_runs.append(generate_and_measure(case, str(tmp_path)))
+        all_runs.append(generate_and_measure(case, str(tmp_path), process_backend))
     metric_keys = sorted(all_runs[0])
 
     if calibrate_runs > 0:
@@ -184,3 +212,25 @@ def test_generate_end_to_end(case, tmp_path, calibrate_runs, ci_level, calibrate
         f"Recalibrate on the code before your change: pytest integrationtests --calibrate -s"
     )
     check_bounds(all_runs[0], checks, f"{case} calibrated baseline")
+
+
+def test_multiprocessing_single_worker_powsybl(tmp_path: Path) -> None:
+    """Spawn one PowSyBl worker without pickling the parent's network object."""
+    config = build_config(
+        {
+            "network": {"reader": "powsybl"},
+            "load": {"scenarios": 3},
+            "settings": {
+                "mode": "pf",
+                "pf_solver": "powsybl",
+                "process_backend": "multiprocessing_pool",
+                "num_processes": 1,
+                "large_chunk_size": 2,
+            },
+        },
+        str(tmp_path / "data"),
+    )
+    config_path = tmp_path / "single_worker.yaml"
+    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    run_cli("generate", str(config_path))
+    run_cli("validate", str(tmp_path / "data" / NETWORK / "raw"), "--n-partitions", "0")

@@ -261,6 +261,10 @@ class _StaticSettingsConfig(_ConfigModel):
     """Settings required by static PF and OPF generation."""
 
     num_processes: _PositiveInt = 1
+    process_backend: Literal["process_pool_executor", "multiprocessing_pool"] = (
+        "process_pool_executor"
+    )
+    enable_checkpointing: bool = False
     data_dir: _NonEmptyString
     large_chunk_size: _PositiveInt = 1_000
     overwrite: bool
