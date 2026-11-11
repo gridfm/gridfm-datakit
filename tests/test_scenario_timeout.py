@@ -209,7 +209,9 @@ def test_invalid_timeout_preserves_output(tmp_path: Path, timeout: Any) -> None:
     """Reject invalid limits before overwriting a dataset."""
     config = yaml.safe_load(Path("scripts/config/default.yaml").read_text())
     config["settings"].update(
-        data_dir=str(tmp_path), is_multiprocessing=True, scenario_timeout_sec=timeout,
+        data_dir=str(tmp_path),
+        process_backend="multiprocessing_pool",
+        scenario_timeout_sec=timeout,
     )
     raw = tmp_path / config["network"]["name"] / "raw"
     raw.mkdir(parents=True)
@@ -223,8 +225,11 @@ def test_invalid_timeout_preserves_output(tmp_path: Path, timeout: Any) -> None:
 def test_timeout_requires_pool_backend() -> None:
     """Reject executor timeouts instead of silently ignoring the limit."""
     config = yaml.safe_load(Path("scripts/config/default.yaml").read_text())
-    config["settings"].update(is_multiprocessing=False, scenario_timeout_sec=600.0)
-    with pytest.raises(ValueError, match="requires is_multiprocessing"):
+    config["settings"].update(
+        process_backend="process_pool_executor",
+        scenario_timeout_sec=600.0,
+    )
+    with pytest.raises(ValueError, match="requires process_backend"):
         validate_static_config(config)
 
 
@@ -254,7 +259,7 @@ def test_skipped_scenarios_are_durable_before_chunk_commit(tmp_path: Path) -> No
     config = yaml.safe_load(Path("scripts/config/default.yaml").read_text())
     config["settings"].update(
         data_dir=str(tmp_path),
-        is_multiprocessing=True,
+        process_backend="multiprocessing_pool",
         scenario_timeout_sec=1.0,
         enable_checkpointing=True,
     )

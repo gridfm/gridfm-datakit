@@ -5,7 +5,7 @@ This module validates configuration for static PF and OPF generation.
 ### Scenario timeouts
 
 `settings.scenario_timeout_sec` defaults to `null`. A positive finite value enables
-per-load-scenario timeouts and requires `settings.is_multiprocessing: true`.
+per-load-scenario timeouts and requires `settings.process_backend: multiprocessing_pool`.
 Timed-out indices are skipped; checkpointing makes those skips survive a resume.
 See the [timeout manual](../manual/getting_started.md#scenario-timeouts).
 
@@ -18,8 +18,8 @@ Use `overwrite: false` to resume with matching settings. See the
 
 ### Multiprocessing backend
 
-Set `settings.is_multiprocessing: true` to select a spawned `multiprocessing.Pool`
-with a Manager queue for live scenario progress. The default is `false`, which
+Set `settings.process_backend: multiprocessing_pool` to select a spawned `multiprocessing.Pool`
+with a Manager queue for live scenario progress. The default is `process_pool_executor`, which
 keeps the existing `ProcessPoolExecutor` backend. Both use the same chunk
 boundaries, seed policy, solver options, and output ordering. See the
 [generation manual](../manual/getting_started.md#parallel-generation).

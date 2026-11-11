@@ -261,7 +261,9 @@ class _StaticSettingsConfig(_ConfigModel):
     """Settings required by static PF and OPF generation."""
 
     num_processes: _PositiveInt = 1
-    is_multiprocessing: bool = False
+    process_backend: Literal["process_pool_executor", "multiprocessing_pool"] = (
+        "process_pool_executor"
+    )
     enable_checkpointing: bool = False
     scenario_timeout_sec: Optional[_PositiveFloat] = None
     data_dir: _NonEmptyString
@@ -288,8 +290,13 @@ class _StaticSettingsConfig(_ConfigModel):
         Raises:
             ValueError: If a timeout is requested for the executor backend.
         """
-        if self.scenario_timeout_sec is not None and not self.is_multiprocessing:
-            raise ValueError("scenario_timeout_sec requires is_multiprocessing: true")
+        if (
+            self.scenario_timeout_sec is not None
+            and self.process_backend != "multiprocessing_pool"
+        ):
+            raise ValueError(
+                "scenario_timeout_sec requires process_backend: multiprocessing_pool",
+            )
         return self
 
 

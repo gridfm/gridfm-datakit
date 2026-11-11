@@ -136,14 +136,14 @@ def run_cli(*args: str) -> None:
 def generate_and_measure(
     case: str,
     work_dir: str,
-    is_multiprocessing: bool = False,
+    process_backend: str = "process_pool_executor",
 ) -> dict:
     """Generate and validate one dataset using the selected process backend.
 
     Args:
         case: Reader and solver case to exercise.
         work_dir: Temporary directory for configuration and generated data.
-        is_multiprocessing: Whether to select Pool instead of ProcessPoolExecutor.
+        process_backend: ProcessPoolExecutor or multiprocessing.Pool backend name.
 
     Returns:
         Dataset metrics used for comparison with the calibrated baseline.
@@ -151,7 +151,7 @@ def generate_and_measure(
     data_dir = os.path.join(work_dir, "data")
     shutil.rmtree(data_dir, ignore_errors=True)
     config = build_config(CASES[case], data_dir)
-    config["settings"]["is_multiprocessing"] = is_multiprocessing
+    config["settings"]["process_backend"] = process_backend
     config_path = os.path.join(work_dir, f"{case}.yaml")
     with open(config_path, "w") as f:
         yaml.safe_dump(config, f, sort_keys=False)
@@ -173,8 +173,8 @@ def generate_and_measure(
 
 @pytest.mark.parametrize("case", sorted(CASES))
 @pytest.mark.parametrize(
-    "is_multiprocessing",
-    [False, True],
+    "process_backend",
+    ["process_pool_executor", "multiprocessing_pool"],
     ids=["executor", "multiprocessing"],
 )
 def test_generate_end_to_end(
@@ -183,14 +183,14 @@ def test_generate_end_to_end(
     calibrate_runs: int,
     ci_level: float,
     calibrate_pad: float,
-    is_multiprocessing: bool,
+    process_backend: str,
 ) -> None:
     """Validate each backend against bounds calibrated on unchanged code."""
     n_runs = max(calibrate_runs, 1)
     all_runs = []
     for run_i in range(n_runs):
         print(f"\n--- {case.upper()} generation run {run_i + 1}/{n_runs} ---")
-        all_runs.append(generate_and_measure(case, str(tmp_path), is_multiprocessing))
+        all_runs.append(generate_and_measure(case, str(tmp_path), process_backend))
     metric_keys = sorted(all_runs[0])
 
     if calibrate_runs > 0:
@@ -223,7 +223,7 @@ def test_multiprocessing_single_worker_powsybl(tmp_path: Path) -> None:
             "settings": {
                 "mode": "pf",
                 "pf_solver": "powsybl",
-                "is_multiprocessing": True,
+                "process_backend": "multiprocessing_pool",
                 "num_processes": 1,
                 "large_chunk_size": 2,
             },

@@ -52,7 +52,7 @@ def test_timeout_skips_only_offender_and_preserves_outputs(
                 "mode": mode,
                 "num_processes": 2,
                 "large_chunk_size": 4,
-                "is_multiprocessing": True,
+                "process_backend": "multiprocessing_pool",
                 "scenario_timeout_sec": 2.0,
                 "enable_checkpointing": True,
             },
