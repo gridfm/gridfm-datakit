@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from math import isclose
+from pathlib import Path
 from typing import Annotated, Any, Dict, Literal, Mapping, Optional, Protocol, Union
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
@@ -223,10 +224,47 @@ _StaticAdmittancePerturbationConfig = Annotated[
 ]
 
 
+class CoinHSLConfig(_ConfigModel):
+    """Optional CoinHSL linear solver configuration for Ipopt.
+
+    Attributes:
+        enabled: Whether to use CoinHSL instead of Ipopt's default solver.
+        linear_solver: Name of the CoinHSL linear solver.
+        hsllib: Shared-library path, resolved from the working directory.
+    """
+
+    enabled: bool = False
+    linear_solver: Literal["ma27", "ma57", "ma77", "ma86", "ma97"] = "ma57"
+    hsllib: str = ""
+
+    @model_validator(mode="after")
+    def validate_library(self) -> "CoinHSLConfig":
+        """Check enabled libraries before generation can overwrite output.
+
+        Returns:
+            Configuration with an absolute library path when enabled.
+
+        Raises:
+            ValueError: If an enabled library path is missing or is not a file.
+        """
+        if self.enabled:
+            if not self.hsllib:
+                raise ValueError("hsllib is required when CoinHSL is enabled")
+            library = Path(self.hsllib).resolve()
+            if not library.is_file():
+                raise ValueError(f"CoinHSL library not found at: {library}")
+            self.hsllib = str(library)
+        return self
+
+
 class _StaticSettingsConfig(_ConfigModel):
     """Settings required by static PF and OPF generation."""
 
     num_processes: _PositiveInt = 1
+    process_backend: Literal["process_pool_executor", "multiprocessing_pool"] = (
+        "process_pool_executor"
+    )
+    enable_checkpointing: bool = False
     data_dir: _NonEmptyString
     large_chunk_size: _PositiveInt = 1_000
     overwrite: bool
@@ -239,6 +277,7 @@ class _StaticSettingsConfig(_ConfigModel):
     seed: Optional[_Seed] = None
     pf_solver: Literal["powermodel", "powsybl", "lightsim2grid"] = "powermodel"
     opf_formulation: Literal["polar", "rectangular"] = "polar"
+    coinhsl: CoinHSLConfig = Field(default_factory=CoinHSLConfig)
 
 
 class _StaticGenerationConfig(_ConfigModel):

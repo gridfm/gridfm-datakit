@@ -153,6 +153,32 @@ def test_benchmark_ieee14_run_dynawo_simulation(
     )
 
 
+@needs_dynawo
+def test_benchmark_ieee14_run_dynamic_simulation_with_events(
+    pp_net_ieee14,
+    model_mapping_ieee14,
+    variable_mapping_ieee14,
+    param_ieee14,
+    df_ref_curves_ieee14,
+    benchmark_dataset,
+):
+    from gridfm_datakit.dynamic import process_dynamic
+    from gridfm_datakit.dynamic.dynawo import DynawoMappings
+
+    dynamic_results = process_dynamic._run_dynamic_simulation(
+        pp_net_ieee14,
+        DynawoMappings(
+            dynamic_model_mapping=model_mapping_ieee14,
+            event_mapping=None,
+            variable_mapping=variable_mapping_ieee14,
+        ),
+        benchmark_dataset["df_events"],
+        param_ieee14,
+        "dynawo",
+    )
+    assert _validate_res_against_ref(dynamic_results, df_ref_curves_ieee14, True)
+
+
 def _report(*models) -> str:
     """A ReportNode JSON carrying one instantiation entry per (model, id, state)."""
     return json.dumps(

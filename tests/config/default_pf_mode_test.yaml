@@ -36,6 +36,8 @@ admittance_perturbation:
 
 settings:
   num_processes: 2 # Number of parallel processes to use
+  process_backend: "process_pool_executor" # Options: process_pool_executor, multiprocessing_pool
+  enable_checkpointing: false # Resume completed chunks when overwrite is false
   data_dir: "tests/test_data_pf_mode/" # Directory to save generated data relative to the project root
   large_chunk_size: 5 # Number of load scenarios processed before saving
   overwrite: true # If true, overwrites existing files, if false, appends to files
@@ -46,4 +48,8 @@ settings:
   dcpf_fast: true # Whether to use fast DCPF solver by default (compute_dc_pf from PowerModels.jl)
   pf_solver: "powermodel" # Engine solving the power flow in pf mode; options: powermodel, powsybl, lightsim2grid. The OPF is always solved by PowerModels. powsybl requires network.reader: powsybl.
   max_iter: 200 # Max iterations for Ipopt-based solvers
+  coinhsl:
+    enabled: false
+    linear_solver: "ma57"
+    hsllib: "" # Path to the shared library; required when enabled
   seed: null # Seed for random number generation. If null, a random seed is generated (RECOMMENDED). To get the same data across runs, set the seed and note that ALL OTHER PARAMETERS IN THE CONFIG FILE MUST BE THE SAME.

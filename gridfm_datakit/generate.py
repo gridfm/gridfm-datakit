@@ -2,7 +2,10 @@
 
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import multiprocessing
+from multiprocessing.pool import Pool
+from queue import Empty
 import os
+from pathlib import Path
 import shutil
 import sys
 from datetime import datetime
@@ -14,7 +17,8 @@ from tqdm import tqdm
 
 import gridfm_datakit.lightsim2grid as lightsim2grid
 import gridfm_datakit.powsybl as powsybl
-from gridfm_datakit.config import validate_static_config
+from gridfm_datakit.config import CoinHSLConfig, validate_static_config
+from gridfm_datakit.checkpoint import GenerationCheckpoint
 from gridfm_datakit.network import (
     Network,
     get_pglib_file_path,
@@ -67,8 +71,65 @@ def _split_range(start: int, stop: int, n_parts: int) -> List[Tuple[int, int]]:
     return bounds
 
 
+def _collect_pool_results(
+    pool: Pool,
+    tasks: List[Tuple[int, np.ndarray]],
+    progress_queue: Any,
+    progress_bar: tqdm,
+) -> Dict[int, Tuple]:
+    """Collect pool results by chunk offset while displaying scenario progress.
+
+    Args:
+        pool: Spawned pool initialized with the run's worker state.
+        tasks: Global offsets paired with contiguous scenario slices.
+        progress_queue: Manager queue receiving completed-scenario counts.
+        progress_bar: Parent-process progress display.
+
+    Returns:
+        Worker results keyed by their submitted global offsets.
+
+    Raises:
+        RuntimeError: If a task raises or a worker reports a chunk failure.
+    """
+    pending = {
+        start: pool.apply_async(_process_scenario_worker, ((start, scenarios),))
+        for start, scenarios in tasks
+    }
+    results = {}
+    while pending:
+        for start in list(pending):
+            if not pending[start].ready():
+                continue
+            try:
+                result = pending.pop(start).get()
+            except Exception as error:
+                raise RuntimeError(
+                    f"Scenario worker failed for chunk starting at {start}",
+                ) from error
+            if result[2] is not None:
+                raise RuntimeError(
+                    f"Scenario chunk starting at {start} failed: {result[2]}\n{result[3]}",
+                ) from result[2]
+            results[start] = result
+        try:
+            progress_bar.update(progress_queue.get(timeout=0.1))
+        except Empty:
+            pass
+
+    # Queue puts complete before a worker returns; drain final ticks before
+    # the next large chunk so progress cannot be counted twice or leak across chunks.
+    while True:
+        try:
+            progress_bar.update(progress_queue.get_nowait())
+        except Empty:
+            break
+    return results
+
+
 def _setup_environment(
     config: Union[str, Dict[str, Any], NestedNamespace],
+    *,
+    allow_checkpointing: bool = False,
 ) -> Tuple[NestedNamespace, str, Dict[str, str], int]:
     """Setup the environment for data generation.
 
@@ -77,6 +138,7 @@ def _setup_environment(
             1. Path to a YAML config file (str)
             2. Configuration dictionary (Dict)
             3. NestedNamespace object (NestedNamespace)
+        allow_checkpointing: Whether the calling pipeline supports chunk recovery.
 
     Returns:
         Tuple of (args, base_path, file_paths, seed)
@@ -104,7 +166,29 @@ def _setup_environment(
     is_dynamic_config = bool(config.get("dynamic"))
     if not is_dynamic_config:
         config = validate_static_config(config)
+    checkpointing = config.get("settings", {}).get("enable_checkpointing", False)
+    if checkpointing and (is_dynamic_config or not allow_checkpointing):
+        raise ValueError(
+            "enable_checkpointing is supported only by static generate_power_flow_data_distributed",
+        )
+    base_path = os.path.join(
+        config["settings"]["data_dir"],
+        config["network"]["name"],
+        "raw",
+    )
+    checkpoint = GenerationCheckpoint.load(Path(base_path), config)
+    if checkpoint is not None:
+        config["settings"]["seed"] = checkpoint.state.seed
+        config = validate_static_config(config)
     args = NestedNamespace(**config)
+
+    # Dynamic configs share setup but retain their own configuration validator.
+    if is_dynamic_config:
+        args.settings.coinhsl = NestedNamespace(
+            **CoinHSLConfig.model_validate(
+                config.get("settings", {}).get("coinhsl", {}),
+            ).model_dump(),
+        )
 
     # Set global seed if provided, otherwise generate a unique seed for this generation
     if (
@@ -120,6 +204,9 @@ def _setup_environment(
         # This ensures scenarios are i.i.d. within a run, but different across runs
         seed = _DEFAULT_SEED_POLICY.random_base_seed()
         print(f"No seed provided. Using seed={seed}")
+
+    if checkpointing:
+        args.settings.seed = seed
 
     # Dynamic generation retains its dedicated validator for now. Static
     # configurations receive these defaults from the Pydantic schema above.
@@ -195,6 +282,8 @@ def _setup_environment(
             f"scenarios_{args.load.generator}.log",
         ),
     }
+    if checkpointing:
+        file_paths["checkpoint"] = os.path.join(base_path, "checkpoint.json")
 
     # Initialize logs
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -213,6 +302,29 @@ def _setup_environment(
         yaml.safe_dump(args.to_dict(), f)
 
     return args, base_path, file_paths, seed
+
+
+def _powsybl_network_path(args: NestedNamespace) -> str:
+    """Return the network file the powsybl reader loads.
+
+    Args:
+        args: Configuration object, ``network.source`` ``pglib`` or ``file``.
+
+    Returns:
+        The PGLib file, downloaded and corrected if needed, or the given file.
+
+    Raises:
+        ValueError: If ``network.source`` is neither ``pglib`` nor ``file``.
+    """
+    if args.network.source == "pglib":
+        return get_pglib_file_path(args.network.name)
+    if args.network.source != "file":
+        raise ValueError(
+            f"network.source must be 'pglib' or 'file', got {args.network.source!r}",
+        )
+    if getattr(args.network, "file", None):
+        return args.network.file
+    return os.path.join(args.network.network_dir, args.network.name) + ".m"
 
 
 def _prepare_network_and_scenarios(
@@ -235,7 +347,7 @@ def _prepare_network_and_scenarios(
 
     if args.network.source == "pglib":
         if reader == "powsybl":
-            network_path = get_pglib_file_path(args.network.name)
+            network_path = _powsybl_network_path(args)
             loaded_net = powsybl.load_net(network_path)
             meta["pp_net"] = loaded_net.pp_net
             meta["network_path"] = network_path
@@ -245,11 +357,7 @@ def _prepare_network_and_scenarios(
             net = load_net_from_pglib(args.network.name)
     elif args.network.source == "file":
         if reader == "powsybl":
-            network_path = (
-                args.network.file
-                if getattr(args.network, "file", None)
-                else os.path.join(args.network.network_dir, args.network.name) + ".m"
-            )
+            network_path = _powsybl_network_path(args)
             loaded_net = powsybl.load_net(network_path)
             meta["pp_net"] = loaded_net.pp_net
             meta["network_path"] = network_path
@@ -272,6 +380,7 @@ def _prepare_network_and_scenarios(
         file_paths["scenarios_log"],
         max_iter=args.settings.max_iter,
         seed=seed,
+        coinhsl=args.settings.coinhsl.to_dict(),
     )
     scenarios_df = load_scenarios_to_df(scenarios)
     write_parquet(scenarios_df, file_paths["scenarios"])
@@ -381,6 +490,7 @@ def generate_power_flow_data(
         args.settings.max_iter,
         file_paths["solver_log_dir"],
         opf_formulation=args.settings.opf_formulation,
+        coinhsl=args.settings.coinhsl.to_dict(),
     )
 
     processed_data = []
@@ -463,6 +573,12 @@ def generate_power_flow_data_distributed(
 ) -> Dict[str, str]:
     """Generate power flow data based on the provided configuration using distributed processing.
 
+    ``settings.process_backend`` selects ``multiprocessing_pool`` for a spawned
+    Pool with live progress, or ``process_pool_executor`` (the default).
+    Both backends share worker initialization, chunk boundaries, and seed policy.
+    With ``settings.enable_checkpointing``, completed large chunks and the run
+    seed are persisted; ``overwrite: false`` resumes compatible saved progress.
+
     Args:
         config: Configuration can be provided in three ways:
             1. Path to a YAML config file (str)
@@ -489,11 +605,33 @@ def generate_power_flow_data_distributed(
         - scenarios_{generator}.log: Load scenario generation notes
     """
     # Setup environment
-    args, base_path, file_paths, seed = _setup_environment(config)
+    args, base_path, file_paths, seed = _setup_environment(
+        config,
+        allow_checkpointing=True,
+    )
 
     scenario_count = args.load.scenarios
     large_chunk_size = args.settings.large_chunk_size
     configured_processes = args.settings.num_processes
+
+    # Match np.array_split's balanced boundaries and preserve full-run chunking
+    # and worker counts even when resuming.
+    n_large_chunks = (scenario_count + large_chunk_size - 1) // large_chunk_size
+    large_chunks = _split_range(0, scenario_count, n_large_chunks)
+    checkpoint = None
+    if args.settings.enable_checkpointing:
+        checkpoint = GenerationCheckpoint.load(Path(base_path), args.to_dict())
+        if checkpoint is None:
+            checkpoint = GenerationCheckpoint.create(
+                Path(base_path),
+                args.to_dict(),
+                seed,
+            )
+        else:
+            checkpoint.recover()
+        if checkpoint.state.next_chunk == n_large_chunks:
+            print("All large chunks are already checkpointed; generation is complete.")
+            return file_paths
 
     # Prepare network and scenarios
     net, scenarios, meta = _prepare_network_and_scenarios(args, file_paths, seed)
@@ -513,18 +651,16 @@ def generate_power_flow_data_distributed(
         net,
     )
 
-    # Match np.array_split's balanced chunk boundaries without first allocating
-    # an int64 array containing every scenario index.
-    n_large_chunks = (scenario_count + large_chunk_size - 1) // large_chunk_size
-    large_chunks = _split_range(0, scenario_count, n_large_chunks)
     max_large_chunk_size = max(stop - start for start, stop in large_chunks)
     worker_count = min(configured_processes, max_large_chunk_size)
+    process_backend = getattr(args.settings, "process_backend", "process_pool_executor")
+    use_multiprocessing = process_backend == "multiprocessing_pool"
 
     # pp_net wraps JVM state and cannot cross process boundaries. Spawned
     # workers reload it once from network_path; the in-process path can reuse it.
     worker_meta = (
         meta
-        if worker_count == 1
+        if worker_count == 1 and not use_multiprocessing
         else {key: value for key, value in meta.items() if key != "pp_net"}
     )
     worker_initargs = (
@@ -543,6 +679,7 @@ def generate_power_flow_data_distributed(
         args.settings.pf_solver,
         worker_meta,
         args.settings.opf_formulation,
+        args.settings.coinhsl.to_dict(),
     )
 
     with open(file_paths["tqdm_log"], "a", encoding="utf-8") as f:
@@ -555,8 +692,16 @@ def generate_power_flow_data_distributed(
 
             def process_large_chunks(
                 executor: Optional[ProcessPoolExecutor] = None,
+                pool: Optional[Pool] = None,
+                progress_queue: Optional[Any] = None,
             ) -> None:
-                for large_start, large_stop in large_chunks:
+                for chunk_index, (large_start, large_stop) in enumerate(large_chunks):
+                    if (
+                        checkpoint is not None
+                        and chunk_index < checkpoint.state.next_chunk
+                    ):
+                        pbar.update(large_stop - large_start)
+                        continue
                     write_ram_usage_distributed(f)
                     chunk_size = large_stop - large_start
                     scenario_chunks = _split_range(
@@ -566,7 +711,18 @@ def generate_power_flow_data_distributed(
                     )
                     results_by_start = {}
 
-                    if executor is None:
+                    if pool is not None:
+                        tasks = [
+                            (start, np.ascontiguousarray(scenarios[:, start:stop, :]))
+                            for start, stop in scenario_chunks
+                        ]
+                        results_by_start = _collect_pool_results(
+                            pool,
+                            tasks,
+                            progress_queue,
+                            pbar,
+                        )
+                    elif executor is None:
                         for start, stop in scenario_chunks:
                             result = _process_scenario_worker(
                                 (start, scenarios[:, start:stop, :]),
@@ -618,7 +774,8 @@ def generate_power_flow_data_distributed(
                             raise RuntimeError(
                                 f"Scenario chunk starting at {start} returned no data",
                             )
-                        pbar.update(processed_count)
+                        if progress_queue is None:
+                            pbar.update(processed_count)
                         processed_data.extend(local_processed_data)
 
                     # Save processed data
@@ -629,8 +786,20 @@ def generate_power_flow_data_distributed(
                         base_path,
                         args,
                     )
+                    if checkpoint is not None:
+                        checkpoint.commit(chunk_index + 1)
 
-            if worker_count == 1:
+            if use_multiprocessing:
+                mp_context = multiprocessing.get_context("spawn")
+                with mp_context.Manager() as manager:
+                    progress_queue = manager.Queue()
+                    with mp_context.Pool(
+                        processes=worker_count,
+                        initializer=_initialize_scenario_worker,
+                        initargs=worker_initargs + (progress_queue,),
+                    ) as pool:
+                        process_large_chunks(pool=pool, progress_queue=progress_queue)
+            elif worker_count == 1:
                 # Avoid spawning a process, serializing state, and starting a
                 # second Python interpreter when no parallelism was requested.
                 _initialize_scenario_worker(*worker_initargs)

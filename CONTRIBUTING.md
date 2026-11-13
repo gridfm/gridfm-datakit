@@ -84,7 +84,8 @@ Before opening a PR, make sure you complete all steps:
 
 `integrationtests/` holds end-to-end tests that exercise the whole pipeline the way a
 user does. For `case14_ieee` (200 load scenarios x 2 topology variants, fixed seed) in
-both `pf` and `opf` mode, each test:
+both `pf` and `opf` mode, once with the default reader and once through PowSyBl, each
+test:
 
 1. builds a config from `scripts/config/default.yaml`,
 2. runs `gridfm_datakit generate` and then `gridfm_datakit validate --n-partitions 0`,
@@ -93,6 +94,12 @@ both `pf` and `opf` mode, each test:
    angle differences), and
 4. checks them against calibrated bounds read from
    `integrationtests/calibration_baseline.json`.
+
+Each reader/mode case runs with both `ProcessPoolExecutor` and
+`multiprocessing.Pool`, comparing both backends against the same baseline.
+A separate small case checks the Pool backend with one PowSyBl worker.
+Checkpoint recovery tests also interrupt a saved but uncommitted chunk and compare
+resumed PF/OPF datasets with uninterrupted generation across both process backends.
 
 `validate` checks that every scenario is physically valid; the calibrated bounds
 catch changes in *what* is generated, which `validate` cannot see.

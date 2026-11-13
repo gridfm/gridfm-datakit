@@ -62,6 +62,7 @@ def main() -> None:
         "branch_data",
         "y_bus_data",
         "runtime_data",
+        "events",
         "dynamic_results",
         "dynamic_reports_dir",
         "metadata",

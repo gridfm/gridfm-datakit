@@ -41,6 +41,8 @@ admittance_perturbation:
 
 settings:
   num_processes: 16 # Number of parallel processes to use
+  process_backend: "process_pool_executor" # Options: process_pool_executor, multiprocessing_pool
+  enable_checkpointing: false # Save completed chunks; overwrite: false resumes a matching run
   data_dir: "./data_out" # Directory to save generated data relative to the project root
   large_chunk_size: 1000 # Number of load scenarios processed before saving
   overwrite: true # If true, overwrites existing files, if false, appends to files
@@ -52,4 +54,8 @@ settings:
   pf_solver: "powermodel" # Engine solving the power flow in pf mode; options: powermodel, powsybl, lightsim2grid. The OPF is always solved by PowerModels. powsybl requires network.reader: powsybl.
   opf_formulation: "polar" # Use "rectangular" for the faster ACR formulation. AC OPF is nonconvex, so validate that its potentially different local solution is acceptable before switching.
   max_iter: 200 # Max iterations for Ipopt-based solvers
+  coinhsl:
+    enabled: false # Enable an installed CoinHSL library for Ipopt solves
+    linear_solver: "ma57" # Options: ma27, ma57, ma77, ma86, ma97
+    hsllib: "" # Path to the CoinHSL shared library; required when enabled
   seed: null # Seed for random number generation. If null, a random seed is generated (RECOMMENDED). To get the same data across runs, set the seed and note that ALL OTHER PARAMETERS IN THE CONFIG FILE MUST BE THE SAME.

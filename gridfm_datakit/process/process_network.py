@@ -6,6 +6,7 @@ running power flow calculations, and generating perturbed scenarios
 for data generation purposes.
 """
 
+import json
 import os
 import time
 import traceback
@@ -16,6 +17,7 @@ import numpy as np
 
 import gridfm_datakit.lightsim2grid as lightsim2grid
 import gridfm_datakit.powsybl as powsybl
+from gridfm_datakit.config import CoinHSLConfig
 from gridfm_datakit.network import Network, branch_vectors, makeYbus
 from gridfm_datakit.perturbations.admittance_perturbation import AdmittanceGenerator
 from gridfm_datakit.perturbations.generator_perturbation import GenerationGenerator
@@ -75,6 +77,7 @@ def init_julia(
     print_level: Optional[int] = None,
     output: Optional[SolverOutputConfig] = None,
     opf_formulation: str = "polar",
+    coinhsl: Optional[Dict[str, Any]] = None,
 ) -> Any:
     """Initialize Julia interface with PowerModels.jl.
 
@@ -94,17 +97,29 @@ def init_julia(
         opf_formulation: AC OPF coordinate formulation. ``"polar"`` preserves
             the historical formulation; ``"rectangular"`` uses ACR coordinates
             with starts from the current network state and is often faster.
+        coinhsl: Optional mapping with ``enabled``, ``linear_solver``, and
+            ``hsllib``. Applies to all Ipopt solves; disabled by default.
 
     Returns:
         Julia interface object for running power flow calculations.
 
     Raises:
+        ValueError: If the OPF formulation or CoinHSL settings are invalid.
         RuntimeError: If Julia initialization fails.
     """
     if opf_formulation not in ("polar", "rectangular"):
         raise ValueError(
             "opf_formulation must be 'polar' or 'rectangular', "
             f"got {opf_formulation!r}",
+        )
+
+    hsl = CoinHSLConfig.model_validate({} if coinhsl is None else coinhsl)
+    coinhsl_options = ""
+    if hsl.enabled:
+        # JSON quoting escapes paths; additionally escape Julia interpolation.
+        library_literal = json.dumps(hsl.hsllib, ensure_ascii=False).replace("$", "\\$")
+        coinhsl_options = (
+            f'"linear_solver" => "{hsl.linear_solver}",\n"hsllib" => {library_literal},'
         )
 
     if output is None:
@@ -241,6 +256,7 @@ def init_julia(
                     "tol" => 1e-6,
                     "print_level" => {print_level},
                     "max_iter" => {max_iter},
+                    {coinhsl_options}
                 ),
             )
             result["runtime"] = time() - start_time
@@ -263,6 +279,7 @@ def init_julia(
                         "tol" => 1e-6,
                         "print_level" => {print_level},
                         "max_iter" => {max_iter},
+                        {coinhsl_options}
                     );
                     solution_processors=[sol_data_model!],
                 )
@@ -299,6 +316,7 @@ def init_julia(
                     "tol" => 1e-6,
                     "print_level" => {},
                     "max_iter" => {},
+                    {coinhsl_options}
                 ),
             )
             end_time = time()  # record end time
@@ -306,7 +324,7 @@ def init_julia(
             result["solution"]["pf"] = false
             return result
         end
-        """.format(print_level, dc_iter),
+        """.format(print_level, dc_iter, coinhsl_options=coinhsl_options),
         )
 
         jl.seval("const run_dcopf = _run_dcopf_core")
@@ -373,6 +391,7 @@ def init_julia(
                         "tol" => 1e-6,
                         "print_level" => {},
                         "max_iter" => {},
+                        {coinhsl_options}
                     ),
                 )
             finally
@@ -391,7 +410,7 @@ def init_julia(
             return result
         end
         _run_pf_core(case_file) = run_pf_data(PowerModels.parse_file(case_file))
-        """.format(print_level, max_iter),
+        """.format(print_level, max_iter, coinhsl_options=coinhsl_options),
         )
 
         jl.seval("const run_pf = _run_pf_core")
@@ -407,6 +426,7 @@ def init_julia(
                     "tol" => 1e-6,
                     "print_level" => {},
                     "max_iter" => {},
+                    {coinhsl_options}
                 ),
             )
 
@@ -422,7 +442,7 @@ def init_julia(
             return result
         end
         _run_dcpf_core(case_file) = run_dcpf_data(PowerModels.parse_file(case_file))
-        """.format(print_level, dc_iter),
+        """.format(print_level, dc_iter, coinhsl_options=coinhsl_options),
         )
 
         jl.seval("const run_dcpf = _run_dcpf_core")
@@ -1319,8 +1339,14 @@ def _initialize_scenario_worker(
     pf_solver: str,
     meta: Optional[Dict],
     opf_formulation: str = "polar",
+    coinhsl: Optional[Dict[str, Any]] = None,
+    progress_queue: Optional[Any] = None,
 ) -> None:
-    """Install immutable run state once in a spawned scenario worker."""
+    """Install immutable run state once in a spawned scenario worker.
+
+    The optional ``progress_queue`` reports completed scenarios to the parent
+    when using the multiprocessing.Pool backend.
+    """
     global _worker_context, _worker_jl
     _worker_jl = None
     _worker_context = {
@@ -1339,6 +1365,8 @@ def _initialize_scenario_worker(
         "pf_solver": pf_solver,
         "meta": meta,
         "opf_formulation": opf_formulation,
+        "coinhsl": coinhsl,
+        "progress_queue": progress_queue,
     }
 
 
@@ -1363,7 +1391,7 @@ def _process_scenario_worker(
         scenario_count,
         scenarios,
         _worker_context["net"],
-        None,
+        _worker_context["progress_queue"],
         _worker_context["topology_generator"],
         _worker_context["generation_generator"],
         _worker_context["admittance_generator"],
@@ -1378,6 +1406,7 @@ def _process_scenario_worker(
         _worker_context["meta"],
         scenario_index_offset=scenario_index_offset,
         opf_formulation=_worker_context["opf_formulation"],
+        coinhsl=_worker_context["coinhsl"],
     )
     return (
         scenario_index_offset,
@@ -1410,6 +1439,7 @@ def process_scenario_chunk(
     *,
     scenario_index_offset: int = 0,
     opf_formulation: str = "polar",
+    coinhsl: Optional[Dict[str, Any]] = None,
 ) -> Tuple[
     Union[None, Exception],
     Union[None, str],
@@ -1443,6 +1473,8 @@ def process_scenario_chunk(
             and 'mapping_p2g'. 'pp_net' is loaded fresh per worker from 'network_path'.
         scenario_index_offset: Global index added to local indices when ``scenarios``
             contains only the current chunk.
+        opf_formulation: AC OPF coordinate formulation.
+        coinhsl: Optional CoinHSL settings forwarded to Ipopt initialization.
 
     Returns:
         Tuple containing:
@@ -1459,6 +1491,7 @@ def process_scenario_chunk(
                 max_iter,
                 solver_log_dir,
                 opf_formulation=opf_formulation,
+                coinhsl=coinhsl,
             )
         jl = _worker_jl
 

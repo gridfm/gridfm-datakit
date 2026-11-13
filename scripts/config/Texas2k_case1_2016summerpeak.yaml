@@ -40,6 +40,8 @@ admittance_perturbation:
 
 settings:
   num_processes: 16 # Number of parallel processes to use
+  process_backend: "process_pool_executor" # Options: process_pool_executor, multiprocessing_pool
+  enable_checkpointing: false # Save completed chunks; overwrite: false resumes a matching run
   data_dir: "./baseline_perturbations" # Directory to save generated data relative to the project root
   large_chunk_size: 10000 # Number of load scenarios processed before saving
   overwrite: true # If true, overwrites existing files, if false, appends to files
@@ -50,4 +52,8 @@ settings:
   dcpf_fast: true # Whether to use fast DCPF solver by default (compute_dc_pf from PowerModels.jl)
   opf_formulation: "polar" # "rectangular" is faster on this grid but produced a materially different operating point in benchmarks; keep polar unless that tradeoff is intentional.
   max_iter: 200 # Max iterations for Ipopt-based solvers
+  coinhsl:
+    enabled: false # Enable an installed CoinHSL library for Ipopt solves
+    linear_solver: "ma57" # Options: ma27, ma57, ma77, ma86, ma97
+    hsllib: "" # Path to the shared library; required when enabled
   seed: null # Seed for random number generation. If null, a random seed is generated (RECOMMENDED). To get the same data across runs, set the seed and note that ALL OTHER PARAMETERS IN THE CONFIG FILE MUST BE THE SAME.
