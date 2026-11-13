@@ -32,8 +32,6 @@ _pypowsybl_dynamic = None
 
 # Where powsybl looks for its configuration, and how the Dynawo installation is
 # declared in it. See https://powsybl.readthedocs.io/ (itools configuration).
-_CONFIG_DIR_ENV = "POWSYBL_CONFIG_DIR"
-_CONFIG_NAME_ENV = "POWSYBL_CONFIG_NAME"
 _DEFAULT_CONFIG_DIR = Path.home() / ".itools"
 _DEFAULT_CONFIG_NAME = "config"
 _CONFIG_EXTENSIONS = (".yml", ".yaml", ".xml")
@@ -93,17 +91,19 @@ def check_pypowsybl_dynamic_available() -> None:
 
 
 def _powsybl_config_dir() -> Path:
-    """Return the directory powsybl reads its configuration from."""
-    env = os.environ.get(_CONFIG_DIR_ENV)
-    return Path(env) if env else _DEFAULT_CONFIG_DIR
+    """Return the directory powsybl reads its configuration from.
+
+    pypowsybl takes it from Java system properties only, so no environment
+    variable moves it.
+    """
+    return _DEFAULT_CONFIG_DIR
 
 
 def _find_powsybl_config_file() -> Optional[Path]:
     """Return the powsybl config file, or None if there is none."""
     config_dir = _powsybl_config_dir()
-    name = os.environ.get(_CONFIG_NAME_ENV, _DEFAULT_CONFIG_NAME)
     for ext in _CONFIG_EXTENSIONS:
-        candidate = config_dir / f"{name}{ext}"
+        candidate = config_dir / f"{_DEFAULT_CONFIG_NAME}{ext}"
         if candidate.is_file():
             return candidate
     return None
