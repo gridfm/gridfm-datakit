@@ -225,7 +225,9 @@ class ScenarioTimeoutPool:
         self.pool = None
 
     def collect(
-        self, tasks: list[tuple[int, np.ndarray]], progress_bar: tqdm,
+        self,
+        tasks: list[tuple[int, np.ndarray]],
+        progress_bar: tqdm,
     ) -> dict[int, tuple]:
         """Retry an unsaved large chunk until every non-skipped scenario finishes.
 

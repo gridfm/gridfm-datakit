@@ -25,7 +25,9 @@ def _initialize_with_stall(*args: Any) -> None:
         original = getattr(process_network, name)
 
         def stalled(
-            *positional: Any, _original: Any = original, **keywords: Any,
+            *positional: Any,
+            _original: Any = original,
+            **keywords: Any,
         ) -> list:
             """Simulate a hung solver call while preserving all other computations."""
             if positional[2] == 2:
@@ -67,9 +69,9 @@ def test_timeout_skips_only_offender_and_preserves_outputs(
     baseline_config = deepcopy(config)
     baseline_config["settings"]["overwrite"] = False
     expected = generate.generate_power_flow_data_distributed(baseline_config)
-    assert (
-        json.loads(Path(expected["checkpoint"]).read_text())["skipped_scenarios"] == [2]
-    )
+    assert json.loads(Path(expected["checkpoint"]).read_text())[
+        "skipped_scenarios"
+    ] == [2]
     target = deepcopy(config)
     target["settings"]["data_dir"] = str(tmp_path / "stalled")
     monkeypatch.setattr(generate, "_initialize_scenario_worker", _initialize_with_stall)
@@ -135,21 +137,37 @@ def test_large_timeout_matches_disabled_timeout(tmp_path: Path, mode: str) -> No
         {
             "load": {"scenarios": 8},
             "settings": {
-                "mode": mode, "num_processes": 2, "large_chunk_size": 3,
-                "process_backend": "multiprocessing_pool", "enable_checkpointing": True,
+                "mode": mode,
+                "num_processes": 2,
+                "large_chunk_size": 3,
+                "process_backend": "multiprocessing_pool",
+                "enable_checkpointing": True,
             },
         },
         str(tmp_path / "disabled"),
     )
     expected = generate.generate_power_flow_data_distributed(config)
-    config["settings"].update(data_dir=str(tmp_path / "monitored"), scenario_timeout_sec=1000.0)
+    config["settings"].update(
+        data_dir=str(tmp_path / "monitored"),
+        scenario_timeout_sec=1000.0,
+    )
     actual = generate.generate_power_flow_data_distributed(config)
     assert json.loads(Path(actual["checkpoint"]).read_text())["skipped_scenarios"] == []
     for dataset, keys in {
-        "bus_data": ["scenario", "bus"], "gen_data": ["scenario", "idx"],
-        "branch_data": ["scenario", "idx"], "y_bus_data": ["scenario", "index1", "index2"],
+        "bus_data": ["scenario", "bus"],
+        "gen_data": ["scenario", "idx"],
+        "branch_data": ["scenario", "idx"],
+        "y_bus_data": ["scenario", "index1", "index2"],
     }.items():
-        baseline = pd.read_parquet(expected[dataset]).sort_values(keys).reset_index(drop=True)
-        observed = pd.read_parquet(actual[dataset]).sort_values(keys).reset_index(drop=True)
+        baseline = (
+            pd.read_parquet(expected[dataset]).sort_values(keys).reset_index(drop=True)
+        )
+        observed = (
+            pd.read_parquet(actual[dataset]).sort_values(keys).reset_index(drop=True)
+        )
         assert_frame_equal(observed, baseline, check_exact=True)
-    assert_frame_equal(pd.read_parquet(actual["scenarios"]), pd.read_parquet(expected["scenarios"]), check_exact=True)
+    assert_frame_equal(
+        pd.read_parquet(actual["scenarios"]),
+        pd.read_parquet(expected["scenarios"]),
+        check_exact=True,
+    )

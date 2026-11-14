@@ -294,7 +294,8 @@ def _setup_environment(
         file_paths["checkpoint"] = os.path.join(base_path, "checkpoint.json")
     if getattr(args.settings, "scenario_timeout_sec", None) is not None:
         file_paths["timeouts_log"] = os.path.join(
-            base_path, "timed_out_scenarios.jsonl",
+            base_path,
+            "timed_out_scenarios.jsonl",
         )
         Path(file_paths["timeouts_log"]).touch(exist_ok=True)
 
@@ -740,7 +741,10 @@ def generate_power_flow_data_distributed(
                             for start, stop in scenario_chunks
                         ]
                         results_by_start = _collect_pool_results(
-                            pool, tasks, progress_queue, pbar,
+                            pool,
+                            tasks,
+                            progress_queue,
+                            pbar,
                         )
                     elif executor is None:
                         for start, stop in scenario_chunks:

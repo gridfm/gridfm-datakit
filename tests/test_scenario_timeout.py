@@ -42,7 +42,10 @@ def _fake_scenario(*args: Any, **kwargs: Any) -> list:
 
 
 def _initialize_fake_worker(
-    options: dict, queue: Any, timeout: float, skipped: set[int],
+    options: dict,
+    queue: Any,
+    timeout: float,
+    skipped: set[int],
 ) -> None:
     """Install the real scenario loop with a simulated solver in a spawned child."""
     global _OPTIONS
@@ -91,7 +94,8 @@ def test_hung_scenarios_are_skipped_with_repeatable_chunk_draws(
             reports.append,
         ) as pool:
             results = pool.collect(
-                [(5, np.zeros((1, 3, 2))), (8, np.zeros((1, 3, 2)))], bar,
+                [(5, np.zeros((1, 3, 2))), (8, np.zeros((1, 3, 2)))],
+                bar,
             )
             assert pool.skipped_scenarios == {6, 9}
         assert bar.n == 6
@@ -110,7 +114,10 @@ def test_hung_scenarios_are_skipped_with_repeatable_chunk_draws(
 @pytest.mark.parametrize("mode", ["pf", "opf"])
 @pytest.mark.parametrize("seed", [0, 42])
 def test_large_timeout_preserves_chunk_random_stream(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str, seed: int,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mode: str,
+    seed: int,
 ) -> None:
     """Monitoring must preserve successive draws, including at nonzero offsets."""
     monkeypatch.setattr(process_network, "_worker_jl", object())
@@ -124,9 +131,24 @@ def test_large_timeout_preserves_chunk_random_stream(
     outputs = []
     for timeout in (None, 1000.0):
         error, traceback_text, data = process_network.process_scenario_chunk(
-            mode, 0, 5, np.zeros((1, 5, 2)), None, Queue(), None, None, None,
-            str(tmp_path / "error.log"), False, True, True, None, 10, seed,
-            scenario_index_offset=7, scenario_timeout_sec=timeout,
+            mode,
+            0,
+            5,
+            np.zeros((1, 5, 2)),
+            None,
+            Queue(),
+            None,
+            None,
+            None,
+            str(tmp_path / "error.log"),
+            False,
+            True,
+            True,
+            None,
+            10,
+            seed,
+            scenario_index_offset=7,
+            scenario_timeout_sec=timeout,
         )
         assert error is None, traceback_text
         outputs.append(data)
@@ -200,7 +222,12 @@ def test_done_events_are_drained_before_deadline_checks() -> None:
     bar = Mock()
     assert (
         _collect_timed_results(
-            pool, [(7, np.zeros((1, 1, 2)))], queue, bar, 1.0, Mock(),
+            pool,
+            [(7, np.zeros((1, 1, 2)))],
+            queue,
+            bar,
+            1.0,
+            Mock(),
         )[7][0]
         == 7
     )
@@ -217,7 +244,12 @@ def test_finished_over_budget_scenario_still_times_out() -> None:
     pool._pool = []
     with pytest.raises(ScenarioTimeout) as caught:
         _collect_timed_results(
-            pool, [(7, np.zeros((1, 1, 2)))], queue, Mock(), 1.0, Mock(),
+            pool,
+            [(7, np.zeros((1, 1, 2)))],
+            queue,
+            Mock(),
+            1.0,
+            Mock(),
         )
     assert caught.value.scenario_index == 7
     assert caught.value.elapsed == 2.0
@@ -294,5 +326,6 @@ def test_skipped_scenarios_are_durable_before_chunk_commit(tmp_path: Path) -> No
     assert loaded.state.skipped_scenarios == [2, 4]
     loaded.commit(1)
     assert GenerationCheckpoint.load(
-        Path(root), validate_static_config(config),
+        Path(root),
+        validate_static_config(config),
     ).state.skipped_scenarios == [2, 4]
