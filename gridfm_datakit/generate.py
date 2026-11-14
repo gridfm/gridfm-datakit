@@ -592,7 +592,7 @@ def generate_power_flow_data_distributed(
     With ``settings.enable_checkpointing``, completed large chunks and the run
     seed are persisted; ``overwrite: false`` resumes compatible saved progress.
     An optional ``settings.scenario_timeout_sec`` enables Pool supervision,
-    per-load-scenario seeds, and durable skipping of timed-out indices.
+    unchanged chunk seeding, and durable skipping of timed-out indices.
 
     Args:
         config: Configuration can be provided in three ways:

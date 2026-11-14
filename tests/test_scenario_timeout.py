@@ -72,10 +72,10 @@ def _initialize_fake_worker(
 
 
 @pytest.mark.timeout(45)
-def test_hung_scenarios_are_skipped_without_changing_other_draws(
+def test_hung_scenarios_are_skipped_with_repeatable_chunk_draws(
     tmp_path: Path,
 ) -> None:
-    """Kill offenders, recreate pools, and preserve the draws of surviving indices."""
+    """Kill offenders and reproduce each chunk's stream for the final skip set."""
     previous = {process.pid for process in multiprocessing.active_children()}
     options = {"hang": [6, 9], "error_log": str(tmp_path / "error.log")}
     reports = []
@@ -96,22 +96,41 @@ def test_hung_scenarios_are_skipped_without_changing_other_draws(
             assert pool.skipped_scenarios == {6, 9}
         assert bar.n == 6
     actual = [record for start in sorted(results) for record in results[start][4]]
-    expected = [
-        (
-            index,
-            float(
-                np.random.RandomState(
-                    _DEFAULT_SEED_POLICY.distributed_seed(42, index),
-                ).random_sample(),
-            ),
-        )
-        for index in (5, 7, 8, 10)
-    ]
+    expected = []
+    for start, indices in ((5, (5, 7)), (8, (8, 10))):
+        rng = np.random.RandomState(_DEFAULT_SEED_POLICY.distributed_seed(42, start))
+        expected.extend((index, float(rng.random_sample())) for index in indices)
     assert actual == expected
     assert {error.scenario_index for error in reports} == {6, 9}
     assert not (
         {process.pid for process in multiprocessing.active_children()} - previous
     )
+
+
+@pytest.mark.parametrize("mode", ["pf", "opf"])
+@pytest.mark.parametrize("seed", [0, 42])
+def test_large_timeout_preserves_chunk_random_stream(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str, seed: int,
+) -> None:
+    """Monitoring must preserve successive draws, including at nonzero offsets."""
+    monkeypatch.setattr(process_network, "_worker_jl", object())
+
+    def record_draws(*args: Any, **kwargs: Any) -> list:
+        """Consume a different number of draws for each load scenario."""
+        args[6].append((args[2], tuple(np.random.random(args[2] % 3 + 1))))
+        return args[6]
+
+    monkeypatch.setattr(process_network, f"process_scenario_{mode}_mode", record_draws)
+    outputs = []
+    for timeout in (None, 1000.0):
+        error, traceback_text, data = process_network.process_scenario_chunk(
+            mode, 0, 5, np.zeros((1, 5, 2)), None, Queue(), None, None, None,
+            str(tmp_path / "error.log"), False, True, True, None, 10, seed,
+            scenario_index_offset=7, scenario_timeout_sec=timeout,
+        )
+        assert error is None, traceback_text
+        outputs.append(data)
+    assert outputs[0] == outputs[1]
 
 
 @pytest.mark.timeout(45)

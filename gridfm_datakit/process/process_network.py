@@ -1483,7 +1483,7 @@ def process_scenario_chunk(
             contains only the current chunk.
         opf_formulation: AC OPF coordinate formulation.
         coinhsl: Optional CoinHSL settings forwarded to Ipopt initialization.
-        scenario_timeout_sec: Enables timed start/done events and per-scenario seeds.
+        scenario_timeout_sec: Enables timed events without changing chunk seeding.
         skipped_scenarios: Global indices of timed-out load scenarios to omit.
 
     Returns:
@@ -1533,11 +1533,6 @@ def process_scenario_chunk(
                     continue
                 current_scenario = scenario_index
                 if scenario_timeout_sec is not None:
-                    # Retry-independent randomness: skipped scenarios never shift
-                    # the perturbations of another scenario in this chunk.
-                    np.random.seed(
-                        _DEFAULT_SEED_POLICY.distributed_seed(seed, scenario_index),
-                    )
                     progress_queue.put(
                         ("start", os.getpid(), scenario_index, time.monotonic()),
                     )

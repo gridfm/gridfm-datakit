@@ -140,11 +140,16 @@ the checkpoint also persists `skipped_scenarios` immediately, before the chunk i
 saved, so resuming does not rerun known offenders. Without checkpointing, the skip
 set applies to the current invocation. Logs retain the history of aborted attempts.
 
-Timeout mode seeds each load scenario independently using its global index.
-Retries and skipped scenarios therefore do not change the random perturbations of
-surviving scenarios. This differs from the legacy chunk-stream seed sequence:
-enabling timeouts can change seeded output even when no limit is exceeded. Keep
-the timeout setting unchanged when resuming a checkpointed run.
+Timeout monitoring uses the same chunk-based seed stream as ordinary generation.
+With the same seed and configuration, a positive timeout (for example, `1000`)
+and `null` produce identical physical outputs when no scenario times out.
+If a scenario is actually skipped, it consumes no random draws on the retry, so
+later perturbations in that worker chunk can differ from a run that processed it.
+Retries and resumes are deterministic for the same skipped indices and settings.
+Keep the timeout setting unchanged when resuming a checkpointed run.
+
+Start a fresh run when updating from the earlier per-scenario timeout seeding
+implementation; its saved chunks were generated with a different seed sequence.
 
 The default `scenario_timeout_sec: null` disables timeouts and retains the
 existing seed behavior. Timeouts apply only to distributed static generation with

@@ -43,7 +43,7 @@ def test_timeout_skips_only_offender_and_preserves_outputs(
     mode: str,
     interrupt_after_skip: bool,
 ) -> None:
-    """Kill a hung real-solver worker and retain exactly the other load scenarios."""
+    """Match a reference that omits the same offender from the chunk seed stream."""
     generate = importlib.import_module("gridfm_datakit.generate")
     config = build_config(
         {
@@ -59,9 +59,16 @@ def test_timeout_skips_only_offender_and_preserves_outputs(
         },
         str(tmp_path / "baseline"),
     )
-    expected = generate.generate_power_flow_data_distributed(config)
+    args, root, _, seed = generate._setup_environment(config, allow_checkpointing=True)
+    reference = GenerationCheckpoint.create(Path(root), args.to_dict(), seed)
+    # A skipped scenario consumes no draws; seed the reference with the same
+    # skip set instead of filtering a run that already consumed those draws.
+    reference.record_skip(2)
+    baseline_config = deepcopy(config)
+    baseline_config["settings"]["overwrite"] = False
+    expected = generate.generate_power_flow_data_distributed(baseline_config)
     assert (
-        json.loads(Path(expected["checkpoint"]).read_text())["skipped_scenarios"] == []
+        json.loads(Path(expected["checkpoint"]).read_text())["skipped_scenarios"] == [2]
     )
     target = deepcopy(config)
     target["settings"]["data_dir"] = str(tmp_path / "stalled")
@@ -118,3 +125,31 @@ def test_timeout_skips_only_offender_and_preserves_outputs(
             for line in Path(actual["timeouts_log"]).read_text().splitlines()
         ]
         assert [record["load_scenario_idx"] for record in records] == [2]
+
+
+@pytest.mark.parametrize("mode", ["pf", "opf"])
+def test_large_timeout_matches_disabled_timeout(tmp_path: Path, mode: str) -> None:
+    """A non-triggered watchdog must leave seeded physical datasets unchanged."""
+    generate = importlib.import_module("gridfm_datakit.generate")
+    config = build_config(
+        {
+            "load": {"scenarios": 8},
+            "settings": {
+                "mode": mode, "num_processes": 2, "large_chunk_size": 3,
+                "process_backend": "multiprocessing_pool", "enable_checkpointing": True,
+            },
+        },
+        str(tmp_path / "disabled"),
+    )
+    expected = generate.generate_power_flow_data_distributed(config)
+    config["settings"].update(data_dir=str(tmp_path / "monitored"), scenario_timeout_sec=1000.0)
+    actual = generate.generate_power_flow_data_distributed(config)
+    assert json.loads(Path(actual["checkpoint"]).read_text())["skipped_scenarios"] == []
+    for dataset, keys in {
+        "bus_data": ["scenario", "bus"], "gen_data": ["scenario", "idx"],
+        "branch_data": ["scenario", "idx"], "y_bus_data": ["scenario", "index1", "index2"],
+    }.items():
+        baseline = pd.read_parquet(expected[dataset]).sort_values(keys).reset_index(drop=True)
+        observed = pd.read_parquet(actual[dataset]).sort_values(keys).reset_index(drop=True)
+        assert_frame_equal(observed, baseline, check_exact=True)
+    assert_frame_equal(pd.read_parquet(actual["scenarios"]), pd.read_parquet(expected["scenarios"]), check_exact=True)
