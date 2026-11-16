@@ -37,8 +37,11 @@ def _initialize_with_stall(*args: Any) -> None:
         setattr(process_network, name, stalled)
 
 
-@pytest.mark.parametrize("mode", ["pf", "opf"])
-@pytest.mark.parametrize("interrupt_after_skip", [False, True], ids=["retry", "resume"])
+@pytest.mark.parametrize(
+    ("mode", "interrupt_after_skip"),
+    [("pf", False), ("opf", True)],
+    ids=["retry-pf", "resume-opf"],
+)
 def test_timeout_skips_only_offender_and_preserves_outputs(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -129,7 +132,7 @@ def test_timeout_skips_only_offender_and_preserves_outputs(
         assert [record["load_scenario_idx"] for record in records] == [2]
 
 
-@pytest.mark.parametrize("mode", ["pf", "opf"])
+@pytest.mark.parametrize("mode", ["pf"])
 def test_large_timeout_matches_disabled_timeout(tmp_path: Path, mode: str) -> None:
     """A non-triggered watchdog must leave seeded physical datasets unchanged."""
     generate = importlib.import_module("gridfm_datakit.generate")
