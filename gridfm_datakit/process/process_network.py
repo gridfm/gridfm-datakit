@@ -1483,7 +1483,7 @@ def process_scenario_chunk(
             contains only the current chunk.
         opf_formulation: AC OPF coordinate formulation.
         coinhsl: Optional CoinHSL settings forwarded to Ipopt initialization.
-        scenario_timeout_sec: Enables timed events without changing chunk seeding.
+        scenario_timeout_sec: Wall-clock limit in seconds for one load scenario. None disables it.
         skipped_scenarios: Global indices of timed-out load scenarios to omit.
 
     Returns:
