@@ -31,7 +31,7 @@ def _initialize_with_stall(*args: Any) -> None:
         ) -> list:
             """Simulate a hung solver call while preserving all other computations."""
             if positional[2] == 2:
-                time.sleep(20)
+                time.sleep(180)
             return _original(*positional, **keywords)
 
         setattr(process_network, name, stalled)
@@ -58,7 +58,9 @@ def test_timeout_skips_only_offender_and_preserves_outputs(
                 "num_processes": 2,
                 "large_chunk_size": 4,
                 "process_backend": "multiprocessing_pool",
-                "scenario_timeout_sec": 2.0,
+                # First solves can include Julia compilation on a cold CI runner.
+                # Keep the injected stall well above this healthy-scenario limit.
+                "scenario_timeout_sec": 60.0,
                 "enable_checkpointing": True,
             },
         },
