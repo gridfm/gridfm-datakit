@@ -46,7 +46,7 @@ def _collect_timed_results(
     """Collect chunk results while enforcing deadlines on active load scenarios.
 
     Args:
-        pool: Spawned pool using timed worker events.
+        pool: Pool whose workers report when a scenario starts and finishes.
         tasks: Global offsets and contiguous scenario slices.
         progress_queue: Queue receiving start/done/error events.
         progress_bar: Parent-process progress display.
@@ -170,8 +170,9 @@ class ScenarioTimeoutPool:
         Args:
             context: Spawn multiprocessing context.
             processes: Maximum worker count.
-            initializer: Existing scenario-worker initializer.
-            initargs: Shared worker state before queue/timeout/skip arguments.
+            initializer: Worker setup function
+            initargs: Worker setup arguments. The queue, timeout, and skip
+            list are added after them.
             worker: Existing scenario-worker callable.
             timeout: Per-load-scenario wall-clock limit in seconds.
             skipped_scenarios: Previously persisted timed-out global indices.
@@ -190,7 +191,7 @@ class ScenarioTimeoutPool:
         self.progress_queue = None
 
     def __enter__(self) -> "ScenarioTimeoutPool":
-        """Start the Manager; workers start only when a non-skipped task needs them."""
+        """Start the Manager; workers are started later."""
         self.manager = self.context.Manager()
         return self
 
@@ -236,7 +237,7 @@ class ScenarioTimeoutPool:
             progress_bar: Parent progress display, including skipped scenarios.
 
         Returns:
-            Ordered-by-offset-compatible task results for the successful attempt.
+            Results keyed by the same chunk starts as a normal run.
         """
         indices = {
             index

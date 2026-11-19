@@ -282,7 +282,7 @@ class _StaticSettingsConfig(_ConfigModel):
 
     @model_validator(mode="after")
     def validate_timeout_backend(self) -> "_StaticSettingsConfig":
-        """Require a terminable Pool when scenario timeouts are enabled.
+        """Timeouts need multiprocessing_pool, because those workers can be killed.
 
         Returns:
             Settings with a compatible process backend.

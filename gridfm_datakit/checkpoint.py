@@ -155,10 +155,6 @@ class GenerationCheckpoint:
             index >= config["load"]["scenarios"] for index in state.skipped_scenarios
         ):
             raise ValueError("Checkpoint contains invalid skipped scenario indices")
-        if state.skipped_scenarios and settings.get("scenario_timeout_sec") is None:
-            raise ValueError(
-                "Checkpoint contains skipped scenarios without timeout mode",
-            )
         for name, size in state.files.items():
             relative = PurePosixPath(name)
             if (
@@ -249,7 +245,7 @@ class GenerationCheckpoint:
         )
 
     def record_skip(self, scenario_index: int) -> None:
-        """Persist a timed-out index without committing the unfinished chunk.
+        """Save the skipped scenario now. Do not mark the chunk as finished.
 
         Args:
             scenario_index: Global load-scenario index that must not be retried.

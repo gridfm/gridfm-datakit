@@ -66,8 +66,8 @@ def test_timeout_skips_only_offender_and_preserves_outputs(
     )
     args, root, _, seed = generate._setup_environment(config, allow_checkpointing=True)
     reference = GenerationCheckpoint.create(Path(root), args.to_dict(), seed)
-    # A skipped scenario consumes no draws; seed the reference with the same
-    # skip set instead of filtering a run that already consumed those draws.
+    # Record the skip before the reference run, so it draws random numbers in
+    # the same order as the timed-out run.
     reference.record_skip(2)
     baseline_config = deepcopy(config)
     baseline_config["settings"]["overwrite"] = False
@@ -109,7 +109,7 @@ def test_timeout_skips_only_offender_and_preserves_outputs(
         baseline = pd.read_parquet(expected[dataset])
         baseline = baseline[baseline["load_scenario_idx"] != 2].copy()
         baseline["scenario"] = pd.factorize(baseline["scenario"], sort=True)[0]
-        # Partition ids are derived from the rewritten output scenario numbers.
+        # The partition number is recomputed from the new scenario numbers.
         baseline["scenario_partition"] = baseline["scenario"] // 200
         observed = pd.read_parquet(actual[dataset])
         baseline["scenario_partition"] = baseline["scenario_partition"].astype(
@@ -134,7 +134,7 @@ def test_timeout_skips_only_offender_and_preserves_outputs(
 
 @pytest.mark.parametrize("mode", ["pf"])
 def test_large_timeout_matches_disabled_timeout(tmp_path: Path, mode: str) -> None:
-    """A non-triggered watchdog must leave seeded physical datasets unchanged."""
+    """A timeout that never fires must leave the data unchanged."""
     generate = importlib.import_module("gridfm_datakit.generate")
     config = build_config(
         {

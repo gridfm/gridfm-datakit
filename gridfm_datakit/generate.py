@@ -592,8 +592,8 @@ def generate_power_flow_data_distributed(
     Both backends share worker initialization, chunk boundaries, and seed policy.
     With ``settings.enable_checkpointing``, completed large chunks and the run
     seed are persisted; ``overwrite: false`` resumes compatible saved progress.
-    An optional ``settings.scenario_timeout_sec`` enables Pool supervision,
-    unchanged chunk seeding, and durable skipping of timed-out indices.
+    An optional ``settings.scenario_timeout_sec`` skips a scenario that runs
+    too long and saves that skip.
 
     Args:
         config: Configuration can be provided in three ways:
