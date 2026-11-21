@@ -20,7 +20,7 @@ class ScenarioTimeout(TimeoutError):
     """
 
     def __init__(self, scenario_index: int, worker_pid: int, elapsed: float) -> None:
-        """Store the offender and its measured duration.
+        """Store the timed-out scenario and its measured duration.
 
         Args:
             scenario_index: Global load-scenario index.
