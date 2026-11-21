@@ -165,15 +165,15 @@ class ScenarioTimeoutPool:
         skipped_scenarios: set[int],
         on_timeout: Callable[[ScenarioTimeout], None],
     ) -> None:
-        """Configure pool ownership and durable timeout reporting.
+        """Configure the pool and the callback that saves each skip.
 
         Args:
             context: Spawn multiprocessing context.
             processes: Maximum worker count.
-            initializer: Worker setup function
+            initializer: Worker setup function.
             initargs: Worker setup arguments. The queue, timeout, and skip
-            list are added after them.
-            worker: Existing scenario-worker callable.
+                list are added after them.
+            worker: Scenario worker function.
             timeout: Per-load-scenario wall-clock limit in seconds.
             skipped_scenarios: Previously persisted timed-out global indices.
             on_timeout: Parent callback persisting each newly skipped index.
