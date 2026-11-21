@@ -28,7 +28,7 @@ Skipped global `load_scenario_idx` values and measured durations are written to
 `timed_out_scenarios.jsonl` and reported in `error.log`.
 With [checkpointing](checkpoint.md) enabled, the checkpoint also persists
 `skipped_scenarios` immediately, before the chunk is
-saved, so resuming does not rerun known offenders. Without checkpointing, the skip
+saved, so a skipped scenario stays skipped after a resume. Without checkpointing, the skip
 set applies to the current invocation. Logs retain the history of aborted attempts.
 
 If nothing times out, the data matches a run with no timeout. If a scenario is
