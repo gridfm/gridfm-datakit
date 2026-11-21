@@ -33,9 +33,15 @@ With [checkpointing](checkpoint.md) enabled, the checkpoint also persists
 saved, so a skipped scenario stays skipped after a resume. Without checkpointing, the skip
 set applies to the current invocation. Logs retain the history of aborted attempts.
 
-If nothing times out, the data matches a run with no timeout. If a scenario is
-skipped, it uses no random numbers, so the later scenarios in that chunk can differ.
-Keep the timeout setting unchanged when resuming a checkpointed run.
+If nothing times out, the data matches a run with no timeout.
+
+Each worker draws the random perturbations of its load scenarios one after the
+other. A skipped load scenario draws none. So the later load scenarios of that
+worker get different perturbations than in a run where the skipped one
+finishes, for example a run with another solver. The data is still valid. A
+resumed run gives the same data as an uninterrupted one, because the skips are
+saved in the checkpoint. Keep the timeout setting unchanged when resuming a
+checkpointed run.
 
 The default `scenario_timeout_sec: null` disables timeouts. Timeouts apply only
 to distributed static generation with
