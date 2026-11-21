@@ -83,7 +83,7 @@ def test_timeout_skips_only_offender_and_preserves_outputs(
     record_skip = GenerationCheckpoint.record_skip
 
     def interrupt(self: GenerationCheckpoint, index: int) -> None:
-        """Simulate interruption immediately after the skip becomes durable."""
+        """Stop right after the skip has been saved."""
         record_skip(self, index)
         raise RuntimeError("interrupted after recording timed-out scenario")
 
