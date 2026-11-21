@@ -148,7 +148,7 @@ def _collect_timed_results(
 
 
 class ScenarioTimeoutPool:
-    """Reuse a Pool until a timeout, then skip the offender and retry its chunk.
+    """Reuse a Pool until a timeout, then skip that scenario and retry its chunk.
 
     Attributes:
         skipped_scenarios: Global indices excluded from this and future attempts.
