@@ -227,8 +227,6 @@ jobs:
     # to absorb run-to-run jitter, not cross-environment drift.
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    # Temporarily allow a cold-cache calibration and assertion run to finish.
-    # Restore 60 minutes after a successful run has cached the baseline.
     timeout-minutes: 90
     steps:
       # Baseline is written in phase 1 and read in phase 2. Keep it in RUNNER_TEMP
