@@ -10,11 +10,13 @@ settings:
   enable_checkpointing: true
 ```
 
-The timer covers one complete load scenario: its dispatch OPF and all topology
-variants. It begins after worker/solver initialization, immediately before
-scenario processing. Initialization, queue wait, and result transfer are outside
-this limit. A scenario that exceeds it is skipped in full, so none of its
-partially accumulated variants are saved.
+The timer covers one load scenario. In OPF mode, this is one OPF per topology
+variant. In PF mode, this is the OPF that sets the generator setpoints, followed
+by one PF per topology variant. DC solves are included when `include_dc_res` is
+set. If any of these solves runs too long, every variant of that load scenario
+is skipped. The timer begins after worker/solver initialization, immediately
+before scenario processing. Initialization, queue wait, and result transfer are
+outside this limit.
 
 `ScenarioTimeoutPool` supervises workers from the parent process. The main
 process kills the worker that ran too long, stops the other workers, and runs
