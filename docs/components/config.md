@@ -2,12 +2,15 @@
 
 This module validates configuration for static PF and OPF generation.
 
+### Scenario timeouts
+
+See [Scenario timeouts](scenario_timeout.md) for `settings.scenario_timeout_sec`,
+its backend requirement, and skip behavior.
+
 ### Checkpointing
 
-`settings.enable_checkpointing` defaults to `false`. When enabled, distributed
-static generation persists its seed and completed chunks in `checkpoint.json`.
-Use `overwrite: false` to resume with matching settings. See the
-[checkpoint and resume manual](../manual/getting_started.md#checkpoint-and-resume).
+See [Checkpoint and resume](checkpoint.md) for `settings.enable_checkpointing`
+and resuming with `overwrite: false`.
 
 ### Multiprocessing backend
 

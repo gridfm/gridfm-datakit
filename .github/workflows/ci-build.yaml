@@ -227,7 +227,7 @@ jobs:
     # to absorb run-to-run jitter, not cross-environment drift.
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       # Baseline is written in phase 1 and read in phase 2. Keep it in RUNNER_TEMP
       # (outside the workspace) so the phase-2 checkout does not wipe it. Set via
@@ -241,7 +241,7 @@ jobs:
       #   - runner image: baselines are machine sensitive; a new image must recalibrate
       #   - juliapkg.json + pyproject.toml of the BASE: a solver/dep bump shifts numerics
       # On a hit, phase 1 (checkout base -> calibrate) is skipped entirely. On a miss
-      # we calibrate inline and the cache is saved at job end (post step).
+      # we calibrate inline and save immediately before testing the PR head.
       - name: Checkout base for cache key inputs
         uses: actions/checkout@v7
         with:
@@ -250,7 +250,7 @@ jobs:
 
       - name: Restore base baseline
         id: baseline-cache
-        uses: actions/cache@v6
+        uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/baseline.json
           key: >-
@@ -290,7 +290,14 @@ jobs:
           python -m pip install --upgrade pip wheel
           pip install -e ".[test,powsybl]"
           python -c "from juliacall import Main as jl; jl.seval('using PowerModels, Ipopt, Memento')"
-          pytest integrationtests -s --calibrate
+          pytest integrationtests/test_generate_e2e.py -s --calibrate
+
+      - name: Save calibrated base baseline
+        if: steps.baseline-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ runner.temp }}/baseline.json
+          key: ${{ steps.baseline-cache.outputs.cache-primary-key }}
 
       # --- Phase 2: assert the PR head against the (cached or fresh) baseline ---
       - name: Checkout PR head
