@@ -35,8 +35,8 @@ If nothing times out, the data matches a run with no timeout. If a scenario is
 skipped, it uses no random numbers, so the later scenarios in that chunk can differ.
 Keep the timeout setting unchanged when resuming a checkpointed run.
 
-The default `scenario_timeout_sec: null` disables timeouts and retains the
-existing seed behavior. Timeouts apply only to distributed static generation with
+The default `scenario_timeout_sec: null` disables timeouts. Timeouts apply only
+to distributed static generation with
 `process_backend: multiprocessing_pool`; sequential and dynamic pipelines reject them.
 
 ::: gridfm_datakit.process.scenario_timeout.ScenarioTimeout
