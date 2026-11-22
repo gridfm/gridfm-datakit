@@ -21,3 +21,7 @@ This module provides functions for generating power flow data.
 ### `generate_power_flow_data_distributed`
 
 ::: gridfm_datakit.generate.generate_power_flow_data_distributed
+
+### `_collect_pool_results`
+
+::: gridfm_datakit.generate._collect_pool_results
