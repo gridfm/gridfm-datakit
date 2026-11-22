@@ -82,54 +82,61 @@ Before opening a PR, make sure you complete all steps:
 
 ## Running the integration tests
 
-`integrationtests/` holds end-to-end tests that exercise the whole pipeline the way a
-user does. For `case14_ieee` (200 load scenarios x 2 topology variants, fixed seed) in
-both `pf` and `opf` mode, once with the default reader and once through PowSyBl, each
-test:
-
-1. builds a config from `scripts/config/default.yaml`,
-2. runs `gridfm_datakit generate` and then `gridfm_datakit validate --n-partitions 0`,
-3. computes summary metrics from the generated parquet files (dataset size, total
-   load and dispatch, generation cost, voltages, branch flows and loading, DC-vs-AC
-   angle differences), and
-4. checks them against calibrated bounds read from
-   `integrationtests/calibration_baseline.json`.
-
-Each reader/mode case runs with both `ProcessPoolExecutor` and
-`multiprocessing.Pool`, comparing both backends against the same baseline.
-A separate small case checks the Pool backend with one PowSyBl worker.
-Checkpoint recovery tests also interrupt a saved but uncommitted chunk and compare
-resumed PF/OPF datasets with uninterrupted generation across both process backends.
-
-`validate` checks that every scenario is physically valid; the calibrated bounds
-catch changes in *what* is generated, which `validate` cannot see.
-
-They are not part of `pytest tests/` and take a few minutes. Run them with:
+`integrationtests/` holds end-to-end tests. They generate small datasets with the
+real solvers and check the result. They are not part of `pytest tests/` and take a
+few minutes. Run them with:
 
 ```bash
 pytest integrationtests -s
 ```
 
-The committed baseline was calibrated on unchanged code. Generation runs on the CPU
-and is seeded, so it is bit-reproducible on one machine and the default bounds are
-`mean ± 0.1%`. If you run on a different machine the test warns that the environment
-fingerprint differs; if a bound then fails **before** you have changed any code,
-calibrate a local baseline first:
+### What each test checks
+
+- **`test_generate_e2e.py`** generates `case14_ieee` with 200 load scenarios and 2
+  topology variants, with a fixed seed. It runs PF and OPF mode, each with the
+  default reader and with PowSyBl, and each with both process backends. Every
+  dataset must pass `gridfm_datakit validate`. Its summary metrics (number of
+  scenarios, active generators and branches, total load and generation,
+  generation cost, voltages, branch flows and loading, AC-vs-DC angles) must stay
+  within the bounds in `integrationtests/calibration_baseline.json`. A separate
+  small case runs one PowSyBl worker on the `multiprocessing_pool` backend.
+- **`test_checkpoint_resume.py`** stops a run after a chunk is saved but before the
+  checkpoint is updated. It resumes the run on the other process backend. The data
+  must be identical to a run that was never stopped. Resuming a finished run must
+  not generate anything.
+- **`test_scenario_timeout.py`** makes one load scenario hang. Only that load
+  scenario must be skipped. In PF mode, the run retries the chunk and finishes. In
+  OPF mode, the run stops right after the skip is saved and is then resumed. In
+  both cases, the data must be identical to a run that skips that load scenario
+  from the start.
+
+`validate` checks that each scenario is physically valid. The baseline catches
+changes in *what* is generated, which `validate` cannot see. Only
+`test_generate_e2e.py` uses the baseline. The other tests compare two runs with
+each other.
+
+### The baseline
+
+The committed baseline was calibrated on unchanged code. Generation is seeded, so
+on one machine it gives the same data every time, and the default bounds are
+`mean ± 0.1%`. On another machine, the test warns that the environment differs. If
+a bound then fails **before** you have changed any code, calibrate a local
+baseline first:
 
 ```bash
 # On an unchanged checkout:
 export GRIDFM_CALIBRATION_BASELINE=~/gridfm-datakit-baseline.json
 pytest integrationtests --calibrate -s
-# Make your changes, then assert against your baseline:
+# Make your changes, then check them against your baseline:
 pytest integrationtests -s
 ```
 
-If you calibrate *after* changing the code, the baseline just encodes your changed
-behaviour and can no longer catch regressions.
+If you calibrate *after* changing the code, the baseline describes your changed
+code and can no longer catch regressions.
 
-If your change is *meant* to alter the generated data (e.g. a new perturbation
-default), recalibrate the committed baseline in the same PR and explain the metric
-shifts in the PR description, so reviewers can see what moved and by how much.
+If your change is *meant* to change the generated data (for example, a new
+perturbation default), recalibrate the committed baseline in the same PR. Explain
+which metrics moved, and by how much, in the PR description.
 
 ### Calibration options
 

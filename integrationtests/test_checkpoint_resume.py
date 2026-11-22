@@ -15,11 +15,12 @@ from gridfm_datakit.cli import validate_data_directory
 from integrationtests.test_generate_e2e import build_config
 
 
-@pytest.mark.parametrize("mode", ["pf", "opf"])
+# Cover both solvers and backend-switch directions without repeating expensive
+# solver startup for every solver/backend combination.
 @pytest.mark.parametrize(
-    "process_backend",
-    ["process_pool_executor", "multiprocessing_pool"],
-    ids=["executor", "pool"],
+    ("mode", "process_backend"),
+    [("pf", "process_pool_executor"), ("opf", "multiprocessing_pool")],
+    ids=["pf-executor-to-pool", "opf-pool-to-executor"],
 )
 def test_checkpoint_resume_matches_uninterrupted(
     tmp_path: Path,

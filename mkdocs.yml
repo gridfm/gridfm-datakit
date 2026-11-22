@@ -36,6 +36,7 @@ nav:
     - Configuration: components/config.md
     - Generate: components/generate.md
     - Checkpoint: components/checkpoint.md
+    - Scenario Timeouts: components/scenario_timeout.md
     - Dynamic: components/dynamic.md
     - Validation: components/validation.md
     - CLI: components/cli.md

@@ -265,6 +265,7 @@ class _StaticSettingsConfig(_ConfigModel):
         "process_pool_executor"
     )
     enable_checkpointing: bool = False
+    scenario_timeout_sec: Optional[_PositiveFloat] = None
     data_dir: _NonEmptyString
     large_chunk_size: _PositiveInt = 1_000
     overwrite: bool
@@ -278,6 +279,25 @@ class _StaticSettingsConfig(_ConfigModel):
     pf_solver: Literal["powermodel", "powsybl", "lightsim2grid"] = "powermodel"
     opf_formulation: Literal["polar", "rectangular"] = "polar"
     coinhsl: CoinHSLConfig = Field(default_factory=CoinHSLConfig)
+
+    @model_validator(mode="after")
+    def validate_timeout_backend(self) -> "_StaticSettingsConfig":
+        """Timeouts need multiprocessing_pool, because those workers can be killed.
+
+        Returns:
+            Settings with a compatible process backend.
+
+        Raises:
+            ValueError: If a timeout is requested for the executor backend.
+        """
+        if (
+            self.scenario_timeout_sec is not None
+            and self.process_backend != "multiprocessing_pool"
+        ):
+            raise ValueError(
+                "scenario_timeout_sec requires process_backend: multiprocessing_pool",
+            )
+        return self
 
 
 class _StaticGenerationConfig(_ConfigModel):
