@@ -392,6 +392,65 @@ jobs:
         working-directory: head-src
         run: pytest integrationtests -s
 
+  integration-tests-other-pythons:
+    # Calibrate on 3.12 and assert on the matrix version on one runner, so only
+    # the interpreter and its wheels differ.
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.13', '3.14']
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set baseline path
+        run: echo "GRIDFM_CALIBRATION_BASELINE=$RUNNER_TEMP/baseline.json" >> "$GITHUB_ENV"
+
+      - name: Install Julia 1.12
+        uses: julia-actions/setup-julia@v3
+        with:
+          version: '1.12'
+
+      - name: Cache Julia depot
+        uses: actions/cache@v6
+        with:
+          path: ~/.julia
+          key: julia-depot-${{ runner.os }}-julia1.12-${{ hashFiles('gridfm_datakit/juliapkg.json') }}
+          restore-keys: |
+            julia-depot-${{ runner.os }}-julia1.12-
+
+      - name: Set up Python 3.12
+        id: python-base
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Set up Python ${{ matrix.python-version }}
+        id: python-other
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Calibrate on Python 3.12
+        run: |
+          "${{ steps.python-base.outputs.python-path }}" -m venv "$RUNNER_TEMP/venv-base"
+          source "$RUNNER_TEMP/venv-base/bin/activate"
+          python -m pip install --upgrade pip wheel
+          pip install -e ".[test,powsybl]"
+          python -c "from juliacall import Main as jl; jl.seval('using PowerModels, Ipopt, Memento')"
+          pytest integrationtests/test_generate_e2e.py -s --calibrate
+
+      - name: Assert on Python ${{ matrix.python-version }}
+        run: |
+          "${{ steps.python-other.outputs.python-path }}" -m venv "$RUNNER_TEMP/venv-other"
+          source "$RUNNER_TEMP/venv-other/bin/activate"
+          python -m pip install --upgrade pip wheel
+          pip install -e ".[test,powsybl]"
+          python -c "from juliacall import Main as jl; jl.seval('using PowerModels, Ipopt, Memento')"
+          pytest integrationtests/test_generate_e2e.py -s
+
   codeql:
     name: CodeQL (Python)
     runs-on: ubuntu-latest
