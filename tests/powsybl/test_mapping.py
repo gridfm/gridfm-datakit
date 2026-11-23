@@ -20,7 +20,19 @@ import pytest
 import gridfm_datakit.powsybl as powsybl
 from gridfm_datakit.network import Network, load_net_from_pglib
 from gridfm_datakit.powsybl.convert import update_powsybl
-from gridfm_datakit.utils.idx_brch import F_BUS, T_BUS
+from gridfm_datakit.utils.idx_brch import ANGMAX, ANGMIN, BR_STATUS, BR_X, F_BUS, T_BUS
+from gridfm_datakit.utils.idx_bus import (
+    BASE_KV,
+    BUS_AREA,
+    BUS_I,
+    BUS_TYPE,
+    PD,
+    VM,
+    VMAX,
+    VMIN,
+    ZONE,
+)
+from gridfm_datakit.utils.idx_gen import GEN_BUS, GEN_STATUS, PG, PMAX, QMAX, QMIN, VG
 
 pytestmark = pytest.mark.skipif(
     not powsybl.is_powsybl_available(),
@@ -201,21 +213,6 @@ class TestBuildP2gMaps:
         mapping = powsybl.build_p2g_maps(net, pp_net)
         assert len(mapping.bus) == n_bus
 
-    def test_gen_map_preserves_row_order(self, case14):
-        """mapping.gen values must be 0, 1, 2, … in the order pypowsybl enumerates generators.
-
-        pypowsybl preserves MATPOWER gen row order, so the map is a pure positional
-        enumeration: pp_gen_ids[i] → i.  Any deviation would silently corrupt PF results.
-        """
-        net, pp_net = case14
-        mapping = powsybl.build_p2g_maps(net, pp_net)
-        pp_gen_ids = list(pp_net.get_generators().index)
-        for expected_row, pp_gen_id in enumerate(pp_gen_ids):
-            assert mapping.gen[pp_gen_id] == expected_row, (
-                f"Generator {pp_gen_id!r} mapped to row {mapping.gen[pp_gen_id]}, "
-                f"expected {expected_row}"
-            )
-
 
 # ---------------------------------------------------------------------------
 # 3. to_powsybl maps follow the original bus numbers
@@ -297,3 +294,114 @@ class TestToPowsyblMapsFollowOriginalBusNumbers:
 
 def _branch_frames(pp_net):
     return pp_net.get_lines(), pp_net.get_2_windings_transformers()
+
+
+# ---------------------------------------------------------------------------
+# 4. Generator maps follow the machine each gridfm row describes
+# ---------------------------------------------------------------------------
+
+
+def _chain(gens):
+    """Network on buses 5, 9, 1 and 7, one generator per (bus, Pmax, status)."""
+    bus = np.zeros((4, 13))
+    bus[:, BUS_I] = [5, 9, 1, 7]
+    bus[:, BUS_TYPE] = [2, 2, 3, 1]
+    bus[:, PD] = [10, 20, 0, 5]
+    bus[:, [BUS_AREA, VM, ZONE]] = 1
+    bus[:, BASE_KV] = 135
+    bus[:, VMAX] = 1.1
+    bus[:, VMIN] = 0.9
+    gen = np.zeros((len(gens), 21))
+    gen[:, [GEN_BUS, PMAX, GEN_STATUS]] = gens
+    gen[:, VG] = 1
+    gen[:, QMAX] = 100
+    gen[:, QMIN] = -100
+    branch = np.zeros((3, 13))
+    branch[:, [F_BUS, T_BUS]] = [[1, 5], [5, 9], [9, 7]]
+    branch[:, BR_X] = 0.1
+    branch[:, BR_STATUS] = 1
+    branch[:, ANGMIN] = -360
+    branch[:, ANGMAX] = 360
+    gencost = np.tile([2, 0, 0, 3, 0, 1, 0], (len(gens), 1)).astype(float)
+    return Network(
+        {
+            "version": "2",
+            "baseMVA": 100.0,
+            "bus": bus,
+            "gen": gen,
+            "branch": branch,
+            "gencost": gencost,
+        },
+    )
+
+
+GEN_CASES = {
+    "bus_order": [(5, 11, 1), (5, 22, 1), (1, 33, 1), (9, 44, 1)],
+    "disconnected_between": [
+        (9, 10, 1),
+        (9, 24, 0),
+        (9, 30, 1),
+        (5, 40, 1),
+        (1, 50, 1),
+    ],
+}
+
+
+def _assert_gens_match(net, pp_net, gen_map):
+    """Each mapped generator has the bus, Pmax and status of its gridfm row."""
+    pp_net.per_unit = False
+    gens = pp_net.get_generators(
+        attributes=["max_p", "connected", "bus_breaker_bus_id"],
+    )
+    rev = net.reverse_bus_index_mapping
+    for pp_gen_id, row in gen_map.items():
+        gen = gens.loc[pp_gen_id]
+        assert net.gens[row, PMAX] == gen.max_p, pp_gen_id
+        assert bool(net.gens[row, GEN_STATUS]) == gen.connected, pp_gen_id
+        assert rev[int(net.gens[row, GEN_BUS])] == _bus_number(gen.bus_breaker_bus_id)
+
+
+@pytest.mark.parametrize("case", GEN_CASES)
+def test_export_gen_map_follows_export_rows(case):
+    """build_p2g_maps pairs each generator with the row the export wrote for it."""
+    pp_net = powsybl.to_powsybl(_chain(GEN_CASES[case])).pp_net
+    net = powsybl.from_powsybl(pp_net)
+    gen_map = powsybl.build_p2g_maps(net, pp_net).gen
+    _assert_gens_match(net, pp_net, gen_map)
+    connected = pp_net.get_generators().connected
+    assert set(connected.index[connected]) <= set(gen_map)
+
+
+@pytest.mark.parametrize("case", GEN_CASES)
+def test_to_powsybl_gen_map_follows_gridfm_rows(case):
+    """to_powsybl pairs each generator with the gridfm row it was read from."""
+    net = _chain(GEN_CASES[case])
+    conv = powsybl.to_powsybl(net)
+    _assert_gens_match(net, conv.pp_net, conv.mapping_p2g.gen)
+    assert len(conv.mapping_p2g.gen) == net.gens.shape[0]
+
+
+@pytest.mark.parametrize("case", GEN_CASES)
+def test_update_writes_each_setpoint_to_its_generator(case):
+    """update_powsybl writes a gridfm row's Pg onto the generator of that row."""
+    pp_net = powsybl.to_powsybl(_chain(GEN_CASES[case])).pp_net
+    net = powsybl.from_powsybl(pp_net)
+    mapping = powsybl.build_p2g_maps(net, pp_net)
+    net.gens[:, PG] = net.gens[:, PMAX] / 2
+    update_powsybl(pp_net, net, mapping)
+    pp_net.per_unit = False
+    gens = pp_net.get_generators().loc[list(mapping.gen)]
+    assert np.array_equal(gens.target_p, gens.max_p / 2)
+
+
+def test_generator_left_out_of_the_export_has_no_entry():
+    """A non-regulating generator next to a regulating one is folded into the load."""
+    pp_net = powsybl.to_powsybl(_chain([(1, 50, 1), (5, 11, 1), (5, 22, 1)])).pp_net
+    pp_net.update_generators(id="GEN-5#0", voltage_regulator_on=False)
+    before = pp_net.get_generators().loc["GEN-5#0", "target_p"]
+    net = powsybl.from_powsybl(pp_net)
+    mapping = powsybl.build_p2g_maps(net, pp_net)
+    assert "GEN-5#0" not in mapping.gen
+    _assert_gens_match(net, pp_net, mapping.gen)
+    update_powsybl(pp_net, net, mapping)
+    assert pp_net.get_generators().loc["GEN-5#0", "target_p"] == before
