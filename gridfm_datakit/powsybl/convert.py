@@ -159,19 +159,6 @@ def _mapped_ids(df, mapping: Dict[str, int]) -> np.ndarray:
     return df.index[df.index.isin(set(mapping))].to_numpy()
 
 
-def _bus_shares(loads, column: str) -> np.ndarray:
-    """Return each load's share of its bus total of *column*.
-
-    Loads split equally a bus whose total is zero.
-    """
-    by_bus = loads.groupby("bus_id")[column]
-    total = by_bus.transform("sum").to_numpy()
-    count = by_bus.transform("size").to_numpy()
-    value = loads[column].to_numpy()
-    nonzero = total != 0
-    return np.where(nonzero, value / np.where(nonzero, total, 1.0), 1.0 / count)
-
-
 def update_powsybl(
     pp_net,
     gfm_net: Network,
@@ -184,15 +171,14 @@ def update_powsybl(
     and line/transformer impedances from *gfm_net* to *pp_net*.  A bus,
     load or generator with no entry in the maps is left as it is.
 
-    The load of a bus is split across its pypowsybl loads in their current
-    proportions.
-
     Parameters
     ----------
     pp_net:
         The pypowsybl network to update (mutated in-place).
     gfm_net:
         The gridfm_datakit Network whose values are written into *pp_net*.
+        The load of a bus is split across its pypowsybl loads in their
+        current proportions.
     mapping_p2g:
         Pre-computed pypowsybl-to-gridfm index maps.  Must have been built
         from the base network that *gfm_net* descends from (perturbations
@@ -259,6 +245,19 @@ def update_powsybl(
         )
 
     pp_net.per_unit = initial_per_unit_status
+
+
+def _bus_shares(loads, column: str) -> np.ndarray:
+    """Return each load's share of its bus total of *column*.
+
+    Loads split equally a bus whose total is zero.
+    """
+    by_bus = loads.groupby("bus_id")[column]
+    total = by_bus.transform("sum").to_numpy()
+    count = by_bus.transform("size").to_numpy()
+    value = loads[column].to_numpy()
+    nonzero = total != 0
+    return np.where(nonzero, value / np.where(nonzero, total, 1.0), 1.0 / count)
 
 
 def from_powsybl(
