@@ -2,6 +2,10 @@
 
 This module provides functions for processing power networks and scenarios.
 
+### `init_julia`
+
+::: gridfm_datakit.process.process_network.init_julia
+
 ### `pf_preprocessing`
 
 ::: gridfm_datakit.process.process_network.pf_preprocessing
