@@ -18,6 +18,7 @@ import numpy as np
 import pytest
 
 import gridfm_datakit.powsybl as powsybl
+import gridfm_datakit.powsybl.mapping as mapping_module
 from gridfm_datakit.network import Network, load_net_from_pglib
 from gridfm_datakit.powsybl.convert import update_powsybl
 from gridfm_datakit.utils.idx_brch import ANGMAX, ANGMIN, BR_STATUS, BR_X, F_BUS, T_BUS
@@ -32,7 +33,16 @@ from gridfm_datakit.utils.idx_bus import (
     VMIN,
     ZONE,
 )
-from gridfm_datakit.utils.idx_gen import GEN_BUS, GEN_STATUS, PG, PMAX, QMAX, QMIN, VG
+from gridfm_datakit.utils.idx_gen import (
+    GEN_BUS,
+    GEN_STATUS,
+    MBASE,
+    PG,
+    PMAX,
+    QMAX,
+    QMIN,
+    VG,
+)
 
 pytestmark = pytest.mark.skipif(
     not powsybl.is_powsybl_available(),
@@ -459,3 +469,90 @@ def test_bus_map_reads_named_buses():
     assert mapping.bus == {
         pp_bus_id: row for row, pp_bus_id in enumerate(pp_net.get_buses().index)
     }
+
+
+# ---------------------------------------------------------------------------
+# 6. A change in the export conventions raises instead of mispairing
+# ---------------------------------------------------------------------------
+
+
+def _alter_export(monkeypatch, alter):
+    """Make build_p2g_maps read an export changed by *alter*."""
+    load = mapping_module.scipy.io.loadmat
+
+    def altered(*args, **kwargs):
+        data = load(*args, **kwargs)
+        alter(data["mpc"][0, 0])
+        return data
+
+    monkeypatch.setattr(mapping_module.scipy.io, "loadmat", altered)
+
+
+def _ieee14():
+    pp_net = powsybl.pypowsybl.network.create_ieee14()
+    return powsybl.from_powsybl(pp_net), pp_net
+
+
+def test_export_without_generator_tags_raises(monkeypatch):
+    """An export that stops writing rated_s as MBASE is refused."""
+    net, pp_net = _ieee14()
+
+    def untag(mpc):
+        mpc["gen"][:, MBASE] = 0
+
+    _alter_export(monkeypatch, untag)
+    with pytest.raises(ValueError, match="generator tags"):
+        powsybl.build_p2g_maps(net, pp_net)
+
+
+def test_generator_row_of_another_machine_raises(monkeypatch):
+    """A tag on the row of another machine is refused."""
+    net, pp_net = _ieee14()
+
+    def swap(mpc):
+        mpc["gen"][[0, 1], MBASE] = mpc["gen"][[1, 0], MBASE]
+
+    _alter_export(monkeypatch, swap)
+    with pytest.raises(ValueError, match="does not describe pypowsybl generator"):
+        powsybl.build_p2g_maps(net, pp_net)
+
+
+def test_bus_row_of_another_bus_raises(monkeypatch):
+    """A bus name on the row of a bus with another voltage is refused."""
+    net, pp_net = _ieee14()
+    nominal_v = net.buses[:, BASE_KV]
+    other = int(np.flatnonzero(nominal_v != nominal_v[0])[0])
+
+    def swap(mpc):
+        names = mpc["bus_name"]
+        names[0, 0], names[other, 0] = names[other, 0], names[0, 0]
+
+    _alter_export(monkeypatch, swap)
+    with pytest.raises(ValueError, match="does not describe pypowsybl bus"):
+        powsybl.build_p2g_maps(net, pp_net)
+
+
+def test_unnamed_bus_rows_raise(monkeypatch):
+    """An export whose bus names match no bus is refused."""
+    net, pp_net = _ieee14()
+
+    def rename(mpc):
+        for row in range(mpc["bus_name"].shape[0]):
+            mpc["bus_name"][row, 0] = np.array([f"row {row}"])
+
+    _alter_export(monkeypatch, rename)
+    with pytest.raises(ValueError, match="has no row for pypowsybl buses"):
+        powsybl.build_p2g_maps(net, pp_net)
+
+
+def test_bus_row_named_after_the_id_of_a_named_bus(monkeypatch):
+    """A row named after the ID of a named bus still finds that bus."""
+    pp_net = powsybl.pypowsybl.network.create_ieee14()
+    pp_net.update_voltage_levels(id="VL1", name="First")
+    net = powsybl.from_powsybl(pp_net)
+
+    def use_ids(mpc):
+        mpc["bus_name"][0, 0] = np.array(["VL1_0"])
+
+    _alter_export(monkeypatch, use_ids)
+    assert powsybl.build_p2g_maps(net, pp_net).bus["VL1_0"] == 0
