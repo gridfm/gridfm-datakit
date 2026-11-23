@@ -87,7 +87,7 @@ def _search(monkeypatch, solved, start=0.8, step=0.05, max_scaling=4.0):
     fake = _FakeJulia(solved)
     monkeypatch.setattr(load_perturbation, "init_julia", lambda **kwargs: fake)
     net = load_net_from_pglib("case14_ieee")
-    args = (net, max_scaling, step, start, True, 200)
+    args = (net, max_scaling, step, start, True, 200, None)
     return load_perturbation._find_largest_scaling_factor_worker(args)
 
 
