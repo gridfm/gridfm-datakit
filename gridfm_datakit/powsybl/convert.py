@@ -168,9 +168,8 @@ def update_powsybl(
     Update a pypowsybl network in-place from a gridfm_datakit Network.
 
     Applies bus loads, generator setpoints/status, branch connection status,
-    and line/transformer impedances from *gfm_net* to *pp_net*.  Elements
-    with no gridfm counterpart, a disconnected load, or a disconnected
-    generator or branch before pypowsybl 1.16, are left as they are.
+    and line/transformer impedances from *gfm_net* to *pp_net*.  A bus,
+    load or generator with no entry in the maps is left as it is.
 
     Parameters
     ----------
@@ -181,7 +180,8 @@ def update_powsybl(
     mapping_p2g:
         Pre-computed pypowsybl-to-gridfm index maps.  Must have been built
         from the base network that *gfm_net* descends from (perturbations
-        preserve element identity, so the base mapping stays valid).
+        preserve element identity, so the base mapping stays valid).  A
+        branch with no entry is left as it is.
     """
     check_powsybl_available()
     if not isinstance(pp_net, pypowsybl.network.Network):
@@ -202,7 +202,7 @@ def update_powsybl(
     )
 
     pp_net.per_unit = True
-    bus_id = pp_net.get_buses().index.to_numpy()
+    bus_id = _mapped_ids(pp_net.get_buses(), mapping_p2g.bus)
     gfm_bus_idx = np.array([int(mapping_p2g.bus[i]) for i in bus_id])
     pp_net.update_buses(
         id=bus_id,
