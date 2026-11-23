@@ -405,3 +405,57 @@ def test_generator_left_out_of_the_export_has_no_entry():
     _assert_gens_match(net, pp_net, mapping.gen)
     update_powsybl(pp_net, net, mapping)
     assert pp_net.get_generators().loc["GEN-5#0", "target_p"] == before
+
+
+# ---------------------------------------------------------------------------
+# 5. Bus maps follow the buses the export keeps
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def four_substations():
+    """Node-breaker network whose S1 buses sit behind an LCC line."""
+    pp_net = powsybl.pypowsybl.network.create_four_substations_node_breaker_network()
+    net = powsybl.from_powsybl(pp_net)
+    return net, pp_net, powsybl.build_p2g_maps(net, pp_net)
+
+
+def test_bus_map_leaves_out_buses_the_export_skips(four_substations):
+    """Only buses of the main synchronous component have a row."""
+    _, pp_net, mapping = four_substations
+    component = pp_net.get_buses().synchronous_component
+    assert set(mapping.bus) == set(component.index[component == 0])
+
+
+def test_bus_map_follows_export_rows(four_substations):
+    """Each mapped bus has the base voltage of its gridfm row."""
+    net, pp_net, mapping = four_substations
+    nominal_v = pp_net.get_buses().join(
+        pp_net.get_voltage_levels().nominal_v,
+        on="voltage_level_id",
+    )["nominal_v"]
+    assert sorted(mapping.bus.values()) == list(range(net.buses.shape[0]))
+    for pp_bus_id, row in mapping.bus.items():
+        assert net.buses[row, BASE_KV] == nominal_v[pp_bus_id]
+
+
+def test_gen_map_skips_converter_and_svc_rows(four_substations):
+    """VSC stations and static VAR compensators get rows but no generator."""
+    net, pp_net, mapping = four_substations
+    pp_net.per_unit = False
+    max_p = pp_net.get_generators()["max_p"]
+    assert set(mapping.gen) == {"GTH1", "GTH2"}
+    for pp_gen_id, row in mapping.gen.items():
+        assert net.gens[row, PMAX] == max_p[pp_gen_id]
+
+
+def test_bus_map_reads_named_buses():
+    """A bus named after its voltage level is found through its name."""
+    pp_net = powsybl.pypowsybl.network.create_ieee14()
+    pp_net.update_voltage_levels(id="VL1", name="First")
+    net = powsybl.from_powsybl(pp_net)
+    mapping = powsybl.build_p2g_maps(net, pp_net)
+    assert pp_net.get_buses().loc["VL1_0", "name"] == "First_0"
+    assert mapping.bus == {
+        pp_bus_id: row for row, pp_bus_id in enumerate(pp_net.get_buses().index)
+    }

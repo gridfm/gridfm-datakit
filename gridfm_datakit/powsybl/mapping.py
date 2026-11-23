@@ -1,8 +1,9 @@
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
+import numpy as np
 import scipy.io
 
 from gridfm_datakit.network import Network
@@ -47,13 +48,13 @@ def build_p2g_maps(
     """Build pypowsybl-to-gridfm index maps for a network read by ``from_powsybl``.
 
     :func:`~gridfm_datakit.powsybl.convert.from_powsybl` builds the gridfm
-    tables from pypowsybl's MATPOWER export.  The export writes buses and
-    branches (lines, then 2-winding transformers) in the order pypowsybl lists
-    them, so the bus and branch maps pair the i-th pypowsybl element with
-    gridfm row i.  It writes generators grouped by bus number and leaves some
-    out, so the generator map follows the rows of the export, see
-    :func:`_tagged_export`.  A generator the export leaves out has no
-    entry.  A network built by
+    tables from pypowsybl's MATPOWER export.  The export writes branches
+    (lines, then 2-winding transformers) in the order pypowsybl lists them, so
+    the branch map pairs the i-th pypowsybl branch with gridfm row i.  It
+    leaves out buses outside the main synchronous component and writes
+    generators grouped by bus number, so the bus and generator maps follow the
+    rows of the export, see :func:`_tagged_export`.  A bus or generator the
+    export leaves out has no entry.  A network built by
     :func:`~gridfm_datakit.powsybl.convert.to_powsybl` follows the gridfm
     tables instead, so use the maps ``to_powsybl`` returns.
 
@@ -88,17 +89,20 @@ def build_p2g_maps(
     """
     check_powsybl_available()
 
+    mpc, gen_ids = _tagged_export(pp_net)
+
     # -------------------------------------------------------------------------
-    # 0. Bus map - direct enumeration (row order is preserved by pypowsybl)
+    # 0. Bus map - the rows of the MATPOWER export
     # -------------------------------------------------------------------------
     map_bus_p2g: Dict[str, float] = {
-        pp_bus_id: gfm_row for gfm_row, pp_bus_id in enumerate(pp_net.get_buses().index)
+        pp_bus_id: gfm_row
+        for gfm_row, pp_bus_id in enumerate(_bus_ids(pp_net, mpc["bus_name"]))
+        if pp_bus_id is not None
     }
 
     # -------------------------------------------------------------------------
     # 1. Gen map - the rows of the MATPOWER export
     # -------------------------------------------------------------------------
-    mpc, gen_ids = _tagged_export(pp_net)
     map_gen_p2g: Dict[str, int] = {
         gen_ids[int(tag) - 1]: gfm_row
         for gfm_row, tag in enumerate(mpc["gen"][:, MBASE])
@@ -220,7 +224,7 @@ def _gen_rows_by_id(network: Network, pp_net) -> Dict[str, int]:
 
 
 def _tagged_export(pp_net) -> Tuple[Any, List[str]]:
-    """Export *pp_net* to MATPOWER with each generator's row tag in MBASE.
+    """Export *pp_net* to MATPOWER with bus names and each generator's tag in MBASE.
 
     The MATPOWER export carries no generator IDs.  It writes generators by bus
     number, connected ones first, drops some, and adds rows for static VAR
@@ -242,7 +246,11 @@ def _tagged_export(pp_net) -> Tuple[Any, List[str]]:
         if ids:
             tags = [float(k) for k in range(1, len(ids) + 1)]
             pp_net.update_generators(id=ids, rated_s=tags)
-        pp_net.save(mat_path, format="MATPOWER")
+        pp_net.save(
+            mat_path,
+            format="MATPOWER",
+            parameters={"matpower.export.with-bus-names": "true"},
+        )
         data = scipy.io.loadmat(mat_path, struct_as_record=True, squeeze_me=False)
     finally:
         if ids:
@@ -250,3 +258,18 @@ def _tagged_export(pp_net) -> Tuple[Any, List[str]]:
         pp_net.per_unit = per_unit
         Path(mat_path).unlink()
     return data["mpc"][0, 0], ids
+
+
+def _bus_ids(pp_net, bus_names) -> List[Optional[str]]:
+    """Return the pypowsybl bus ID behind each bus row of the export.
+
+    The export names a row after the bus name, or its ID when it has none,
+    which pypowsybl reports as ``name`` and the index.  Buses that share a
+    name are taken in table order.  Boundary and 3-winding transformer star
+    buses come last and have no pypowsybl bus.
+    """
+    candidates: Dict[str, List[str]] = {}
+    for pp_bus_id, name in pp_net.get_buses(attributes=["name"])["name"].items():
+        candidates.setdefault(name or pp_bus_id, []).append(pp_bus_id)
+    names = [str(name[0]) if np.size(name) else "" for name in bus_names.ravel()]
+    return [candidates[name].pop(0) if candidates.get(name) else None for name in names]

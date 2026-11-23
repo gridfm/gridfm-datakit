@@ -142,6 +142,7 @@ def _format_buses_res(
             "va": row.v_angle,
         }
         for row in df[["v_mag", "v_angle"]].itertuples()
+        if row.Index in map_bus_p2g
     }
 
 
