@@ -2,7 +2,7 @@
 
 1. ⭐ Star the [repository](https://github.com/gridfm/gridfm-datakit) on GitHub to support the project!
 
-2. Make sure you have Python 3.10 or later installed.
+2. Make sure you have Python 3.10 to 3.14 installed.
 
 3. Install gridfm-datakit
 
