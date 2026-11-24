@@ -154,6 +154,11 @@ def _build_gencost_matrix(
     return gencost_matrix
 
 
+def _mapped_ids(df, mapping: Dict[str, int]) -> np.ndarray:
+    """Return the IDs of *df* that have an entry in *mapping*."""
+    return df.index[df.index.isin(set(mapping))].to_numpy()
+
+
 def update_powsybl(
     pp_net,
     gfm_net: Network,
@@ -163,7 +168,8 @@ def update_powsybl(
     Update a pypowsybl network in-place from a gridfm_datakit Network.
 
     Applies bus loads, generator setpoints/status, branch connection status,
-    and line/transformer impedances from *gfm_net* to *pp_net*.
+    and line/transformer impedances from *gfm_net* to *pp_net*.  A bus,
+    load or generator with no entry in the maps is left as it is.
 
     Parameters
     ----------
@@ -174,7 +180,8 @@ def update_powsybl(
     mapping_p2g:
         Pre-computed pypowsybl-to-gridfm index maps.  Must have been built
         from the base network that *gfm_net* descends from (perturbations
-        preserve element identity, so the base mapping stays valid).
+        preserve element identity, so the base mapping stays valid).  A
+        branch with no entry is left as it is.
     """
     check_powsybl_available()
     if not isinstance(pp_net, pypowsybl.network.Network):
@@ -184,6 +191,7 @@ def update_powsybl(
 
     pp_net.per_unit = False
     loads = pp_net.get_loads()
+    loads = loads[loads["bus_id"].isin(set(mapping_p2g.bus))]
     load_id = loads.index.to_numpy()
     bus_id = loads["bus_id"].to_numpy()
     gfm_bus_idx = np.array([int(mapping_p2g.bus[i]) for i in bus_id])
@@ -194,7 +202,7 @@ def update_powsybl(
     )
 
     pp_net.per_unit = True
-    bus_id = pp_net.get_buses().index.to_numpy()
+    bus_id = _mapped_ids(pp_net.get_buses(), mapping_p2g.bus)
     gfm_bus_idx = np.array([int(mapping_p2g.bus[i]) for i in bus_id])
     pp_net.update_buses(
         id=bus_id,
@@ -202,7 +210,7 @@ def update_powsybl(
     )
 
     pp_net.per_unit = False
-    gen_id = pp_net.get_generators().index.to_numpy()
+    gen_id = _mapped_ids(pp_net.get_generators(), mapping_p2g.gen)
     gfm_gen_idx = np.array([mapping_p2g.gen[i] for i in gen_id])
     pp_net.update_generators(
         id=gen_id,
@@ -210,13 +218,13 @@ def update_powsybl(
         target_p=gfm_net.gens[gfm_gen_idx, PG].tolist(),
     )
 
-    br_id = pp_net.get_branches().index.to_numpy()
+    br_id = _mapped_ids(pp_net.get_branches(), mapping_p2g.branch)
     gfm_br_idx = np.array([mapping_p2g.branch[i] for i in br_id])
     br_status = gfm_net.branches[gfm_br_idx, BR_STATUS].astype(bool).tolist()
     pp_net.update_branches(id=br_id, connected1=br_status, connected2=br_status)
 
     pp_net.per_unit = True
-    line_id = pp_net.get_lines().index.to_numpy()
+    line_id = _mapped_ids(pp_net.get_lines(), mapping_p2g.branch)
     if len(line_id):
         gfm_line_idx = np.array([mapping_p2g.branch[i] for i in line_id])
         pp_net.update_lines(
@@ -225,7 +233,7 @@ def update_powsybl(
             x=gfm_net.branches[gfm_line_idx, BR_X].tolist(),
         )
 
-    wt2_id = pp_net.get_2_windings_transformers().index.to_numpy()
+    wt2_id = _mapped_ids(pp_net.get_2_windings_transformers(), mapping_p2g.branch)
     if len(wt2_id):
         gfm_wt2_idx = np.array([mapping_p2g.branch[i] for i in wt2_id])
         pp_net.update_2_windings_transformers(
