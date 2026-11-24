@@ -102,3 +102,8 @@ def test_scaling_search_stops_at_max_scaling(monkeypatch):
 def test_scaling_search_raises_when_start_fails(monkeypatch):
     with pytest.raises(RuntimeError, match="starting u=0.800"):
         _search(monkeypatch, solved=0)
+
+
+def test_scaling_search_rejects_start_above_max(monkeypatch):
+    with pytest.raises(ValueError, match="start=1.200 is above max_scaling=1.000"):
+        _search(monkeypatch, 100, 1.2, 0.1, 1.0)

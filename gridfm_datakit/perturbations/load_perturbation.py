@@ -19,6 +19,10 @@ def _find_largest_scaling_factor_worker(
     (net, max_scaling, step_size, start, change_reactive_power, max_iter, coinhsl) = (
         args
     )
+    if start > max_scaling:
+        raise ValueError(
+            f"start={start:.3f} is above max_scaling={max_scaling:.3f}",
+        )
 
     net = deepcopy(net)
     # Get reference values from Network class (PD and QD columns)
