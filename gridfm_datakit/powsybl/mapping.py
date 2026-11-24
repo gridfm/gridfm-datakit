@@ -1,8 +1,15 @@
+import tempfile
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+import numpy as np
+import scipy.io
 
 from gridfm_datakit.network import Network
 from gridfm_datakit.utils.idx_brch import F_BUS, T_BUS
+from gridfm_datakit.utils.idx_bus import BASE_KV, BUS_I
+from gridfm_datakit.utils.idx_gen import GEN_BUS, MBASE, PG
 
 from .api import check_powsybl_available
 
@@ -41,16 +48,25 @@ def build_p2g_maps(
 ) -> MappingP2G:
     """Build pypowsybl-to-gridfm index maps for a network read by ``from_powsybl``.
 
-    :func:`~gridfm_datakit.powsybl.convert.from_powsybl` writes buses,
-    generators and branches (lines, then 2-winding transformers) in the order
-    pypowsybl lists them, so each map pairs the i-th pypowsybl element with
-    gridfm row i.  A network built by
+    :func:`~gridfm_datakit.powsybl.convert.from_powsybl` builds the gridfm
+    tables from pypowsybl's MATPOWER export.  The export writes branches
+    (lines, then 2-winding transformers) in the order pypowsybl lists them, so
+    the branch map pairs the i-th pypowsybl branch with gridfm row i.  It
+    leaves out buses outside the main synchronous component and writes
+    generators grouped by bus number, so the bus and generator maps follow the
+    rows of the export, see :func:`_tagged_export`.  A bus or generator the
+    export leaves out has no entry.  A network built by
     :func:`~gridfm_datakit.powsybl.convert.to_powsybl` follows the gridfm
     tables instead, so use the maps ``to_powsybl`` returns.
 
     The maps can be built once on the **base network** and then reused across
     all perturbed scenarios, because perturbations preserve element identity
     and row ordering.
+
+    pypowsybl 1.16 exports disconnected branches out of service, older
+    releases leave them out, and no release writes a branch with an end on a
+    bus it skips.  The branch map then follows the branches the export kept,
+    told apart by the row count, and the others have no entry.
 
     Parameters
     ----------
@@ -79,31 +95,45 @@ def build_p2g_maps(
     """
     check_powsybl_available()
 
+    mpc, gen_ids = _tagged_export(pp_net)
+
     # -------------------------------------------------------------------------
-    # 0. Bus map - direct enumeration (row order is preserved by pypowsybl)
+    # 0. Bus map - the rows of the MATPOWER export
     # -------------------------------------------------------------------------
     map_bus_p2g: Dict[str, float] = {
-        pp_bus_id: gfm_row for gfm_row, pp_bus_id in enumerate(pp_net.get_buses().index)
+        pp_bus_id: gfm_row
+        for gfm_row, pp_bus_id in enumerate(_bus_ids(pp_net, mpc["bus_name"]))
+        if pp_bus_id is not None
     }
 
     # -------------------------------------------------------------------------
-    # 1. Gen map — direct enumeration (row order is preserved by pypowsybl)
+    # 1. Gen map - the rows of the MATPOWER export
     # -------------------------------------------------------------------------
     map_gen_p2g: Dict[str, int] = {
-        pp_gen_id: gfm_row
-        for gfm_row, pp_gen_id in enumerate(pp_net.get_generators().index)
+        gen_ids[int(tag) - 1]: gfm_row
+        for gfm_row, tag in enumerate(mpc["gen"][:, MBASE])
+        if tag >= 1
     }
 
     # -------------------------------------------------------------------------
     # 2. Branch map — direct enumeration (lines, transformers, ...)
     # -------------------------------------------------------------------------
+    pp_buses = set(map_bus_p2g)
+    branch_frames = (pp_net.get_lines(), pp_net.get_2_windings_transformers())
+    export_all = sum(map(len, branch_frames)) == network.branches.shape[0]
     offset = 0
     map_branch_p2g: Dict[str, int] = {}
-    for df in (pp_net.get_lines(), pp_net.get_2_windings_transformers()):
-        for row, pp_branch_id in enumerate(df.index):
+    for df in branch_frames:
+        exported = df.index
+        if not export_all:
+            exported = exported[
+                df["bus1_id"].isin(pp_buses) & df["bus2_id"].isin(pp_buses)
+            ]
+        for row, pp_branch_id in enumerate(exported):
             map_branch_p2g[pp_branch_id] = offset + row
-        offset += len(df)
+        offset += len(exported)
 
+    _check_rows(pp_net, mpc, map_bus_p2g, map_gen_p2g)
     return MappingP2G(
         bus=map_bus_p2g,
         branch=map_branch_p2g,
@@ -125,22 +155,33 @@ def build_p2g_maps_by_bus_number(
     bus number.  pypowsybl lists buses by voltage level, and buses joined by a
     transformer share one, so position does not give the gridfm row.  Branches
     are matched by original from and to buses, parallel branches in table
-    order, because pypowsybl lists lines before transformers.
+    order, because pypowsybl lists lines before transformers.  Generators are
+    named ``GEN-<n>``, then ``GEN-<n>#0``, ``GEN-<n>#1`` for the next ones on
+    bus ``n`` in table order, and pypowsybl lists them by bus.
 
     Args:
         network: The gridfm_datakit Network passed to ``to_powsybl``.
         pp_net: The pypowsybl network ``to_powsybl(network)`` built.
 
     Returns:
-        MappingP2G with the bus and branch maps read from the original bus
-        numbers.
+        MappingP2G with the bus, branch and generator maps read from the
+        original bus numbers.
 
     Raises:
         ValueError: If a pypowsybl bus groups several gridfm buses or has none,
-            or a pypowsybl branch has no gridfm branch with the same ends.
+            a pypowsybl branch has no gridfm branch with the same ends, or a
+            pypowsybl generator has no gridfm generator on its bus.
     """
-    maps = build_p2g_maps(network, pp_net)
-    maps.bus = {}
+    check_powsybl_available()
+    maps = MappingP2G(
+        bus={},
+        branch={},
+        gen=_gen_rows_by_id(network, pp_net),
+        reverse_bus_index_mapping={
+            int(row): int(orig)
+            for row, orig in network.reverse_bus_index_mapping.items()
+        },
+    )
     bb_buses = pp_net.get_bus_breaker_view_buses(attributes=["bus_id"])
     for bb_bus_id, pp_bus_id in bb_buses["bus_id"].items():
         if not pp_bus_id:
@@ -157,7 +198,6 @@ def build_p2g_maps_by_bus_number(
     for row, (f_bus, t_bus) in enumerate(network.branches[:, [F_BUS, T_BUS]]):
         rows_by_ends.setdefault((rev[int(f_bus)], rev[int(t_bus)]), []).append(row)
     ends = ["bus_breaker_bus1_id", "bus_breaker_bus2_id"]
-    maps.branch = {}
     for df in (
         pp_net.get_lines(attributes=ends),
         pp_net.get_2_windings_transformers(attributes=ends),
@@ -177,3 +217,149 @@ def build_p2g_maps_by_bus_number(
 def _bus_number(bus_breaker_bus_id: str) -> int:
     """Return the original bus number of a ``BUS-<n>`` bus-breaker bus ID."""
     return int(bus_breaker_bus_id.rsplit("-", 1)[1])
+
+
+def _gen_rows_by_id(network: Network, pp_net) -> Dict[str, int]:
+    """Pair each ``GEN-<n>[#k]`` generator with its gridfm row on bus ``n``."""
+    rev = network.reverse_bus_index_mapping
+    rows_by_bus: Dict[int, List[int]] = {}
+    for row, gfm_bus in enumerate(network.gens[:, GEN_BUS]):
+        rows_by_bus.setdefault(rev[int(gfm_bus)], []).append(row)
+    gen_rows: Dict[str, int] = {}
+    for pp_gen_id in pp_net.get_generators().index:
+        number, _, copy = pp_gen_id.removeprefix("GEN-").partition("#")
+        rows = rows_by_bus.get(int(number), [])
+        k = int(copy) + 1 if copy else 0
+        if k >= len(rows):
+            raise ValueError(
+                f"No gridfm generator on bus {number} for pypowsybl generator {pp_gen_id}",
+            )
+        gen_rows[pp_gen_id] = rows[k]
+    return gen_rows
+
+
+def _tagged_export(pp_net) -> Tuple[Any, List[str]]:
+    """Export *pp_net* to MATPOWER with bus names and each generator's tag in MBASE.
+
+    The MATPOWER export carries no generator IDs.  It writes generators by bus
+    number, connected ones first, drops some, and adds rows for static VAR
+    compensators and VSC stations.  Each generator's ``rated_s``, which the
+    export writes as MBASE, is set to its position plus one for the export
+    and restored afterwards, so a row with MBASE ``k`` describes generator
+    ``k - 1`` of the returned IDs and a row with MBASE 0 no generator.
+
+    Returns:
+        The exported ``mpc`` struct and the generator IDs in tag order.
+
+    Raises:
+        ValueError: If MBASE does not carry the tags: a tag out of range or
+            repeated, or more untagged rows than static VAR compensators, VSC
+            stations and boundary lines.
+    """
+    per_unit = pp_net.per_unit
+    pp_net.per_unit = False
+    gens = pp_net.get_generators(attributes=["rated_s"])
+    ids = gens.index.tolist()
+    with tempfile.NamedTemporaryFile(suffix=".mat", delete=False) as tmp:
+        mat_path = tmp.name
+    try:
+        if ids:
+            tags = [float(k) for k in range(1, len(ids) + 1)]
+            pp_net.update_generators(id=ids, rated_s=tags)
+        pp_net.save(
+            mat_path,
+            format="MATPOWER",
+            parameters={"matpower.export.with-bus-names": "true"},
+        )
+        data = scipy.io.loadmat(mat_path, struct_as_record=True, squeeze_me=False)
+    finally:
+        if ids:
+            pp_net.update_generators(id=ids, rated_s=gens["rated_s"].tolist())
+        pp_net.per_unit = per_unit
+        Path(mat_path).unlink()
+    mpc = data["mpc"][0, 0]
+    tags = mpc["gen"][:, MBASE]
+    tagged = tags[tags >= 1]
+    others = (
+        len(pp_net.get_static_var_compensators())
+        + len(pp_net.get_vsc_converter_stations())
+        + len(pp_net.get_boundary_lines())
+    )
+    if (
+        np.any((tags != np.round(tags)) | (tags < 0) | (tags > len(ids)))
+        or len(set(tagged)) != len(tagged)
+        or len(tags) - len(tagged) > others
+    ):
+        raise ValueError(
+            "The MATPOWER export does not carry the generator tags in MBASE",
+        )
+    return mpc, ids
+
+
+def _bus_ids(pp_net, bus_names) -> List[Optional[str]]:
+    """Return the pypowsybl bus ID behind each bus row of the export.
+
+    The export names a row after the bus name, or its ID when it has none,
+    which pypowsybl reports as ``name`` and the index, and a row named after
+    the ID of a named bus falls back to that bus.  Buses that share a name are
+    taken in table order.  Boundary and 3-winding transformer star buses come
+    last and have no pypowsybl bus.
+    """
+    names = pp_net.get_buses(attributes=["name"])["name"]
+    candidates: Dict[str, List[str]] = {}
+    for pp_bus_id, name in names.items():
+        candidates.setdefault(name or pp_bus_id, []).append(pp_bus_id)
+    taken: set = set()
+
+    def pick(row_name: str) -> Optional[str]:
+        for pp_bus_id in candidates.get(row_name, []) + [row_name]:
+            if pp_bus_id in names.index and pp_bus_id not in taken:
+                taken.add(pp_bus_id)
+                return pp_bus_id
+        return None
+
+    return [pick(str(name[0]) if np.size(name) else "") for name in bus_names.ravel()]
+
+
+def _check_rows(pp_net, mpc, map_bus_p2g, map_gen_p2g) -> None:
+    """Raise if a map points at a row of the export that describes another element.
+
+    Every bus of the main synchronous component must have a row with its
+    nominal voltage, and every mapped generator a row with its bus and target
+    P.  Guards the export conventions the maps rely on.
+    """
+    per_unit = pp_net.per_unit
+    pp_net.per_unit = False
+    try:
+        buses = pp_net.get_buses(
+            attributes=["voltage_level_id", "synchronous_component"],
+        )
+        nominal_v = pp_net.get_voltage_levels(attributes=["nominal_v"])["nominal_v"]
+        gens = pp_net.get_generators(attributes=["target_p", "bus_id"])
+    finally:
+        pp_net.per_unit = per_unit
+    missing = sorted(
+        set(buses.index[buses["synchronous_component"] == 0]) - set(map_bus_p2g),
+    )
+    if missing:
+        raise ValueError(
+            f"The MATPOWER export has no row for pypowsybl buses {missing}",
+        )
+    for pp_bus_id, row in map_bus_p2g.items():
+        if (
+            mpc["bus"][row, BASE_KV]
+            != nominal_v[buses.at[pp_bus_id, "voltage_level_id"]]
+        ):
+            raise ValueError(
+                f"MATPOWER bus row {row} does not describe pypowsybl bus {pp_bus_id}",
+            )
+    row_of_bus = {int(number): row for row, number in enumerate(mpc["bus"][:, BUS_I])}
+    for pp_gen_id, row in map_gen_p2g.items():
+        gen_bus, target_p = gens.at[pp_gen_id, "bus_id"], gens.at[pp_gen_id, "target_p"]
+        exported_p = mpc["gen"][row, PG]
+        same_p = exported_p == target_p or (np.isnan(exported_p) and np.isnan(target_p))
+        bus_row = row_of_bus[int(mpc["gen"][row, GEN_BUS])]
+        if not same_p or (gen_bus and map_bus_p2g.get(gen_bus) != bus_row):
+            raise ValueError(
+                f"MATPOWER generator row {row} does not describe pypowsybl generator {pp_gen_id}",
+            )

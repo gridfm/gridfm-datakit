@@ -88,6 +88,7 @@ def _format_gens_res(
     return {
         str(int(map_gen_p2g[row.Index] + 1)): {"pg": -row.p, "qg": -row.q}
         for row in df[df["connected"]][["p", "q"]].itertuples()
+        if row.Index in map_gen_p2g
     }
 
 
@@ -113,6 +114,7 @@ def _format_branch_res(
             "qt": row.q2,
         }
         for row in df[["p1", "q1", "p2", "q2"]].itertuples()
+        if row.Index in map_branch_p2g
     }
 
 
@@ -141,6 +143,7 @@ def _format_buses_res(
             "va": row.v_angle,
         }
         for row in df[["v_mag", "v_angle"]].itertuples()
+        if row.Index in map_bus_p2g
     }
 
 
@@ -156,9 +159,10 @@ def _add_slack_results(pp_net, pf_res, pf_metadata, map_gen_p2g):
     slack_res = pf_metadata[0].slack_bus_results[0].active_power_mismatch
 
     df_gens = pp_net.get_generators()
-    slack_gen_id = df_gens[df_gens["bus_id"] == slack_bus].index[
+    slack_gens = df_gens.index[df_gens["bus_id"] == slack_bus]
+    slack_gen_id = slack_gens[slack_gens.isin(set(map_gen_p2g))][
         0
-    ]  # assigning slack results to the first generator attached to the slack bus.
+    ]  # assigning slack results to the first mapped generator on the slack bus.
 
     pf_res["solution"]["gen"][str(int(map_gen_p2g[slack_gen_id] + 1))]["pg"] += (
         slack_res / pf_res["solution"]["baseMVA"]
