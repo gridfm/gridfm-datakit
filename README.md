@@ -67,7 +67,7 @@ If you use `gridfm-datakit` in your research, please cite both:
 
 1. ⭐ Star the repository on GitHub to support the project!
 
-2. Make sure you have Python 3.10 to 3.14 installed.
+2. Make sure you have Python 3.10 to 3.14 installed. On Windows, CI tests only Python 3.12.
 
 3. Install gridfm-datakit
 
