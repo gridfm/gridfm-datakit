@@ -115,6 +115,11 @@ changes in *what* is generated, which `validate` cannot see. Only
 `test_generate_e2e.py` uses the baseline. The other tests compare two runs with
 each other.
 
+On Python 3.13 and 3.14, CI runs only `test_generate_e2e.py`. Its summary metrics
+must stay within 0.1% of a baseline made on Python 3.12 on the same runner.
+`test_checkpoint_resume.py` and `test_scenario_timeout.py` run only on Python
+3.12. The unit tests for checkpoints and timeouts run on every Python version.
+
 ### The baseline
 
 No baseline is committed. Generation is seeded, so on one machine it gives the

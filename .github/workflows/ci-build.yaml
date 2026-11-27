@@ -394,7 +394,9 @@ jobs:
 
   integration-tests-other-pythons:
     # Calibrate on 3.12 and assert on the matrix version on one runner, so only
-    # the interpreter and its wheels differ.
+    # the interpreter and its wheels differ. Only test_generate_e2e.py runs here.
+    # test_checkpoint_resume.py and test_scenario_timeout.py run only on 3.12.
+    # The checkpoint and timeout unit tests run on every version.
     if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 120
